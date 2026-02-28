@@ -32,3 +32,27 @@ reference each other by name (`db:5432`). The `environment:` block in docker-com
 overrides the .env value with the docker-internal hostname. Both modes work without touching .env.
 
 ---
+
+## Chunk 1.2 — Database Schema & Alembic Migrations
+
+**[1.2] [2026-02-28] indicator_field_mapping ORM model created in 1.2, not 1.7**
+Rationale: The initial migration (0001_initial_schema.py) creates all 15 tables including
+indicator_field_mappings. Alembic autogenerate needs the ORM model to detect the table in metadata.
+Creating the model file in chunk 1.2 ensures the migration works correctly. Chunk 1.7 still owns
+the seeder, schemas, and acceptance test — the model file is just moved earlier.
+
+**[1.2] [2026-02-28] alert_indicators join table has no uuid column**
+Rationale: Join tables are never referenced externally by UUID — they are queried via their FKs.
+Adding a UUID to a join table would be unnecessary overhead and would confuse the "external IDs
+are always UUIDs" convention (which applies to first-class entities, not join tables).
+
+---
+
+## Chunk 1.3 — Core Pydantic Schemas
+
+**[1.3] [2026-02-28] PRD has 14 system indicator field mappings, not 17 as stated in PROJECT_PLAN.md**
+Rationale: Section 7.12 of the PRD lists exactly 14 CalsetaAlert field → indicator type mappings.
+The project plan says "17 system mappings" — this appears to be a planning error. Implemented 14
+per the authoritative PRD content. The seeder in chunk 1.7 will insert these 14 rows.
+
+---

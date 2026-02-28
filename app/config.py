@@ -1,18 +1,124 @@
 """
-Application settings loaded from environment variables and .env file.
+Application settings loaded from environment variables and optional cloud secrets backends.
 
-All configuration lives here. Every other module imports from this module —
-never from os.environ directly. Settings is instantiated once at module load
-and injected via FastAPI's Depends() where needed.
+Priority order (highest to lowest):
+    1. Azure Key Vault      (if AZURE_KEY_VAULT_URL is set)
+    2. AWS Secrets Manager  (if AWS_SECRETS_MANAGER_SECRET_NAME is set)
+    3. Environment variables
+    4. .env file
+    5. Defaults
 
-Required variables (no defaults — startup fails if missing):
-  - DATABASE_URL
+Only one cloud backend is active at a time. If neither is configured, neither SDK
+is imported — no startup overhead for self-hosters.
+
+Required variables (no defaults — startup fails with a clear error if missing):
+    - DATABASE_URL
 
 All other variables have safe defaults suitable for local development.
 """
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from __future__ import annotations
 
+import json
+import logging
+from typing import Any
+
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Optional secrets source: Azure Key Vault
+# ---------------------------------------------------------------------------
+
+class _AzureKeyVaultSource(PydanticBaseSettingsSource):
+    """
+    Loads secrets from Azure Key Vault at startup.
+    Only imported/instantiated when AZURE_KEY_VAULT_URL is non-empty.
+    """
+
+    def __init__(self, settings_cls: type[BaseSettings], vault_url: str) -> None:
+        super().__init__(settings_cls)
+        self._vault_url = vault_url
+
+    def get_field_value(self, field: Any, field_name: str) -> Any:  # type: ignore[override]
+        return None, field_name, False
+
+    def __call__(self) -> dict[str, Any]:
+        try:
+            from azure.identity import DefaultAzureCredential  # type: ignore[import]
+            from azure.keyvault.secrets import SecretClient  # type: ignore[import]
+
+            client = SecretClient(
+                vault_url=self._vault_url,
+                credential=DefaultAzureCredential(),
+            )
+            values: dict[str, Any] = {}
+            for secret in client.list_properties_of_secrets():
+                if secret.name:
+                    try:
+                        sv = client.get_secret(secret.name)
+                        # Azure KV secret names use hyphens; map back to underscores
+                        key = secret.name.replace("-", "_").upper()
+                        values[key] = sv.value
+                    except Exception:
+                        pass
+            logger.info("secrets_source=azure_key_vault loaded=%d", len(values))
+            return values
+        except Exception as exc:
+            logger.error("Azure Key Vault load failed: %s", exc)
+            return {}
+
+    def field_is_complex(self, field: Any) -> bool:  # type: ignore[override]
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Optional secrets source: AWS Secrets Manager
+# ---------------------------------------------------------------------------
+
+class _AWSSecretsManagerSource(PydanticBaseSettingsSource):
+    """
+    Loads secrets from AWS Secrets Manager at startup.
+    Secret value must be a JSON object whose keys match Settings field names.
+    Only imported/instantiated when AWS_SECRETS_MANAGER_SECRET_NAME is non-empty.
+    """
+
+    def __init__(
+        self,
+        settings_cls: type[BaseSettings],
+        secret_name: str,
+        region: str,
+    ) -> None:
+        super().__init__(settings_cls)
+        self._secret_name = secret_name
+        self._region = region
+
+    def get_field_value(self, field: Any, field_name: str) -> Any:  # type: ignore[override]
+        return None, field_name, False
+
+    def __call__(self) -> dict[str, Any]:
+        try:
+            import boto3  # type: ignore[import]
+
+            client = boto3.client("secretsmanager", region_name=self._region)
+            response = client.get_secret_value(SecretId=self._secret_name)
+            raw = response.get("SecretString", "{}")
+            values: dict[str, Any] = json.loads(raw)
+            logger.info("secrets_source=aws_secrets_manager loaded=%d", len(values))
+            return values
+        except Exception as exc:
+            logger.error("AWS Secrets Manager load failed: %s", exc)
+            return {}
+
+    def field_is_complex(self, field: Any) -> bool:  # type: ignore[override]
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Settings
+# ---------------------------------------------------------------------------
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -41,7 +147,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Task Queue
     # ------------------------------------------------------------------
-    QUEUE_BACKEND: str = "postgres"  # "postgres" | "celery_redis" | "sqs" | "azure_service_bus"
+    QUEUE_BACKEND: str = "postgres"
     QUEUE_CONCURRENCY: int = 10
     QUEUE_MAX_RETRIES: int = 3
     QUEUE_RETRY_BACKOFF_SECONDS: int = 60
@@ -98,7 +204,7 @@ class Settings(BaseSettings):
     ENTRA_CLIENT_SECRET: str = ""
 
     # ------------------------------------------------------------------
-    # Secrets backends (optional — one or neither, never both)
+    # Cloud Secrets Backends (optional — at most one active)
     # ------------------------------------------------------------------
     AZURE_KEY_VAULT_URL: str = ""
     AWS_SECRETS_MANAGER_SECRET_NAME: str = ""
@@ -111,6 +217,48 @@ class Settings(BaseSettings):
     SLACK_BOT_TOKEN: str = ""
     SLACK_SIGNING_SECRET: str = ""
     TEAMS_WEBHOOK_URL: str = ""
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        secrets_dir_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """
+        Build the source priority chain. Cloud backends are inserted at the
+        top only when their trigger env vars are present.
+
+        Priority (highest first):
+            Azure Key Vault  → AWS Secrets Manager → env vars → .env → defaults
+        """
+        # Read trigger vars directly from the environment (before Settings loads)
+        import os
+
+        azure_url = os.getenv("AZURE_KEY_VAULT_URL", "")
+        aws_secret = os.getenv("AWS_SECRETS_MANAGER_SECRET_NAME", "")
+        aws_region = os.getenv("AWS_REGION", "")
+
+        sources: list[PydanticBaseSettingsSource] = [init_settings]
+
+        if azure_url:
+            sources.append(_AzureKeyVaultSource(settings_cls, azure_url))
+            _log_secrets_source("azure_key_vault")
+        elif aws_secret:
+            sources.append(_AWSSecretsManagerSource(settings_cls, aws_secret, aws_region))
+            _log_secrets_source("aws_secrets_manager")
+        else:
+            _log_secrets_source("environment")
+
+        sources.extend([env_settings, dotenv_settings, secrets_dir_settings])
+        return tuple(sources)
+
+
+def _log_secrets_source(source: str) -> None:
+    """Emit the startup log line indicating which secrets source is active."""
+    logger.info("secrets_source=%s", source)
 
 
 settings = Settings()

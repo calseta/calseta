@@ -12,7 +12,7 @@ Thanks for your interest in contributing. Calseta is currently in pre-MVP develo
 
 **Star or watch the repo** to get notified when the project reaches a state where contributions are welcome.
 
-**Read the design docs** — `PLATFORM_DESIGN.md` covers the architecture and key decisions. If you're planning to contribute later, this is the right place to start.
+**Read the design docs** — `CLAUDE.md` covers architecture, coding philosophy, and extension patterns. `PRD.md` covers full product requirements. These are the right place to start.
 
 ---
 
@@ -25,7 +25,7 @@ Once MVP ships, we'll update this file with full contribution guidelines. The ge
 - **Example agents** — additions to the `/examples` directory showing how to build on top of Calseta
 - **Bug fixes and API improvements** — issues labeled `good first issue` will be the right entry point
 
-All contributions will require: passing CI (ruff, mypy, pytest), documentation for any new extension point, and alignment with the design philosophy in `PLATFORM_DESIGN.md`.
+All contributions will require: passing CI (ruff, mypy, pytest), documentation for any new extension point, and alignment with the design philosophy in `CLAUDE.md`.
 
 ---
 
