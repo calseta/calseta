@@ -225,7 +225,7 @@ class Settings(BaseSettings):
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
         dotenv_settings: PydanticBaseSettingsSource,
-        secrets_dir_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """
         Build the source priority chain. Cloud backends are inserted at the
@@ -252,7 +252,7 @@ class Settings(BaseSettings):
         else:
             _log_secrets_source("environment")
 
-        sources.extend([env_settings, dotenv_settings, secrets_dir_settings])
+        sources.extend([env_settings, dotenv_settings, file_secret_settings])
         return tuple(sources)
 
 
