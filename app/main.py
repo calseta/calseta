@@ -12,6 +12,7 @@ everything uniformly.
 from fastapi import FastAPI
 
 from app.api.errors import register_exception_handlers
+from app.api.v1.router import v1_router
 from app.config import settings
 from app.middleware.logging import RequestLoggingMiddleware
 from app.middleware.request_id import RequestIDMiddleware
@@ -35,6 +36,9 @@ def create_app() -> FastAPI:
     # request_id to ensure request_id is outermost (runs first on ingress).
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(RequestIDMiddleware)
+
+    # Routers
+    app.include_router(v1_router)
 
     @app.get("/health", include_in_schema=False)
     async def health_check() -> dict[str, str]:
