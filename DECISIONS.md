@@ -56,3 +56,20 @@ The project plan says "17 system mappings" — this appears to be a planning err
 per the authoritative PRD content. The seeder in chunk 1.7 will insert these 14 rows.
 
 ---
+
+## Chunk 1.6 — Task Queue
+
+**[1.6] [2026-02-28] PsycopgConnector (psycopg3) instead of AsyncpgConnector for procrastinate**
+Rationale: procrastinate v3 removed `AsyncpgConnector`. The supported async connector is
+`PsycopgConnector` (psycopg3 + psycopg_pool). Both `asyncpg` (SQLAlchemy ORM) and `psycopg`
+(procrastinate) connect to the same PostgreSQL instance — they are independent driver choices
+for each library. The 1.1 decision log entry about `procrastinate[asyncpg]` is now superseded.
+DATABASE_URL is converted from `postgresql+asyncpg://` to `postgresql://` (plain libpq DSN)
+when constructing the PsycopgConnector.
+
+**[1.6] [2026-02-28] enqueue() opens/closes a psycopg_pool per call in Wave 1**
+Rationale: No tasks are enqueued in Wave 1. Connection-per-enqueue is correct and simple for now.
+High-volume deployments should wire `app.open_async()` into FastAPI lifespan for pool reuse.
+Deferred to Wave 5+ when the first actual task enqueue calls are added.
+
+---
