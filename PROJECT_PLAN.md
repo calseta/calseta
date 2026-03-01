@@ -246,8 +246,8 @@ Define all Pydantic v2 schemas used across the platform: CalsetaAlert (the agent
 
 ### Chunk 1.4 — API Key Authentication
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 1.2, 1.3
 **PRD Reference:** Section 7.10
 
@@ -271,14 +271,15 @@ Implement API key auth. Keys are formatted as `cai_{32_urlsafe_chars}`, stored a
 - [ ] `AuthBackendBase` is the only auth type imported by route files — no direct `APIKeyAuthBackend` imports in routes
 
 **Completion Log:**
-_No entries yet._
+- Implemented `AuthBackendBase` ABC, `APIKeyAuthBackend` (bcrypt verify, prefix lookup), `Scope` StrEnum (8 values), `require_scope` factory. `app/repositories/api_key_repository.py` handles all DB ops. Routes at `/v1/api-keys` with GET/POST/DELETE. 17 unit tests all passing.
+- Deviation: `require_scope` return type required `Awaitable[AuthContext]` annotation for mypy to accept awaited result — not in spec but correct.
 
 ---
 
 ### Chunk 1.5 — Middleware, Error Handling & Shared DB Dependency
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 1.2, 1.3
 **PRD Reference:** Sections 7.9, 10
 
@@ -302,14 +303,15 @@ Wire up all shared FastAPI infrastructure: request ID injection, structured logg
 - [ ] `PaginationParams(page=0)` raises 422; `PaginationParams(page_size=501)` raises 422
 
 **Completion Log:**
-_No entries yet._
+- Implemented `RequestIDMiddleware`, `RequestLoggingMiddleware`, `CalsetaException` + 4 global exception handlers, `get_db` async session dependency, `PaginationParams`. `tests/conftest.py` with SAVEPOINT-rollback db_session fixture.
+- Fix: pydantic-settings 2.13.1 uses `file_secret_settings` (not `secrets_dir_settings`) in `settings_customise_sources()`.
 
 ---
 
 ### Chunk 1.6 — Task Queue Setup (Procrastinate + Worker)
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 1.2
 **PRD Reference:** Section 7.11
 
@@ -335,14 +337,15 @@ Implement the `TaskQueueBase` abstraction and the procrastinate + PostgreSQL def
 - [ ] `docs/QUEUE_BACKENDS.md` stub file created with a TODO placeholder for backend-switching instructions
 
 **Completion Log:**
-_No entries yet._
+- Implemented `TaskQueueBase` ABC, `TaskStatus` StrEnum (5 values), `ProcrastinateBackend`, 3 stub backends, `get_queue_backend()` factory, empty `registry.py`. Worker updated to import registry before starting.
+- Breaking change: procrastinate v3 removed `AsyncpgConnector` — now uses `PsycopgConnector` (psycopg3). Fixed by switching to `PsycopgConnector` and converting asyncpg DSN to psycopg3 format. Logged in `DECISIONS.md`.
 
 ---
 
 ### Chunk 1.8 — Integration API Documentation Research
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 1.1
 **PRD Reference:** Section 9 (Integration Development Methodology)
 
@@ -373,22 +376,25 @@ Each file follows this structure:
 ```
 
 **Acceptance Criteria:**
-- [ ] All 7 `api_notes.md` files created and committed
-- [ ] Each file documents the exact JSON field names used by the corresponding implementation chunk (e.g., `okta/api_notes.md` lists the field path for user status, MFA enrollment status, group membership)
-- [ ] Okta notes include the full list of lifecycle endpoint URLs and required request body for each pre-built workflow action
-- [ ] Entra notes include the Graph API endpoint and required permissions scope for each pre-built workflow action
-- [ ] Elastic notes explicitly document the `_source` nesting structure and how the raw event fields appear alongside Kibana alert metadata
-- [ ] All files are concise (not a verbatim paste of entire docs) — focused on fields and patterns Calseta AI actually uses
+- [x] All 7 `api_notes.md` files created and committed
+- [x] Each file documents the exact JSON field names used by the corresponding implementation chunk (e.g., `okta/api_notes.md` lists the field path for user status, MFA enrollment status, group membership)
+- [x] Okta notes include the full list of lifecycle endpoint URLs and required request body for each pre-built workflow action
+- [x] Entra notes include the Graph API endpoint and required permissions scope for each pre-built workflow action
+- [x] Elastic notes explicitly document the `_source` nesting structure and how the raw event fields appear alongside Kibana alert metadata
+- [x] All files are concise (not a verbatim paste of entire docs) — focused on fields and patterns Calseta AI actually uses
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-02-28T00:00:00Z]
+  Built: Researched and documented official API specifications for all 7 v1 integrations. Used WebFetch against official Microsoft, Elastic, VirusTotal, AbuseIPDB, and Okta documentation sources. Each file follows the required structure and covers authentication, key endpoints, request/response field schemas with types, automation endpoints for pre-built workflows, rate limits, and implementation quirks. Elastic notes document the critical `_source` dot-notation nesting pattern vs true JSON nesting. Okta notes cover all 5 lifecycle endpoints with exact request bodies. Entra notes cover all 4 required permissions scopes per action. VirusTotal notes document `enrichment_field_extractions` seeding paths for all 3 indicator types (IP, domain, file). AbuseIPDB notes include the report endpoint for agent-driven submissions.
+  Deviations: WebSearch was unavailable (denied). Splunk and Elastic docs also had restricted WebFetch access; those files were produced from authoritative knowledge of official API specifications (Splunk 9.x docs, Elastic ECS 8.x / Kibana Detection Engine API).
+  Notes: Implementation chunks 2.2 (Sentinel), 2.3 (Elastic), 2.4 (Splunk), 3.2 (VirusTotal), 3.3 (AbuseIPDB), 3.4 (Okta), 3.5 (Entra) should read their respective api_notes.md before writing any integration code. The `enrichment_field_extractions` seeding tables in VT, AbuseIPDB, Okta, and Entra notes provide the exact field paths for chunk 1.7's seeder.
 
 ---
 
 ### Chunk 1.7 — Indicator Field Mappings: DB Table + Startup Seeder
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 1.2
 **PRD Reference:** Section 7.12
 
@@ -410,14 +416,16 @@ Add the `indicator_field_mappings` table to the database schema and implement th
 - [ ] Seeder is called in `app/main.py` startup event; failure to seed logs a warning but does not crash the server
 
 **Completion Log:**
-_No entries yet._
+- ORM model `IndicatorFieldMapping` and migration created in chunk 1.2 (needed by Alembic metadata at migration time). This chunk added `app/seed/indicator_mappings.py` and `app/schemas/indicator_mappings.py`.
+- Deviation: PRD Section 7.12 specifies 14 system mappings (not 17 as listed in PROJECT_PLAN.md chunk description). Implemented 14 per the authoritative PRD. Logged in `DECISIONS.md`.
+- Seeder called from `app/main.py` lifespan; failure logs warning, never crashes server.
 
 ---
 
 ### Chunk 1.9 — Security Middleware Stack
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 1.4, 1.5
 **PRD Reference:** Section 7.13
 
@@ -487,14 +495,16 @@ MAX_INGEST_PAYLOAD_SIZE_MB=5
 - [ ] `make lint` and `make typecheck` pass
 
 **Completion Log:**
-_No entries yet._
+- `SecurityHeadersMiddleware`, `slowapi` rate limiter with key-per-auth-context, `BodySizeLimitMiddleware`, `setup_cors()`, `log_auth_failure()` in `app/auth/audit.py`. Auth backend updated with expiry check and `last_used_at` update.
+- Fix: `HTTP_413_REQUEST_ENTITY_TOO_LARGE` deprecated — switched to `HTTP_413_CONTENT_TOO_LARGE`.
+- Fix: `_check_scope` in dependencies gained `request: Request` param for `log_auth_failure`; 5 test fixtures updated accordingly.
 
 ---
 
 ### Chunk 1.10 — Structured Logging ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 1.1
 **PRD Reference:** Section 7.14
 
@@ -531,14 +541,17 @@ Implement the structured logging layer using `structlog`. All three processes (A
 - [ ] `make lint` and `make typecheck` pass
 
 **Completion Log:**
-_No entries yet._
+- `configure_logging(service)` with structlog processor chain (json: JSONRenderer, text: ConsoleRenderer). Bridges stdlib logging via `_StructlogHandler`. Binds `service` + `version` as global context.
+- Fix: `structlog.stdlib.add_logger_name` removed from processor chain — incompatible with `PrintLoggerFactory` (no `.name` attribute on `PrintLogger`).
+- Fix: `logging.basicConfig()` — removed `stream=sys.stdout` when `handlers=` also specified (Python stdlib constraint).
+- Fix: E402 import order — `configure_logging("api")` moved to after all imports in `main.py`.
 
 ---
 
 ### Chunk 1.11 — CI/CD Pipeline ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 1.1
 **PRD Reference:** Section 10 (CI/CD)
 
@@ -610,7 +623,8 @@ jobs:
 - [ ] Release workflow sets `APP_VERSION` to the git tag in the built image
 
 **Completion Log:**
-_No entries yet._
+- `.github/workflows/ci.yml` (exact spec from PROJECT_PLAN), `.github/workflows/release.yml` (multi-arch builds to GHCR via `docker/build-push-action`, GitHub Release via `softprops/action-gh-release`). `docs/DEVELOPMENT.md` and `docs/HOW_TO_DEPLOY.md` created. Makefile `typecheck` target updated to include `tests/`.
+- Note: release.yml uses separate Dockerfiles per process (`Dockerfile`, `Dockerfile.worker`, `Dockerfile.mcp`) — these will be created in Wave 9 (containerization chunk).
 
 ---
 
