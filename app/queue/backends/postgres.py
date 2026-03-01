@@ -27,8 +27,6 @@ SIGTERM handling:
 
 from __future__ import annotations
 
-import procrastinate
-
 from app.queue.base import TaskQueueBase, TaskStatus
 
 # Procrastinate job status → TaskStatus mapping
@@ -53,8 +51,12 @@ class ProcrastinateBackend(TaskQueueBase):
     def __init__(self, database_url: str, concurrency: int = 10) -> None:
         self._pg_dsn = _to_pg_dsn(database_url)
         self._concurrency = concurrency
-        self._connector = procrastinate.PsycopgConnector(conninfo=self._pg_dsn)
-        self.app = procrastinate.App(connector=self._connector)
+        # Reuse the shared App from registry — tasks are already registered on it.
+        # Creating a separate App instance here would mean those tasks are invisible
+        # to this backend when enqueue() looks them up via app.tasks.get(name).
+        from app.queue.registry import procrastinate_app
+
+        self.app = procrastinate_app
 
     async def enqueue(
         self,

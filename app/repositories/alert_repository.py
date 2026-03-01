@@ -39,6 +39,12 @@ class AlertRepository:
         await self._db.flush()
         return alert
 
+    async def get_by_id(self, alert_id: int) -> Alert | None:
+        result = await self._db.execute(
+            select(Alert).where(Alert.id == alert_id)
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_uuid(self, alert_uuid: uuid.UUID) -> Alert | None:
         result = await self._db.execute(
             select(Alert).where(Alert.uuid == alert_uuid)

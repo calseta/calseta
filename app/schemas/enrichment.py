@@ -8,6 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.indicators import IndicatorType
+
 
 class EnrichmentStatus(StrEnum):
     SUCCESS = "success"
@@ -69,3 +71,50 @@ class EnrichmentResult(BaseModel):
             success=False,
             error_message=reason,
         )
+
+
+# ---------------------------------------------------------------------------
+# On-demand enrichment endpoint schemas (POST /v1/enrichments)
+# ---------------------------------------------------------------------------
+
+
+class OnDemandEnrichmentRequest(BaseModel):
+    """Request body for POST /v1/enrichments."""
+
+    type: IndicatorType
+    value: str
+
+
+class OnDemandEnrichmentResult(BaseModel):
+    """Per-provider result in the on-demand enrichment response."""
+
+    status: EnrichmentStatus
+    success: bool
+    extracted: dict[str, Any] | None = None
+    enriched_at: datetime | None = None
+    error_message: str | None = None
+    cache_hit: bool = False
+
+
+class OnDemandEnrichmentResponse(BaseModel):
+    """Response body for POST /v1/enrichments."""
+
+    type: IndicatorType
+    value: str
+    results: dict[str, OnDemandEnrichmentResult]
+    enriched_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Provider listing endpoint schema (GET /v1/enrichments/providers)
+# ---------------------------------------------------------------------------
+
+
+class EnrichmentProviderInfo(BaseModel):
+    """Single provider entry for GET /v1/enrichments/providers."""
+
+    provider_name: str
+    display_name: str
+    supported_types: list[IndicatorType]
+    is_configured: bool
+    cache_ttl_seconds: int
