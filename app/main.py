@@ -33,12 +33,15 @@ from slowapi.errors import RateLimitExceeded
 from app.api.errors import register_exception_handlers
 from app.api.v1.router import v1_router
 from app.config import settings
+from app.logging_config import configure_logging
 from app.middleware.body_size import BodySizeLimitMiddleware
 from app.middleware.cors import setup_cors
 from app.middleware.logging import RequestLoggingMiddleware
 from app.middleware.rate_limit import limiter
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
+
+configure_logging("api")
 
 logger = structlog.get_logger(__name__)
 

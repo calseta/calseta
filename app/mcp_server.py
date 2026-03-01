@@ -10,24 +10,24 @@ Tools:      post_alert_finding, update_alert_status, execute_workflow, etc.
 Chunk 1.1: stub that starts cleanly. Full MCP server implemented in Wave 7.
 """
 
-import asyncio
-import logging
-import sys
+from __future__ import annotations
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    stream=sys.stderr,
-)
-logger = logging.getLogger(__name__)
+import asyncio
+
+from app.logging_config import configure_logging
+
+configure_logging("mcp")
+
+import structlog  # noqa: E402 (must be after configure_logging)
+
+logger = structlog.get_logger(__name__)
 
 
 async def main() -> None:
     """Start the Calseta MCP server."""
-    logger.info("Calseta MCP server starting...")
+    logger.info("calseta_mcp_starting")
     # Full implementation in Wave 7 (chunk 7.1–7.5)
-    # Structlog configured in chunk 1.10
-    logger.info("Calseta MCP server ready (stub — full implementation in Wave 7)")
+    logger.info("calseta_mcp_ready", note="stub — full implementation in Wave 7")
     await asyncio.Event().wait()
 
 

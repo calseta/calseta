@@ -10,21 +10,20 @@ then starts the procrastinate worker consuming from all four named queues:
 
 Concurrency is controlled by QUEUE_CONCURRENCY env var (default 10).
 SIGTERM is handled by procrastinate — current job finishes, then exits.
-Structlog configured in chunk 1.10.
 """
 
 from __future__ import annotations
 
 import asyncio
-import logging
 import sys
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    stream=sys.stderr,
-)
-logger = logging.getLogger(__name__)
+from app.logging_config import configure_logging
+
+configure_logging("worker")
+
+import structlog  # noqa: E402 (must be after configure_logging)
+
+logger = structlog.get_logger(__name__)
 
 WORKER_QUEUES = ["enrichment", "dispatch", "workflows", "default"]
 
@@ -35,15 +34,15 @@ async def main() -> None:
     import app.queue.registry  # noqa: F401
     from app.queue.factory import get_queue_backend
 
-    logger.info("Calseta worker starting on queues: %s", WORKER_QUEUES)
+    logger.info("calseta_worker_starting", queues=WORKER_QUEUES)
 
     try:
         backend = get_queue_backend()
     except ValueError as exc:
-        logger.critical("Worker startup failed — invalid queue config: %s", exc)
+        logger.critical("worker_startup_failed", error=str(exc))
         sys.exit(1)
 
-    logger.info("Calseta worker ready, consuming from %s", WORKER_QUEUES)
+    logger.info("calseta_worker_ready", queues=WORKER_QUEUES)
     await backend.start_worker(queues=WORKER_QUEUES)
 
 

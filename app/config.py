@@ -25,6 +25,8 @@ from typing import Any
 
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
+# Use stdlib logger here (not structlog) — structlog isn't configured yet
+# when config.py is imported at process startup.
 logger = logging.getLogger(__name__)
 
 
