@@ -49,6 +49,14 @@ class IndicatorRepository:
         )
         return result.scalar_one()
 
+    async def get_by_type_and_value(self, itype: str, value: str) -> Indicator | None:
+        result = await self._db.execute(
+            select(Indicator).where(
+                Indicator.type == itype, Indicator.value == value
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_uuid(self, indicator_uuid: str) -> Indicator | None:
         result = await self._db.execute(
             select(Indicator).where(Indicator.uuid == indicator_uuid)  # type: ignore[arg-type]

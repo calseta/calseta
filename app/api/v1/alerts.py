@@ -39,8 +39,10 @@ from app.schemas.alerts import (
     FindingResponse,
 )
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
+from app.schemas.context_documents import ContextDocumentResponse
 from app.schemas.indicators import EnrichedIndicator
 from app.services.activity_event import ActivityEventService
+from app.services.context_targeting import get_applicable_documents
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -303,6 +305,44 @@ async def add_finding(
             created_at=now,
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/alerts/{uuid}/context
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{alert_uuid}/context",
+    response_model=DataResponse[list[ContextDocumentResponse]],
+)
+async def get_alert_context(
+    alert_uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[list[ContextDocumentResponse]]:
+    """
+    Return all applicable context documents for an alert.
+
+    Global documents appear first (sorted by document_type), followed by
+    targeted documents that match the alert's fields (also sorted by document_type).
+    """
+    alert_repo = AlertRepository(db)
+    alert = await alert_repo.get_by_uuid(alert_uuid)
+    if alert is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Alert not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    docs = await get_applicable_documents(alert, db)
+    return DataResponse(data=[ContextDocumentResponse.model_validate(d) for d in docs])
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/alerts/{uuid}/activity
+# ---------------------------------------------------------------------------
 
 
 @router.get(
