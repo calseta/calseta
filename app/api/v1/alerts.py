@@ -43,7 +43,7 @@ from app.schemas.alerts import (
 )
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.context_documents import ContextDocumentResponse
-from app.schemas.indicators import EnrichedIndicator
+from app.schemas.indicators import EnrichedIndicator, IndicatorResponse
 from app.services.activity_event import ActivityEventService
 from app.services.agent_trigger import get_matching_agents
 from app.services.context_targeting import get_applicable_documents
@@ -52,6 +52,16 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 _Read = Annotated[AuthContext, Depends(require_scope(Scope.ALERTS_READ))]
 _Write = Annotated[AuthContext, Depends(require_scope(Scope.ALERTS_WRITE))]
+
+
+def _filter_enrichment_results(raw_results: dict | None) -> dict | None:  # type: ignore[type-arg]
+    """Strip the `raw` key from each provider's enrichment data before returning to callers."""
+    if not raw_results:
+        return raw_results
+    filtered = {}
+    for provider, data in raw_results.items():
+        filtered[provider] = {k: v for k, v in data.items() if k != "raw"}
+    return filtered
 
 
 def _build_indicator(ind: object) -> EnrichedIndicator:
@@ -380,6 +390,57 @@ async def get_alert_context(
 
     docs = await get_applicable_documents(alert, db)
     return DataResponse(data=[ContextDocumentResponse.model_validate(d) for d in docs])
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/alerts/{uuid}/indicators
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{alert_uuid}/indicators",
+    response_model=DataResponse[list[IndicatorResponse]],
+)
+async def list_alert_indicators(
+    alert_uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[list[IndicatorResponse]]:
+    """
+    Return all indicators linked to an alert.
+
+    Each indicator includes enrichment results keyed by provider with the raw
+    response excluded — only the extracted sub-object, success flag, and
+    enriched_at timestamp are returned.
+    """
+    alert_repo = AlertRepository(db)
+    indicator_repo = IndicatorRepository(db)
+
+    alert = await alert_repo.get_by_uuid(alert_uuid)
+    if alert is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Alert not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    indicators = await indicator_repo.list_for_alert(alert.id)
+    result = [
+        IndicatorResponse(
+            uuid=str(ind.uuid),
+            type=ind.type,  # type: ignore[arg-type]
+            value=ind.value,
+            malice=ind.malice,
+            first_seen=ind.first_seen,
+            last_seen=ind.last_seen,
+            is_enriched=ind.is_enriched,
+            enrichment_results=_filter_enrichment_results(ind.enrichment_results),
+            created_at=ind.created_at,
+            updated_at=ind.updated_at,
+        )
+        for ind in indicators
+    ]
+    return DataResponse(data=result)
 
 
 # ---------------------------------------------------------------------------

@@ -18,6 +18,8 @@ from app.api.v1 import (
     enrichments,
     indicator_mappings,
     ingest,
+    metrics,
+    sources,
     workflow_approvals,
     workflows,
 )
@@ -35,3 +37,5 @@ v1_router.include_router(workflows.workflow_runs_router)
 v1_router.include_router(workflow_approvals.router)
 v1_router.include_router(approvals.router)
 v1_router.include_router(agents.router)
+v1_router.include_router(sources.router)
+v1_router.include_router(metrics.router)

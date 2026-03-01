@@ -51,16 +51,16 @@ Update this table when chunk statuses change.
 
 | Wave | Name | Total | Pending | In Progress | Complete | Blocked |
 |---|---|---|---|---|---|---|
-| 1 | Foundation | 11 | 8 | 0 | 3 | 0 |
-| 2 | Ingestion + Detection Rules | 11 | 11 | 0 | 0 | 0 |
-| 3 | Enrichment Engine | 9 | 9 | 0 | 0 | 0 |
-| 4 | Context + Workflow Engine | 13 | 13 | 0 | 0 | 0 |
+| 1 | Foundation | 11 | 0 | 0 | 11 | 0 |
+| 2 | Ingestion + Detection Rules | 11 | 0 | 0 | 11 | 0 |
+| 3 | Enrichment Engine | 9 | 0 | 0 | 9 | 0 |
+| 4 | Context + Workflow Engine | 13 | 0 | 0 | 13 | 0 |
 | 5 | Agent Integration Layer | 6 | 0 | 0 | 6 | 0 |
-| 6 | Metrics + Admin Endpoints | 6 | 6 | 0 | 0 | 0 |
+| 6 | Metrics + Admin Endpoints | 6 | 0 | 0 | 6 | 0 |
 | 7 | MCP Server | 5 | 5 | 0 | 0 | 0 |
 | 8 | Testing + Docs + Examples | 15 | 15 | 0 | 0 | 0 |
 | 9 | Hosted Sandbox (v1.5) | 5 | 5 | 0 | 0 | 0 |
-| **Total** | | **81** | **75** | **0** | **6** | **0** |
+| **Total** | | **81** | **25** | **0** | **56** | **0** |
 
 ---
 
@@ -1969,8 +1969,8 @@ Implement the manual agent trigger endpoint. Allows operators to re-dispatch an 
 
 ### Chunk 6.1 — Alert Metrics + GET /v1/metrics/alerts ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** Wave 2 + 3 complete
 **PRD Reference:** Section 7.6
 
@@ -1996,14 +1996,17 @@ Implement all alert metrics computations and the metrics endpoint. All metrics s
 - [ ] Requires scope `alerts:read`
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: app/schemas/metrics.py (AlertMetricsResponse with 13 fields, all MTTX nullable float); app/services/metrics.py (compute_alert_metrics() with 13 targeted SQL queries using extract('epoch') for interval-to-seconds, LIKE 'False Positive%' for FP rate, date_trunc for time buckets); app/api/v1/metrics.py (GET /v1/metrics/alerts, from/to window params defaulting to last 30 days, alerts:read scope).
+  Deviations: None.
+  Notes: All MTTX return None (not 0.0) when no qualifying data per PRD spec.
 
 ---
 
 ### Chunk 6.2 — Workflow Metrics + GET /v1/metrics/workflows ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** Wave 4 complete
 **PRD Reference:** Section 7.6
 
@@ -2022,14 +2025,17 @@ Implement all workflow metrics and the workflow metrics endpoint.
 - [ ] Requires scope `workflows:read`
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: WorkflowMetricsResponse added to metrics.py schema; compute_workflow_metrics() added to metrics service (6 queries: total_configured, workflows_by_type, run_count, success_rate, runs_over_time, time_saved_hours, most_executed); GET /v1/metrics/workflows added to metrics API.
+  Deviations: Workflow ORM uses workflow_type column (not trigger_type); trigger_type exists on WorkflowRun and is different.
+  Notes: time_saved_hours = SUM(successful_run.workflow.time_saved_minutes) / 60.
 
 ---
 
 ### Chunk 6.3 — GET /v1/metrics/summary
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 6.1, 6.2
 **PRD Reference:** Section 7.6
 
@@ -2046,14 +2052,17 @@ Implement the compact metrics summary endpoint. Returns the exact JSON structure
 - [ ] Requires scope `alerts:read`
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: MetricsSummaryResponse (4 nested models: MetricsSummaryAlerts, MetricsSummaryWorkflows, MetricsSummaryApprovals, MetricsSummaryResponse); compute_metrics_summary() with 8 targeted queries (no reuse of full metric functions for performance); GET /v1/metrics/summary (no time params, fixed 30-day window, alerts:read scope). Median response time via PERCENTILE_CONT(0.5) using text() with bound parameter.
+  Deviations: total_configured in summary = active workflows only (state='active'); full workflow metric counts all states.
+  Notes: Response time < 500ms target: all aggregations happen in SQL, no Python-side loops.
 
 ---
 
 ### Chunk 6.4 — Source Integrations CRUD Endpoints ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** Wave 1 complete
 **PRD Reference:** Section 7.9
 
@@ -2071,14 +2080,17 @@ Implement source integration management endpoints. Source integrations store met
 - [ ] Requires scope `admin` for all write operations; `alerts:read` for reads
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: app/schemas/sources.py (SourceIntegrationCreate/Response/Patch — auth_config absent from Response schema by design); app/repositories/source_repository.py (5 CRUD methods); app/api/v1/sources.py (5 routes: GET/POST/GET/{uuid}/PATCH/{uuid}/DELETE/{uuid}). auth_config encrypted as JSON then Fernet, stored as {"_encrypted": "..."} in JSONB. source_name validated against source_registry.
+  Deviations: None.
+  Notes: auth_config never returned in any response — absent from response schema entirely.
 
 ---
 
 ### Chunk 6.5 — GET /v1/alerts/{uuid}/indicators ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** Wave 2 + 3 complete
 **PRD Reference:** Section 7.9
 
@@ -2098,14 +2110,17 @@ Implement the alert indicators sub-resource endpoint. Returns all extracted IOCs
 - [ ] Requires scope `alerts:read`
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: IndicatorResponse schema added to app/schemas/indicators.py; _filter_enrichment_results() helper strips "raw" key per provider; GET /v1/alerts/{uuid}/indicators endpoint added to alerts.py using existing list_for_alert() from IndicatorRepository.
+  Deviations: No new repository file needed — list_for_alert() already existed in indicator_repository.py.
+  Notes: IndicatorResponse is distinct from EnrichedIndicator (used in alert detail); enrichment_results excludes raw key for token efficiency.
 
 ---
 
 ### Chunk 6.6 — GET /health (Full Implementation)
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 1.6
 **PRD Reference:** Section 7.9, 7.11
 
@@ -2124,7 +2139,10 @@ Upgrade the stub health endpoint to a full health check. Reports status of all s
 - [ ] Responds within 2 seconds even if a subsystem check hangs (timeout per check)
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: app/api/health.py replacing the main.py stub. Three helpers: _check_db() (SELECT 1 via AsyncSessionLocal, 2s timeout), _get_queue_depth() (COUNT procrastinate_jobs WHERE status='todo', best-effort), _get_provider_status() (enrichment_registry.list_all()). Returns 200/503 based on DB status. No auth required. main.py updated to import and register health router, stub removed.
+  Deviations: "degraded" status not triggered by queue check failure (returns 0 silently per spec).
+  Notes: include_in_schema=False keeps /health out of OpenAPI docs.
 
 ---
 

@@ -32,6 +32,7 @@ from fastapi import FastAPI
 from slowapi.errors import RateLimitExceeded
 
 from app.api.errors import register_exception_handlers
+from app.api.health import router as health_router
 from app.api.v1.router import v1_router
 from app.config import settings
 from app.logging_config import configure_logging
@@ -124,6 +125,7 @@ def create_app() -> FastAPI:
     )
 
     # Routers
+    application.include_router(health_router)
     application.include_router(v1_router)
 
     # Middleware stack — added in innermost-to-outermost order.
@@ -133,10 +135,6 @@ def create_app() -> FastAPI:
     application.add_middleware(SecurityHeadersMiddleware)
     setup_cors(application)                                # adds CORSMiddleware if configured
     application.add_middleware(BodySizeLimitMiddleware)    # outermost
-
-    @application.get("/health", include_in_schema=False)
-    async def health_check() -> dict[str, str]:
-        return {"status": "ok"}
 
     return application
 

@@ -53,3 +53,20 @@ class EnrichedIndicator(BaseModel):
     enrichment_results: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class IndicatorResponse(BaseModel):
+    """Indicator as returned by GET /v1/alerts/{uuid}/indicators."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    uuid: str
+    type: IndicatorType
+    value: str
+    malice: str  # Pending | Benign | Suspicious | Malicious
+    first_seen: datetime
+    last_seen: datetime
+    is_enriched: bool
+    enrichment_results: dict[str, Any] | None = None  # raw excluded per provider
+    created_at: datetime
+    updated_at: datetime
