@@ -646,7 +646,7 @@ jobs:
 
 ### Chunk 2.1 — AlertSourceBase + Plugin Registry
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** Wave 1 complete
 **PRD Reference:** Section 7.1
@@ -670,13 +670,13 @@ Define the `AlertSourceBase` abstract class and the source plugin registry. This
 - [ ] Unit test: register a mock source, verify `get()` and `list_all()` return it correctly
 
 **Completion Log:**
-_No entries yet._
+Built AlertSourceBase ABC (app/integrations/sources/base.py) with all abstract methods + default implementations for extract_detection_rule_ref (returns None) and verify_webhook_signature (returns True with warning). Built SourceRegistry singleton (app/integrations/sources/registry.py) with register/get/list_all. 12 unit tests in tests/test_source_registry.py. All acceptance criteria met.
 
 ---
 
 ### Chunk 2.2 — Microsoft Sentinel Source Integration ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 2.1, 1.8
 **PRD Reference:** Section 7.1, Section 9
@@ -700,13 +700,13 @@ Implement the Sentinel source plugin. Map Sentinel alert webhook payload fields 
 - [ ] Unit test using `tests/fixtures/sentinel_alert.json` validates normalize and extract_indicators outputs
 
 **Completion Log:**
-_No entries yet._
+Built SentinelSource with HMAC-SHA256 webhook verification (X-Sentinel-Signature), Entities array indicator extraction (ip/account/host/url/filehash types), ARM path parsing for detection_rule_ref. 15 unit tests covering normalize, extract_indicators, verify_webhook_signature. Fixture: tests/fixtures/sentinel_alert.json.
 
 ---
 
 ### Chunk 2.3 — Elastic Security Source Integration ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 2.1, 1.8
 **PRD Reference:** Section 7.1, Section 9
@@ -728,13 +728,13 @@ Implement the Elastic Security source plugin. Elastic alert webhooks have a diff
 - [ ] Unit test using `tests/fixtures/elastic_alert.json`
 
 **Completion Log:**
-_No entries yet._
+Built ElasticSource with _get() helper for flat dot-notation and nested JSON traversal, HMAC-SHA256 webhook verification (X-Elastic-Signature), ECS field extraction (source.ip, destination.ip, host.ip, dns.question.name, process.hash.*, user.email, user.name, url.full, destination.domain, threat.indicator.*). 13 unit tests. Fixture: tests/fixtures/elastic_alert.json.
 
 ---
 
 ### Chunk 2.4 — Splunk Source Integration ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 2.1, 1.8
 **PRD Reference:** Section 7.1, Section 9
@@ -756,13 +756,13 @@ Implement the Splunk source plugin. Splunk webhook payloads (via Splunk's Alert 
 - [ ] Unit test using `tests/fixtures/splunk_alert.json`
 
 **Completion Log:**
-_No entries yet._
+Built SplunkSource with bearer token verification (X-Splunk-Webhook-Secret, hmac.compare_digest), Unix timestamp parsing via contextlib.suppress, result field extraction (src_ip, dest_ip, user, sha256, md5, url, domain). 13 unit tests. Fixture: tests/fixtures/splunk_alert.json.
 
 ---
 
 ### Chunk 2.5 — POST /v1/alerts (Generic Alert Ingest Endpoint) ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 2.1
 **PRD Reference:** Sections 7.1, 7.9
@@ -784,13 +784,13 @@ Implement the generic alert ingest endpoint. Caller supplies a pre-normalized al
 - [ ] Requires scope `alerts:write`
 
 **Completion Log:**
-_No entries yet._
+Built AlertIngestionService (app/services/alert_ingestion.py) shared by both ingest routes: normalize → persist → associate detection rule → enqueue enrichment task → write alert_ingested activity event. POST /v1/alerts generic endpoint accepts {"source_name": "...", "payload": {...}}, validates with source plugin, returns 202. Scope: alerts:write.
 
 ---
 
 ### Chunk 2.6 — POST /v1/ingest/{source_name} (Source-Specific Ingest) ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 2.1
 **PRD Reference:** Sections 7.1, 7.9, 7.13
@@ -821,13 +821,13 @@ Implement the source-specific ingest endpoint. Looks up the source plugin by `so
 - [ ] Integration test: POST with wrong/missing signature → 401, no alert created
 
 **Completion Log:**
-_No entries yet._
+Built POST /v1/ingest/{source_name} in same ingest.py file. Reads raw body bytes before JSON parsing for HMAC verification. Enforces order: auth → source lookup (404) → allowed_sources check (403) → signature verification (401) → payload validation (422) → ingest. Returns 202 with alert_uuid.
 
 ---
 
 ### Chunk 2.7 — Detection Rule Auto-Association Logic ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 2.1
 **PRD Reference:** Section 7.3
@@ -847,13 +847,13 @@ Implement the detection rule auto-association logic that runs on every alert ing
 - [ ] Unit tests cover: no ref → no rule, existing rule → associated, new rule → created and associated
 
 **Completion Log:**
-_No entries yet._
+Built DetectionRuleService (app/services/detection_rules.py): associate_detection_rule() looks up by (source_name, source_rule_id), creates stub rule if not found, sets alert.detection_rule_id. DetectionRuleRepository handles DB operations. Called synchronously within AlertIngestionService after alert creation.
 
 ---
 
 ### Chunk 2.8 — Three-Pass Indicator Extraction Pipeline
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 1.7, 2.1
 **PRD Reference:** Section 7.12
@@ -886,13 +886,13 @@ Implement the complete three-pass indicator extraction pipeline as described in 
 - [ ] Unit tests: all three passes independently, deduplication, array unwrapping with nested arrays, missing field path, upsert behavior (first_seen preserved, last_seen updated)
 
 **Completion Log:**
-_No entries yet._
+Built IndicatorExtractionService (app/services/indicator_extraction.py): 3-pass pipeline with Pass1 (source plugin), Pass2 (normalized CalsetaAlert fields via IndicatorMappingRepository.get_active_for_extraction), Pass3 (raw_payload dot-notation traversal). Per-pass exception handling — failures logged, other passes continue. Deduplication by (type, value). IndicatorRepository.upsert() uses pg_insert ON CONFLICT DO UPDATE for last_seen. Indicator.link_to_alert() uses ON CONFLICT DO NOTHING.
 
 ---
 
 ### Chunk 2.9 — Indicator Field Mappings API Endpoints ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 1.7
 **PRD Reference:** Sections 7.12, 7.9
@@ -912,13 +912,13 @@ Implement the CRUD and test endpoints for indicator field mappings. System mappi
 - [ ] All endpoints require scope `admin`
 
 **Completion Log:**
-_No entries yet._
+Built GET/POST/PATCH/DELETE /v1/indicator-mappings in app/api/v1/indicator_mappings.py. System mappings: can toggle is_active, cannot change field_path or delete (422/422). User mappings: full CRUD, always created with is_system=False. Filters: source_name, is_system, is_active, extraction_target. Scope: admin.
 
 ---
 
 ### Chunk 2.10 — Detection Rules CRUD Endpoints
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 2.7
 **PRD Reference:** Sections 7.3, 7.9
@@ -945,13 +945,13 @@ Implement all detection rule management endpoints. Rules are primarily auto-crea
 - [ ] `GET /v1/detection-rules/{uuid}/alerts` returns paginated list of associated alerts
 
 **Completion Log:**
-_No entries yet._
+Built GET/POST/PATCH/DELETE /v1/detection-rules in app/api/v1/detection_rules.py. Filters: source_name, is_active. Read scope: alerts:read. Write scope: admin. GET /v1/detection-rules/{uuid}/alerts stub pending (Wave 2.11).
 
 ---
 
 ### Chunk 2.11 — Alerts Read + Write Endpoints
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 2.5, 2.6, 2.8
 **PRD Reference:** Sections 7.9
@@ -990,7 +990,7 @@ Implement all alert read and update endpoints. Alert creation is handled by the 
 - [ ] `ActivityEventService.write()` errors are caught and logged — they never cause the parent request to fail
 
 **Completion Log:**
-_No entries yet._
+Built app/api/v1/alerts.py with: GET /v1/alerts (7 filters, pagination), GET /v1/alerts/{uuid} (includes indicators + _metadata computed at serialization), PATCH (status/severity/tags/close_classification with lifecycle timestamps and activity events), DELETE, POST /v1/alerts/{uuid}/findings (appends to agent_findings JSONB, writes activity event), GET /v1/alerts/{uuid}/activity (paginated, newest-first). ActivityEventService (app/services/activity_event.py) swallows all errors. AlertRepository renamed list→list_alerts to avoid shadowing builtin.
 
 ---
 
