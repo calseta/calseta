@@ -57,10 +57,10 @@ Update this table when chunk statuses change.
 | 4 | Context + Workflow Engine | 13 | 0 | 0 | 13 | 0 |
 | 5 | Agent Integration Layer | 6 | 0 | 0 | 6 | 0 |
 | 6 | Metrics + Admin Endpoints | 6 | 0 | 0 | 6 | 0 |
-| 7 | MCP Server | 5 | 1 | 0 | 4 | 0 |
+| 7 | MCP Server | 5 | 0 | 0 | 5 | 0 |
 | 8 | Testing + Docs + Examples | 15 | 15 | 0 | 0 | 0 |
 | 9 | Hosted Sandbox (v1.5) | 5 | 5 | 0 | 0 | 0 |
-| **Total** | | **81** | **21** | **0** | **60** | **0** |
+| **Total** | | **81** | **20** | **0** | **61** | **0** |
 
 ---
 
@@ -2277,8 +2277,8 @@ Implement the enrichment MCP resource. When an agent reads `calseta://enrichment
 
 ### Chunk 7.5 — MCP Tools
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-opus-4-6
 **Depends on:** 7.1, 7.2, 7.3, 7.4, Wave 5 complete
 **PRD Reference:** Section 7.8
 
@@ -2292,17 +2292,20 @@ Implement all six MCP tools from PRD Section 7.8. Tools are write/execute operat
 - `app/mcp/tools/detection_rules.py` — `search_detection_rules`
 
 **Acceptance Criteria:**
-- [ ] All 6 tools from PRD Section 7.8 implemented with correct input schemas
-- [ ] `post_alert_finding`: requires `alert_uuid`, `summary`, `confidence`; returns finding UUID
-- [ ] `update_alert_status`: requires `alert_uuid`, `status`; validates status value
-- [ ] `execute_workflow`: requires `workflow_uuid` and trigger context; enqueues task and returns run UUID
-- [ ] `enrich_indicator`: requires `type` and `value`; returns enrichment results synchronously
-- [ ] `search_alerts` and `search_detection_rules`: accept filter criteria, return matching records
-- [ ] Tool descriptions in MCP schema are written for agent consumption (clear, concise, state what inputs are required and what the tool returns)
-- [ ] Each tool enforces the appropriate scope on the connected API key
+- [x] All 6 tools from PRD Section 7.8 implemented with correct input schemas
+- [x] `post_alert_finding`: requires `alert_uuid`, `summary`, `confidence`; returns finding UUID
+- [x] `update_alert_status`: requires `alert_uuid`, `status`; validates status value
+- [x] `execute_workflow`: requires `workflow_uuid` and trigger context; enqueues task and returns run UUID
+- [x] `enrich_indicator`: requires `type` and `value`; returns enrichment results synchronously
+- [x] `search_alerts` and `search_detection_rules`: accept filter criteria, return matching records
+- [x] Tool descriptions in MCP schema are written for agent consumption (clear, concise, state what inputs are required and what the tool returns)
+- [x] Each tool enforces the appropriate scope on the connected API key
 
 **Completion Log:**
-_No entries yet._
+- [claude-opus-4-6] [2026-03-01T15:48:00Z]
+  Built: app/mcp/tools/__init__.py, app/mcp/tools/alerts.py (post_alert_finding, update_alert_status, search_alerts), app/mcp/tools/workflows.py (execute_workflow with approval gate), app/mcp/tools/enrichment.py (enrich_indicator, cache-first), app/mcp/tools/detection_rules.py (search_detection_rules by name/MITRE/source). Added app/mcp/scope.py (check_scope helper for per-tool scope enforcement via client_id lookup). All tools accept Context parameter; scope checked before any DB mutation. Activity events recorded with actor_type="mcp" and actor_key_prefix from Context.client_id.
+  Deviations: MCP SDK doesn't expose AccessToken.scopes on request context directly — scope enforcement implemented via check_scope() helper that looks up scopes from client_id (key_prefix) on each tool call. One extra DB query per tool call; acceptable for security.
+  Notes: search_detection_rules supports name (ilike), mitre_tactic (array contains), mitre_technique (searches both techniques and subtechniques arrays). execute_workflow always uses trigger_type="agent" since MCP calls are agent-originated.
 
 ---
 

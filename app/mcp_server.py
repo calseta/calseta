@@ -41,6 +41,13 @@ def main() -> None:
         import app.mcp.resources.enrichments  # noqa: E402, F401
         import app.mcp.resources.metrics  # noqa: E402, F401
         import app.mcp.resources.workflows  # noqa: E402, F401
+
+        # Import tool modules so @mcp_server.tool decorators register
+        import app.mcp.tools.alerts  # noqa: E402, F401
+        import app.mcp.tools.detection_rules  # noqa: E402, F401
+        import app.mcp.tools.enrichment  # noqa: E402, F401
+        import app.mcp.tools.workflows  # noqa: E402, F401
+
         from app.mcp.server import mcp_server  # noqa: E402
 
         mcp_server.run(transport="sse")
