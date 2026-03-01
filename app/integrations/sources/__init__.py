@@ -10,6 +10,11 @@ Adding a new source:
     3. Add: source_registry.register(MySource())
 """
 
+from app.integrations.sources.elastic import ElasticSource
 from app.integrations.sources.registry import source_registry  # noqa: F401
+from app.integrations.sources.sentinel import SentinelSource
+from app.integrations.sources.splunk import SplunkSource
 
-# Built-in source registrations — added by chunks 2.2, 2.3, 2.4
+source_registry.register(SentinelSource())
+source_registry.register(ElasticSource())
+source_registry.register(SplunkSource())

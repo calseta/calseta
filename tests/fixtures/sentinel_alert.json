@@ -1,0 +1,49 @@
+{
+  "id": "/subscriptions/sub-123/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/incident-uuid-001",
+  "name": "incident-uuid-001",
+  "type": "Microsoft.SecurityInsights/incidents",
+  "etag": "\"1234abcd\"",
+  "properties": {
+    "title": "Suspicious PowerShell Execution on WORKSTATION-01",
+    "description": "Multiple suspicious PowerShell commands were executed with encoded arguments.",
+    "severity": "High",
+    "status": "New",
+    "createdTimeUtc": "2024-01-15T10:35:00.000Z",
+    "firstActivityTimeUtc": "2024-01-15T10:29:50.000Z",
+    "lastActivityTimeUtc": "2024-01-15T10:32:00.000Z",
+    "lastModifiedTimeUtc": "2024-01-15T10:35:10.000Z",
+    "incidentNumber": 12345,
+    "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/incident-uuid-001",
+    "providerName": "Azure Sentinel",
+    "providerIncidentId": "12345",
+    "relatedAnalyticRuleIds": [
+      "/subscriptions/sub-123/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-uuid-abc123"
+    ],
+    "labels": [
+      {"labelName": "powershell", "labelType": "User"},
+      {"labelName": "endpoint", "labelType": "AutoAssigned"}
+    ],
+    "owner": {
+      "objectId": null,
+      "email": null,
+      "userPrincipalName": null,
+      "assignedTo": null,
+      "ownerType": "Unknown"
+    },
+    "additionalData": {
+      "alertsCount": 2,
+      "bookmarksCount": 0,
+      "commentsCount": 0,
+      "alertProductNames": ["Microsoft Defender for Endpoint"],
+      "tactics": ["Execution", "DefenseEvasion"]
+    }
+  },
+  "Entities": [
+    {"Type": "ip", "Address": "10.0.0.55"},
+    {"Type": "ip", "Address": "185.220.101.32"},
+    {"Type": "account", "Name": "jdoe", "UPNSuffix": "corp.com"},
+    {"Type": "host", "HostName": "WORKSTATION-01", "DnsDomain": "corp.com"},
+    {"Type": "filehash", "Algorithm": "SHA256", "Value": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456"},
+    {"Type": "filehash", "Algorithm": "MD5", "Value": "d41d8cd98f00b204e9800998ecf8427e"}
+  ]
+}
