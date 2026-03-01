@@ -39,6 +39,7 @@ class AgentRepository:
         )
         self._db.add(agent)
         await self._db.flush()
+        await self._db.refresh(agent)
         return agent
 
     async def get_by_uuid(self, agent_uuid: uuid.UUID) -> AgentRegistration | None:
@@ -89,6 +90,7 @@ class AgentRepository:
             ):
                 setattr(agent, key, value)
         await self._db.flush()
+        await self._db.refresh(agent)
         return agent
 
     async def delete(self, agent: AgentRegistration) -> None:

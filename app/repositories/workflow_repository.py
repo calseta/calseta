@@ -57,6 +57,7 @@ class WorkflowRepository:
         )
         self._db.add(workflow)
         await self._db.flush()
+        await self._db.refresh(workflow)
         return workflow
 
     async def get_by_uuid(self, workflow_uuid: uuid.UUID) -> Workflow | None:
@@ -171,6 +172,7 @@ class WorkflowRepository:
         if documentation is not None:
             workflow.documentation = documentation
         await self._db.flush()
+        await self._db.refresh(workflow)
         return workflow
 
     async def upsert_system_workflow(self, **kwargs: Any) -> Workflow:

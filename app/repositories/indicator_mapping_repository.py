@@ -102,6 +102,7 @@ class IndicatorMappingRepository:
         )
         self._db.add(mapping)
         await self._db.flush()
+        await self._db.refresh(mapping)
         return mapping
 
     async def patch(
@@ -114,6 +115,7 @@ class IndicatorMappingRepository:
         for field, value in updates.items():
             setattr(mapping, field, value)
         await self._db.flush()
+        await self._db.refresh(mapping)
         return mapping
 
     async def delete(self, mapping: IndicatorFieldMapping) -> None:

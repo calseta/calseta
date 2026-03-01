@@ -33,6 +33,7 @@ class SourceRepository:
         )
         self._db.add(integration)
         await self._db.flush()
+        await self._db.refresh(integration)
         return integration
 
     async def get_by_uuid(self, integration_uuid: uuid.UUID) -> SourceIntegration | None:
@@ -76,6 +77,7 @@ class SourceRepository:
             if value is not None or key in nullable_fields:
                 setattr(integration, key, value)
         await self._db.flush()
+        await self._db.refresh(integration)
         return integration
 
     async def delete(self, integration: SourceIntegration) -> None:

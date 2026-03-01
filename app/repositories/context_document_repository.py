@@ -39,6 +39,7 @@ class ContextDocumentRepository:
         )
         self._db.add(doc)
         await self._db.flush()
+        await self._db.refresh(doc)
         return doc
 
     async def get_by_uuid(self, doc_uuid: uuid.UUID) -> ContextDocument | None:
@@ -117,6 +118,7 @@ class ContextDocumentRepository:
         if targeting_rules is not None:
             doc.targeting_rules = targeting_rules
         await self._db.flush()
+        await self._db.refresh(doc)
         return doc
 
     async def delete(self, doc: ContextDocument) -> None:

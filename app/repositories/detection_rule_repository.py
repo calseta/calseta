@@ -51,6 +51,7 @@ class DetectionRuleRepository:
         )
         self._db.add(rule)
         await self._db.flush()
+        await self._db.refresh(rule)
         return rule
 
     async def list(
@@ -92,6 +93,7 @@ class DetectionRuleRepository:
         for field, value in updates.items():
             setattr(rule, field, value)
         await self._db.flush()
+        await self._db.refresh(rule)
         return rule
 
     async def delete(self, rule: DetectionRule) -> None:

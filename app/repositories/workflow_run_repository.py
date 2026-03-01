@@ -35,6 +35,7 @@ class WorkflowRunRepository:
         )
         self._db.add(run)
         await self._db.flush()
+        await self._db.refresh(run)
         return run
 
     async def get_by_uuid(self, run_uuid: uuid.UUID) -> WorkflowRun | None:
@@ -128,4 +129,5 @@ class WorkflowRunRepository:
         run.completed_at = completed_at
         run.attempt_count = run.attempt_count + 1
         await self._db.flush()
+        await self._db.refresh(run)
         return run

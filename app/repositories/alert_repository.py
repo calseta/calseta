@@ -37,6 +37,7 @@ class AlertRepository:
         )
         self._db.add(alert)
         await self._db.flush()
+        await self._db.refresh(alert)
         return alert
 
     async def get_by_id(self, alert_id: int) -> Alert | None:
@@ -151,6 +152,7 @@ class AlertRepository:
             alert.close_classification = close_classification
 
         await self._db.flush()
+        await self._db.refresh(alert)
         return alert
 
     async def delete(self, alert: Alert) -> None:
@@ -166,6 +168,7 @@ class AlertRepository:
         current = alert.agent_findings or []
         alert.agent_findings = [*current, finding]
         await self._db.flush()
+        await self._db.refresh(alert)
         return alert
 
     async def mark_enriched(self, alert: Alert) -> None:
