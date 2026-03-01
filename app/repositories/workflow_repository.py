@@ -135,6 +135,17 @@ class WorkflowRepository:
         if indicator_types is not None:
             workflow.indicator_types = indicator_types
         if code is not None:
+            # Save current code snapshot before overwriting
+            from app.repositories.workflow_code_version_repository import (
+                WorkflowCodeVersionRepository,
+            )
+
+            ver_repo = WorkflowCodeVersionRepository(self._db)
+            await ver_repo.save_version(
+                workflow_id=workflow.id,
+                version=workflow.code_version,
+                code=workflow.code,
+            )
             workflow.code = code
             workflow.code_version = workflow.code_version + 1
         if state is not None:

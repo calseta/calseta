@@ -3,11 +3,14 @@ Workflow management routes.
 
 GET    /v1/workflows                  — Paginated list (no code field)
 POST   /v1/workflows                  — Create workflow
+POST   /v1/workflows/generate         — Generate workflow code via LLM
 GET    /v1/workflows/{uuid}           — Full workflow with code
 PATCH  /v1/workflows/{uuid}           — Partial update
 DELETE /v1/workflows/{uuid}           — Delete (403 if is_system=True)
 POST   /v1/workflows/{uuid}/execute   — Enqueue a workflow run (202 Accepted)
 GET    /v1/workflows/{uuid}/runs      — Paginated run history
+POST   /v1/workflows/{uuid}/test      — Sandbox test run (mock HTTP)
+GET    /v1/workflows/{uuid}/versions  — Code version history
 
 On create and on any PATCH that includes a new `code` value, the code is
 AST-validated before storage. Invalid code returns 400 with the error list.
@@ -26,7 +29,9 @@ from app.api.pagination import PaginationParams
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.session import get_db
+from app.repositories.workflow_code_version_repository import WorkflowCodeVersionRepository
 from app.repositories.workflow_repository import WorkflowRepository
 from app.repositories.workflow_run_repository import WorkflowRunRepository
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
@@ -34,10 +39,15 @@ from app.schemas.workflows import (
     WorkflowCreate,
     WorkflowExecuteRequest,
     WorkflowExecuteResponse,
+    WorkflowGenerateRequest,
+    WorkflowGenerateResponse,
     WorkflowPatch,
     WorkflowResponse,
     WorkflowRunResponse,
     WorkflowSummary,
+    WorkflowTestRequest,
+    WorkflowTestResponse,
+    WorkflowVersionResponse,
 )
 from app.services.workflow_ast import validate_workflow_code
 
@@ -399,4 +409,224 @@ async def list_all_workflow_runs(
         meta=PaginationMeta.from_total(
             total=total, page=pagination.page, page_size=pagination.page_size
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/workflows/generate  (Chunk 4.7)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/generate",
+    response_model=DataResponse[WorkflowGenerateResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def generate_workflow(
+    body: WorkflowGenerateRequest,
+    auth: _Write,
+) -> DataResponse[WorkflowGenerateResponse]:
+    """
+    Generate workflow Python code from a natural language description.
+
+    Uses the configured LLM (Anthropic Claude) to produce a runnable
+    workflow. Returns the generated code for review; does not save automatically.
+    Requires ANTHROPIC_API_KEY to be configured.
+    """
+    from app.services.workflow_generator import generate_workflow_code
+
+    try:
+        result = await generate_workflow_code(
+            description=body.description,
+            workflow_type=body.workflow_type,
+            indicator_types=body.indicator_types,
+            cfg=settings,
+        )
+    except ValueError as exc:
+        raise CalsetaException(
+            code="WORKFLOW_GENERATION_FAILED",
+            message=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        ) from exc
+
+    return DataResponse(data=result)
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/workflows/{uuid}/test  (Chunk 4.7)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{workflow_uuid}/test",
+    response_model=DataResponse[WorkflowTestResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def test_workflow(
+    workflow_uuid: UUID,
+    body: WorkflowTestRequest,
+    auth: _Execute,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[WorkflowTestResponse]:
+    """
+    Execute a workflow in a sandboxed test environment.
+
+    All outbound HTTP from ctx.http is intercepted — no real external calls.
+    Integration clients (Okta, Entra) are replaced with mock versions that
+    record calls without executing them. Returns the WorkflowResult and
+    captured log output.
+    """
+    import httpx
+
+    from app.workflows.context import (
+        EntraClient,
+        IndicatorContext,
+        IntegrationClients,
+        OktaClient,
+        SecretsAccessor,
+        WorkflowContext,
+        WorkflowLogger,
+    )
+    from app.workflows.sandbox import run_workflow_code
+
+    repo = WorkflowRepository(db)
+    workflow = await repo.get_by_uuid(workflow_uuid)
+    if workflow is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message=f"Workflow {workflow_uuid} not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    if not workflow.is_active:
+        raise CalsetaException(
+            code="WORKFLOW_NOT_EXECUTABLE",
+            message="Workflow is inactive — set is_active=True before testing",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Build mock HTTP transport that returns 200 for all requests
+    mock_transport = httpx.MockTransport(
+        handler=lambda request: httpx.Response(
+            200,
+            json=body.mock_http_responses or {"status": "ok"},
+        )
+    )
+
+    # Build mock integration clients (record calls, no real API)
+    class _MockOkta(OktaClient):
+        def __init__(self) -> None:
+            super().__init__(domain="mock.okta.com", api_token="mock")
+
+        async def revoke_sessions(self, user_id: str) -> None:
+            pass
+
+        async def suspend_user(self, user_id: str) -> None:
+            pass
+
+        async def unsuspend_user(self, user_id: str) -> None:
+            pass
+
+        async def reset_password(self, user_id: str) -> str | None:
+            return None
+
+        async def expire_password(self, user_id: str) -> None:
+            pass
+
+    class _MockEntra(EntraClient):
+        def __init__(self) -> None:
+            super().__init__(tenant_id="mock", client_id="mock", client_secret="mock")
+
+        async def revoke_sessions(self, user_id: str) -> None:
+            pass
+
+        async def disable_account(self, user_id: str) -> None:
+            pass
+
+        async def enable_account(self, user_id: str) -> None:
+            pass
+
+        async def reset_mfa(self, user_id: str) -> None:
+            pass
+
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    _now = datetime.now(UTC)
+    ctx = WorkflowContext(
+        indicator=IndicatorContext(
+            uuid=uuid4(),
+            type=body.indicator_type,
+            value=body.indicator_value,
+            malice="Pending",
+            is_enriched=False,
+            enrichment_results={},
+            first_seen=_now,
+            last_seen=_now,
+            created_at=_now,
+            updated_at=_now,
+        ),
+        alert=None,
+        http=httpx.AsyncClient(transport=mock_transport),
+        log=WorkflowLogger(),
+        secrets=SecretsAccessor(),
+        integrations=IntegrationClients(
+            okta=_MockOkta(),
+            entra=_MockEntra(),
+        ),
+    )
+
+    result = await run_workflow_code(
+        code=workflow.code,
+        ctx=ctx,
+        timeout=min(workflow.timeout_seconds, 30),
+    )
+
+    return DataResponse(
+        data=WorkflowTestResponse(
+            success=result.success,
+            message=result.message,
+            log_output=ctx.log.render(),
+            duration_ms=0,
+            result_data=result.data or {},
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/workflows/{uuid}/versions  (Chunk 4.7)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{workflow_uuid}/versions",
+    response_model=DataResponse[list[WorkflowVersionResponse]],
+)
+async def list_workflow_versions(
+    workflow_uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[list[WorkflowVersionResponse]]:
+    """List saved code versions for a workflow, newest first."""
+    repo = WorkflowRepository(db)
+    workflow = await repo.get_by_uuid(workflow_uuid)
+    if workflow is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message=f"Workflow {workflow_uuid} not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    ver_repo = WorkflowCodeVersionRepository(db)
+    versions = await ver_repo.list_for_workflow(workflow.id)
+
+    return DataResponse(
+        data=[
+            WorkflowVersionResponse(
+                version=v.version,
+                code_preview=v.code[:120],
+                saved_at=v.saved_at,
+            )
+            for v in versions
+        ]
     )

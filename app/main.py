@@ -18,6 +18,7 @@ everything uniformly.
 Startup events:
   - seed_system_mappings: inserts 14 CalsetaAlert → indicator type system
     mappings into indicator_field_mappings if not already present.
+  - seed_builtin_workflows: upserts 9 pre-built Okta/Entra system workflows.
     Failure logs a warning but does not crash the server.
 """
 
@@ -57,19 +58,21 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
 async def _on_startup() -> None:
     """Run all startup tasks. Failures are logged but never crash the server."""
     from app.db.session import AsyncSessionLocal
+    from app.seed.builtin_workflows import seed_builtin_workflows
     from app.seed.indicator_mappings import seed_system_mappings
 
     try:
         async with AsyncSessionLocal() as db:
             await seed_system_mappings(db)
+            await seed_builtin_workflows(db, settings)
             await db.commit()
     except Exception as exc:
         logger.warning(
             "startup_seed_failed",
             error=str(exc),
             hint=(
-                "Indicator field mappings may be missing — "
-                "extraction pipeline degraded"
+                "Indicator field mappings or built-in workflows may be missing — "
+                "extraction pipeline and workflow catalog may be degraded"
             ),
         )
 

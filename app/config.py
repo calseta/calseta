@@ -218,6 +218,16 @@ class Settings(BaseSettings):
     AWS_REGION: str = ""
 
     # ------------------------------------------------------------------
+    # AI / LLM (Chunk 4.7 — workflow generation)
+    # ------------------------------------------------------------------
+    ANTHROPIC_API_KEY: str = ""
+
+    # ------------------------------------------------------------------
+    # Deployment base URL (used for approval callback links, Teams notifier)
+    # ------------------------------------------------------------------
+    CALSETA_BASE_URL: str = "http://localhost:8000"
+
+    # ------------------------------------------------------------------
     # Approval Notifications
     # ------------------------------------------------------------------
     APPROVAL_NOTIFIER: str = "none"  # "none" | "slack" | "teams"

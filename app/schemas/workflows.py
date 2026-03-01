@@ -219,3 +219,78 @@ class WorkflowRunResponse(BaseModel):
     completed_at: str | None
     created_at: datetime
     updated_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Workflow generation schemas (Chunk 4.7)
+# ---------------------------------------------------------------------------
+
+
+class WorkflowGenerateRequest(BaseModel):
+    """Request body for POST /v1/workflows/generate."""
+
+    description: str
+    workflow_type: str | None = None
+    indicator_types: list[str] = []
+
+    @field_validator("workflow_type")
+    @classmethod
+    def _validate_workflow_type(cls, v: str | None) -> str | None:
+        if v is not None and v not in WORKFLOW_TYPES:
+            raise ValueError(f"workflow_type must be one of: {sorted(WORKFLOW_TYPES)}")
+        return v
+
+
+class WorkflowGenerateResponse(BaseModel):
+    """Response for POST /v1/workflows/generate."""
+
+    generated_code: str
+    suggested_name: str
+    suggested_documentation: str
+    warnings: list[str] = []
+
+
+# ---------------------------------------------------------------------------
+# Workflow test schemas (Chunk 4.7)
+# ---------------------------------------------------------------------------
+
+
+class WorkflowTestRequest(BaseModel):
+    """Request body for POST /v1/workflows/{uuid}/test."""
+
+    indicator_type: str = "ip"
+    indicator_value: str = "1.2.3.4"
+    mock_http_responses: dict[str, Any] = {}
+
+    @field_validator("indicator_type")
+    @classmethod
+    def _validate_indicator_type(cls, v: str) -> str:
+        valid = {t.value for t in IndicatorType}
+        if v not in valid:
+            raise ValueError(f"indicator_type must be one of: {sorted(valid)}")
+        return v
+
+
+class WorkflowTestResponse(BaseModel):
+    """Response for POST /v1/workflows/{uuid}/test."""
+
+    success: bool
+    message: str
+    log_output: str
+    duration_ms: int
+    result_data: dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# Workflow version schemas (Chunk 4.7)
+# ---------------------------------------------------------------------------
+
+
+class WorkflowVersionResponse(BaseModel):
+    """Single entry in GET /v1/workflows/{uuid}/versions."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    version: int
+    code_preview: str
+    saved_at: datetime

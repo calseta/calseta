@@ -49,7 +49,7 @@ _ALLOWED_IMPORTS: frozenset[str] = frozenset(
         "unicodedata",
         "urllib",
         "uuid",
-        # Calseta workflow SDK
+        # Calseta workflow SDK (internal and published package name)
         "calseta",
         "calseta.workflows",
     }
@@ -102,6 +102,20 @@ _BLOCKED_BUILTINS: frozenset[str] = frozenset(
 )
 
 
+def _is_allowed_import(module_name: str) -> bool:
+    """Return True if module_name is in the allowed imports list.
+
+    Checks the top-level name against _ALLOWED_IMPORTS AND allows
+    ``app.workflows.*`` imports so workflow code can reference
+    WorkflowContext / WorkflowResult from the Calseta SDK.
+    """
+    top = module_name.split(".")[0]
+    if top in _ALLOWED_IMPORTS:
+        return True
+    # Allow app.workflows.* for built-in type imports
+    return module_name == "app.workflows" or module_name.startswith("app.workflows.")
+
+
 def _check_imports(tree: ast.AST) -> list[str]:
     """Return errors for any disallowed or blocked import statements."""
     errors: list[str] = []
@@ -113,7 +127,7 @@ def _check_imports(tree: ast.AST) -> list[str]:
                     errors.append(
                         f"Line {node.lineno}: import of '{alias.name}' is not allowed"
                     )
-                elif top not in _ALLOWED_IMPORTS:
+                elif not _is_allowed_import(alias.name):
                     errors.append(
                         f"Line {node.lineno}: import of '{alias.name}' is not in "
                         "the allowed imports list"
@@ -125,7 +139,7 @@ def _check_imports(tree: ast.AST) -> list[str]:
                 errors.append(
                     f"Line {node.lineno}: import from '{module}' is not allowed"
                 )
-            elif top not in _ALLOWED_IMPORTS:
+            elif not _is_allowed_import(module):
                 errors.append(
                     f"Line {node.lineno}: import from '{module}' is not in "
                     "the allowed imports list"

@@ -50,12 +50,13 @@ class TestAPIKeyFormat:
 
 
 class TestScopes:
-    def test_all_eight_scopes_present(self) -> None:
+    def test_all_scopes_present(self) -> None:
         expected = {
             "alerts:read",
             "alerts:write",
             "enrichments:read",
             "workflows:read",
+            "workflows:write",
             "workflows:execute",
             "agents:read",
             "agents:write",
