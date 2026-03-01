@@ -21,6 +21,7 @@ Registered tasks:
   Wave 4: deliver_agent_webhook           (queue: dispatch)        ← added in Wave 4
   Wave 4: send_approval_notification_task (queue: dispatch)        ← added in Wave 4
   Wave 4: execute_approved_workflow_task  (queue: workflows)       ← added in Wave 4
+  Wave 5: dispatch_agent_webhooks         (queue: dispatch)        ← added in Wave 5
 """
 
 from __future__ import annotations
@@ -75,6 +76,25 @@ async def enrich_alert_task(alert_id: int) -> None:
         except Exception:
             await session.rollback()
             raise
+
+    # Enqueue agent dispatch after successful enrichment (outside session — best-effort)
+    try:
+        from app.queue.factory import get_queue_backend
+
+        queue = get_queue_backend()
+        await queue.enqueue(
+            "dispatch_agent_webhooks",
+            {"alert_id": alert_id},
+            queue="dispatch",
+            delay_seconds=0,
+            priority=0,
+        )
+    except Exception:
+        import structlog as _structlog
+
+        _structlog.get_logger().warning(
+            "dispatch_enqueue_failed", alert_id=alert_id
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +372,63 @@ async def execute_approved_workflow_task(approval_request_id: int) -> None:
                 approved=True,
                 responder_id=approval.responder_id,
             )
+
+        except Exception:
+            await session.rollback()
+            raise
+
+
+# ---------------------------------------------------------------------------
+# Wave 5: Agent webhook dispatch task (dispatch queue)
+# ---------------------------------------------------------------------------
+
+
+@procrastinate_app.task(
+    name="dispatch_agent_webhooks",
+    queue="dispatch",
+    retry=procrastinate.RetryStrategy(max_attempts=3, wait=30),
+)
+async def dispatch_agent_webhooks_task(alert_id: int) -> None:
+    """
+    Evaluate trigger criteria and dispatch alert to all matching agents.
+
+    Enqueued after enrichment completes for each alert.
+    Idempotent: re-dispatching sends the webhook again (operators can
+    use POST /v1/alerts/{uuid}/trigger-agents to re-trigger manually).
+    """
+    import structlog as _structlog
+
+    from app.db.session import AsyncSessionLocal
+    from app.repositories.alert_repository import AlertRepository
+    from app.services.agent_dispatch import build_webhook_payload, dispatch_to_agent
+    from app.services.agent_trigger import get_matching_agents
+
+    _logger = _structlog.get_logger()
+
+    async with AsyncSessionLocal() as session:
+        try:
+            alert_repo = AlertRepository(session)
+            alert = await alert_repo.get_by_id(alert_id)
+            if alert is None:
+                return  # Alert deleted before task ran
+
+            agents = await get_matching_agents(alert, session)
+            if not agents:
+                return
+
+            payload = await build_webhook_payload(alert_id, session)
+
+            for agent in agents:
+                try:
+                    await dispatch_to_agent(agent, alert_id, payload, session)
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
+                    _logger.exception(
+                        "agent_dispatch_failed",
+                        agent_uuid=str(agent.uuid),
+                        alert_id=alert_id,
+                    )
 
         except Exception:
             await session.rollback()

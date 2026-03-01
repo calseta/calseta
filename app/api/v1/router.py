@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    agents,
     alerts,
     api_keys,
     approvals,
@@ -33,3 +34,4 @@ v1_router.include_router(workflows.router)
 v1_router.include_router(workflows.workflow_runs_router)
 v1_router.include_router(workflow_approvals.router)
 v1_router.include_router(approvals.router)
+v1_router.include_router(agents.router)

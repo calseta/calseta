@@ -228,6 +228,11 @@ class Settings(BaseSettings):
     CALSETA_BASE_URL: str = "http://localhost:8000"
 
     # ------------------------------------------------------------------
+    # API base URL included in agent webhook payloads so agents can call back
+    # ------------------------------------------------------------------
+    CALSETA_API_BASE_URL: str = "http://localhost:8000"
+
+    # ------------------------------------------------------------------
     # Approval Notifications
     # ------------------------------------------------------------------
     APPROVAL_NOTIFIER: str = "none"  # "none" | "slack" | "teams"

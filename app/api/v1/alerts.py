@@ -25,6 +25,8 @@ from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
 from app.db.session import get_db
+from app.queue.base import TaskQueueBase
+from app.queue.dependencies import get_queue
 from app.repositories.activity_event_repository import ActivityEventRepository
 from app.repositories.alert_repository import AlertRepository
 from app.repositories.indicator_repository import IndicatorRepository
@@ -35,6 +37,7 @@ from app.schemas.alerts import (
     AlertPatch,
     AlertResponse,
     AlertSummary,
+    FindingConfidence,
     FindingCreate,
     FindingResponse,
 )
@@ -42,6 +45,7 @@ from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.context_documents import ContextDocumentResponse
 from app.schemas.indicators import EnrichedIndicator
 from app.services.activity_event import ActivityEventService
+from app.services.agent_trigger import get_matching_agents
 from app.services.context_targeting import get_applicable_documents
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -278,11 +282,12 @@ async def add_finding(
     finding_id = str(_uuid.uuid4())
     finding = {
         "id": finding_id,
-        "content": body.content,
-        "actor": body.actor,
-        "confidence": body.confidence,
-        "metadata": body.metadata,
-        "created_at": now.isoformat(),
+        "agent_name": body.agent_name,
+        "summary": body.summary,
+        "confidence": body.confidence.value if body.confidence else None,
+        "recommended_action": body.recommended_action,
+        "evidence": body.evidence,
+        "posted_at": now.isoformat(),
     }
 
     await alert_repo.add_finding(alert, finding)
@@ -292,19 +297,56 @@ async def add_finding(
         actor_type="api",
         actor_key_prefix=auth.key_prefix,
         alert_id=alert.id,
-        references={"finding_id": finding_id, "actor": body.actor},
+        references={"finding_id": finding_id, "agent_name": body.agent_name},
     )
 
     return DataResponse(
         data=FindingResponse(
             id=finding_id,
-            content=body.content,
-            actor=body.actor,
+            agent_name=body.agent_name,
+            summary=body.summary,
             confidence=body.confidence,
-            metadata=body.metadata,
-            created_at=now,
+            recommended_action=body.recommended_action,
+            evidence=body.evidence,
+            posted_at=now,
         )
     )
+
+
+@router.get(
+    "/{alert_uuid}/findings",
+    response_model=DataResponse[list[FindingResponse]],
+)
+async def list_findings(
+    alert_uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[list[FindingResponse]]:
+    """Return all agent findings for an alert, ordered by posted_at."""
+    alert_repo = AlertRepository(db)
+    alert = await alert_repo.get_by_uuid(alert_uuid)
+    if alert is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Alert not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    raw_findings = alert.agent_findings or []
+    findings = sorted(raw_findings, key=lambda f: f.get("posted_at", ""))
+    result = [
+        FindingResponse(
+            id=f["id"],
+            agent_name=f["agent_name"],
+            summary=f["summary"],
+            confidence=FindingConfidence(f["confidence"]) if f.get("confidence") else None,
+            recommended_action=f.get("recommended_action"),
+            evidence=f.get("evidence"),
+            posted_at=datetime.fromisoformat(f["posted_at"]),
+        )
+        for f in findings
+    ]
+    return DataResponse(data=result)
 
 
 # ---------------------------------------------------------------------------
@@ -376,4 +418,53 @@ async def list_alert_activity(
         meta=PaginationMeta.from_total(
             total=total, page=pagination.page, page_size=pagination.page_size
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/alerts/{uuid}/trigger-agents
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{alert_uuid}/trigger-agents",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def trigger_agents(
+    alert_uuid: UUID,
+    auth: Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_WRITE))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    queue: Annotated[TaskQueueBase, Depends(get_queue)],
+) -> DataResponse[dict]:  # type: ignore[type-arg]
+    """
+    Manually re-dispatch an alert to all matching registered agents.
+
+    Evaluates trigger criteria against the alert (same logic as post-enrichment
+    dispatch) and enqueues a dispatch_agent_webhooks task. Returns 202 with the
+    count and names of agents that will receive the webhook.
+    """
+    alert_repo = AlertRepository(db)
+    alert = await alert_repo.get_by_uuid(alert_uuid)
+    if alert is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Alert not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    matching_agents = await get_matching_agents(alert, db)
+
+    await queue.enqueue(
+        "dispatch_agent_webhooks",
+        {"alert_id": alert.id},
+        queue="dispatch",
+        delay_seconds=0,
+        priority=0,
+    )
+
+    return DataResponse(
+        data={
+            "queued_agent_count": len(matching_agents),
+            "agent_names": [a.name for a in matching_agents],
+        }
     )

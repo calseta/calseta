@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -90,23 +91,31 @@ class AlertPatch(BaseModel):
     tags: list[str] | None = None
 
 
+class FindingConfidence(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 class FindingCreate(BaseModel):
     """Agent finding posted to POST /v1/alerts/{uuid}/findings."""
 
-    content: str = Field(..., min_length=1, max_length=50_000)
-    actor: str | None = None  # Agent identifier
-    confidence: float | None = Field(None, ge=0.0, le=1.0)
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    agent_name: str = Field(..., min_length=1, max_length=255)
+    summary: str = Field(..., min_length=1, max_length=50_000)
+    confidence: FindingConfidence | None = None
+    recommended_action: str | None = None
+    evidence: dict[str, Any] | None = None
 
 
 class FindingResponse(BaseModel):
-    """Response from POST /v1/alerts/{uuid}/findings."""
+    """Response from POST /v1/alerts/{uuid}/findings and items in GET list."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    content: str
-    actor: str | None
-    confidence: float | None
-    metadata: dict[str, Any]
-    created_at: datetime
+    agent_name: str
+    summary: str
+    confidence: FindingConfidence | None
+    recommended_action: str | None
+    evidence: dict[str, Any] | None
+    posted_at: datetime

@@ -55,12 +55,12 @@ Update this table when chunk statuses change.
 | 2 | Ingestion + Detection Rules | 11 | 11 | 0 | 0 | 0 |
 | 3 | Enrichment Engine | 9 | 9 | 0 | 0 | 0 |
 | 4 | Context + Workflow Engine | 13 | 13 | 0 | 0 | 0 |
-| 5 | Agent Integration Layer | 6 | 6 | 0 | 0 | 0 |
+| 5 | Agent Integration Layer | 6 | 0 | 0 | 6 | 0 |
 | 6 | Metrics + Admin Endpoints | 6 | 6 | 0 | 0 | 0 |
 | 7 | MCP Server | 5 | 5 | 0 | 0 | 0 |
 | 8 | Testing + Docs + Examples | 15 | 15 | 0 | 0 | 0 |
 | 9 | Hosted Sandbox (v1.5) | 5 | 5 | 0 | 0 | 0 |
-| **Total** | | **81** | **81** | **0** | **0** | **0** |
+| **Total** | | **81** | **75** | **0** | **6** | **0** |
 
 ---
 
@@ -1787,8 +1787,8 @@ Implement the Microsoft Teams Adaptive Card approval notifier. Sends Adaptive Ca
 
 ### Chunk 5.1 — Agent Registration CRUD Endpoints ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** Wave 1 complete
 **PRD Reference:** Sections 7.7, 7.9
 
@@ -1807,14 +1807,17 @@ Implement agent registration management. Agents register their webhook endpoint,
 - [ ] Write endpoints require scope `agents:write`; reads require `agents:read`
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: app/auth/encryption.py (Fernet encrypt/decrypt utilities using ENCRYPTION_KEY from settings; raises ValueError if key not configured — allows startup without key but prevents storing secrets without one); app/schemas/agents.py (AgentRegistrationCreate/Response/Patch); app/repositories/agent_repository.py (CRUD + list_active() for trigger pipeline); app/api/v1/agents.py (5 CRUD routes + POST /test stub returning 501); router.py updated. Added cryptography>=44.0.0 to pyproject.toml.
+  Deviations: _maybe_encrypt() helper defers encryption module import to avoid startup issues when ENCRYPTION_KEY not set; returns 400 ENCRYPTION_NOT_CONFIGURED if key missing when auth_header_value provided.
+  Notes: list_active() returns agents ordered by created_at ASC for deterministic dispatch order.
 
 ---
 
 ### Chunk 5.2 — Trigger Evaluation Engine
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 5.1
 **PRD Reference:** Section 7.7
 
@@ -1832,14 +1835,17 @@ Implement the trigger evaluation logic that, after enrichment completes, determi
 - [ ] Unit tests: agent matches on source only, severity only, combined, with JSONB filter, inactive agent excluded
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: app/services/agent_trigger.py with get_matching_agents() and 3 private helpers (_passes_source_filter, _passes_severity_filter, _passes_jsonb_filter). Reuses evaluate_targeting_rules() from context_targeting for JSONB filter. tests/test_agent_trigger.py with 27 unit tests (sync helpers + async integration via AsyncMock).
+  Deviations: is_active filtering handled entirely at repository layer (list_active()); no redundant check in service layer.
+  Notes: All three filter passes must succeed for an agent to match. Empty list = match all, None trigger_filter = match all.
 
 ---
 
 ### Chunk 5.3 — Agent Webhook Dispatch
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 5.2, 1.6
 **PRD Reference:** Section 7.7, 7.11
 
@@ -1862,14 +1868,17 @@ Implement the webhook dispatch task. Builds the full enriched alert payload (ale
 - [ ] Dispatch task enqueued after enrichment task completes (not before)
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: app/services/agent_runs.py (record_agent_run() for AgentRun audit writes); app/services/agent_dispatch.py (build_webhook_payload() assembling full alert+indicators+detection_rule+context_docs+workflows payload with _metadata block; dispatch_to_agent() with httpx, exponential backoff retry, per-attempt AgentRun record, Fernet auth header decryption). Registry updated: dispatch_agent_webhooks_task added on dispatch queue; enrich_alert_task now enqueues dispatch after commit. Added CALSETA_API_BASE_URL to config and .env.example.
+  Deviations: dispatch_to_agent() takes alert_id as parameter (not derived from payload) for AgentRun FK. Auth header decryption skips silently on ValueError (no ENCRYPTION_KEY) rather than failing dispatch.
+  Notes: build_webhook_payload() excludes "raw" key from enrichment_results per provider for token optimization. Workflow payloads exclude "code" field.
 
 ---
 
 ### Chunk 5.4 — POST /v1/alerts/{uuid}/findings ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** Wave 2 complete
 **PRD Reference:** Sections 7.7, 7.9
 
@@ -1886,14 +1895,17 @@ Implement the agent findings write-back endpoint. Agents call this after investi
 - [ ] Requires scope `alerts:write`
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: Updated FindingCreate schema (agent_name/summary/confidence enum low/medium/high/recommended_action/evidence replacing content/actor/metadata); FindingConfidence StrEnum added; FindingResponse updated with posted_at (not created_at). Updated add_finding handler to use new fields. Added GET /v1/alerts/{uuid}/findings endpoint returning all findings sorted by posted_at.
+  Deviations: Confidence stored as string value in JSONB, re-hydrated to enum on read. Schema change is breaking vs. prior 2.11 stub but aligns with PROJECT_PLAN spec.
+  Notes: findings sorted by ISO 8601 posted_at string (lexicographic sort is safe for ISO 8601).
 
 ---
 
 ### Chunk 5.5 — POST /v1/agents/{uuid}/test
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 5.3
 **PRD Reference:** Section 7.9
 
@@ -1911,14 +1923,17 @@ Implement the agent test endpoint. Sends a synthetic webhook payload to the regi
 - [ ] Requires scope `agents:write`
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: Replaced 501 stub in agents.py with full implementation. AgentTestResponse schema added to agents.py schemas. Sends synthetic payload with "test": True, sentinel UUID, full _metadata block. Decrypts auth header via decrypt_value(); skips on ValueError. Uses httpx.AsyncClient with agent.timeout_seconds. Returns DataResponse[AgentTestResponse] with delivered/status_code/duration_ms/error. Never propagates HTTP errors as 5xx.
+  Deviations: None.
+  Notes: Synthetic payload mirrors real webhook shape for accurate integration testing.
 
 ---
 
 ### Chunk 5.6 — POST /v1/alerts/{uuid}/trigger-agents
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-sonnet-4-6
 **Depends on:** 5.3
 **PRD Reference:** Section 7.9
 
@@ -1935,7 +1950,10 @@ Implement the manual agent trigger endpoint. Allows operators to re-dispatch an 
 - [ ] Requires scope `agents:write`
 
 **Completion Log:**
-_No entries yet._
+- [claude-sonnet-4-6] [2026-03-01T00:00:00Z]
+  Built: POST /v1/alerts/{uuid}/trigger-agents endpoint added to alerts.py. Evaluates trigger criteria via get_matching_agents(), enqueues dispatch_agent_webhooks task for the alert via injected queue dependency. Returns 202 with queued_agent_count and agent_names list.
+  Deviations: Uses get_queue FastAPI dependency (lru_cache singleton) rather than calling get_queue_backend() directly — consistent with codebase pattern.
+  Notes: One task dispatch covers all matched agents (dispatch_agent_webhooks_task iterates matched agents internally).
 
 ---
 
