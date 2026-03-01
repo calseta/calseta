@@ -1,6 +1,6 @@
 """Workflow ORM model — Python automation functions."""
 
-from sqlalchemy import BigInteger, Boolean, Integer, Text
+from sqlalchemy import BigInteger, Boolean, Integer, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,7 +14,7 @@ class Workflow(TimestampMixin, UUIDMixin, Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     workflow_type: Mapped[str | None] = mapped_column(Text)
     indicator_types: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     code: Mapped[str] = mapped_column(Text, nullable=False)
     code_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -24,7 +24,7 @@ class Workflow(TimestampMixin, UUIDMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     tags: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     time_saved_minutes: Mapped[int | None] = mapped_column(Integer)
     requires_approval: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

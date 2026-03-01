@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, Integer, Text
+from sqlalchemy import BigInteger, Boolean, Integer, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,10 +19,10 @@ class AgentRegistration(TimestampMixin, UUIDMixin, Base):
     auth_header_name: Mapped[str | None] = mapped_column(Text)
     auth_header_value_encrypted: Mapped[str | None] = mapped_column(Text)
     trigger_on_sources: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     trigger_on_severities: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     trigger_filter: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     timeout_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=30)

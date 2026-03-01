@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, Integer, Text
+from sqlalchemy import BigInteger, Boolean, Integer, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,6 +20,6 @@ class ContextDocument(TimestampMixin, UUIDMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     tags: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

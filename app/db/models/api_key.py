@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,7 +17,7 @@ class APIKey(TimestampMixin, UUIDMixin, Base):
     key_prefix: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     key_hash: Mapped[str] = mapped_column(Text, nullable=False)
     scopes: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -1,6 +1,6 @@
 """DetectionRule ORM model."""
 
-from sqlalchemy import BigInteger, Boolean, Text
+from sqlalchemy import BigInteger, Boolean, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,16 +17,16 @@ class DetectionRule(TimestampMixin, UUIDMixin, Base):
     severity: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     mitre_tactics: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     mitre_techniques: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     mitre_subtechniques: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     data_sources: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     run_frequency: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[str | None] = mapped_column(Text)

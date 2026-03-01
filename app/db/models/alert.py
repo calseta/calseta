@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Text, func, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -49,11 +49,11 @@ class Alert(TimestampMixin, UUIDMixin, Base):
 
     # Payload and tags
     raw_payload: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, server_default="'{}'::jsonb"
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     agent_findings: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     tags: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="ARRAY[]::text[]"
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
 
     # Foreign keys
