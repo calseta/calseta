@@ -59,19 +59,18 @@ The goal is agents that spend tokens on reasoning, not parsing.
 ```bash
 git clone https://github.com/calseta/calseta
 cd calseta
-cp .env.example .env
+cp .env.local.example .env
 docker compose up
 ```
 
-Three services start: API server (`localhost:8000`), MCP server (`localhost:8001`), PostgreSQL (`localhost:5432`).
+Three services start: API server (`localhost:8000`), MCP server (`localhost:8001`), PostgreSQL (`localhost:5432`). The admin UI is served at `localhost:8000` if you've run `make ui-build`.
 
 ```bash
-# Create an API key
-curl -X POST localhost:8000/v1/api-keys \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-agent"}'
+# Bootstrap your first admin API key
+docker compose exec api python -m app.cli.create_api_key \
+  --name my-admin --scopes admin
 
-# → {"key": "cai_...", "show_once": true}
+# Save the printed key (cai_...) — it's shown once, never again
 ```
 
 Full setup guide at `docs/DEVELOPMENT.md`. Production deployment at `docs/HOW_TO_DEPLOY.md`.
@@ -203,12 +202,37 @@ A single enriched payload on every alert:
 | **MCP server** | Native MCP on port 8001. Works with any MCP-compatible agent or tool |
 | **Metrics API** | Alert volume, MTTD, false positive rates — accessible via REST and MCP |
 | **API key auth** | Scoped API keys for agent access |
+| **Admin UI** | Built-in dark-themed admin panel for triage, configuration, and monitoring |
+
+---
+
+## Admin UI
+
+Calseta ships with a built-in admin panel served from the same FastAPI container — no additional infrastructure required.
+
+The UI provides:
+- **Dashboard** — KPI cards and charts from the metrics API
+- **Alerts** — paginated list with filters, drill-down with indicators, findings, context, activity timeline, and raw payload viewer
+- **Workflows** — list, create, code editor, test sandbox, run history, and approval management
+- **Settings** — detection rules, context documents, source integrations, agent registrations, and API keys
+
+Authentication uses the same API keys as the REST API. Paste a `cai_` key to log in.
+
+The UI is a React SPA built with Vite. In production, it's compiled to static files and served by FastAPI at the root path. In development, Vite's dev server runs on port 5173 with hot reload and proxies API calls to the backend.
+
+```bash
+# Development (hot reload)
+make ui-dev          # http://localhost:5173
+
+# Production build (served at http://localhost:8000)
+make ui-build
+```
 
 ---
 
 ## Tech Stack
 
-Python 3.12 · FastAPI · PostgreSQL 15 · SQLAlchemy 2.0 async · Pydantic v2 · Alembic · procrastinate · httpx · MCP Python SDK · Docker
+Python 3.12 · FastAPI · PostgreSQL 15 · SQLAlchemy 2.0 async · Pydantic v2 · Alembic · procrastinate · httpx · MCP Python SDK · Docker · React 19 · Vite · Tailwind CSS · TanStack Query/Router
 
 ---
 

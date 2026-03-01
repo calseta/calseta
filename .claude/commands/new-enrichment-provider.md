@@ -33,7 +33,7 @@ Follow these steps exactly:
    - Use `ctx.http` (httpx.AsyncClient) for all HTTP calls — never import httpx directly.
    - Structure `EnrichmentResult.data` to be minimal and agent-readable — not a raw API dump.
 
-3. **Add env var keys** to `.env.example` with descriptive comments.
+3. **Add env var keys** to `.env.local.example` and `.env.prod.example` with descriptive comments.
 
 4. **Register the provider** in `app/integrations/enrichment/__init__.py`.
 

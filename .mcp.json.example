@@ -5,7 +5,7 @@
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-postgres", "${DATABASE_URL}"],
-      "description": "Direct access to the local Calseta dev database. Use for schema inspection, data verification, and debugging during development. DATABASE_URL must be set in your environment (see .env.example)."
+      "description": "Direct access to the local Calseta dev database. Use for schema inspection, data verification, and debugging during development. DATABASE_URL must be set in your environment (see .env.local.example)."
     },
 
     "github": {

@@ -472,7 +472,7 @@ All work during MVP phase targets `feat/mvp-dev`. Direct commits to `main` are n
 
 ## Environment Configuration
 
-All config via `.env` file (never committed). See `.env.example` for all variables with descriptions. Key variables:
+All config via `.env` file (never committed). See `.env.local.example` (dev) and `.env.prod.example` (production) for all variables with descriptions. Key variables:
 
 | Variable | Description |
 |---|---|

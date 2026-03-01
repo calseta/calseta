@@ -4,10 +4,12 @@
 
 Calseta AI is deployed as three Docker Compose services backed by PostgreSQL:
 
-- `api` — FastAPI REST API (port 8000)
+- `api` — FastAPI REST API + admin UI (port 8000)
 - `worker` — background job processor
 - `mcp` — MCP server (port 8001)
 - `db` — PostgreSQL 15 (or bring your own managed Postgres)
+
+The admin UI is compiled during `docker build` (multi-stage: Node.js builds the UI, then the static files are copied into the Python image). It's served by FastAPI at the root path — no separate web server or CDN needed. Access it at `http://your-host:8000`.
 
 All services are stateless except the database. Scale the API and worker horizontally by running multiple replicas — they share no in-memory state.
 
@@ -42,7 +44,7 @@ docker pull ghcr.io/your-org/calseta-api:v1.0.0
 Create a `.env` file (never commit this):
 
 ```bash
-cp .env.example .env.prod
+cp .env.prod.example .env
 ```
 
 Set all required variables. At minimum:
@@ -150,13 +152,25 @@ curl http://localhost:8000/health
 
 ### 6. Create the first API key
 
+API key management requires `admin` scope, so the very first key must be bootstrapped via CLI:
+
 ```bash
-curl -s -X POST http://localhost:8000/v1/api-keys \
-  -H "Content-Type: application/json" \
-  -d '{"name": "admin", "scopes": ["admin"]}' | jq .
+docker compose -f docker-compose.prod.yml exec api \
+  python -m app.cli.create_api_key --name admin --scopes admin
 ```
 
-The full API key is returned once. Save it securely — it cannot be retrieved again.
+The full API key (`cai_...`) is printed once. **Store it in your secrets manager immediately** — it cannot be retrieved again.
+
+Do not pipe this command's output to a log file or echo it to CI. Treat the key like a password.
+
+Once the admin key exists, create additional keys via the API:
+
+```bash
+curl -s -X POST http://localhost:8000/v1/api-keys \
+  -H "Authorization: Bearer $ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "agent-prod", "scopes": ["alerts:read", "alerts:write", "enrichments:read", "workflows:execute"]}' | jq .
+```
 
 ---
 
@@ -191,7 +205,7 @@ The full API key is returned once. Save it securely — it cannot be retrieved a
 
 ## Environment variables reference
 
-See `.env.example` for the complete list with descriptions.
+See `.env.prod.example` for the complete list with descriptions.
 
 ### Required
 
@@ -209,7 +223,7 @@ See `.env.example` for the complete list with descriptions.
 | `HTTPS_ENABLED` | `false` | Set `true` when behind TLS termination proxy |
 | `ENCRYPTION_KEY` | `""` | 32-byte key for encrypting auth configs at rest |
 | `TRUSTED_PROXY_COUNT` | `0` | Number of trusted reverse proxies (for real IP extraction) |
-| `CORS_ALLOWED_ORIGINS` | `""` | Comma-separated list of allowed CORS origins |
+| `CORS_ALLOWED_ORIGINS` | `""` | Comma-separated list of allowed CORS origins. Not needed if accessing the UI from the same origin (port 8000) |
 
 ### Secrets backends (optional, pick one)
 
