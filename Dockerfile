@@ -9,6 +9,17 @@
 # ============================================================
 
 # ============================================================
+# UI Build: Node.js stage to build the admin panel
+# ============================================================
+FROM node:22-alpine AS ui-build
+
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci
+COPY ui/ .
+RUN npm run build
+
+# ============================================================
 # Base: shared system dependencies
 # ============================================================
 FROM python:3.12-slim AS base
@@ -46,10 +57,12 @@ RUN pip install --no-cache-dir .
 # Copy application source
 COPY app/ app/
 
-# Copy Alembic config if present (optional — only needed for
-# containers that run migrations)
+# Copy Alembic config and migrations (needed for containers that run migrations)
 COPY alembic.ini* ./
-COPY alembic/ alembic/ 2>/dev/null || true
+COPY alembic/ alembic/
+
+# Copy built UI from Node.js stage
+COPY --from=ui-build /ui/dist/ ui/dist/
 
 # Run as non-root
 RUN useradd --system --no-create-home --shell /bin/false calseta

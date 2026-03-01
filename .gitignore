@@ -45,3 +45,10 @@ postgres_data/
 # Claude Code local overrides
 .claude/settings.local.json
 .mcp.local.json
+
+# Admin UI build output
+ui/dist/
+ui/node_modules/
+
+# Personal testing notes
+JC-TODO.md
