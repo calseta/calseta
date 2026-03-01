@@ -40,6 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ActorBadge } from "@/components/activity/actor-badge";
 import { ActivityEventReferences } from "@/components/activity/activity-event-references";
+import { AlertGraph } from "@/components/alert-graph/alert-graph";
 import {
   Shield,
   Tag,
@@ -54,7 +55,10 @@ import {
   Activity,
   Zap,
   Radio,
+  GitFork,
 } from "lucide-react";
+
+const SEVERITY_OPTIONS = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
   enriched: ["Open"],
@@ -91,6 +95,7 @@ export function AlertDetailPage() {
   const patchAlert = usePatchAlert();
 
   const [closingWith, setClosingWith] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("indicators");
 
   const alert = alertResp?.data;
   const activities = activityResp?.data ?? [];
@@ -118,7 +123,7 @@ export function AlertDetailPage() {
   const nextStatuses = STATUS_TRANSITIONS[alert.status] ?? [];
 
   function handleStatusChange(newStatus: string) {
-    if (newStatus === "Closed") return;
+    if (newStatus === "Closed") return; // Close requires classification — handled separately
     patchAlert.mutate(
       { uuid, body: { status: newStatus } },
       {
@@ -138,6 +143,16 @@ export function AlertDetailPage() {
           setClosingWith("");
         },
         onError: () => toast.error("Failed to close alert"),
+      },
+    );
+  }
+
+  function handleSeverityChange(newSeverity: string) {
+    patchAlert.mutate(
+      { uuid, body: { severity: newSeverity } },
+      {
+        onSuccess: () => toast.success(`Severity changed to ${newSeverity}`),
+        onError: () => toast.error("Failed to update severity"),
       },
     );
   }
@@ -178,50 +193,6 @@ export function AlertDetailPage() {
               )}
             </>
           }
-          actions={
-            nextStatuses.length > 0 ? (
-              <div className="flex gap-2">
-                {nextStatuses.filter((s) => s !== "Closed").map((s) => (
-                  <Button
-                    key={s}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleStatusChange(s)}
-                    disabled={patchAlert.isPending}
-                    className="bg-card border-border text-sm hover:border-teal/40"
-                  >
-                    {s}
-                  </Button>
-                ))}
-                {nextStatuses.includes("Closed") && (
-                  <div className="flex gap-2">
-                    <Select value={closingWith} onValueChange={setClosingWith}>
-                      <SelectTrigger className="w-48 bg-card border-border text-sm">
-                        <SelectValue placeholder="Close as..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        {CLOSE_CLASSIFICATIONS.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {c}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {closingWith && (
-                      <Button
-                        size="sm"
-                        onClick={handleClose}
-                        disabled={patchAlert.isPending}
-                        className="bg-teal text-white hover:bg-teal-dim text-sm"
-                      >
-                        Close
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : undefined
-          }
         />
 
         <DetailPageStatusCards
@@ -229,7 +200,63 @@ export function AlertDetailPage() {
             {
               label: "Status",
               icon: Activity,
-              value: (
+              value: nextStatuses.length > 0 ? (
+                <div className="space-y-2">
+                  <Select
+                    value={alert.status}
+                    onValueChange={(v) => {
+                      if (v === "Closed") {
+                        // Don't close directly — need classification
+                        return;
+                      }
+                      handleStatusChange(v);
+                    }}
+                  >
+                    <SelectTrigger className={cn("h-7 w-full text-xs border", statusColor(alert.status))}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value={alert.status} disabled>
+                        {alert.status}
+                      </SelectItem>
+                      {nextStatuses.filter((s) => s !== "Closed").map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                      {nextStatuses.includes("Closed") && (
+                        <SelectItem value="__close" disabled className="text-dim text-[11px]">
+                          Close (select below)
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {nextStatuses.includes("Closed") && (
+                    <div className="space-y-1.5">
+                      <Select value={closingWith} onValueChange={setClosingWith}>
+                        <SelectTrigger className="h-7 w-full text-xs bg-surface border-border">
+                          <SelectValue placeholder="Close as..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border">
+                          {CLOSE_CLASSIFICATIONS.map((c) => (
+                            <SelectItem key={c} value={c} className="text-xs">
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {closingWith && (
+                        <Button
+                          size="sm"
+                          onClick={handleClose}
+                          disabled={patchAlert.isPending}
+                          className="h-7 w-full bg-teal text-white hover:bg-teal-dim text-xs"
+                        >
+                          Close Alert
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
                 <Badge variant="outline" className={cn("text-xs", statusColor(alert.status))}>
                   {alert.status}
                 </Badge>
@@ -239,9 +266,16 @@ export function AlertDetailPage() {
               label: "Severity",
               icon: AlertTriangle,
               value: (
-                <Badge variant="outline" className={cn("text-xs", severityColor(alert.severity))}>
-                  {alert.severity}
-                </Badge>
+                <Select value={alert.severity} onValueChange={handleSeverityChange}>
+                  <SelectTrigger className={cn("h-7 w-full text-xs border", severityColor(alert.severity))}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {SEVERITY_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ),
             },
             {
@@ -306,7 +340,7 @@ export function AlertDetailPage() {
             </DetailPageSidebar>
           }
         >
-          <Tabs defaultValue="indicators">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="bg-surface border border-border">
               <TabsTrigger value="indicators" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
                 Indicators ({alert.indicators?.length ?? 0})
@@ -319,6 +353,10 @@ export function AlertDetailPage() {
               </TabsTrigger>
               <TabsTrigger value="activity" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
                 Activity ({activities.length})
+              </TabsTrigger>
+              <TabsTrigger value="graph" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <GitFork className="h-3.5 w-3.5 mr-1" />
+                Graph
               </TabsTrigger>
               <TabsTrigger value="raw" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
                 <Code className="h-3.5 w-3.5 mr-1" />
@@ -501,6 +539,11 @@ export function AlertDetailPage() {
               ) : (
                 <Empty text="No activity recorded yet" />
               )}
+            </TabsContent>
+
+            {/* Relationship Graph */}
+            <TabsContent value="graph" className="mt-4">
+              <AlertGraph alertUuid={uuid} />
             </TabsContent>
 
             {/* Raw Data */}

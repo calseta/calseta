@@ -7,6 +7,7 @@ PATCH  /v1/alerts/{uuid}                     — Update alert (status, severity,
 DELETE /v1/alerts/{uuid}                     — Delete alert
 POST   /v1/alerts/{uuid}/findings           — Add an agent finding to an alert
 GET    /v1/alerts/{uuid}/activity           — List activity events for an alert
+GET    /v1/alerts/{uuid}/relationship-graph — Alert-indicator-sibling relationship graph
 """
 
 from __future__ import annotations
@@ -44,6 +45,11 @@ from app.schemas.alerts import (
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.context_documents import ContextDocumentResponse
 from app.schemas.indicators import EnrichedIndicator, IndicatorResponse
+from app.schemas.relationship_graph import (
+    AlertRelationshipGraph,
+    GraphAlertNode,
+    GraphIndicatorNode,
+)
 from app.services.activity_event import ActivityEventService
 from app.services.agent_trigger import get_matching_agents
 from app.services.context_targeting import get_applicable_documents
@@ -76,13 +82,15 @@ def _build_indicator(ind: object) -> EnrichedIndicator:
         last_seen=ind.last_seen,
         is_enriched=ind.is_enriched,
         malice=ind.malice,
-        enrichment_results=ind.enrichment_results,
+        enrichment_results=_filter_enrichment_results(ind.enrichment_results),
         created_at=ind.created_at,
         updated_at=ind.updated_at,
     )
 
 
-def _build_metadata(alert: object, indicator_count: int) -> AlertMetadata:
+def _build_metadata(
+    alert: object, indicator_count: int, context_docs_count: int = 0
+) -> AlertMetadata:
     from app.db.models.alert import Alert
 
     assert isinstance(alert, Alert)
@@ -97,7 +105,7 @@ def _build_metadata(alert: object, indicator_count: int) -> AlertMetadata:
         indicator_count=indicator_count,
         enrichment=enrichment,
         detection_rule_matched=alert.detection_rule_id is not None,
-        context_documents_applied=0,
+        context_documents_applied=context_docs_count,
     )
 
 
@@ -155,12 +163,16 @@ async def get_alert(
 
     indicators = await indicator_repo.list_for_alert(alert.id)
     enriched_indicators = [_build_indicator(i) for i in indicators]
-    metadata = _build_metadata(alert, len(enriched_indicators))
+
+    # Count applicable context documents
+    context_docs = await get_applicable_documents(alert, db)
+
+    metadata = _build_metadata(alert, len(enriched_indicators), len(context_docs))
 
     response = AlertResponse.model_validate(alert)
     response.indicators = enriched_indicators
 
-    return DataResponse(data=response, meta={"_metadata": metadata.model_dump()})
+    return DataResponse(data=response, meta=metadata.model_dump())
 
 
 @router.patch("/{alert_uuid}", response_model=DataResponse[AlertResponse])
@@ -246,7 +258,7 @@ async def patch_alert(
     response = AlertResponse.model_validate(updated)
     response.indicators = enriched_indicators
 
-    return DataResponse(data=response, meta={"_metadata": metadata.model_dump()})
+    return DataResponse(data=response, meta=metadata.model_dump())
 
 
 @router.delete("/{alert_uuid}", status_code=status.HTTP_204_NO_CONTENT)
@@ -480,6 +492,110 @@ async def list_alert_activity(
             total=total, page=pagination.page, page_size=pagination.page_size
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/alerts/{uuid}/relationship-graph
+# ---------------------------------------------------------------------------
+
+
+def _build_enrichment_summary(enrichment_results: dict | None) -> dict[str, str]:  # type: ignore[type-arg]
+    """Extract a one-line verdict summary per provider from enrichment_results."""
+    if not enrichment_results:
+        return {}
+    summary: dict[str, str] = {}
+    for provider, data in enrichment_results.items():
+        if not isinstance(data, dict):
+            continue
+        extracted = data.get("extracted", {})
+        if isinstance(extracted, dict):
+            verdict = extracted.get("verdict") or extracted.get("malice") or extracted.get("risk_score")
+            if verdict is not None:
+                summary[provider] = str(verdict)
+                continue
+        if data.get("success") is True:
+            summary[provider] = "enriched"
+        elif data.get("success") is False:
+            summary[provider] = "failed"
+    return summary
+
+
+@router.get(
+    "/{alert_uuid}/relationship-graph",
+    response_model=DataResponse[AlertRelationshipGraph],
+)
+async def get_relationship_graph(
+    alert_uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    sibling_limit: int = Query(default=10, ge=1, le=50),
+) -> DataResponse[AlertRelationshipGraph]:
+    """
+    Return the alert-indicator relationship graph.
+
+    Includes the current alert, its indicators, and for each indicator
+    the other alerts it appears in (capped by sibling_limit).
+    """
+    alert_repo = AlertRepository(db)
+    indicator_repo = IndicatorRepository(db)
+
+    alert = await alert_repo.get_by_uuid(alert_uuid)
+    if alert is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Alert not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    indicators = await indicator_repo.list_for_alert(alert.id)
+    indicator_ids = [ind.id for ind in indicators]
+
+    related = await indicator_repo.get_related_alerts_for_indicators(
+        indicator_ids, exclude_alert_id=alert.id, limit_per_indicator=sibling_limit
+    )
+
+    alert_node = GraphAlertNode(
+        uuid=str(alert.uuid),
+        title=alert.title,
+        severity=alert.severity,
+        status=alert.status,
+        source_name=alert.source_name,
+        occurred_at=alert.occurred_at,
+        tags=alert.tags or [],
+    )
+
+    indicator_nodes = []
+    for ind in indicators:
+        sibling_alerts, total_count = related.get(ind.id, ([], 0))
+        sibling_nodes = [
+            GraphAlertNode(
+                uuid=str(a.uuid),
+                title=a.title,
+                severity=a.severity,
+                status=a.status,
+                source_name=a.source_name,
+                occurred_at=a.occurred_at,
+                tags=a.tags or [],
+            )
+            for a in sibling_alerts
+        ]
+        indicator_nodes.append(
+            GraphIndicatorNode(
+                uuid=str(ind.uuid),
+                type=ind.type,
+                value=ind.value,
+                malice=ind.malice,
+                first_seen=ind.first_seen,
+                last_seen=ind.last_seen,
+                is_enriched=ind.is_enriched,
+                enrichment_summary=_build_enrichment_summary(ind.enrichment_results),
+                total_alert_count=total_count,
+                sibling_alerts=sibling_nodes,
+            )
+        )
+
+    graph = AlertRelationshipGraph(alert=alert_node, indicators=indicator_nodes)
+    return DataResponse(data=graph)
 
 
 # ---------------------------------------------------------------------------

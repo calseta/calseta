@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models.alert import Alert
 from app.db.models.alert_indicator import AlertIndicator
 from app.db.models.indicator import Indicator
 
@@ -96,11 +97,63 @@ class IndicatorRepository:
 
     async def count_for_alert(self, alert_id: int) -> int:
         """Return count of indicators linked to the given alert."""
-        from sqlalchemy import func
-
         result = await self._db.execute(
             select(func.count())
             .select_from(AlertIndicator)
             .where(AlertIndicator.alert_id == alert_id)
         )
         return result.scalar_one()
+
+    async def get_related_alerts_for_indicators(
+        self,
+        indicator_ids: list[int],
+        exclude_alert_id: int,
+        limit_per_indicator: int = 10,
+    ) -> dict[int, tuple[list[Alert], int]]:
+        """
+        For each indicator ID, return sibling alerts (excluding the given alert)
+        and the total count of linked alerts.
+
+        Returns a dict mapping indicator_id -> (list[Alert], total_count).
+        """
+        result: dict[int, tuple[list[Alert], int]] = {}
+
+        if not indicator_ids:
+            return result
+
+        # Get total counts per indicator (excluding the current alert)
+        count_stmt = (
+            select(
+                AlertIndicator.indicator_id,
+                func.count(AlertIndicator.alert_id).label("cnt"),
+            )
+            .where(
+                AlertIndicator.indicator_id.in_(indicator_ids),
+                AlertIndicator.alert_id != exclude_alert_id,
+            )
+            .group_by(AlertIndicator.indicator_id)
+        )
+        count_rows = await self._db.execute(count_stmt)
+        counts = {row.indicator_id: row.cnt for row in count_rows}
+
+        # For each indicator, fetch top-N sibling alerts ordered by occurred_at desc
+        for ind_id in indicator_ids:
+            total = counts.get(ind_id, 0)
+            if total == 0:
+                result[ind_id] = ([], 0)
+                continue
+
+            sibling_stmt = (
+                select(Alert)
+                .join(AlertIndicator, AlertIndicator.alert_id == Alert.id)
+                .where(
+                    AlertIndicator.indicator_id == ind_id,
+                    Alert.id != exclude_alert_id,
+                )
+                .order_by(Alert.occurred_at.desc())
+                .limit(limit_per_indicator)
+            )
+            sibling_rows = await self._db.execute(sibling_stmt)
+            result[ind_id] = (list(sibling_rows.scalars().all()), total)
+
+        return result
