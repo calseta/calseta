@@ -64,6 +64,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # LLM system prompt strings contain intentionally long lines
 "app/services/workflow_generator.py" = ["E501"]
+# Block Kit / Adaptive Card dicts have long string values inline
+"app/workflows/notifiers/slack_notifier.py" = ["E501"]
+"app/workflows/notifiers/teams_notifier.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

@@ -11,11 +11,13 @@ from fastapi import APIRouter
 from app.api.v1 import (
     alerts,
     api_keys,
+    approvals,
     context_documents,
     detection_rules,
     enrichments,
     indicator_mappings,
     ingest,
+    workflow_approvals,
     workflows,
 )
 
@@ -29,3 +31,5 @@ v1_router.include_router(enrichments.router)
 v1_router.include_router(context_documents.router)
 v1_router.include_router(workflows.router)
 v1_router.include_router(workflows.workflow_runs_router)
+v1_router.include_router(workflow_approvals.router)
+v1_router.include_router(approvals.router)

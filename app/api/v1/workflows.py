@@ -35,9 +35,9 @@ from app.repositories.workflow_code_version_repository import WorkflowCodeVersio
 from app.repositories.workflow_repository import WorkflowRepository
 from app.repositories.workflow_run_repository import WorkflowRunRepository
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
+from app.schemas.workflow_approvals import WorkflowExecuteAgentRequest
 from app.schemas.workflows import (
     WorkflowCreate,
-    WorkflowExecuteRequest,
     WorkflowExecuteResponse,
     WorkflowGenerateRequest,
     WorkflowGenerateResponse,
@@ -248,23 +248,37 @@ async def delete_workflow(
 
 @router.post(
     "/{workflow_uuid}/execute",
-    response_model=DataResponse[WorkflowExecuteResponse],
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def execute_workflow(
     workflow_uuid: UUID,
-    body: WorkflowExecuteRequest,
+    body: WorkflowExecuteAgentRequest,
     auth: _Execute,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[WorkflowExecuteResponse]:
     """
     Enqueue a workflow for execution. Returns 202 Accepted immediately.
 
-    The indicator must already exist in the database (created by alert ingestion).
-    If alert_uuid is provided, it must also already exist.
+    Approval gate:
+    - If trigger_source="agent" AND workflow.requires_approval=True:
+      creates an approval request, enqueues a notification, returns
+      {"status": "pending_approval", "approval_request_uuid": "...", "expires_at": "..."}
+    - Otherwise: immediately enqueues execution (existing behavior).
+
+    When trigger_source="agent", both `reason` and `confidence` are required.
     """
     from app.queue.factory import get_queue_backend
     from app.repositories.alert_repository import AlertRepository
+
+    # Agent-specific field validation
+    agent_errors = body.validate_agent_fields()
+    if agent_errors:
+        raise CalsetaException(
+            code="VALIDATION_ERROR",
+            message="Missing required fields for agent-triggered execution",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            details={"errors": agent_errors},
+        )
 
     repo = WorkflowRepository(db)
     workflow = await repo.get_by_uuid(workflow_uuid)
@@ -298,17 +312,66 @@ async def execute_workflow(
             )
         alert_id = alert.id
 
-    # Create WorkflowRun record with status="queued"
+    trigger_context = {
+        "indicator_type": body.indicator_type,
+        "indicator_value": body.indicator_value,
+        "alert_id": alert_id,
+        "alert_uuid": str(body.alert_uuid) if body.alert_uuid else None,
+    }
+
+    # ---------------------------------------------------------------------------
+    # Approval gate: agent trigger + requires_approval
+    # ---------------------------------------------------------------------------
+    if body.trigger_source == "agent" and workflow.requires_approval:
+        from app.workflows.approval import create_approval_request
+        from app.workflows.notifiers.factory import get_approval_notifier
+
+        notifier = get_approval_notifier(settings)
+        approval_req = await create_approval_request(
+            workflow=workflow,
+            trigger_type=body.trigger_source,
+            trigger_agent_key_prefix=auth.key_prefix,
+            trigger_context=trigger_context,
+            reason=body.reason or "",
+            confidence=body.confidence or 0.0,
+            notifier_type=notifier.notifier_name,
+            db=db,
+            cfg=settings,
+        )
+
+        # Enqueue notification task
+        queue = get_queue_backend()
+        await queue.enqueue(
+            "send_approval_notification_task",
+            {"approval_request_id": approval_req.id},
+            queue="dispatch",
+            delay_seconds=0,
+            priority=0,
+        )
+
+        await db.commit()
+
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(  # type: ignore[return-value]
+            status_code=status.HTTP_202_ACCEPTED,
+            content={
+                "data": {
+                    "status": "pending_approval",
+                    "approval_request_uuid": str(approval_req.uuid),
+                    "expires_at": approval_req.expires_at.isoformat(),
+                }
+            },
+        )
+
+    # ---------------------------------------------------------------------------
+    # Immediate execution path (human trigger, or requires_approval=False)
+    # ---------------------------------------------------------------------------
     run_repo = WorkflowRunRepository(db)
     run = await run_repo.create(
         workflow_id=workflow.id,
         trigger_type=body.trigger_source,
-        trigger_context={
-            "indicator_type": body.indicator_type,
-            "indicator_value": body.indicator_value,
-            "alert_id": alert_id,
-            "alert_uuid": str(body.alert_uuid) if body.alert_uuid else None,
-        },
+        trigger_context=trigger_context,
         code_version_executed=workflow.code_version,
         status="queued",
     )

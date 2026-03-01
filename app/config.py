@@ -231,6 +231,7 @@ class Settings(BaseSettings):
     # Approval Notifications
     # ------------------------------------------------------------------
     APPROVAL_NOTIFIER: str = "none"  # "none" | "slack" | "teams"
+    APPROVAL_DEFAULT_TIMEOUT_SECONDS: int = 3600
     SLACK_BOT_TOKEN: str = ""
     SLACK_SIGNING_SECRET: str = ""
     TEAMS_WEBHOOK_URL: str = ""

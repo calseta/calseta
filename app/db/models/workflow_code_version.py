@@ -1,6 +1,6 @@
 """WorkflowCodeVersion ORM model — version history for workflow code edits."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,5 +21,5 @@ class WorkflowCodeVersion(Base):
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )

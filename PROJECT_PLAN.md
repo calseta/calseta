@@ -1408,8 +1408,8 @@ Implement workflow management endpoints. Workflows are Python automation functio
 
 ### Chunk 4.5 — Pre-built Workflow Seeder (Okta + Entra) ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** Claude (claude-sonnet-4-6)
 **Depends on:** 4.4, 1.8
 **PRD Reference:** Section 9 (Pre-built Workflow Catalog)
 
@@ -1450,7 +1450,11 @@ Reference `docs/integrations/okta/api_notes.md` and `docs/integrations/entra/api
 - [ ] Unit test: seeder with Okta vars set → 5 Okta workflows with `is_active=True`; without vars → 5 with `is_active=False`
 
 **Completion Log:**
-_No entries yet._
+- Created `app/seed/builtin_workflows.py`: `seed_builtin_workflows(db, cfg)` upserts 9 pre-built system workflows at startup using `upsert_system_workflow()` keyed on `name + is_system=True`. 5 Okta workflows (revoke sessions, suspend, unsuspend, reset password, force expire password) and 4 Entra workflows (revoke sessions, disable account, enable account, reset MFA). Okta workflows `is_active` set from `cfg.OKTA_DOMAIN and cfg.OKTA_API_TOKEN`; Entra from all 3 Entra vars; all seeded as `workflow_type="indicator"`, `indicator_types=["account"]`, `requires_approval=True`.
+- Extended `app/main.py` lifespan startup to call `seed_builtin_workflows()` alongside `seed_system_mappings()`.
+- Refactored `OktaClient` and `EntraClient` in `app/workflows/context.py` to manage their own `httpx.AsyncClient` internally (created in `__init__`); removed `http: Any` parameter from all public methods. Workflow code now calls `ctx.integrations.okta.revoke_sessions(user)` without passing http.
+- Extended AST import whitelist in `app/services/workflow_ast.py` to allow `app.workflows.*` imports.
+- Created `tests/test_builtin_workflows.py`: 13 tests covering catalog sanity, idempotency, credential-controlled activation, shared fields, and AST validation.
 
 ---
 
@@ -1495,8 +1499,8 @@ Implement the Python execution sandbox that runs workflow code safely. This is t
 
 ### Chunk 4.7 — AI Workflow Generation, Test, and Versions Endpoints
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** Claude (claude-sonnet-4-6)
 **Depends on:** 4.6
 **PRD Reference:** Section 7.5, 7.9
 
@@ -1540,7 +1544,15 @@ For versioning: every successful `PATCH` that changes `code` writes a `workflow_
 - [ ] Integration test: generate → validate → save (PATCH state to active) → test → execute flow works end-to-end
 
 **Completion Log:**
-_No entries yet._
+- Created `alembic/versions/0002_add_workflow_code_versions.py`: migration adds `workflow_code_versions` table with `workflow_id` FK (CASCADE), `version` INTEGER, `code` TEXT, `saved_at` TIMESTAMP.
+- Created `app/db/models/workflow_code_version.py`: ORM model for `workflow_code_versions`.
+- Created `app/repositories/workflow_code_version_repository.py`: `save_version()` and `list_for_workflow()`.
+- Updated `app/repositories/workflow_repository.py` `patch()`: saves code snapshot to `workflow_code_versions` before incrementing `code_version`.
+- Created `app/services/workflow_generator.py`: `generate_workflow_code()` calls Anthropic `claude-sonnet-4-6` API with system prompt including full WorkflowContext spec, allowed imports, integration client signatures, and examples. AST-validates generated code before returning.
+- Added `WorkflowGenerateRequest`, `WorkflowGenerateResponse`, `WorkflowTestRequest`, `WorkflowTestResponse`, `WorkflowVersionResponse` to `app/schemas/workflows.py`.
+- Added 3 routes to `app/api/v1/workflows.py`: `POST /generate` (workflows:write), `POST /{uuid}/test` (workflows:execute) with httpx.MockTransport + mock integration clients, `GET /{uuid}/versions` (workflows:read).
+- Added `ANTHROPIC_API_KEY` and `CALSETA_BASE_URL` to `app/config.py`.
+- Added `"app/services/workflow_generator.py" = ["E501"]` to pyproject.toml per-file-ignores (system prompt contains long strings).
 
 ---
 
@@ -1609,8 +1621,8 @@ _No entries yet._
 
 ### Chunk 4.10 — GET /v1/workflow-runs (Global Run History)
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** Claude (claude-sonnet-4-6)
 **Depends on:** 4.9
 **PRD Reference:** Section 7.9
 
@@ -1627,14 +1639,14 @@ Implement the global workflow run history endpoint. Lists runs across all workfl
 - [ ] Requires scope `workflows:read`
 
 **Completion Log:**
-_No entries yet._
+- Added `GET /v1/workflow-runs` via `workflow_runs_router` in `app/api/v1/workflows.py`. Returns paginated `WorkflowRunResponse` list across all workflows. Supports filters: `status`, `workflow_uuid`. Ordered by `created_at` descending. Requires `workflows:read` scope. Committed together with chunks 4.8 and 4.9.
 
 ---
 
 ### Chunk 4.11 — Workflow Approval Gate + ApprovalNotifierBase + NullApprovalNotifier
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** Claude (claude-sonnet-4-6)
 **Depends on:** 4.8, 1.6
 **PRD Reference:** Section 7.5 (Human-in-the-Loop Workflow Approval)
 
@@ -1678,14 +1690,23 @@ Implement the human-in-the-loop approval gate. When an agent calls `POST /v1/wor
 - [ ] Unit tests: approval gate fires on agent trigger; bypassed on human trigger; approve → execution enqueued; reject → no execution; expired request → 409
 
 **Completion Log:**
-_No entries yet._
+- Created `app/workflows/notifiers/` package: `__init__.py`, `base.py`, `null_notifier.py`, `factory.py`.
+- `ApprovalNotifierBase` ABC: `send_approval_request() -> str`, `send_result_notification() -> None`, `is_configured() -> bool`. `ApprovalRequest` dataclass with all fields from PRD §7.5.
+- `NullApprovalNotifier`: `is_configured()=True`, `send_approval_request()` logs WARNING, `send_result_notification()` logs INFO. Never raises.
+- `get_approval_notifier(cfg)` factory: resolves from `APPROVAL_NOTIFIER` env var; defaults to `NullApprovalNotifier`.
+- Created `app/workflows/approval.py`: `create_approval_request()` (inserts pending row with computed `expires_at`), `process_approval_decision()` (validates not expired/terminal, sets status, enqueues `execute_approved_workflow_task` if approved).
+- Created `app/schemas/workflow_approvals.py`: `WorkflowApprovalRequestResponse`, `WorkflowExecuteAgentRequest` (with `reason`/`confidence` required fields), `WorkflowApproveRequest`, `WorkflowRejectRequest`, `WorkflowPendingApprovalResponse`.
+- Created `app/api/v1/workflow_approvals.py`: `GET /v1/workflow-approvals` (paginated, status/workflow_uuid filters), `GET /v1/workflow-approvals/{uuid}`, `POST /v1/workflow-approvals/{uuid}/approve`, `POST /v1/workflow-approvals/{uuid}/reject`. 409 on expired/terminal.
+- Updated execute endpoint: applies approval gate when `trigger_source="agent"` AND `requires_approval=True`; returns `202 {status: pending_approval}`.
+- Registered `send_approval_notification_task` (dispatch queue, 3 retries) and `execute_approved_workflow_task` (workflows queue, 1 attempt) in `app/queue/registry.py`.
+- Added `APPROVAL_NOTIFIER`, `APPROVAL_DEFAULT_CHANNEL`, `APPROVAL_DEFAULT_TIMEOUT_SECONDS` to `app/config.py`.
 
 ---
 
 ### Chunk 4.12 — SlackApprovalNotifier ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** Claude (claude-sonnet-4-6)
 **Depends on:** 4.11
 **PRD Reference:** Section 7.5 (Slack Notification)
 
@@ -1709,14 +1730,17 @@ Implement the Slack Block Kit approval notifier. Sends interactive Block Kit mes
 - [ ] Unit tests: `send_approval_request()` with mocked Slack API; callback signature validation (valid + invalid); approve + reject flows end-to-end
 
 **Completion Log:**
-_No entries yet._
+- Created `app/workflows/notifiers/slack_notifier.py`: `SlackApprovalNotifier` sends Block Kit messages via `chat.postMessage`. Header block shows risk level + workflow name; section block shows indicator, trigger, confidence, expiry; text block shows agent reason; actions block has Approve/Reject buttons with `action_id = "approve:{uuid}"` / `"reject:{uuid}"` and `block_id = "approval:{uuid}"`. Returns Slack `ts` as external_message_id. `send_result_notification()` posts thread reply via `thread_ts`.
+- Created `app/api/v1/approvals.py`: `POST /v1/approvals/callback/slack` reads raw body FIRST (to cache for HMAC validation), then parses form data. Validates Slack signature with `hmac.compare_digest()`. Extracts `action_id` from first action, parses `approve:{uuid}` / `reject:{uuid}`, routes to `process_approval_decision()`. Returns `200 "ok"` immediately. `POST /v1/approvals/callback/teams` returns 200 with explanation message (no interactive callback support in v1). Added `approvals.router` to `app/api/v1/router.py`.
+- Design note: raw body must be read before FastAPI form parsing to avoid "Stream consumed" error on subsequent `request.body()` calls. Fixed by removing `payload: Form()` parameter and reading `await request.form()` manually after `await request.body()`.
+- Added `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` to `app/config.py`. Added `E501` per-file-ignore for `slack_notifier.py` in pyproject.toml.
 
 ---
 
 ### Chunk 4.13 — TeamsApprovalNotifier ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** Claude (claude-sonnet-4-6)
 **Depends on:** 4.11
 **PRD Reference:** Section 7.5 (Teams Notification)
 
@@ -1739,7 +1763,10 @@ Implement the Microsoft Teams Adaptive Card approval notifier. Sends Adaptive Ca
 - [ ] Unit tests: `send_approval_request()` with mocked webhook; result notification; unconfigured notifier returns `is_configured() = False`
 
 **Completion Log:**
-_No entries yet._
+- Created `app/workflows/notifiers/teams_notifier.py`: `TeamsApprovalNotifier` POSTs Adaptive Cards to `TEAMS_WEBHOOK_URL`. Card body: risk level + workflow name title, indicator/trigger/confidence/expiry fact set, agent reason, `Action.OpenUrl` buttons linking to `{CALSETA_BASE_URL}/v1/workflow-approvals/{uuid}/approve` and `/reject`. `send_result_notification()` posts a second card with Approved/Rejected outcome and execution result if present.
+- `POST /v1/approvals/callback/teams` added in `approvals.py`: returns `200` with a message explaining REST API approval path (Teams incoming webhooks don't support interactive button callbacks in v1).
+- Added `TEAMS_WEBHOOK_URL` to `app/config.py`. Added `E501` per-file-ignore for `teams_notifier.py` in pyproject.toml.
+- Unit tests in `tests/test_approval_gate.py` cover all acceptance criteria for 4.11/4.12/4.13: 36 tests total; all pass.
 
 ---
 
