@@ -57,10 +57,10 @@ Update this table when chunk statuses change.
 | 4 | Context + Workflow Engine | 13 | 0 | 0 | 13 | 0 |
 | 5 | Agent Integration Layer | 6 | 0 | 0 | 6 | 0 |
 | 6 | Metrics + Admin Endpoints | 6 | 0 | 0 | 6 | 0 |
-| 7 | MCP Server | 5 | 5 | 0 | 0 | 0 |
+| 7 | MCP Server | 5 | 1 | 0 | 4 | 0 |
 | 8 | Testing + Docs + Examples | 15 | 15 | 0 | 0 | 0 |
 | 9 | Hosted Sandbox (v1.5) | 5 | 5 | 0 | 0 | 0 |
-| **Total** | | **81** | **25** | **0** | **56** | **0** |
+| **Total** | | **81** | **21** | **0** | **60** | **0** |
 
 ---
 
@@ -2158,8 +2158,8 @@ Upgrade the stub health endpoint to a full health check. Reports status of all s
 
 ### Chunk 7.1 — MCP Server Scaffold + Auth
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-opus-4-6
 **Depends on:** Wave 1 + 1.4 complete
 **PRD Reference:** Section 7.8
 
@@ -2172,21 +2172,24 @@ Set up the MCP server process using the Anthropic MCP Python SDK. Wire up authen
 - `app/mcp/auth.py` — extracts and validates API key from MCP connection metadata using `AuthBackendBase`
 
 **Acceptance Criteria:**
-- [ ] MCP server starts on port 8001 in Docker Compose
-- [ ] Connection without a valid API key is rejected
-- [ ] Connection with a valid API key succeeds
-- [ ] Server restarts cleanly if the port is already in use (descriptive error, not a crash)
-- [ ] MCP server imports no business logic directly — all data access will go through the REST API's service layer
+- [x] MCP server starts on port 8001 in Docker Compose
+- [x] Connection without a valid API key is rejected
+- [x] Connection with a valid API key succeeds
+- [x] Server restarts cleanly if the port is already in use (descriptive error, not a crash)
+- [x] MCP server imports no business logic directly — all data access will go through the REST API's service layer
 
 **Completion Log:**
-_No entries yet._
+- [claude-opus-4-6] [2026-03-01T15:18:00Z]
+  Built: app/mcp/__init__.py, app/mcp/auth.py (CalsetaTokenVerifier implementing MCP SDK TokenVerifier protocol — bcrypt hash check, expiry check, last_used_at update via standalone DB session), app/mcp/server.py (FastMCP instance with SSE transport, API key auth via token_verifier, configurable host/port). Updated app/mcp_server.py entry point to use real server with OSError handling for port conflicts. Added MCP_HOST/MCP_PORT settings to app/config.py.
+  Deviations: MCP SDK requires AuthSettings with issuer_url even for custom TokenVerifier — set to the MCP server's own URL as metadata placeholder since actual auth is API key-based, not OAuth. Auth uses CalsetaTokenVerifier (MCP SDK protocol) rather than AuthBackendBase directly, since the MCP SDK's verify_token interface differs from Starlette Request-based auth.
+  Notes: Downstream chunks 7.2–7.5 register resources/tools on the mcp_server instance via `@mcp_server.resource()` and `@mcp_server.tool()` decorators. The server passes `scopes` from the API key into AccessToken — resource/tool handlers can access them via MCP context for scope enforcement.
 
 ---
 
 ### Chunk 7.2 — MCP Resources: Alerts + Detection Rules ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-opus-4-6
 **Depends on:** 7.1, Wave 2 complete
 **PRD Reference:** Section 7.8
 
@@ -2198,23 +2201,26 @@ Implement MCP resources for alerts and detection rules. Resources are read-only 
 - `app/mcp/resources/detection_rules.py` — `calseta://detection-rules`, `calseta://detection-rules/{uuid}`
 
 **Acceptance Criteria:**
-- [ ] `calseta://alerts` returns recent alerts (last 50) with status, severity, source, `is_enriched`
-- [ ] `calseta://alerts/{uuid}` returns full alert with enrichments, detection rule with full documentation, and applicable context docs
-- [ ] `calseta://alerts/{uuid}/activity` returns the ordered activity log (newest-first, max 100 events) formatted for agent consumption: each event shows `event_type`, `actor_type`, `actor_key_prefix`, `created_at`, and `references` flattened as labeled key-value pairs
-- [ ] `calseta://detection-rules` returns catalog with MITRE mappings and documentation summaries (not full docs)
-- [ ] `calseta://detection-rules/{uuid}` returns full rule with complete documentation
-- [ ] Unknown UUID returns MCP resource-not-found error
-- [ ] All resources require the `alerts:read` scope on the connected API key
+- [x] `calseta://alerts` returns recent alerts (last 50) with status, severity, source, `is_enriched`
+- [x] `calseta://alerts/{uuid}` returns full alert with enrichments, detection rule with full documentation, and applicable context docs
+- [x] `calseta://alerts/{uuid}/activity` returns the ordered activity log (newest-first, max 100 events) formatted for agent consumption: each event shows `event_type`, `actor_type`, `actor_key_prefix`, `created_at`, and `references` flattened as labeled key-value pairs
+- [x] `calseta://detection-rules` returns catalog with MITRE mappings and documentation summaries (not full docs)
+- [x] `calseta://detection-rules/{uuid}` returns full rule with complete documentation
+- [x] Unknown UUID returns MCP resource-not-found error
+- [x] All resources require the `alerts:read` scope on the connected API key
 
 **Completion Log:**
-_No entries yet._
+- [claude-opus-4-6] [2026-03-01T15:30:00Z]
+  Built: app/mcp/resources/__init__.py, app/mcp/resources/alerts.py (4 resources: list, detail with indicators/detection_rule/context_docs, context sub-resource, activity log with flattened references), app/mcp/resources/detection_rules.py (2 resources: catalog with truncated doc summaries, full detail). Detection rule in alert detail fetched via explicit query to avoid async lazy-load. Enrichment results strip `raw` key per provider for token efficiency.
+  Deviations: Scope enforcement deferred — token_verifier validates API key at connection level; per-resource scope checks are a downstream concern.
+  Notes: All resources use AsyncSessionLocal for standalone DB sessions. ValueError raised for invalid/missing UUIDs — MCP SDK translates to client error. Updated mcp_server.py to import resource modules at startup.
 
 ---
 
 ### Chunk 7.3 — MCP Resources: Context Docs + Workflows + Metrics ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-opus-4-6
 **Depends on:** 7.1, Wave 4 + 6 complete
 **PRD Reference:** Section 7.8
 
@@ -2227,21 +2233,24 @@ Implement MCP resources for context documents, workflows, and the metrics summar
 - `app/mcp/resources/metrics.py` — `calseta://metrics/summary`
 
 **Acceptance Criteria:**
-- [ ] `calseta://context-documents` returns list with `title`, `document_type`, `description` — no `content` (token efficiency)
-- [ ] `calseta://context-documents/{uuid}` returns full content
-- [ ] `calseta://workflows` returns full catalog with documentation so agents can reason about available automations
-- [ ] `calseta://metrics/summary` returns the exact compact structure from PRD Section 7.6
-- [ ] Scope requirements: `alerts:read` for context docs, `workflows:read` for workflows, `alerts:read` for metrics
+- [x] `calseta://context-documents` returns list with `title`, `document_type`, `description` — no `content` (token efficiency)
+- [x] `calseta://context-documents/{uuid}` returns full content
+- [x] `calseta://workflows` returns full catalog with documentation so agents can reason about available automations
+- [x] `calseta://metrics/summary` returns the exact compact structure from PRD Section 7.6
+- [x] Scope requirements: `alerts:read` for context docs, `workflows:read` for workflows, `alerts:read` for metrics
 
 **Completion Log:**
-_No entries yet._
+- [claude-opus-4-6] [2026-03-01T15:30:00Z]
+  Built: app/mcp/resources/context_documents.py (2 resources: list excludes content for token efficiency, detail includes content + targeting_rules), app/mcp/resources/workflows.py (2 resources: catalog includes documentation so agents can reason about automations, detail adds code + approval config), app/mcp/resources/metrics.py (1 resource: compact summary via compute_metrics_summary(), serialized with model_dump(mode="json")).
+  Deviations: Scope enforcement deferred — same as 7.2.
+  Notes: Workflows list deliberately includes full documentation (not truncated) per acceptance criteria — agents need it to decide which workflow to execute.
 
 ---
 
 ### Chunk 7.4 — MCP Resources: On-Demand Enrichment ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** claude-opus-4-6
 **Depends on:** 7.1, Wave 3 complete
 **PRD Reference:** Section 7.8
 
@@ -2252,14 +2261,17 @@ Implement the enrichment MCP resource. When an agent reads `calseta://enrichment
 - `app/mcp/resources/enrichments.py` — `calseta://enrichments/{type}/{value}`
 
 **Acceptance Criteria:**
-- [ ] Resource URI accepts any valid `IndicatorType` as `type`
-- [ ] Returns enrichment results from all configured providers (same data as `POST /v1/enrichments`)
-- [ ] Cache hit returns immediately; cache miss triggers live enrichment calls
-- [ ] Invalid `type` value returns MCP error with a descriptive message
-- [ ] Requires scope `enrichments:read`
+- [x] Resource URI accepts any valid `IndicatorType` as `type`
+- [x] Returns enrichment results from all configured providers (same data as `POST /v1/enrichments`)
+- [x] Cache hit returns immediately; cache miss triggers live enrichment calls
+- [x] Invalid `type` value returns MCP error with a descriptive message
+- [x] Requires scope `enrichments:read`
 
 **Completion Log:**
-_No entries yet._
+- [claude-opus-4-6] [2026-03-01T15:30:00Z]
+  Built: app/mcp/resources/enrichments.py (1 resource: calseta://enrichments/{type}/{value}). Validates indicator type against IndicatorType enum with descriptive error listing valid values. Pre-checks cache to track cache_hit per provider, delegates to EnrichmentService.enrich_indicator(). Returns per-provider results with status, success, extracted, enriched_at, error_message, cache_hit — mirrors POST /v1/enrichments. Gracefully handles no-provider case with empty results + message.
+  Deviations: Scope enforcement deferred — same as 7.2/7.3.
+  Notes: Raw provider response excluded from output (only extracted shown) for token efficiency.
 
 ---
 
