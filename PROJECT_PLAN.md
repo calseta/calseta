@@ -1276,8 +1276,8 @@ Implement the provider listing endpoint. Returns all registered enrichment provi
 
 ### Chunk 4.1 — Context Document CRUD Endpoints ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** Claude (claude-sonnet-4-6)
 **Depends on:** Wave 1 complete
 **PRD Reference:** Sections 7.4, 7.9
 
@@ -1303,7 +1303,12 @@ Implement context document management endpoints. Documents are markdown text wit
 - [ ] `markitdown` and `python-multipart` are listed as dependencies in `pyproject.toml`
 
 **Completion Log:**
-_No entries yet._
+- Created `app/schemas/context_documents.py`: `DOCUMENT_TYPES` frozenset, `validate_targeting_rules()` with `_validate_rule()`, `ContextDocumentCreate` (with Pydantic validators for document_type and targeting_rules), `ContextDocumentPatch` (all optional), `ContextDocumentSummary` (no content), `ContextDocumentResponse` (extends summary with content + targeting_rules).
+- Created `app/repositories/context_document_repository.py`: `create()`, `get_by_uuid()`, `list_documents()` (type/is_global filters + pagination), `list_all_for_targeting()` (for 4.2), `patch()` (increments version when content changes), `delete()`.
+- Created `app/api/v1/context_documents.py`: all 5 endpoints. POST accepts both `application/json` (content field) and `multipart/form-data` (file upload). File-to-markdown via `markitdown.MarkItDown().convert(BytesIO(bytes), stream_info=StreamInfo(extension=ext, filename=filename))`. Unsupported file format returns 422. Original file not persisted.
+- Created `tests/test_context_documents.py`: 23 unit tests covering `validate_targeting_rules()`, `ContextDocumentCreate`, and `ContextDocumentPatch`; all pass.
+- Updated `app/api/v1/router.py` to include `context_documents.router`.
+- Note: `markitdown` and `python-multipart` are already in pyproject.toml (added in Wave 1).
 
 ---
 
@@ -1363,8 +1368,8 @@ _No entries yet._
 
 ### Chunk 4.4 — Workflow CRUD Endpoints ⚡
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** Claude (claude-sonnet-4-6)
 **Depends on:** Wave 1 complete
 **PRD Reference:** Sections 7.5, 7.9
 
@@ -1389,7 +1394,13 @@ Implement workflow management endpoints. Workflows are Python automation functio
 - [ ] Unit tests: create with valid code passes; create with `import os` returns `400`; patch with new code increments version
 
 **Completion Log:**
-_No entries yet._
+- Created `app/services/workflow_ast.py`: `validate_workflow_code(code: str) -> list[str]`; checks: (1) parses as valid Python, (2) defines `async def run`, (3) only allowed imports (stdlib safe subset + `calseta.workflows`), (4) no blocked builtins (`exec`, `eval`, `open`, `compile`, `__import__`, `breakpoint`, `input`, `memoryview`). Returns empty list on success.
+- Created `app/schemas/workflows.py`: `WorkflowCreate` (with Pydantic validators for workflow_type, indicator_types, state, risk_level), `WorkflowPatch` (all optional), `WorkflowSummary` (no code field), `WorkflowResponse` (extends summary with code + approval config). All field validators accept `None` gracefully in patch.
+- Created `app/repositories/workflow_repository.py`: `create()`, `get_by_uuid()`, `get_by_name_and_system()`, `list_workflows()` (type/state/is_active filters + pagination), `patch()` (increments `code_version` when code changes), `upsert_system_workflow()` (idempotent seeder helper), `delete()`.
+- Created `app/api/v1/workflows.py`: all 5 CRUD endpoints. `DELETE` returns 403 on `is_system=True`. AST validation called on create and on PATCH with new code; returns 400 with `details.errors` list on failure. Requires `workflows:read` for reads, `workflows:write` for writes.
+- Created `tests/test_workflow_ast.py`: 19 unit tests covering valid code, missing `run` function, blocked imports (`os`, `subprocess`, `sys`, `importlib`, `socket`), blocked builtins (`exec`, `eval`, `open`, `compile`), syntax errors, multiple violations; all pass.
+- Updated `app/api/v1/router.py` to include `workflows.router`.
+- Updated `app/auth/scopes.py` to add `WORKFLOWS_WRITE = "workflows:write"` (was missing from original scope list).
 
 ---
 

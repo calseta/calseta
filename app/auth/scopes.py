@@ -15,6 +15,7 @@ class Scope(StrEnum):
     ALERTS_WRITE = "alerts:write"
     ENRICHMENTS_READ = "enrichments:read"
     WORKFLOWS_READ = "workflows:read"
+    WORKFLOWS_WRITE = "workflows:write"
     WORKFLOWS_EXECUTE = "workflows:execute"
     AGENTS_READ = "agents:read"
     AGENTS_WRITE = "agents:write"
