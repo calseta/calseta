@@ -35,6 +35,7 @@ from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.auth.api_key_backend import APIKeyAuthBackend
+from app.auth.audit import log_auth_failure
 from app.auth.base import AuthBackendBase, AuthContext
 from app.auth.scopes import Scope
 from app.db.session import get_db
@@ -47,11 +48,16 @@ async def get_auth_context(
     """
     FastAPI dependency — authenticates the request and returns AuthContext.
 
+    Stores the result in `request.state.auth` so the rate limiter key
+    function can read the key_prefix without a second DB lookup.
+
     Raises CalsetaException(UNAUTHORIZED, 401) on any auth failure.
     Routes that need only authentication use this directly.
     """
     backend: AuthBackendBase = APIKeyAuthBackend(db)
-    return await backend.authenticate(request)
+    ctx = await backend.authenticate(request)
+    request.state.auth = ctx  # Store for rate limiter key function
+    return ctx
 
 
 def require_scope(*scopes: Scope) -> Callable[..., Awaitable[AuthContext]]:
@@ -68,16 +74,23 @@ def require_scope(*scopes: Scope) -> Callable[..., Awaitable[AuthContext]]:
     """
 
     async def _check_scope(
+        request: Request,
         auth: Annotated[AuthContext, Depends(get_auth_context)],
     ) -> AuthContext:
         if Scope.ADMIN in auth.scopes:
             return auth
         if any(s in auth.scopes for s in scopes):
             return auth
+        required = " or ".join(str(s) for s in scopes)
+        log_auth_failure(
+            "insufficient_scope",
+            request,
+            key_prefix=auth.key_prefix,
+            required_scope=required,
+        )
         raise CalsetaException(
             code="FORBIDDEN",
-            message="Insufficient scope. Required: "
-            + " or ".join(str(s) for s in scopes),
+            message=f"Insufficient scope. Required: {required}",
             status_code=status.HTTP_403_FORBIDDEN,
             details={"required_scopes": [str(s) for s in scopes]},
         )

@@ -186,8 +186,12 @@ class TestAPIKeyAuthBackend:
         mock_record.key_hash = key_hash
         mock_record.scopes = ["alerts:read"]
         mock_record.allowed_sources = None
+        mock_record.expires_at = None  # Not expired
 
-        db = MagicMock()
+        # Use AsyncMock for db so that db.flush() is awaitable
+        from unittest.mock import AsyncMock as AsyncMockCls
+
+        db = AsyncMockCls()
 
         with patch(
             "app.auth.api_key_backend.APIKeyRepository"
@@ -244,6 +248,15 @@ class TestAPIKeyAuthBackend:
 
 
 class TestRequireScope:
+    def _make_mock_request(self) -> object:
+        from unittest.mock import MagicMock
+
+        request = MagicMock()
+        request.method = "GET"
+        request.url.path = "/v1/test"
+        request.headers = {}
+        return request
+
     @pytest.mark.asyncio
     async def test_admin_passes_any_scope_check(self) -> None:
         from app.auth.base import AuthContext
@@ -251,7 +264,7 @@ class TestRequireScope:
 
         ctx = AuthContext(key_prefix="cai_xxxx", scopes=["admin"], key_id=1)
         checker = require_scope(Scope.ALERTS_WRITE)
-        result = await checker(ctx)  # type: ignore[call-arg]
+        result = await checker(self._make_mock_request(), ctx)  # type: ignore[call-arg]
         assert result is ctx
 
     @pytest.mark.asyncio
@@ -261,7 +274,7 @@ class TestRequireScope:
 
         ctx = AuthContext(key_prefix="cai_xxxx", scopes=["alerts:read"], key_id=1)
         checker = require_scope(Scope.ALERTS_READ)
-        result = await checker(ctx)  # type: ignore[call-arg]
+        result = await checker(self._make_mock_request(), ctx)  # type: ignore[call-arg]
         assert result is ctx
 
     @pytest.mark.asyncio
@@ -274,7 +287,7 @@ class TestRequireScope:
         checker = require_scope(Scope.ALERTS_WRITE)
 
         with pytest.raises(CalsetaException) as exc_info:
-            await checker(ctx)  # type: ignore[call-arg]
+            await checker(self._make_mock_request(), ctx)  # type: ignore[call-arg]
 
         assert exc_info.value.status_code == 403
         assert exc_info.value.code == "FORBIDDEN"
@@ -287,5 +300,5 @@ class TestRequireScope:
 
         ctx = AuthContext(key_prefix="cai_xxxx", scopes=["workflows:read"], key_id=1)
         checker = require_scope(Scope.ALERTS_READ, Scope.WORKFLOWS_READ)
-        result = await checker(ctx)  # type: ignore[call-arg]
+        result = await checker(self._make_mock_request(), ctx)  # type: ignore[call-arg]
         assert result is ctx
