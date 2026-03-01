@@ -21,7 +21,7 @@ lint:
 	ruff check app/ tests/
 
 typecheck:
-	mypy app/
+	mypy app/ tests/
 
 migrate:
 	alembic upgrade head
