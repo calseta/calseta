@@ -1,11 +1,13 @@
 """
 Workflow management routes.
 
-GET    /v1/workflows            — Paginated list (no code field)
-POST   /v1/workflows            — Create workflow
-GET    /v1/workflows/{uuid}     — Full workflow with code
-PATCH  /v1/workflows/{uuid}     — Partial update
-DELETE /v1/workflows/{uuid}     — Delete (403 if is_system=True)
+GET    /v1/workflows                  — Paginated list (no code field)
+POST   /v1/workflows                  — Create workflow
+GET    /v1/workflows/{uuid}           — Full workflow with code
+PATCH  /v1/workflows/{uuid}           — Partial update
+DELETE /v1/workflows/{uuid}           — Delete (403 if is_system=True)
+POST   /v1/workflows/{uuid}/execute   — Enqueue a workflow run (202 Accepted)
+GET    /v1/workflows/{uuid}/runs      — Paginated run history
 
 On create and on any PATCH that includes a new `code` value, the code is
 AST-validated before storage. Invalid code returns 400 with the error list.
@@ -26,11 +28,15 @@ from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
 from app.db.session import get_db
 from app.repositories.workflow_repository import WorkflowRepository
+from app.repositories.workflow_run_repository import WorkflowRunRepository
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.workflows import (
     WorkflowCreate,
+    WorkflowExecuteRequest,
+    WorkflowExecuteResponse,
     WorkflowPatch,
     WorkflowResponse,
+    WorkflowRunResponse,
     WorkflowSummary,
 )
 from app.services.workflow_ast import validate_workflow_code
@@ -39,6 +45,7 @@ router = APIRouter(prefix="/workflows", tags=["workflows"])
 
 _Read = Annotated[AuthContext, Depends(require_scope(Scope.WORKFLOWS_READ))]
 _Write = Annotated[AuthContext, Depends(require_scope(Scope.WORKFLOWS_WRITE))]
+_Execute = Annotated[AuthContext, Depends(require_scope(Scope.WORKFLOWS_EXECUTE))]
 
 
 def _to_summary(w: object) -> WorkflowSummary:
@@ -222,3 +229,174 @@ async def delete_workflow(
             status_code=status.HTTP_403_FORBIDDEN,
         )
     await repo.delete(workflow)
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/workflows/{uuid}/execute  (Chunk 4.8)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{workflow_uuid}/execute",
+    response_model=DataResponse[WorkflowExecuteResponse],
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def execute_workflow(
+    workflow_uuid: UUID,
+    body: WorkflowExecuteRequest,
+    auth: _Execute,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[WorkflowExecuteResponse]:
+    """
+    Enqueue a workflow for execution. Returns 202 Accepted immediately.
+
+    The indicator must already exist in the database (created by alert ingestion).
+    If alert_uuid is provided, it must also already exist.
+    """
+    from app.queue.factory import get_queue_backend
+    from app.repositories.alert_repository import AlertRepository
+
+    repo = WorkflowRepository(db)
+    workflow = await repo.get_by_uuid(workflow_uuid)
+    if workflow is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message=f"Workflow {workflow_uuid} not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    if not workflow.is_active or workflow.state == "draft":
+        raise CalsetaException(
+            code="WORKFLOW_NOT_EXECUTABLE",
+            message=(
+                "Workflow cannot be executed: it is either inactive or in 'draft' state. "
+                "Set state='active' and is_active=True before executing."
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Resolve optional alert_uuid → alert_id
+    alert_id: int | None = None
+    if body.alert_uuid is not None:
+        alert_repo = AlertRepository(db)
+        alert = await alert_repo.get_by_uuid(body.alert_uuid)
+        if alert is None:
+            raise CalsetaException(
+                code="NOT_FOUND",
+                message=f"Alert {body.alert_uuid} not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        alert_id = alert.id
+
+    # Create WorkflowRun record with status="queued"
+    run_repo = WorkflowRunRepository(db)
+    run = await run_repo.create(
+        workflow_id=workflow.id,
+        trigger_type=body.trigger_source,
+        trigger_context={
+            "indicator_type": body.indicator_type,
+            "indicator_value": body.indicator_value,
+            "alert_id": alert_id,
+            "alert_uuid": str(body.alert_uuid) if body.alert_uuid else None,
+        },
+        code_version_executed=workflow.code_version,
+        status="queued",
+    )
+
+    # Flush to get run.id, then enqueue
+    await db.flush()
+
+    queue = get_queue_backend()
+    await queue.enqueue(
+        "execute_workflow_run",
+        {"workflow_run_id": run.id},
+        queue="workflows",
+        delay_seconds=0,
+        priority=0,
+    )
+
+    return DataResponse(
+        data=WorkflowExecuteResponse(run_uuid=run.uuid, status="queued")
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/workflows/{uuid}/runs  (Chunk 4.9)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{workflow_uuid}/runs",
+    response_model=PaginatedResponse[WorkflowRunResponse],
+)
+async def list_workflow_runs(
+    workflow_uuid: UUID,
+    auth: _Read,
+    pagination: Annotated[PaginationParams, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PaginatedResponse[WorkflowRunResponse]:
+    repo = WorkflowRepository(db)
+    workflow = await repo.get_by_uuid(workflow_uuid)
+    if workflow is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message=f"Workflow {workflow_uuid} not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    run_repo = WorkflowRunRepository(db)
+    runs, total = await run_repo.list_for_workflow(
+        workflow.id,
+        page=pagination.page,
+        page_size=pagination.page_size,
+    )
+    return PaginatedResponse(
+        data=[WorkflowRunResponse.model_validate(r) for r in runs],
+        meta=PaginationMeta.from_total(
+            total=total, page=pagination.page, page_size=pagination.page_size
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/workflow-runs  (Chunk 4.10 — global run history)
+# ---------------------------------------------------------------------------
+
+workflow_runs_router = APIRouter(prefix="/workflow-runs", tags=["workflow-runs"])
+
+
+@workflow_runs_router.get("", response_model=PaginatedResponse[WorkflowRunResponse])
+async def list_all_workflow_runs(
+    auth: _Read,
+    pagination: Annotated[PaginationParams, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    run_status: str | None = Query(None, alias="status"),
+    workflow_uuid: UUID | None = Query(None),
+) -> PaginatedResponse[WorkflowRunResponse]:
+    """List workflow runs across all workflows. Filterable by status and workflow_uuid."""
+    # Resolve optional workflow_uuid → workflow_id
+    wf_id: int | None = None
+    if workflow_uuid is not None:
+        wf_repo = WorkflowRepository(db)
+        wf = await wf_repo.get_by_uuid(workflow_uuid)
+        if wf is None:
+            raise CalsetaException(
+                code="NOT_FOUND",
+                message=f"Workflow {workflow_uuid} not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        wf_id = wf.id
+
+    run_repo = WorkflowRunRepository(db)
+    runs, total = await run_repo.list_all(
+        status=run_status,
+        workflow_id=wf_id,
+        page=pagination.page,
+        page_size=pagination.page_size,
+    )
+    return PaginatedResponse(
+        data=[WorkflowRunResponse.model_validate(r) for r in runs],
+        meta=PaginationMeta.from_total(
+            total=total, page=pagination.page, page_size=pagination.page_size
+        ),
+    )

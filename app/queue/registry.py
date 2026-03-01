@@ -17,7 +17,7 @@ Task naming:
 
 Registered tasks:
   Wave 3: enrich_alert          (queue: enrichment)
-  Wave 4: execute_workflow      (queue: workflows)       ← added in Wave 4
+  Wave 4: execute_workflow_run  (queue: workflows)       ← added in Wave 4
   Wave 4: deliver_agent_webhook (queue: dispatch)        ← added in Wave 4
 """
 
@@ -69,6 +69,94 @@ async def enrich_alert_task(alert_id: int) -> None:
         try:
             service = EnrichmentService(session, cache)
             await service.enrich_alert(alert_id)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+
+# ---------------------------------------------------------------------------
+# Wave 4: Workflow execution task
+# ---------------------------------------------------------------------------
+
+
+@procrastinate_app.task(
+    name="execute_workflow_run",
+    queue="workflows",
+    retry=procrastinate.RetryStrategy(
+        max_attempts=1,  # Workflow runs are not auto-retried — failures are recorded
+        wait=0,
+    ),
+)
+async def execute_workflow_run_task(workflow_run_id: int) -> None:
+    """
+    Execute a queued workflow run.
+
+    Loads the WorkflowRun record by ID, calls execute_workflow() from the sandbox,
+    and updates the run record with the result.
+
+    Not idempotent by design — each call represents one execution attempt.
+    The WorkflowRun's status is updated from 'queued' to 'success', 'failed',
+    or 'timed_out' after execution completes.
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from app.db.models.workflow import Workflow as WorkflowModel
+    from app.db.session import AsyncSessionLocal
+    from app.repositories.workflow_run_repository import WorkflowRunRepository
+    from app.services.workflow_executor import execute_workflow
+    from app.workflows.context import TriggerContext
+
+    async with AsyncSessionLocal() as session:
+        try:
+            run_repo = WorkflowRunRepository(session)
+            run = await run_repo.get_by_id(workflow_run_id)
+            if run is None:
+                return  # Run was deleted before task was processed
+
+            wf_result = await session.execute(
+                select(WorkflowModel).where(WorkflowModel.id == run.workflow_id)
+            )
+            workflow = wf_result.scalar_one_or_none()
+            if workflow is None:
+                return
+
+            # Build TriggerContext from stored trigger_context JSON
+            tc = run.trigger_context or {}
+            trigger_ctx = TriggerContext(
+                indicator_type=str(tc.get("indicator_type", "")),
+                indicator_value=str(tc.get("indicator_value", "")),
+                trigger_source=run.trigger_type,
+                alert_id=tc.get("alert_id"),
+            )
+
+            run.started_at = datetime.now(UTC).isoformat()
+            await session.flush()
+
+            exec_result = await execute_workflow(workflow, trigger_ctx, session)
+
+            # Determine status
+            if "timed out" in exec_result.result.message.lower():
+                run_status = "timed_out"
+            elif exec_result.result.success:
+                run_status = "success"
+            else:
+                run_status = "failed"
+
+            await run_repo.update_after_execution(
+                run,
+                status=run_status,
+                log_output=exec_result.log_output,
+                result_data={
+                    "success": exec_result.result.success,
+                    "message": exec_result.result.message,
+                    "data": exec_result.result.data,
+                },
+                duration_ms=exec_result.duration_ms,
+                completed_at=datetime.now(UTC).isoformat(),
+            )
             await session.commit()
         except Exception:
             await session.rollback()

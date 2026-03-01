@@ -1546,8 +1546,8 @@ _No entries yet._
 
 ### Chunk 4.8 — POST /v1/workflows/{uuid}/execute + Task Queue Integration
 
-**Status:** `pending`
-**Assigned Agent:** —
+**Status:** `complete`
+**Assigned Agent:** Claude (claude-sonnet-4-6)
 **Depends on:** 4.6, 1.6
 **PRD Reference:** Sections 7.5, 7.9, 7.11
 
@@ -1569,13 +1569,19 @@ Implement the workflow execution endpoint and wire it to the task queue. The end
 - [ ] Requires scope `workflows:execute`
 
 **Completion Log:**
-_No entries yet._
+- Created `app/repositories/workflow_run_repository.py`: `create()`, `get_by_uuid()`, `get_by_id()`, `list_for_workflow()` (paginated), `list_all()` (paginated with status/workflow_id filters), `update_after_execution()`.
+- Added `WorkflowExecuteRequest` (indicator_type, indicator_value, alert_uuid, trigger_source), `WorkflowExecuteResponse` (run_uuid, status), `WorkflowRunResponse` schemas to `app/schemas/workflows.py`.
+- Registered `execute_workflow_run_task` on the `workflows` queue in `app/queue/registry.py`. Worker task: loads WorkflowRun + Workflow by ID, builds TriggerContext from trigger_context JSONB, calls execute_workflow(), updates WorkflowRun status/log_output/result/duration_ms.
+- Added `POST /v1/workflows/{uuid}/execute` to `app/api/v1/workflows.py`: creates WorkflowRun(status="queued"), enqueues task, returns 202. 400 if workflow inactive or draft. 404 for unknown workflow or alert. Requires `workflows:execute` scope.
+- Added `GET /v1/workflows/{uuid}/runs` to `app/api/v1/workflows.py`. Requires `workflows:read`.
+- Added `GET /v1/workflow-runs` via `workflow_runs_router` in `app/api/v1/workflows.py`. Supports filters: status, workflow_uuid.
+- Updated router.py to include `workflows.workflow_runs_router`.
 
 ---
 
 ### Chunk 4.9 — Workflow Run Audit Log + Run Endpoints
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 4.8
 **PRD Reference:** Sections 7.5, 7.9

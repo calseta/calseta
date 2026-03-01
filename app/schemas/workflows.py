@@ -153,3 +153,69 @@ class WorkflowResponse(WorkflowSummary):
     retry_count: int
     approval_channel: str | None
     approval_timeout_seconds: int
+
+
+# ---------------------------------------------------------------------------
+# Workflow execution schemas (Chunk 4.8)
+# ---------------------------------------------------------------------------
+
+TRIGGER_SOURCES = frozenset({"human", "agent", "system"})
+
+
+class WorkflowExecuteRequest(BaseModel):
+    """Request body for POST /v1/workflows/{uuid}/execute."""
+
+    indicator_type: str
+    indicator_value: str
+    alert_uuid: uuid.UUID | None = None
+    trigger_source: str = "human"
+
+    @field_validator("indicator_type")
+    @classmethod
+    def _validate_indicator_type(cls, v: str) -> str:
+        valid = {t.value for t in IndicatorType}
+        if v not in valid:
+            raise ValueError(
+                f"indicator_type must be one of: {sorted(valid)}"
+            )
+        return v
+
+    @field_validator("trigger_source")
+    @classmethod
+    def _validate_trigger_source(cls, v: str) -> str:
+        if v not in TRIGGER_SOURCES:
+            raise ValueError(f"trigger_source must be one of: {sorted(TRIGGER_SOURCES)}")
+        return v
+
+
+class WorkflowExecuteResponse(BaseModel):
+    """Response for POST /v1/workflows/{uuid}/execute (202 Accepted)."""
+
+    run_uuid: uuid.UUID
+    status: str  # "queued"
+
+
+# ---------------------------------------------------------------------------
+# Workflow run schemas (Chunk 4.9)
+# ---------------------------------------------------------------------------
+
+
+class WorkflowRunResponse(BaseModel):
+    """Full workflow run audit record."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    uuid: uuid.UUID
+    workflow_id: int
+    trigger_type: str
+    trigger_context: dict[str, Any] | None
+    code_version_executed: int
+    status: str
+    attempt_count: int
+    log_output: str | None
+    result: dict[str, Any] | None
+    duration_ms: int | None
+    started_at: str | None
+    completed_at: str | None
+    created_at: datetime
+    updated_at: datetime
