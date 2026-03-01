@@ -24,12 +24,16 @@ Startup events:
 
 from __future__ import annotations
 
+import pathlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
+from starlette.responses import FileResponse
+from starlette.types import Receive, Scope, Send
 
 from app.api.errors import register_exception_handlers
 from app.api.health import router as health_router
@@ -136,7 +140,44 @@ def create_app() -> FastAPI:
     setup_cors(application)                                # adds CORSMiddleware if configured
     application.add_middleware(BodySizeLimitMiddleware)    # outermost
 
+    # Admin UI: serve static build from ui/dist/ if present.
+    # In production, the Dockerfile copies the built UI into the image.
+    # In development with `make dev`, the build output is visible via
+    # the volume mount. Run `make ui-build` once to generate ui/dist/.
+    _ui_dist = pathlib.Path(__file__).resolve().parent.parent / "ui" / "dist"
+    if _ui_dist.is_dir():
+        application.mount(
+            "/",
+            _SPAStaticFiles(directory=str(_ui_dist), html=True),
+            name="ui",
+        )
+        logger.info("admin_ui_mounted", path=str(_ui_dist))
+
     return application
+
+
+class _SPAStaticFiles(StaticFiles):
+    """StaticFiles with SPA fallback — returns index.html for unknown paths.
+
+    Starlette's StaticFiles with ``html=True`` serves index.html for
+    directory requests but returns 404 for paths like ``/alerts/abc123``
+    that don't correspond to a real file.  This subclass intercepts
+    those 404s and returns index.html so client-side routing can handle
+    them.
+    """
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        except Exception:
+            # Path didn't match any static file — serve index.html
+            # so the SPA router can handle it client-side.
+            index = pathlib.Path(self.directory) / "index.html"  # type: ignore[arg-type]
+            if index.is_file():
+                response = FileResponse(str(index))
+                await response(scope, receive, send)
+            else:
+                raise
 
 
 app = create_app()
