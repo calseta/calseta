@@ -115,10 +115,12 @@ class ProcrastinateBackend(TaskQueueBase):
         """
         Block and consume tasks from the named queues.
 
-        Called from worker.py main loop. SIGTERM causes graceful shutdown
-        (procrastinate finishes the current job then exits).
+        Called from worker.py main loop. The app must be opened first to
+        initialize the psycopg connection pool. SIGTERM causes graceful
+        shutdown (procrastinate finishes the current job then exits).
         """
-        await self.app.run_worker_async(
-            queues=queues,
-            concurrency=self._concurrency,
-        )
+        async with self.app.open_async():
+            await self.app.run_worker_async(
+                queues=queues,
+                concurrency=self._concurrency,
+            )

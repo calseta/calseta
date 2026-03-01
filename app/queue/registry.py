@@ -58,40 +58,74 @@ procrastinate_app = procrastinate.App(connector=_connector)
 )
 async def enrich_alert_task(alert_id: int) -> None:
     """
-    Run the enrichment pipeline for all indicators of an alert.
+    Run indicator extraction + enrichment pipeline for an alert.
+
+    Steps:
+      1. Load the alert and its source plugin
+      2. Extract indicators via 3-pass pipeline (IndicatorExtractionService)
+      3. Enrich all extracted indicators via configured providers
+      4. Defer agent dispatch task (best-effort)
 
     Idempotent: re-running after success updates last_seen on indicators and
     refreshes enrichment results; no duplicate records are created.
     """
+    import structlog as _structlog
+
     from app.cache.factory import get_cache_backend
     from app.db.session import AsyncSessionLocal
+    from app.integrations.sources.registry import source_registry
+    from app.repositories.alert_repository import AlertRepository
     from app.services.enrichment import EnrichmentService
+    from app.services.indicator_extraction import IndicatorExtractionService
 
+    _logger = _structlog.get_logger()
     cache = get_cache_backend()
+
     async with AsyncSessionLocal() as session:
         try:
-            service = EnrichmentService(session, cache)
-            await service.enrich_alert(alert_id)
+            alert_repo = AlertRepository(session)
+            alert = await alert_repo.get_by_id(alert_id)
+            if alert is None:
+                _logger.error("enrich_alert_not_found", alert_id=alert_id)
+                return
+
+            # Step 1: Extract indicators (3-pass pipeline)
+            source = source_registry.get(alert.source_name)
+            if source is not None and alert.raw_payload:
+                try:
+                    normalized = source.normalize(alert.raw_payload)
+                    extraction_svc = IndicatorExtractionService(session)
+                    count = await extraction_svc.extract_and_persist(
+                        alert, normalized, alert.raw_payload, source
+                    )
+                    _logger.info(
+                        "indicators_extracted",
+                        alert_id=alert_id,
+                        indicator_count=count,
+                    )
+                except Exception:
+                    _logger.exception(
+                        "indicator_extraction_failed", alert_id=alert_id
+                    )
+                await session.flush()
+
+            # Step 2: Enrich all indicators
+            enrichment_svc = EnrichmentService(session, cache)
+            await enrichment_svc.enrich_alert(alert_id)
             await session.commit()
         except Exception:
             await session.rollback()
             raise
 
-    # Enqueue agent dispatch after successful enrichment (outside session — best-effort)
+    # Defer agent dispatch after successful enrichment (best-effort).
+    # Use the procrastinate task's configure().defer_async() directly — we're already
+    # inside the worker's open_async() context, so calling queue.enqueue() (which
+    # opens a new context) would cause AppNotOpen.
     try:
-        from app.queue.factory import get_queue_backend
-
-        queue = get_queue_backend()
-        await queue.enqueue(
-            "dispatch_agent_webhooks",
-            {"alert_id": alert_id},
-            queue="dispatch",
-            delay_seconds=0,
-            priority=0,
-        )
+        dispatch_task = procrastinate_app.tasks.get("dispatch_agent_webhooks")
+        if dispatch_task is not None:
+            await dispatch_task.defer_async(alert_id=alert_id)
     except Exception:
-        import structlog as _structlog
-
         _structlog.get_logger().warning(
             "dispatch_enqueue_failed", alert_id=alert_id
         )
