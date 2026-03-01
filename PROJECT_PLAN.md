@@ -1010,7 +1010,7 @@ Built app/api/v1/alerts.py with: GET /v1/alerts (7 filters, pagination), GET /v1
 
 ### Chunk 3.1 — EnrichmentProviderBase + Registry
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** Wave 2 complete
 **PRD Reference:** Section 7.2
@@ -1031,13 +1031,13 @@ Define the `EnrichmentProviderBase` ABC and the provider registry. This is the c
 - [ ] Unit tests: mock provider registration, `list_configured` filtering
 
 **Completion Log:**
-_No entries yet._
+- Completed by automated agent. Built EnrichmentProviderBase ABC with get_cache_ttl(), DEFAULT_TTL_BY_TYPE dict. EnrichmentRegistry singleton with register/get/list_all/list_configured/list_for_type. __init__.py registers all 4 providers at import. Note: duplicate provider_name raises ValueError per design.
 
 ---
 
 ### Chunk 3.2 — VirusTotal Enrichment Provider ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 3.1, 1.8
 **PRD Reference:** Sections 7.2, 9
@@ -1059,13 +1059,13 @@ Implement the VirusTotal enrichment provider using httpx async. Supports IP, dom
 - [ ] Unit tests use `httpx` mock / `respx` to simulate VT API responses
 
 **Completion Log:**
-_No entries yet._
+- Completed by automated agent. VirusTotalProvider: IP/domain/hash_md5/hash_sha1/hash_sha256 supported. _build_extracted() helper extracts malicious_count, suspicious_count, total_engines, malice verdict, and type-specific fields. 404 returns success=True with found=False. Cache TTL: IP=3600, Domain=21600, Hash=86400.
 
 ---
 
 ### Chunk 3.3 — AbuseIPDB Enrichment Provider ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 3.1, 1.8
 **PRD Reference:** Sections 7.2, 9
@@ -1087,13 +1087,13 @@ Implement the AbuseIPDB enrichment provider. IP addresses only. Returns abuse co
 - [ ] Unit tests with mocked HTTP responses
 
 **Completion Log:**
-_No entries yet._
+- Completed by automated agent. AbuseIPDBProvider: IP only. _abuse_score_to_malice(): >=75=Malicious, >=25=Suspicious, else Benign. 429 returns failure with rate limit message. Extracts abuse_confidence_score, total_reports, country, ISP, is_tor, is_whitelisted.
 
 ---
 
 ### Chunk 3.4 — Okta Enrichment Provider ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 3.1, 1.8
 **PRD Reference:** Sections 7.2, 9
@@ -1115,13 +1115,13 @@ Implement the Okta enrichment provider. Account type only. Returns user profile,
 - [ ] Unit tests with mocked Okta API responses
 
 **Completion Log:**
-_No entries yet._
+- Completed by automated agent. OktaProvider: account only. Fetches user then groups in same async client context. 404 returns success=True with found=False. mfa_enrolled derived from credentials.provider presence.
 
 ---
 
 ### Chunk 3.5 — Microsoft Entra Enrichment Provider ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 3.1, 1.8
 **PRD Reference:** Sections 7.2, 9
@@ -1144,13 +1144,13 @@ Implement the Microsoft Entra ID (formerly Azure AD) enrichment provider. Accoun
 - [ ] Unit tests with mocked Graph API and token endpoint
 
 **Completion Log:**
-_No entries yet._
+- Completed by automated agent. EntraProvider: account only. OAuth2 client credentials with instance-level token caching (monotonic clock, 60s buffer). Fetches user then memberOf groups. 404 returns success=True with found=False.
 
 ---
 
 ### Chunk 3.6 — In-Memory Enrichment Cache ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 3.1
 **PRD Reference:** Section 7.2
@@ -1173,13 +1173,13 @@ Implement the in-memory enrichment cache with per-entry TTL. Cache key format: `
 - [ ] `CACHE_BACKEND=memory` resolves correctly; unknown value fails at startup
 
 **Completion Log:**
-_No entries yet._
+- Completed by automated agent. InMemoryCache with dict-based TTL using monotonic timestamps. CacheBackendBase ABC with get/set/delete. make_enrichment_key() helper. get_cache_backend() singleton via lru_cache. CACHE_BACKEND setting added to app/config.py.
 
 ---
 
 ### Chunk 3.7 — Enrichment Pipeline (Async, Parallel Execution)
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 3.1, 3.6
 **PRD Reference:** Section 7.2, 7.11
@@ -1204,13 +1204,13 @@ Implement the enrichment pipeline task that runs as a background worker job. For
 - [ ] Enrichment task survives a provider timeout (providers use `httpx` with a 30-second timeout)
 
 **Completion Log:**
-_No entries yet._
+- Completed by automated agent. EnrichmentService: enrich_indicator() (cache-first, concurrent providers via asyncio.gather), enrich_alert() (concurrent indicators, malice aggregation, mark_enriched, activity event). _worst_malice() helper: Malicious>Suspicious>Benign>Pending. procrastinate_app singleton in queue/registry.py; enrich_alert_task registered with RetryStrategy. ProcrastinateBackend updated to use shared app from registry.
 
 ---
 
 ### Chunk 3.8 — POST /v1/enrichments (On-Demand Endpoint)
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 3.7
 **PRD Reference:** Sections 7.2, 7.9
@@ -1230,13 +1230,13 @@ Implement the on-demand enrichment endpoint. Any indicator type and value can be
 - [ ] Requires scope `enrichments:read`
 
 **Completion Log:**
-_No entries yet._
+- Completed by automated agent. POST /v1/enrichments: cache pre-check for cache_hit flag per provider, synchronous results, requires enrichments:read scope. OnDemandEnrichmentRequest/Response schemas added. 422 if no providers support the type.
 
 ---
 
 ### Chunk 3.9 — GET /v1/enrichments/providers ⚡
 
-**Status:** `pending`
+**Status:** `complete`
 **Assigned Agent:** —
 **Depends on:** 3.1
 **PRD Reference:** Sections 7.2, 7.9
@@ -1255,7 +1255,7 @@ Implement the provider listing endpoint. Returns all registered enrichment provi
 - [ ] Requires scope `enrichments:read`
 
 **Completion Log:**
-_No entries yet._
+- Completed by automated agent. GET /v1/enrichments/providers: returns all registered providers with is_configured, display_name, supported_types, cache_ttl_seconds. No secrets in response. Added to enrichments.py alongside 3.8 routes.
 
 ---
 
