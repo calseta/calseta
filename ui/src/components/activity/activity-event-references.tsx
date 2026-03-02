@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { severityColor, statusColor, maliceColor } from "@/lib/format";
-import { Shield, ArrowRight } from "lucide-react";
+import { Shield, ArrowRight, Zap } from "lucide-react";
 
 interface ActivityEventReferencesProps {
   eventType: string;
@@ -107,6 +107,32 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
         </div>
       );
 
+    case "alert_indicators_added":
+      return (
+        <div className="flex items-center gap-2 flex-wrap">
+          {r.indicator_count != null && (
+            <span className="text-xs text-foreground">
+              {String(r.indicator_count)} indicator{Number(r.indicator_count) !== 1 ? "s" : ""} added
+            </span>
+          )}
+          {r.enrich_requested === true && (
+            <Badge variant="outline" className="text-[10px] text-teal bg-teal/10 border-teal/30">
+              enrichment queued
+            </Badge>
+          )}
+          {Array.isArray(r.indicators) &&
+            (r.indicators as { type: string; value: string }[]).map((ind, i) => (
+              <Badge
+                key={i}
+                variant="outline"
+                className="text-[10px] text-dim font-mono border-border max-w-48 truncate"
+              >
+                {ind.type}: {ind.value.length > 30 ? ind.value.slice(0, 30) + "..." : ind.value}
+              </Badge>
+            ))}
+        </div>
+      );
+
     case "alert_workflow_triggered":
       return (
         <div className="flex items-center gap-2">
@@ -199,6 +225,55 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
                 {String(f)}
               </Badge>
             ))}
+        </div>
+      );
+
+    case "indicator_malice_updated":
+      return (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Zap className="h-3 w-3 text-amber shrink-0" />
+          {r.indicator_type && r.indicator_value && (
+            <span className="text-xs text-dim font-mono">
+              {String(r.indicator_type)}: {String(r.indicator_value).length > 30
+                ? String(r.indicator_value).slice(0, 30) + "..."
+                : String(r.indicator_value)}
+            </span>
+          )}
+          {r.from_malice && (
+            <Badge variant="outline" className={`text-[10px] ${maliceColor(String(r.from_malice))}`}>
+              {String(r.from_malice)}
+            </Badge>
+          )}
+          <ArrowRight className="h-3 w-3 text-dim" />
+          <Badge variant="outline" className={`text-[10px] ${maliceColor(String(r.to_malice ?? "Pending"))}`}>
+            {String(r.to_malice ?? "enrichment")}
+          </Badge>
+          {r.malice_source && (
+            <span className="text-[10px] text-dim">({String(r.malice_source)})</span>
+          )}
+        </div>
+      );
+
+    case "alert_malice_updated":
+      return (
+        <div className="flex items-center gap-1.5">
+          <Zap className="h-3 w-3 text-amber shrink-0" />
+          {r.from_malice && (
+            <Badge variant="outline" className={`text-[10px] ${maliceColor(String(r.from_malice))}`}>
+              {String(r.from_malice)}
+            </Badge>
+          )}
+          <ArrowRight className="h-3 w-3 text-dim" />
+          {r.to_malice ? (
+            <Badge variant="outline" className={`text-[10px] ${maliceColor(String(r.to_malice))}`}>
+              {String(r.to_malice)}
+            </Badge>
+          ) : (
+            <span className="text-[10px] text-dim">reset to computed</span>
+          )}
+          {r.malice_source && (
+            <span className="text-[10px] text-dim">({String(r.malice_source)})</span>
+          )}
         </div>
       );
 

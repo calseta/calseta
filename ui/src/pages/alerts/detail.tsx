@@ -29,6 +29,7 @@ import {
   useAlertActivity,
   useAlertContext,
   usePatchAlert,
+  useEnrichAlert,
 } from "@/hooks/use-api";
 import {
   formatDate,
@@ -41,7 +42,17 @@ import {
 import { cn } from "@/lib/utils";
 import { ActorBadge } from "@/components/activity/actor-badge";
 import { ActivityEventReferences } from "@/components/activity/activity-event-references";
+import { AddIndicatorsForm } from "@/components/add-indicators-form";
+import { IndicatorDetailSheet } from "@/components/indicator-detail-sheet";
 import { AlertGraph } from "@/components/alert-graph/alert-graph";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Shield,
   Tag,
@@ -57,9 +68,12 @@ import {
   Zap,
   Radio,
   GitFork,
+  Plus,
+  RefreshCw,
 } from "lucide-react";
 
 const SEVERITY_OPTIONS = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
+const MALICE_OPTIONS = ["Pending", "Benign", "Suspicious", "Malicious"];
 
 // Canonical display order — dropdown always shows statuses in this sequence.
 const STATUS_ORDER = ["pending_enrichment", "enriched", "Open", "Triaging", "Escalated", "Closed"];
@@ -99,11 +113,19 @@ export function AlertDetailPage() {
   const { data: activityResp } = useAlertActivity(uuid);
   const { data: contextResp } = useAlertContext(uuid);
   const patchAlert = usePatchAlert();
+  const enrichAlert = useEnrichAlert();
 
   const [closingWith, setClosingWith] = useState<string>("");
   const [showCloseFlow, setShowCloseFlow] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("indicators");
+  const [showAddIndicators, setShowAddIndicators] = useState(false);
+  const [selectedIndicator, setSelectedIndicator] = useState<{
+    uuid: string;
+    type: string;
+    value: string;
+    malice: string;
+  } | null>(null);
 
   const alert = alertResp?.data;
   const activities = activityResp?.data ?? [];
@@ -176,14 +198,29 @@ export function AlertDetailPage() {
     );
   }
 
-  // Compute dominant malice across indicators
-  const maliceOrder = ["Malicious", "Suspicious", "Benign", "Pending"];
-  const dominantMalice =
-    alert.indicators?.reduce((worst, ind) => {
-      const wi = maliceOrder.indexOf(worst);
-      const ci = maliceOrder.indexOf(ind.malice);
-      return ci < wi && ci >= 0 ? ind.malice : worst;
-    }, "Pending") ?? "Pending";
+  // Effective malice: server-returned (override > computed)
+  const effectiveMalice = alert.malice ?? "Pending";
+  const hasOverride = !!alert.malice_override;
+
+  function handleMaliceChange(newMalice: string) {
+    patchAlert.mutate(
+      { uuid, body: { malice_override: newMalice } },
+      {
+        onSuccess: () => toast.success(`Alert malice set to ${newMalice}`),
+        onError: () => toast.error("Failed to update malice"),
+      },
+    );
+  }
+
+  function handleResetMalice() {
+    patchAlert.mutate(
+      { uuid, body: { reset_malice_override: true } },
+      {
+        onSuccess: () => toast.success("Malice reset to computed value"),
+        onError: () => toast.error("Failed to reset malice"),
+      },
+    );
+  }
 
   return (
     <AppLayout title="Alert Detail">
@@ -199,16 +236,24 @@ export function AlertDetailPage() {
               >
                 {alert.severity}
               </Badge>
-              <Badge
-                variant="outline"
-                className={cn("text-xs", statusColor(alert.status))}
-              >
-                {alert.status}
-              </Badge>
-              {alert.is_enriched && (
+              {alert.status === "enriched" ? (
                 <Badge variant="outline" className="text-xs text-teal bg-teal/10 border-teal/30">
                   Enriched
                 </Badge>
+              ) : (
+                <>
+                  <Badge
+                    variant="outline"
+                    className={cn("text-xs", statusColor(alert.status))}
+                  >
+                    {alert.status}
+                  </Badge>
+                  {alert.is_enriched && (
+                    <Badge variant="outline" className="text-xs text-teal bg-teal/10 border-teal/30">
+                      Enriched
+                    </Badge>
+                  )}
+                </>
               )}
             </>
           }
@@ -301,9 +346,31 @@ export function AlertDetailPage() {
               label: "Malice",
               icon: Zap,
               value: (
-                <Badge variant="outline" className={cn("text-xs", maliceColor(dominantMalice))}>
-                  {dominantMalice}
-                </Badge>
+                <div className="space-y-1">
+                  <Select value={effectiveMalice} onValueChange={handleMaliceChange}>
+                    <SelectTrigger className={cn("h-7 w-full text-xs border", maliceColor(effectiveMalice))}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {MALICE_OPTIONS.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {hasOverride ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-amber">Analyst override</span>
+                      <button
+                        onClick={handleResetMalice}
+                        className="text-[10px] text-teal hover:underline"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-dim">Computed from indicators</span>
+                  )}
+                </div>
               ),
             },
             {
@@ -325,6 +392,9 @@ export function AlertDetailPage() {
                 )}
                 {alert.detection_rule_id && (
                   <DetailPageField label="Detection Rule" value={`#${alert.detection_rule_id}`} />
+                )}
+                {alert.duplicate_count > 0 && (
+                  <DetailPageField label="Duplicates" value={alert.duplicate_count} />
                 )}
                 <DetailPageField label="Occurred At" value={formatDate(alert.occurred_at)} />
                 <DetailPageField label="Ingested At" value={formatDate(alert.ingested_at)} />
@@ -382,71 +452,128 @@ export function AlertDetailPage() {
 
             {/* Indicators */}
             <TabsContent value="indicators" className="mt-4">
-              {alert.indicators && alert.indicators.length > 0 ? (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {alert.indicators.map((ind) => {
-                    const Icon = indicatorIcons[ind.type] ?? Hash;
-                    return (
-                      <Card
-                        key={ind.uuid}
-                        className="bg-card border-border hover:border-teal/30 transition-colors"
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-teal/10">
-                              <Icon className="h-4 w-4 text-teal" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-medium uppercase text-dim">
-                                  {ind.type}
-                                </span>
+              <div className="space-y-4">
+                {!showAddIndicators && (
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        enrichAlert.mutate(uuid, {
+                          onSuccess: () =>
+                            toast.success(
+                              "Enrichment queued — results will appear shortly",
+                            ),
+                          onError: () =>
+                            toast.error("Failed to queue enrichment"),
+                        });
+                      }}
+                      disabled={enrichAlert.isPending}
+                      className="h-7 text-xs text-teal border-teal/30 hover:bg-teal/10"
+                    >
+                      <RefreshCw
+                        className={cn(
+                          "h-3.5 w-3.5 mr-1",
+                          enrichAlert.isPending && "animate-spin",
+                        )}
+                      />
+                      Re-enrich
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAddIndicators(true)}
+                      className="h-7 text-xs text-teal border-teal/30 hover:bg-teal/10"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Add Indicators
+                    </Button>
+                  </div>
+                )}
+
+                {showAddIndicators && (
+                  <AddIndicatorsForm
+                    alertUuid={uuid}
+                    onDone={() => setShowAddIndicators(false)}
+                  />
+                )}
+
+                {alert.indicators && alert.indicators.length > 0 ? (
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-border hover:bg-transparent">
+                          <TableHead className="text-xs text-dim">Type</TableHead>
+                          <TableHead className="text-xs text-dim">Value</TableHead>
+                          <TableHead className="text-xs text-dim">Malice</TableHead>
+                          <TableHead className="text-xs text-dim">Enrichments</TableHead>
+                          <TableHead className="text-xs text-dim">First Seen</TableHead>
+                          <TableHead className="text-xs text-dim">Last Seen</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {alert.indicators.map((ind) => {
+                          const Icon = indicatorIcons[ind.type] ?? Hash;
+                          const enrichmentCount = ind.enrichment_results
+                            ? Object.keys(ind.enrichment_results).length
+                            : 0;
+                          return (
+                            <TableRow
+                              key={ind.uuid}
+                              className="border-border cursor-pointer hover:bg-surface-hover"
+                              onClick={() =>
+                                setSelectedIndicator({
+                                  uuid: ind.uuid,
+                                  type: ind.type,
+                                  value: ind.value,
+                                  malice: ind.malice,
+                                })
+                              }
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-1.5">
+                                  <Icon className="h-3.5 w-3.5 text-teal" />
+                                  <span className="text-[11px] font-semibold uppercase text-dim">
+                                    {ind.type}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-mono text-xs max-w-[260px] truncate">
+                                {ind.value}
+                              </TableCell>
+                              <TableCell>
                                 <Badge
                                   variant="outline"
-                                  className={cn(
-                                    "text-[10px]",
-                                    maliceColor(ind.malice),
-                                  )}
+                                  className={cn("text-[10px]", maliceColor(ind.malice))}
                                 >
                                   {ind.malice}
                                 </Badge>
-                              </div>
-                              <p className="mt-0.5 text-sm font-mono text-foreground break-all">
-                                {ind.value}
-                              </p>
-                              <div className="mt-2 flex gap-3 text-[11px] text-dim">
-                                <span>First: {relativeTime(ind.first_seen)}</span>
-                                <span>Last: {relativeTime(ind.last_seen)}</span>
-                              </div>
-                              {ind.enrichment_results && (
-                                <div className="mt-2 space-y-1">
-                                  {Object.entries(ind.enrichment_results).map(
-                                    ([provider, data]) => (
-                                      <div
-                                        key={provider}
-                                        className="rounded bg-surface-hover p-2 text-xs"
-                                      >
-                                        <span className="font-medium text-teal-light">
-                                          {provider}
-                                        </span>
-                                        <pre className="mt-1 text-[11px] text-dim whitespace-pre-wrap break-all">
-                                          {JSON.stringify(data, null, 2)}
-                                        </pre>
-                                      </div>
-                                    ),
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              ) : (
-                <Empty text="No indicators extracted" />
-              )}
+                              </TableCell>
+                              <TableCell className="text-xs text-dim">
+                                {enrichmentCount > 0 ? enrichmentCount : "—"}
+                              </TableCell>
+                              <TableCell className="text-xs text-dim">
+                                {relativeTime(ind.first_seen)}
+                              </TableCell>
+                              <TableCell className="text-xs text-dim">
+                                {relativeTime(ind.last_seen)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  !showAddIndicators && <Empty text="No indicators extracted" />
+                )}
+
+                <IndicatorDetailSheet
+                  indicator={selectedIndicator}
+                  alertUuid={uuid}
+                  onClose={() => setSelectedIndicator(null)}
+                />
+              </div>
             </TabsContent>
 
             {/* Findings */}

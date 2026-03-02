@@ -50,6 +50,7 @@ export interface AlertSummary {
   occurred_at: string;
   ingested_at: string;
   is_enriched: boolean;
+  duplicate_count: number;
   tags: string[];
   created_at: string;
 }
@@ -62,11 +63,17 @@ export interface AlertResponse extends AlertSummary {
   triaged_at: string | null;
   closed_at: string | null;
   detection_rule_id: number | null;
+  malice: string | null;
+  malice_override: string | null;
+  malice_override_source: string | null;
+  malice_override_at: string | null;
   indicators: EnrichedIndicator[];
   agent_findings: AgentFinding[] | null;
   raw_payload: Record<string, unknown> | null;
   updated_at: string;
 }
+
+export type MaliceLevel = "Pending" | "Benign" | "Suspicious" | "Malicious";
 
 export interface EnrichedIndicator {
   uuid: string;
@@ -76,6 +83,8 @@ export interface EnrichedIndicator {
   last_seen: string;
   is_enriched: boolean;
   malice: string;
+  malice_source: string | null;
+  malice_overridden_at: string | null;
   enrichment_results: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
@@ -89,6 +98,41 @@ export interface AgentFinding {
   recommended_action: string | null;
   evidence: Record<string, unknown> | null;
   posted_at: string;
+}
+
+// Indicator Types
+export type IndicatorType =
+  | "ip"
+  | "domain"
+  | "hash_md5"
+  | "hash_sha1"
+  | "hash_sha256"
+  | "url"
+  | "email"
+  | "account";
+
+// Indicator detail (includes raw enrichment data)
+export interface IndicatorDetailResponse {
+  uuid: string;
+  type: string;
+  value: string;
+  malice: string;
+  malice_source: string | null;
+  malice_overridden_at: string | null;
+  first_seen: string;
+  last_seen: string;
+  is_enriched: boolean;
+  enrichment_results: Record<string, ProviderEnrichmentResult> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProviderEnrichmentResult {
+  success: boolean;
+  enriched_at: string | null;
+  extracted: Record<string, unknown> | null;
+  raw: Record<string, unknown> | null;
+  [key: string]: unknown;
 }
 
 // Activity Events

@@ -32,7 +32,7 @@ export function LoginPage() {
             <ShieldAlert className="h-7 w-7 text-teal-light" />
           </div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight text-foreground">
-            Calseta AI
+            Calseta
           </h1>
           <p className="text-sm text-muted-foreground">
             Connect with your API key to access the admin panel

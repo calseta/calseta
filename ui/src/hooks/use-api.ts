@@ -6,6 +6,7 @@ import type {
   AlertSummary,
   AlertResponse,
   AlertRelationshipGraph,
+  IndicatorDetailResponse,
   MetricsSummary,
   WorkflowSummary,
   WorkflowResponse,
@@ -98,6 +99,75 @@ export function usePatchAlert() {
       api.patch<DataResponse<AlertResponse>>(`/alerts/${uuid}`, body),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["alert", vars.uuid] });
+      qc.invalidateQueries({ queryKey: ["alerts"] });
+    },
+  });
+}
+
+export function useAddIndicators() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      uuid,
+      indicators,
+      enrich = true,
+    }: {
+      uuid: string;
+      indicators: { type: string; value: string }[];
+      enrich?: boolean;
+    }) =>
+      api.post<DataResponse<{ added_count: number; indicators: unknown[]; enrich_requested: boolean }>>(
+        `/alerts/${uuid}/indicators?enrich=${enrich}`,
+        { indicators },
+      ),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["alert", vars.uuid] });
+      qc.invalidateQueries({ queryKey: ["alerts"] });
+      qc.invalidateQueries({ queryKey: ["alert-activity", vars.uuid] });
+      qc.invalidateQueries({ queryKey: ["alert-relationship-graph", vars.uuid] });
+    },
+  });
+}
+
+export function useEnrichAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      api.post<DataResponse<{ message: string }>>(`/alerts/${uuid}/enrich`, {}),
+    onSuccess: (_data, uuid) => {
+      qc.invalidateQueries({ queryKey: ["alert", uuid] });
+      qc.invalidateQueries({ queryKey: ["alert-activity", uuid] });
+    },
+  });
+}
+
+export function useIndicatorDetail(uuid: string | null) {
+  return useQuery({
+    queryKey: ["indicator", uuid],
+    queryFn: () =>
+      api.get<DataResponse<IndicatorDetailResponse>>(`/indicators/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function usePatchIndicator() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      uuid,
+      body,
+      alertUuid,
+    }: {
+      uuid: string;
+      body: Record<string, unknown>;
+      alertUuid?: string;
+    }) => api.patch<DataResponse<IndicatorDetailResponse>>(`/indicators/${uuid}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["indicator", vars.uuid] });
+      if (vars.alertUuid) {
+        qc.invalidateQueries({ queryKey: ["alert", vars.alertUuid] });
+        qc.invalidateQueries({ queryKey: ["alert-activity", vars.alertUuid] });
+      }
       qc.invalidateQueries({ queryKey: ["alerts"] });
     },
   });

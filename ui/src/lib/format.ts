@@ -71,6 +71,7 @@ export function maliceColor(malice: string): string {
 
 export function eventDotColor(eventType: string): string {
   if (eventType.includes("closed")) return "bg-dim";
+  if (eventType.includes("malice")) return "bg-amber";
   if (eventType.includes("severity")) return "bg-amber";
   if (eventType.includes("finding")) return "bg-teal-light";
   if (eventType.includes("workflow") || eventType.includes("approval")) return "bg-amber";
