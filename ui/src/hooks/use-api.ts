@@ -438,6 +438,33 @@ export function useDeleteAgent() {
   });
 }
 
+export function useAgent(uuid: string) {
+  return useQuery({
+    queryKey: ["agent", uuid],
+    queryFn: () => api.get<DataResponse<AgentRegistration>>(`/agents/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function usePatchAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<AgentRegistration>>(`/agents/${uuid}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["agents"] });
+      qc.invalidateQueries({ queryKey: ["agent", vars.uuid] });
+    },
+  });
+}
+
+export function useTestAgent() {
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      api.post<DataResponse<{ delivered: boolean; status_code: number | null; duration_ms: number; error: string | null }>>(`/agents/${uuid}/test`),
+  });
+}
+
 // API Keys
 export function useApiKeys() {
   return useQuery({

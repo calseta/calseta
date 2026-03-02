@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -38,10 +40,12 @@ export function AgentsPage() {
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const description = (fd.get("description") as string)?.trim() || undefined;
     createAgent.mutate(
       {
         name: fd.get("name") as string,
         endpoint_url: fd.get("endpoint_url") as string,
+        description,
         is_active: true,
         trigger_on_sources: [],
         trigger_on_severities: [],
@@ -92,6 +96,15 @@ export function AgentsPage() {
                   <Label className="text-xs text-muted-foreground">Endpoint URL</Label>
                   <Input name="endpoint_url" required type="url" className="mt-1 bg-surface border-border text-sm" />
                 </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Description (optional)</Label>
+                  <Textarea
+                    name="description"
+                    rows={2}
+                    className="mt-1 bg-surface border-border text-sm"
+                    placeholder="What does this agent do?"
+                  />
+                </div>
                 <Button type="submit" disabled={createAgent.isPending} className="w-full bg-teal text-white hover:bg-teal-dim">
                   Register
                 </Button>
@@ -124,10 +137,13 @@ export function AgentsPage() {
                 : agents.map((agent) => (
                     <TableRow key={agent.uuid} className="border-border hover:bg-accent/50">
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <Link
+                          to={`/settings/agents/${agent.uuid}`}
+                          className="flex items-center gap-2 hover:text-teal transition-colors"
+                        >
                           <Bot className="h-3.5 w-3.5 text-teal" />
-                          <span className="text-sm text-foreground">{agent.name}</span>
-                        </div>
+                          <span className="text-sm text-foreground hover:text-teal">{agent.name}</span>
+                        </Link>
                       </TableCell>
                       <TableCell className="text-xs text-dim font-mono max-w-48 truncate">
                         {agent.endpoint_url}

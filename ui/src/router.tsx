@@ -15,7 +15,8 @@ import { DetectionRuleDetailPage } from "@/pages/settings/detection-rules/detail
 import { ContextDocsPage } from "@/pages/settings/context-docs";
 import { ContextDocDetailPage } from "@/pages/settings/context-docs/detail";
 import { SourcesPage } from "@/pages/settings/sources";
-import { AgentsPage } from "@/pages/settings/agents";
+import { AgentsPage } from "@/pages/settings/agents/index";
+import { AgentDetailPage } from "@/pages/settings/agents/detail";
 import { ApiKeysPage } from "@/pages/settings/api-keys";
 import { ApiKeyDetailPage } from "@/pages/settings/api-keys/detail";
 
@@ -95,6 +96,12 @@ const agentsRoute = createRoute({
   component: AgentsPage,
 });
 
+const agentDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/agents/$uuid",
+  component: AgentDetailPage,
+});
+
 const apiKeysRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/api-keys",
@@ -120,6 +127,7 @@ const routeTree = rootRoute.addChildren([
   contextDocDetailRoute,
   sourcesRoute,
   agentsRoute,
+  agentDetailRoute,
   apiKeysRoute,
   apiKeyDetailRoute,
 ]);
