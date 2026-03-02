@@ -102,16 +102,21 @@ async def _parse_create_from_form(request: Request) -> ContextDocumentCreate:
     tags: list[str] = []
     tags_raw = form.get("tags")
     if tags_raw:
-        try:
-            tags = json.loads(str(tags_raw))
-            if not isinstance(tags, list):
-                raise ValueError("tags must be a JSON array")
-        except (json.JSONDecodeError, ValueError) as exc:
-            raise CalsetaException(
-                code="VALIDATION_ERROR",
-                message=f"tags field must be a JSON array: {exc}",
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            ) from exc
+        raw_str = str(tags_raw).strip()
+        # Try JSON array first, fall back to comma-separated string
+        if raw_str.startswith("["):
+            try:
+                tags = json.loads(raw_str)
+                if not isinstance(tags, list):
+                    raise ValueError("tags must be an array")
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise CalsetaException(
+                    code="VALIDATION_ERROR",
+                    message=f"tags field must be a JSON array or comma-separated string: {exc}",
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                ) from exc
+        else:
+            tags = [t.strip() for t in raw_str.split(",") if t.strip()]
 
     targeting_rules = None
     targeting_rules_raw = form.get("targeting_rules")
