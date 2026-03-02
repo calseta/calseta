@@ -59,7 +59,14 @@ def _encrypt_auth_config(auth_config: dict | None) -> dict | None:  # type: igno
         )
     from app.auth.encryption import encrypt_value
 
-    ciphertext = encrypt_value(json.dumps(auth_config))
+    try:
+        ciphertext = encrypt_value(json.dumps(auth_config))
+    except ValueError as exc:
+        raise CalsetaException(
+            code="ENCRYPTION_NOT_CONFIGURED",
+            message=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        ) from exc
     return {"_encrypted": ciphertext}
 
 

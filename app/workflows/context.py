@@ -73,6 +73,10 @@ class WorkflowLogger:
             entry["extra"] = kwargs
         self._entries.append(entry)
 
+    def __call__(self, message: str, **kwargs: Any) -> None:
+        """Allow ``ctx.log("msg")`` as shorthand for ``ctx.log.info("msg")``."""
+        self._append("info", message, **kwargs)
+
     def info(self, message: str, **kwargs: Any) -> None:
         self._append("info", message, **kwargs)
 

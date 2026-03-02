@@ -58,7 +58,14 @@ def _maybe_encrypt(plaintext: str) -> str:
         )
     from app.auth.encryption import encrypt_value
 
-    return encrypt_value(plaintext)
+    try:
+        return encrypt_value(plaintext)
+    except ValueError as exc:
+        raise CalsetaException(
+            code="ENCRYPTION_NOT_CONFIGURED",
+            message=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        ) from exc
 
 
 # ---------------------------------------------------------------------------

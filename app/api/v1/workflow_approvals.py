@@ -144,6 +144,7 @@ async def approve_workflow(
             db=db,
         )
         await db.commit()
+        await db.refresh(request)
     except ValueError as exc:
         err_msg = str(exc)
         if "expired" in err_msg.lower():
@@ -198,6 +199,7 @@ async def reject_workflow(
             db=db,
         )
         await db.commit()
+        await db.refresh(request)
     except ValueError as exc:
         err_msg = str(exc)
         if "expired" in err_msg.lower():

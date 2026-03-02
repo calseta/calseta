@@ -23,7 +23,14 @@ def get_fernet() -> Fernet:
     key = settings.ENCRYPTION_KEY
     if not key:
         raise ValueError("ENCRYPTION_KEY is not set. Cannot encrypt/decrypt secrets.")
-    return Fernet(key.encode())
+    try:
+        return Fernet(key.encode())
+    except (ValueError, Exception) as exc:
+        raise ValueError(
+            "ENCRYPTION_KEY is not a valid Fernet key. "
+            "Generate one with: python -c "
+            "\"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+        ) from exc
 
 
 def encrypt_value(plaintext: str) -> str:
