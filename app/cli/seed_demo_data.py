@@ -703,7 +703,7 @@ async def _seed_alerts(
     created = 0
     for source_name, raw_payload in payloads:
         source = _SOURCES[source_name]
-        alert = await ingest_service.ingest(
+        result = await ingest_service.ingest(
             source,
             raw_payload,
             actor_type="system",
@@ -711,9 +711,10 @@ async def _seed_alerts(
         created += 1
         logger.info(
             "demo_alert_ingested",
-            alert_uuid=str(alert.uuid),
+            alert_uuid=str(result.alert.uuid),
             source_name=source_name,
-            title=alert.title,
+            title=result.alert.title,
+            is_duplicate=result.is_duplicate,
         )
     return created
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Text, func, text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Text, func, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,6 +34,10 @@ class Alert(TimestampMixin, UUIDMixin, Base):
     enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_enriched: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     fingerprint: Mapped[str | None] = mapped_column(Text)
+    duplicate_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0"), default=0
+    )
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Status lifecycle
     status: Mapped[str] = mapped_column(

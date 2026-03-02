@@ -107,6 +107,57 @@ def _extract_raw(
     return indicators
 
 
+def extract_for_fingerprint(
+    source: AlertSourceBase,
+    normalized: CalsetaAlert,
+    raw_payload: dict[str, Any],
+    cached_mappings: list[Any],
+) -> list[IndicatorExtract]:
+    """
+    Run Pass 1 + Pass 2 extraction for fingerprint generation — no persistence.
+
+    Each pass is wrapped in try/except — failures are logged, never raised.
+    Returns the deduplicated list of IndicatorExtract objects.
+    """
+    # Pass 1: source plugin
+    try:
+        pass1 = source.extract_indicators(raw_payload)
+    except Exception:
+        logger.exception(
+            "fingerprint_extraction_pass1_failed",
+            source_name=normalized.source_name,
+        )
+        pass1 = []
+
+    # Pass 2: normalized field mappings (using cached mappings)
+    try:
+        pass2 = _extract_normalized(normalized, cached_mappings)
+    except Exception:
+        logger.exception(
+            "fingerprint_extraction_pass2_failed",
+            source_name=normalized.source_name,
+        )
+        pass2 = []
+
+    # Merge and deduplicate by (type, value)
+    seen: set[tuple[str, str]] = set()
+    unique: list[IndicatorExtract] = []
+    for ind in [*pass1, *pass2]:
+        key = (str(ind.type), ind.value.strip())
+        if key[1] and key not in seen:
+            seen.add(key)
+            unique.append(ind)
+
+    logger.debug(
+        "fingerprint_extraction_summary",
+        source_name=normalized.source_name,
+        pass1=len(pass1),
+        pass2=len(pass2),
+        unique=len(unique),
+    )
+    return unique
+
+
 class IndicatorExtractionService:
     def __init__(self, db: AsyncSession) -> None:
         self._indicator_repo = IndicatorRepository(db)

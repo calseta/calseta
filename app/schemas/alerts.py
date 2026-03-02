@@ -47,6 +47,8 @@ class AlertResponse(BaseModel):
     enriched_at: datetime | None
     is_enriched: bool
     fingerprint: str | None
+    duplicate_count: int = 0
+    last_seen_at: datetime | None = None
     close_classification: AlertCloseClassification | None
     acknowledged_at: datetime | None
     triaged_at: datetime | None
@@ -73,6 +75,7 @@ class AlertSummary(BaseModel):
     occurred_at: datetime
     ingested_at: datetime
     is_enriched: bool
+    duplicate_count: int = 0
     tags: list[str]
     created_at: datetime
 

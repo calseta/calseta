@@ -20,6 +20,8 @@ Startup events:
     mappings into indicator_field_mappings if not already present.
   - seed_builtin_workflows: upserts 9 pre-built Okta/Entra system workflows.
     Failure logs a warning but does not crash the server.
+  - load_normalized_mappings: loads active normalized-target mappings into
+    an in-memory cache used for fingerprint extraction at ingest time.
 """
 
 from __future__ import annotations
@@ -65,11 +67,13 @@ async def _on_startup() -> None:
     from app.db.session import AsyncSessionLocal
     from app.seed.builtin_workflows import seed_builtin_workflows
     from app.seed.indicator_mappings import seed_system_mappings
+    from app.services.indicator_mapping_cache import load_normalized_mappings
 
     try:
         async with AsyncSessionLocal() as db:
             await seed_system_mappings(db)
             await seed_builtin_workflows(db, settings)
+            await load_normalized_mappings(db)
             await db.commit()
     except Exception as exc:
         logger.warning(

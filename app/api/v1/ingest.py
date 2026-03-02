@@ -39,6 +39,8 @@ _AlertsWrite = Annotated[AuthContext, Depends(require_scope(Scope.ALERTS_WRITE))
 class IngestResponse(BaseModel):
     alert_uuid: uuid.UUID
     status: str = "queued"
+    is_duplicate: bool = False
+    duplicate_count: int | None = None
 
 
 class GenericIngestBody(BaseModel):
@@ -112,7 +114,7 @@ async def webhook_ingest(
         )
 
     svc = AlertIngestionService(db, queue)
-    alert = await svc.ingest(
+    result = await svc.ingest(
         source,
         raw_payload,
         actor_type="api",
@@ -120,7 +122,12 @@ async def webhook_ingest(
     )
 
     return DataResponse(
-        data=IngestResponse(alert_uuid=alert.uuid),
+        data=IngestResponse(
+            alert_uuid=result.alert.uuid,
+            status="deduplicated" if result.is_duplicate else "queued",
+            is_duplicate=result.is_duplicate,
+            duplicate_count=result.alert.duplicate_count if result.is_duplicate else None,
+        ),
     )
 
 
@@ -169,7 +176,7 @@ async def generic_ingest(
         )
 
     svc = AlertIngestionService(db, queue)
-    alert = await svc.ingest(
+    result = await svc.ingest(
         source,
         body.payload,
         actor_type="api",
@@ -177,5 +184,10 @@ async def generic_ingest(
     )
 
     return DataResponse(
-        data=IngestResponse(alert_uuid=alert.uuid),
+        data=IngestResponse(
+            alert_uuid=result.alert.uuid,
+            status="deduplicated" if result.is_duplicate else "queued",
+            is_duplicate=result.is_duplicate,
+            duplicate_count=result.alert.duplicate_count if result.is_duplicate else None,
+        ),
     )

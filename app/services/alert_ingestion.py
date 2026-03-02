@@ -6,30 +6,43 @@ the generic ingest route (POST /v1/alerts).
 
 Pipeline (all synchronous within the request):
   1. Normalize raw payload → CalsetaAlert
-  2. Persist alert to DB
-  3. Associate detection rule (if source provides one)
-  4. Enqueue enrichment task (async worker handles indicator extraction + enrichment)
-  5. Write alert_ingested activity event (fire-and-forget)
+  2. Extract indicators (Pass 1 + Pass 2) for fingerprinting
+  3. Generate indicator-based fingerprint
+  4. Check for duplicates within configured time window
+  5. If duplicate: increment counter, write activity event, return early
+  6. If new: persist alert, associate detection rule, enqueue enrichment,
+     write alert_ingested activity event
 
-Returns 202 Accepted immediately after enqueue.
+Returns IngestResult with the alert and is_duplicate flag.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.db.models.alert import Alert
 from app.integrations.sources.base import AlertSourceBase
 from app.queue.base import TaskQueueBase
-from app.repositories.alert_repository import AlertRepository
+from app.repositories.alert_repository import AlertRepository, generate_fingerprint
 from app.schemas.activity_events import ActivityEventType
 from app.services.activity_event import ActivityEventService
 from app.services.detection_rules import DetectionRuleService
+from app.services.indicator_extraction import extract_for_fingerprint
+from app.services.indicator_mapping_cache import get_normalized_mappings
 
 logger = structlog.get_logger(__name__)
+
+
+@dataclass
+class IngestResult:
+    alert: Alert
+    is_duplicate: bool
 
 
 class AlertIngestionService:
@@ -47,7 +60,7 @@ class AlertIngestionService:
         *,
         actor_type: str = "api",
         actor_key_prefix: str | None = None,
-    ) -> Alert:
+    ) -> IngestResult:
         """
         Execute the full ingest pipeline.
 
@@ -57,21 +70,64 @@ class AlertIngestionService:
             actor_type:       "api" or "system" (for activity log).
             actor_key_prefix: API key prefix (for activity log).
 
-        Returns the created Alert row (with id and uuid populated).
+        Returns IngestResult with the alert and whether it was deduplicated.
         """
         # Step 1: Normalize
         normalized = source.normalize(raw_payload)
 
-        # Step 2: Persist alert
-        alert = await self._alert_repo.create(normalized, raw_payload)
+        # Step 2: Extract indicators for fingerprinting (Pass 1 + Pass 2, no persistence)
+        cached_mappings = get_normalized_mappings(normalized.source_name)
+        indicators = extract_for_fingerprint(
+            source, normalized, raw_payload, cached_mappings
+        )
+        indicator_tuples = [(str(ind.type), ind.value.strip()) for ind in indicators]
+
+        # Step 3: Generate indicator-based fingerprint
+        fingerprint = generate_fingerprint(
+            normalized.title, normalized.source_name, indicator_tuples
+        )
+
+        # Step 4: Check for duplicates within the configured time window
+        dedup_hours = settings.ALERT_DEDUP_WINDOW_HOURS
+        if dedup_hours > 0:
+            window_start = datetime.now(UTC) - timedelta(hours=dedup_hours)
+            existing = await self._alert_repo.find_duplicate(fingerprint, window_start)
+            if existing is not None:
+                updated = await self._alert_repo.increment_duplicate(existing)
+                logger.info(
+                    "alert_deduplicated",
+                    original_uuid=str(updated.uuid),
+                    duplicate_count=updated.duplicate_count,
+                    source_name=normalized.source_name,
+                    fingerprint=fingerprint,
+                )
+                await self._activity_service.write(
+                    ActivityEventType.ALERT_DEDUPLICATED,
+                    actor_type=actor_type,
+                    actor_key_prefix=actor_key_prefix,
+                    alert_id=updated.id,
+                    references={
+                        "fingerprint": fingerprint,
+                        "duplicate_count": updated.duplicate_count,
+                        "source_name": normalized.source_name,
+                        "title": normalized.title,
+                    },
+                )
+                return IngestResult(alert=updated, is_duplicate=True)
+
+        # Step 5: Persist new alert
+        alert = await self._alert_repo.create(
+            normalized, raw_payload, fingerprint=fingerprint
+        )
         logger.info(
             "alert_ingested",
             alert_uuid=str(alert.uuid),
             source_name=normalized.source_name,
             severity=normalized.severity,
+            fingerprint=fingerprint,
         )
 
-        # Step 3: Associate detection rule (best-effort)
+        # Step 6: Associate detection rule (best-effort)
         rule_ref = source.extract_detection_rule_ref(raw_payload)
         if rule_ref:
             try:
@@ -87,7 +143,7 @@ class AlertIngestionService:
                     rule_ref=rule_ref,
                 )
 
-        # Step 4: Enqueue enrichment (indicator extraction + provider enrichment)
+        # Step 7: Enqueue enrichment (indicator extraction + provider enrichment)
         try:
             task_id = await self._queue.enqueue(
                 "enrich_alert",
@@ -105,7 +161,7 @@ class AlertIngestionService:
                 alert_uuid=str(alert.uuid),
             )
 
-        # Step 5: Activity event (fire-and-forget — never raises)
+        # Step 8: Activity event (fire-and-forget — never raises)
         await self._activity_service.write(
             ActivityEventType.ALERT_INGESTED,
             actor_type=actor_type,
@@ -118,4 +174,4 @@ class AlertIngestionService:
             },
         )
 
-        return alert
+        return IngestResult(alert=alert, is_duplicate=False)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -15,13 +14,17 @@ from app.db.models.alert import Alert
 from app.schemas.alert import AlertSeverity, AlertStatus, CalsetaAlert
 
 
-def _generate_fingerprint(title: str, source_name: str, raw_payload: dict[str, Any]) -> str:
-    """Generate a consistent fingerprint for deduplication.
+def generate_fingerprint(
+    title: str, source_name: str, indicators: list[tuple[str, str]]
+) -> str:
+    """Generate a stable fingerprint based on alert title, source, and indicators.
 
-    Uses MD5 hash of title + source_name + sorted raw_payload JSON.
+    Uses MD5 hash of title + source_name + sorted indicator pairs.
+    Indicators are sorted and joined as 'type:value' with '|' separator.
     """
-    payload_str = json.dumps(raw_payload, sort_keys=True, default=str)
-    hash_input = f"{title}\x00{source_name}\x00{payload_str}"
+    sorted_indicators = sorted(indicators)
+    indicator_str = "|".join(f"{t}:{v}" for t, v in sorted_indicators)
+    hash_input = f"{title}\x00{source_name}\x00{indicator_str}"
     return hashlib.md5(hash_input.encode()).hexdigest()
 
 
@@ -33,11 +36,10 @@ class AlertRepository:
         self,
         normalized: CalsetaAlert,
         raw_payload: dict[str, Any],
+        *,
+        fingerprint: str,
     ) -> Alert:
         """Persist a new alert. Returns the created ORM object with id populated."""
-        fingerprint = _generate_fingerprint(
-            normalized.title, normalized.source_name, raw_payload
-        )
         alert = Alert(
             uuid=uuid.uuid4(),
             title=normalized.title,
@@ -51,6 +53,29 @@ class AlertRepository:
             fingerprint=fingerprint,
         )
         self._db.add(alert)
+        await self._db.flush()
+        await self._db.refresh(alert)
+        return alert
+
+    async def find_duplicate(
+        self, fingerprint: str, window_start: datetime
+    ) -> Alert | None:
+        """Find the most recent alert with the same fingerprint within the time window."""
+        result = await self._db.execute(
+            select(Alert)
+            .where(
+                Alert.fingerprint == fingerprint,
+                Alert.created_at >= window_start,
+            )
+            .order_by(Alert.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def increment_duplicate(self, alert: Alert) -> Alert:
+        """Bump duplicate_count and set last_seen_at on an existing alert."""
+        alert.duplicate_count += 1
+        alert.last_seen_at = datetime.now(UTC)
         await self._db.flush()
         await self._db.refresh(alert)
         return alert

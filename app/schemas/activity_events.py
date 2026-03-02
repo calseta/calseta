@@ -12,12 +12,13 @@ from pydantic import BaseModel, ConfigDict
 
 class ActivityEventType(StrEnum):
     """
-    All 12 activity event types. Shape of the `references` JSONB field
+    All 13 activity event types. Shape of the `references` JSONB field
     is fixed per event type — see PRD Section 8.
     """
 
     # Alert events
     ALERT_INGESTED = "alert_ingested"
+    ALERT_DEDUPLICATED = "alert_deduplicated"
     ALERT_ENRICHMENT_COMPLETED = "alert_enrichment_completed"
     ALERT_STATUS_UPDATED = "alert_status_updated"
     ALERT_SEVERITY_UPDATED = "alert_severity_updated"
