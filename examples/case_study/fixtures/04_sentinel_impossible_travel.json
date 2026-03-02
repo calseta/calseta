@@ -1,0 +1,89 @@
+{
+  "id": "/subscriptions/a1b2c3d4-e5f6-7890-abcd-ef1234567890/resourceGroups/soc-rg/providers/Microsoft.SecurityInsights/Incidents/b23c45d6-7e89-4f0a-b1c2-d34567890123",
+  "name": "b23c45d6-7e89-4f0a-b1c2-d34567890123",
+  "type": "Microsoft.SecurityInsights/Incidents",
+  "properties": {
+    "title": "Impossible travel activity detected for user r.chen@contoso.com",
+    "description": "User r.chen@contoso.com authenticated from New York, US at 09:15 UTC and from Moscow, Russia at 09:47 UTC — 32 minutes apart. The geographic distance of approximately 7,500 km makes physical travel between these locations impossible within this timeframe. The Moscow sign-in originated from IP 91.234.56.78, which has not been previously associated with this user account. The account has Global Administrator privileges in Azure AD.",
+    "severity": "High",
+    "status": "New",
+    "classification": null,
+    "classificationComment": null,
+    "classificationReason": null,
+    "owner": {
+      "objectId": null,
+      "email": null,
+      "assignedTo": null,
+      "userPrincipalName": null
+    },
+    "labels": [
+      {"labelName": "ImpossibleTravel"},
+      {"labelName": "IdentityThreat"},
+      {"labelName": "HighPrivilege"},
+      {"labelName": "GlobalAdmin"}
+    ],
+    "firstActivityTimeUtc": "2026-03-01T09:15:22.000Z",
+    "lastActivityTimeUtc": "2026-03-01T09:47:33.000Z",
+    "createdTimeUtc": "2026-03-01T09:48:01.000Z",
+    "lastModifiedTimeUtc": "2026-03-01T09:48:01.000Z",
+    "incidentNumber": 48305,
+    "incidentUrl": "https://portal.azure.com/#blade/Microsoft_Azure_Security_Insights/IncidentBlade/incidentId/b23c45d6-7e89-4f0a-b1c2-d34567890123",
+    "providerName": "Azure Sentinel",
+    "providerIncidentId": "48305",
+    "additionalData": {
+      "alertsCount": 1,
+      "bookmarksCount": 0,
+      "commentsCount": 0,
+      "alertProductNames": ["Azure Active Directory Identity Protection"],
+      "tactics": ["InitialAccess"],
+      "techniques": ["T1078", "T1078.004"]
+    },
+    "relatedAnalyticRuleIds": [
+      "/subscriptions/a1b2c3d4-e5f6-7890-abcd-ef1234567890/resourceGroups/soc-rg/providers/Microsoft.SecurityInsights/alertRules/e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f01234"
+    ],
+    "alertsCount": 1
+  },
+  "Entities": [
+    {
+      "Type": "account",
+      "Name": "r.chen",
+      "UPNSuffix": "contoso.com",
+      "AadUserId": "f9e8d7c6-b5a4-3210-9876-543210fedcba",
+      "DisplayName": "Robert Chen",
+      "IsDomainJoined": true
+    },
+    {
+      "Type": "ip",
+      "Address": "91.234.56.78",
+      "GeoLocation": {
+        "Country": "Russia",
+        "State": "Moscow",
+        "City": "Moscow",
+        "Latitude": 55.7558,
+        "Longitude": 37.6173
+      }
+    },
+    {
+      "Type": "ip",
+      "Address": "203.0.113.25",
+      "GeoLocation": {
+        "Country": "United States",
+        "State": "New York",
+        "City": "New York",
+        "Latitude": 40.7128,
+        "Longitude": -74.0060
+      }
+    },
+    {
+      "Type": "host",
+      "HostName": "RChen-Laptop",
+      "DnsDomain": "contoso.com",
+      "OSFamily": "Windows",
+      "OSVersion": "11.0.22631"
+    },
+    {
+      "Type": "url",
+      "Url": "https://portal.azure.com"
+    }
+  ]
+}
