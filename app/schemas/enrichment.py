@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.indicators import IndicatorType
 
@@ -79,10 +79,26 @@ class EnrichmentResult(BaseModel):
 
 
 class OnDemandEnrichmentRequest(BaseModel):
-    """Request body for POST /v1/enrichments."""
+    """Request body for POST /v1/enrichments.
 
-    type: IndicatorType
-    value: str
+    Accepts either {type, value} or {indicator_type, indicator_value}.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: IndicatorType = Field(validation_alias="type")
+    value: str = Field(validation_alias="value")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_field_names(cls, data: Any) -> Any:
+        """Accept indicator_type/indicator_value as aliases for type/value."""
+        if isinstance(data, dict):
+            if "indicator_type" in data and "type" not in data:
+                data["type"] = data.pop("indicator_type")
+            if "indicator_value" in data and "value" not in data:
+                data["value"] = data.pop("indicator_value")
+        return data
 
 
 class OnDemandEnrichmentResult(BaseModel):
