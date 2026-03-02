@@ -23,6 +23,7 @@ import {
   SidebarSection,
   DetailPageField,
 } from "@/components/detail-page";
+import { CopyableText } from "@/components/copyable-text";
 import {
   useAlert,
   useAlertActivity,
@@ -60,20 +61,25 @@ import {
 
 const SEVERITY_OPTIONS = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
 
+// Canonical display order — dropdown always shows statuses in this sequence.
+const STATUS_ORDER = ["pending_enrichment", "enriched", "Open", "Triaging", "Escalated", "Closed"];
+
 const STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending_enrichment: ["Open"],
   enriched: ["Open"],
   Open: ["Triaging", "Escalated", "Closed"],
-  Triaging: ["Escalated", "Closed"],
-  Escalated: ["Closed"],
+  Triaging: ["Open", "Escalated", "Closed"],
+  Escalated: ["Open", "Triaging", "Closed"],
 };
 
 const CLOSE_CLASSIFICATIONS = [
-  "True Positive",
-  "True Positive - Mitigated",
-  "False Positive",
-  "False Positive - Policy",
-  "Benign Positive",
-  "Inconclusive",
+  "True Positive - Suspicious Activity",
+  "Benign Positive - Suspicious but Expected",
+  "False Positive - Incorrect Detection Logic",
+  "False Positive - Inaccurate Data",
+  "Undetermined",
+  "Duplicate",
+  "Not Applicable",
 ];
 
 const indicatorIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -95,6 +101,8 @@ export function AlertDetailPage() {
   const patchAlert = usePatchAlert();
 
   const [closingWith, setClosingWith] = useState<string>("");
+  const [showCloseFlow, setShowCloseFlow] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("indicators");
 
   const alert = alertResp?.data;
@@ -121,9 +129,14 @@ export function AlertDetailPage() {
   }
 
   const nextStatuses = STATUS_TRANSITIONS[alert.status] ?? [];
+  // Build the full set of selectable statuses (current + transitions) in canonical order
+  const selectableStatuses = STATUS_ORDER.filter(
+    (s) => s === alert.status || nextStatuses.includes(s),
+  );
 
   function handleStatusChange(newStatus: string) {
     if (newStatus === "Closed") return; // Close requires classification — handled separately
+    setPendingStatus(null);
     patchAlert.mutate(
       { uuid, body: { status: newStatus } },
       {
@@ -141,8 +154,14 @@ export function AlertDetailPage() {
         onSuccess: () => {
           toast.success("Alert closed");
           setClosingWith("");
+          setShowCloseFlow(false);
+          setPendingStatus(null);
         },
-        onError: () => toast.error("Failed to close alert"),
+        onError: () => {
+          toast.error("Failed to close alert");
+          setPendingStatus(null);
+          setShowCloseFlow(false);
+        },
       },
     );
   }
@@ -200,40 +219,44 @@ export function AlertDetailPage() {
             {
               label: "Status",
               icon: Activity,
-              value: nextStatuses.length > 0 ? (
+              value: alert.status === "Closed" ? (
+                <div>
+                  <Badge variant="outline" className={cn("text-xs", statusColor("Closed"))}>
+                    Closed
+                  </Badge>
+                  {alert.close_classification && (
+                    <p className="mt-1.5 text-[11px] text-dim">{alert.close_classification}</p>
+                  )}
+                </div>
+              ) : (
                 <div className="space-y-2">
                   <Select
-                    value={alert.status}
+                    value={pendingStatus ?? alert.status}
                     onValueChange={(v) => {
                       if (v === "Closed") {
-                        // Don't close directly — need classification
+                        setPendingStatus("Closed");
+                        setShowCloseFlow(true);
                         return;
                       }
+                      setShowCloseFlow(false);
+                      setClosingWith("");
                       handleStatusChange(v);
                     }}
                   >
-                    <SelectTrigger className={cn("h-7 w-full text-xs border", statusColor(alert.status))}>
+                    <SelectTrigger className={cn("h-7 w-full text-xs border", statusColor(pendingStatus ?? alert.status))}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
-                      <SelectItem value={alert.status} disabled>
-                        {alert.status}
-                      </SelectItem>
-                      {nextStatuses.filter((s) => s !== "Closed").map((s) => (
+                      {selectableStatuses.map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
-                      {nextStatuses.includes("Closed") && (
-                        <SelectItem value="__close" disabled className="text-dim text-[11px]">
-                          Close (select below)
-                        </SelectItem>
-                      )}
                     </SelectContent>
                   </Select>
-                  {nextStatuses.includes("Closed") && (
+                  {showCloseFlow && (
                     <div className="space-y-1.5">
                       <Select value={closingWith} onValueChange={setClosingWith}>
                         <SelectTrigger className="h-7 w-full text-xs bg-surface border-border">
-                          <SelectValue placeholder="Close as..." />
+                          <SelectValue placeholder="Classification..." />
                         </SelectTrigger>
                         <SelectContent className="bg-card border-border">
                           {CLOSE_CLASSIFICATIONS.map((c) => (
@@ -254,15 +277,6 @@ export function AlertDetailPage() {
                         </Button>
                       )}
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <Badge variant="outline" className={cn("text-xs", statusColor(alert.status))}>
-                    {alert.status}
-                  </Badge>
-                  {alert.close_classification && (
-                    <p className="mt-1.5 text-[11px] text-dim">{alert.close_classification}</p>
                   )}
                 </div>
               ),
@@ -304,10 +318,10 @@ export function AlertDetailPage() {
           sidebar={
             <DetailPageSidebar>
               <SidebarSection title="Details">
-                <DetailPageField label="UUID" value={alert.uuid.slice(0, 8) + "..."} mono />
+                <DetailPageField label="UUID" value={<CopyableText text={alert.uuid} mono className="text-xs" />} />
                 <DetailPageField label="Source" value={alert.source_name} />
                 {alert.fingerprint && (
-                  <DetailPageField label="Fingerprint" value={alert.fingerprint.slice(0, 12) + "..."} mono />
+                  <DetailPageField label="Fingerprint" value={<CopyableText text={alert.fingerprint} mono className="text-xs" />} />
                 )}
                 {alert.detection_rule_id && (
                   <DetailPageField label="Detection Rule" value={`#${alert.detection_rule_id}`} />

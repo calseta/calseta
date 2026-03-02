@@ -32,12 +32,13 @@ export type AlertSeverity =
   | "Critical";
 
 export type AlertCloseClassification =
-  | "True Positive"
-  | "True Positive - Mitigated"
-  | "False Positive"
-  | "False Positive - Policy"
-  | "Benign Positive"
-  | "Inconclusive";
+  | "True Positive - Suspicious Activity"
+  | "Benign Positive - Suspicious but Expected"
+  | "False Positive - Incorrect Detection Logic"
+  | "False Positive - Inaccurate Data"
+  | "Undetermined"
+  | "Duplicate"
+  | "Not Applicable";
 
 export interface AlertSummary {
   uuid: string;
