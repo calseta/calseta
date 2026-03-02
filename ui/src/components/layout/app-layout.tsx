@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 
@@ -9,6 +9,10 @@ export function AppLayout({
   title: string;
   children: ReactNode;
 }) {
+  useEffect(() => {
+    document.title = `Calseta | ${title}`;
+  }, [title]);
+
   return (
     <div className="noise-overlay flex h-screen overflow-hidden bg-background">
       <Sidebar />
