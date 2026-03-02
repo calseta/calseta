@@ -73,6 +73,9 @@ async def create_detection_rule(
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[DetectionRuleResponse]:
+    # Auto-populate created_by from the API key prefix if not set
+    if not body.created_by:
+        body.created_by = auth.key_prefix
     repo = DetectionRuleRepository(db)
     rule = await repo.create(body)
     return DataResponse(data=_to_response(rule))
