@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.api_key import APIKey
 
+_UNSET = object()  # sentinel for "field not provided"
+
 
 class APIKeyRepository:
     def __init__(self, db: AsyncSession) -> None:
@@ -58,6 +60,38 @@ class APIKeyRepository:
         await self.db.flush()
         await self.db.refresh(record)
         return record, plain_key
+
+    async def get_by_uuid(self, uuid: str) -> APIKey | None:
+        """Return the APIKey row matching the UUID, or None."""
+        result = await self.db.execute(
+            select(APIKey).where(APIKey.uuid == uuid)  # type: ignore[arg-type]
+        )
+        return result.scalar_one_or_none()
+
+    async def update(
+        self,
+        uuid: str,
+        *,
+        scopes: list[str] | None = None,
+        allowed_sources: list[str] | None | object = _UNSET,
+        is_active: bool | None = None,
+    ) -> APIKey | None:
+        """
+        Update mutable fields on an API key. Returns the updated record or None
+        if not found. Fields set to their sentinel (_UNSET) are not touched.
+        """
+        record = await self.get_by_uuid(uuid)
+        if record is None:
+            return None
+        if scopes is not None:
+            record.scopes = scopes
+        if allowed_sources is not _UNSET:
+            record.allowed_sources = allowed_sources  # type: ignore[assignment]
+        if is_active is not None:
+            record.is_active = is_active
+        await self.db.flush()
+        await self.db.refresh(record)
+        return record
 
     async def deactivate(self, uuid: str) -> bool:
         """

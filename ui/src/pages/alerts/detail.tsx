@@ -257,9 +257,14 @@ export function AlertDetailPage() {
                   )}
                 </div>
               ) : (
-                <Badge variant="outline" className={cn("text-xs", statusColor(alert.status))}>
-                  {alert.status}
-                </Badge>
+                <div>
+                  <Badge variant="outline" className={cn("text-xs", statusColor(alert.status))}>
+                    {alert.status}
+                  </Badge>
+                  {alert.close_classification && (
+                    <p className="mt-1.5 text-[11px] text-dim">{alert.close_classification}</p>
+                  )}
+                </div>
               ),
             },
             {
@@ -317,9 +322,6 @@ export function AlertDetailPage() {
                 )}
                 {alert.closed_at && (
                   <DetailPageField label="Closed At" value={formatDate(alert.closed_at)} />
-                )}
-                {alert.close_classification && (
-                  <DetailPageField label="Classification" value={alert.close_classification} />
                 )}
               </SidebarSection>
               {alert.tags.length > 0 && (

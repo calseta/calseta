@@ -247,26 +247,61 @@ export function WorkflowDetailPage() {
               label: "State",
               icon: Shield,
               value: (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-xs",
-                    wf.state === "active"
-                      ? "text-teal bg-teal/10 border-teal/30"
-                      : "text-amber bg-amber/10 border-amber/30",
-                  )}
+                <Select
+                  value={wf.state}
+                  onValueChange={(v) => {
+                    patchWorkflow.mutate(
+                      { uuid, body: { state: v } },
+                      {
+                        onSuccess: () => toast.success(`State changed to ${v}`),
+                        onError: () => toast.error("Failed to update state"),
+                      },
+                    );
+                  }}
                 >
-                  {wf.state}
-                </Badge>
+                  <SelectTrigger
+                    className={cn(
+                      "h-7 w-full text-xs border",
+                      wf.state === "active"
+                        ? "text-teal bg-teal/10 border-teal/30"
+                        : "text-amber bg-amber/10 border-amber/30",
+                    )}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {WORKFLOW_STATES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ),
             },
             {
               label: "Risk Level",
               icon: AlertTriangle,
               value: (
-                <Badge variant="outline" className={cn("text-xs", riskColor(wf.risk_level))}>
-                  {wf.risk_level}
-                </Badge>
+                <Select
+                  value={wf.risk_level}
+                  onValueChange={(v) => {
+                    patchWorkflow.mutate(
+                      { uuid, body: { risk_level: v } },
+                      {
+                        onSuccess: () => toast.success(`Risk level changed to ${v}`),
+                        onError: () => toast.error("Failed to update risk level"),
+                      },
+                    );
+                  }}
+                >
+                  <SelectTrigger className={cn("h-7 w-full text-xs border", riskColor(wf.risk_level))}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {RISK_LEVELS.map((r) => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ),
             },
             {

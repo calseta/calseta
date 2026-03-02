@@ -7,6 +7,8 @@ once (on creation) and never stored in plain text.
 Routes:
     GET    /v1/api-keys             — List all active API keys
     POST   /v1/api-keys             — Create a new API key (returns full key once)
+    GET    /v1/api-keys/{uuid}      — Get a single API key by UUID
+    PATCH  /v1/api-keys/{uuid}      — Update scopes, allowed_sources, or deactivate
     DELETE /v1/api-keys/{uuid}      — Deactivate an API key
 """
 
@@ -25,7 +27,7 @@ from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
 from app.db.session import get_db
 from app.repositories.api_key_repository import APIKeyRepository
-from app.schemas.api_keys import APIKeyCreate, APIKeyCreated, APIKeyResponse
+from app.schemas.api_keys import APIKeyCreate, APIKeyCreated, APIKeyResponse, APIKeyUpdate
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
@@ -85,6 +87,79 @@ async def create_api_key(
             is_active=record.is_active,
             created_at=record.created_at,
             expires_at=record.expires_at,
+            allowed_sources=list(record.allowed_sources) if record.allowed_sources else None,
+        )
+    )
+
+
+@router.get("/{key_uuid}", response_model=DataResponse[APIKeyResponse])
+async def get_api_key(
+    auth: _AdminAuth,
+    key_uuid: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[APIKeyResponse]:
+    repo = APIKeyRepository(db)
+    record = await repo.get_by_uuid(str(key_uuid))
+    if record is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="API key not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return DataResponse(
+        data=APIKeyResponse(
+            uuid=record.uuid,
+            name=record.name,
+            key_prefix=record.key_prefix,
+            scopes=list(record.scopes),
+            is_active=record.is_active,
+            created_at=record.created_at,
+            expires_at=record.expires_at,
+            last_used_at=record.last_used_at,
+            allowed_sources=list(record.allowed_sources) if record.allowed_sources else None,
+        )
+    )
+
+
+@router.patch("/{key_uuid}", response_model=DataResponse[APIKeyResponse])
+async def update_api_key(
+    auth: _AdminAuth,
+    key_uuid: UUID,
+    body: APIKeyUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[APIKeyResponse]:
+    from app.repositories.api_key_repository import _UNSET
+
+    repo = APIKeyRepository(db)
+
+    kwargs: dict = {}
+    if body.scopes is not None:
+        kwargs["scopes"] = body.scopes
+    if body.is_active is not None:
+        kwargs["is_active"] = body.is_active
+    # allowed_sources: distinguish between "not sent" and "sent as null"
+    if "allowed_sources" in body.model_fields_set:
+        kwargs["allowed_sources"] = body.allowed_sources
+    else:
+        kwargs["allowed_sources"] = _UNSET
+
+    record = await repo.update(str(key_uuid), **kwargs)
+    if record is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="API key not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return DataResponse(
+        data=APIKeyResponse(
+            uuid=record.uuid,
+            name=record.name,
+            key_prefix=record.key_prefix,
+            scopes=list(record.scopes),
+            is_active=record.is_active,
+            created_at=record.created_at,
+            expires_at=record.expires_at,
+            last_used_at=record.last_used_at,
             allowed_sources=list(record.allowed_sources) if record.allowed_sources else None,
         )
     )

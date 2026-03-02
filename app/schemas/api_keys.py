@@ -33,6 +33,14 @@ class APIKeyCreated(BaseModel):
     allowed_sources: list[str] | None
 
 
+class APIKeyUpdate(BaseModel):
+    """PATCH /v1/api-keys/{uuid} — update mutable fields."""
+
+    scopes: list[str] | None = Field(None, description="Replace scopes list")
+    allowed_sources: list[str] | None = Field(None, description="Restrict to these sources (null = unrestricted)")
+    is_active: bool | None = Field(None, description="Set to false to revoke")
+
+
 class APIKeyResponse(BaseModel):
     """All endpoints other than creation — full key is never included."""
 
