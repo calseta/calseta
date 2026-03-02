@@ -35,26 +35,16 @@ class AlertStatus(StrEnum):
 
 class AlertSeverity(StrEnum):
     """
-    Alert severity levels. Stored alongside the integer severity_id for fast range filtering.
+    Alert severity levels. Stored as TEXT with Pydantic validation.
     Source plugins are responsible for mapping source-specific severity values to this enum.
     """
 
-    PENDING = "Pending"          # severity_id = 0
-    INFORMATIONAL = "Informational"  # severity_id = 1
-    LOW = "Low"                  # severity_id = 2
-    MEDIUM = "Medium"            # severity_id = 3
-    HIGH = "High"                # severity_id = 4
-    CRITICAL = "Critical"        # severity_id = 5
-
-
-SEVERITY_ID_MAP: dict[AlertSeverity, int] = {
-    AlertSeverity.PENDING: 0,
-    AlertSeverity.INFORMATIONAL: 1,
-    AlertSeverity.LOW: 2,
-    AlertSeverity.MEDIUM: 3,
-    AlertSeverity.HIGH: 4,
-    AlertSeverity.CRITICAL: 5,
-}
+    PENDING = "Pending"
+    INFORMATIONAL = "Informational"
+    LOW = "Low"
+    MEDIUM = "Medium"
+    HIGH = "High"
+    CRITICAL = "Critical"
 
 
 class AlertCloseClassification(StrEnum):
@@ -93,9 +83,6 @@ class CalsetaAlert(BaseModel):
     occurred_at: datetime
     source_name: str
 
-    # severity_id is derived from severity if not provided
-    severity_id: int | None = None
-
     # Optional normalized fields used by Pass 2 indicator extraction
     src_ip: str | None = None
     dst_ip: str | None = None
@@ -117,9 +104,3 @@ class CalsetaAlert(BaseModel):
 
     # Additional source context (free-form, not used for extraction)
     extra: dict[str, Any] = Field(default_factory=dict)
-
-    def get_severity_id(self) -> int:
-        """Return severity_id, computing from severity if not explicitly set."""
-        if self.severity_id is not None:
-            return self.severity_id
-        return SEVERITY_ID_MAP.get(self.severity, 0)

@@ -40,7 +40,6 @@ class AlertResponse(BaseModel):
     uuid: uuid.UUID
     title: str
     severity: AlertSeverity
-    severity_id: int
     status: AlertStatus
     source_name: str
     occurred_at: datetime
@@ -54,11 +53,11 @@ class AlertResponse(BaseModel):
     closed_at: datetime | None
     tags: list[str]
     detection_rule_id: int | None
+    raw_payload: dict[str, Any] | None = None
     indicators: list[EnrichedIndicator] = Field(default_factory=list)
     agent_findings: list[dict[str, Any]] | None = None
     created_at: datetime
     updated_at: datetime
-    _metadata: AlertMetadata | None = None
 
 
 class AlertSummary(BaseModel):
@@ -69,7 +68,6 @@ class AlertSummary(BaseModel):
     uuid: uuid.UUID
     title: str
     severity: AlertSeverity
-    severity_id: int
     status: AlertStatus
     source_name: str
     occurred_at: datetime

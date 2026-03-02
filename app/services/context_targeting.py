@@ -12,7 +12,7 @@ Rule operators:
   gte      — alert field value >= rule value (numeric)
   lte      — alert field value <= rule value (numeric)
 
-Field paths supported: source_name, severity, severity_id, tags
+Field paths supported: source_name, severity, tags
 
 Invalid field path or type mismatch evaluates as False (never raises).
 """
@@ -34,7 +34,6 @@ from app.repositories.context_document_repository import ContextDocumentReposito
 _FIELD_ACCESSORS: dict[str, str] = {
     "source_name": "source_name",
     "severity": "severity",
-    "severity_id": "severity_id",
     "tags": "tags",
 }
 

@@ -229,7 +229,6 @@ async def test_agent_webhook(
             "uuid": "00000000-0000-0000-0000-000000000000",
             "title": "Calseta AI — Test Webhook",
             "severity": "Low",
-            "severity_id": 2,
             "status": "Open",
             "source_name": agent.name,
             "occurred_at": now.isoformat(),

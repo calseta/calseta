@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Text, func, text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Text, func, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,7 +23,6 @@ class Alert(TimestampMixin, UUIDMixin, Base):
     # Normalized CalsetaAlert fields
     title: Mapped[str] = mapped_column(Text, nullable=False)
     severity: Mapped[str] = mapped_column(Text, nullable=False, default="Pending")
-    severity_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     source_name: Mapped[str] = mapped_column(Text, nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     source_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -92,7 +92,6 @@ def _build_alert_dict(
         "uuid": str(alert.uuid),
         "title": alert.title,
         "severity": alert.severity,
-        "severity_id": alert.severity_id,
         "source_name": alert.source_name,
         "status": alert.status,
         "occurred_at": alert.occurred_at.isoformat() if alert.occurred_at else None,

@@ -366,7 +366,6 @@ def upgrade() -> None:
         ),
         sa.Column("title", sa.Text(), nullable=False),
         sa.Column("severity", sa.Text(), nullable=False, server_default="'Pending'"),
-        sa.Column("severity_id", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("source_name", sa.Text(), nullable=False),
         sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("source_time", sa.DateTime(timezone=True), nullable=True),

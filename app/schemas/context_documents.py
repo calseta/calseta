@@ -16,7 +16,7 @@ DOCUMENT_TYPES = frozenset(
 _VALID_OPS = frozenset({"eq", "in", "contains", "gte", "lte"})
 
 # Fields that targeting rules may reference
-_VALID_FIELDS = frozenset({"source_name", "severity", "severity_id", "tags"})
+_VALID_FIELDS = frozenset({"source_name", "severity", "tags"})
 
 
 def _validate_rule(rule: object, path: str) -> list[str]:

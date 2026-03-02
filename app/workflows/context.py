@@ -358,7 +358,6 @@ class AlertContext:
     uuid: UUID
     title: str
     severity: str
-    severity_id: int
     source_name: str
     status: str
     occurred_at: datetime
