@@ -23,3 +23,6 @@ class ContextDocument(TimestampMixin, UUIDMixin, Base):
         ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    is_system: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )

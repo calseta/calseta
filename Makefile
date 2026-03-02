@@ -1,4 +1,4 @@
-.PHONY: dev dev-up dev-logs logs test lint typecheck migrate ci build help ui-install ui-dev ui-build
+.PHONY: dev dev-up dev-logs logs test lint typecheck migrate ci build help ui-install ui-dev ui-build seed-sandbox
 
 # Inline script to apply procrastinate's schema (stored procedures + tables)
 define APPLY_PROCRASTINATE_SCHEMA
@@ -72,6 +72,10 @@ ci: lint typecheck test
 
 build:
 	docker build --target prod -t calseta .
+
+# Seed sandbox data (requires SANDBOX_MODE=true ENRICHMENT_MOCK_MODE=true)
+seed-sandbox:
+	python -m app.cli.seed_sandbox
 
 # UI targets
 ui-install:

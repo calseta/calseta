@@ -66,6 +66,11 @@ class Alert(TimestampMixin, UUIDMixin, Base):
         ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
 
+    # System flag (sandbox/seed data)
+    is_system: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+
     # Foreign keys
     detection_rule_id: Mapped[int | None] = mapped_column(
         BigInteger,

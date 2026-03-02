@@ -252,6 +252,13 @@ class Settings(BaseSettings):
     SLACK_SIGNING_SECRET: str = ""
     TEAMS_WEBHOOK_URL: str = ""
 
+    # ------------------------------------------------------------------
+    # Sandbox
+    # ------------------------------------------------------------------
+    ENRICHMENT_MOCK_MODE: bool = False
+    SANDBOX_MODE: bool = False
+    SANDBOX_RESET_INTERVAL_HOURS: int = 24
+
     @classmethod
     def settings_customise_sources(
         cls,

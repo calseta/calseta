@@ -230,6 +230,45 @@ make ui-build
 
 ---
 
+## Sandbox Mode
+
+Sandbox mode lets you explore the full platform with mock enrichment data and pre-seeded alerts — no real API keys required.
+
+**Enable it** by setting two env vars:
+
+```bash
+ENRICHMENT_MOCK_MODE=true
+SANDBOX_MODE=true
+```
+
+Then start normally:
+
+```bash
+docker compose up
+```
+
+**What you get:**
+- 4 mock enrichment providers (VirusTotal, AbuseIPDB, Okta, Entra) — deterministic responses, no HTTP calls
+- 5 pre-seeded alerts from Sentinel, Elastic, and Splunk with realistic scenarios (brute force, malware, impossible travel, data exfiltration, encoded PowerShell)
+- Detection rules with MITRE mappings and investigation documentation
+- Context documents (runbooks, SOPs, IR plans) matched to alerts via targeting rules
+- A public read-only API key: `cai_sandbox_demo_key_not_for_production`
+- Daily auto-reset at midnight UTC — user-created data is wiped and fixtures re-seeded
+
+**Manual seed/reset:**
+
+```bash
+# Seed sandbox data on an existing database
+docker compose exec api python -m app.cli.seed_sandbox
+
+# Or via Make
+make seed-sandbox
+```
+
+**Disable it** by removing or setting the env vars to `false`. The same Docker images are used — no separate sandbox build.
+
+---
+
 ## Tech Stack
 
 Python 3.12 · FastAPI · PostgreSQL 15 · SQLAlchemy 2.0 async · Pydantic v2 · Alembic · procrastinate · httpx · MCP Python SDK · Docker · React 19 · Vite · Tailwind CSS · TanStack Query/Router

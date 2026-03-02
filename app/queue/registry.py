@@ -22,6 +22,7 @@ Registered tasks:
   Wave 4: send_approval_notification_task (queue: dispatch)        ← added in Wave 4
   Wave 4: execute_approved_workflow_task  (queue: workflows)       ← added in Wave 4
   Wave 5: dispatch_agent_webhooks         (queue: dispatch)        ← added in Wave 5
+  Wave 9: sandbox_reset                   (queue: default, periodic) ← conditional on SANDBOX_MODE
 """
 
 from __future__ import annotations
@@ -467,3 +468,28 @@ async def dispatch_agent_webhooks_task(alert_id: int) -> None:
         except Exception:
             await session.rollback()
             raise
+
+
+# ---------------------------------------------------------------------------
+# Wave 9: Sandbox auto-reset (periodic, only when SANDBOX_MODE=true)
+# ---------------------------------------------------------------------------
+
+if settings.SANDBOX_MODE:
+
+    @procrastinate_app.periodic(cron="0 0 * * *")
+    @procrastinate_app.task(name="sandbox_reset", queue="default")
+    async def sandbox_reset_task(timestamp: int) -> None:
+        """
+        Reset the sandbox database daily at midnight UTC.
+
+        Deletes transient data, user-created config, and re-seeds fixtures.
+        Only registered when SANDBOX_MODE=true.
+        """
+        import structlog as _structlog
+
+        from app.tasks.sandbox_reset import reset_sandbox
+
+        _logger = _structlog.get_logger()
+        _logger.info("sandbox_reset_task_triggered", timestamp=timestamp)
+        counts = await reset_sandbox()
+        _logger.info("sandbox_reset_task_complete", deleted_counts=counts)

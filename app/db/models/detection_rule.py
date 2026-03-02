@@ -31,3 +31,6 @@ class DetectionRule(TimestampMixin, UUIDMixin, Base):
     run_frequency: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[str | None] = mapped_column(Text)
     documentation: Mapped[str | None] = mapped_column(Text)
+    is_system: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )

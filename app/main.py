@@ -74,6 +74,12 @@ async def _on_startup() -> None:
             await seed_system_mappings(db)
             await seed_builtin_workflows(db, settings)
             await load_normalized_mappings(db)
+
+            if settings.SANDBOX_MODE:
+                from app.seed.sandbox import seed_sandbox
+
+                await seed_sandbox(db)
+
             await db.commit()
     except Exception as exc:
         logger.warning(
