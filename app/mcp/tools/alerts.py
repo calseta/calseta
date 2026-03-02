@@ -20,9 +20,11 @@ from app.db.session import AsyncSessionLocal
 from app.mcp.scope import check_scope
 from app.mcp.server import mcp_server
 from app.repositories.alert_repository import AlertRepository
+from app.repositories.indicator_repository import IndicatorRepository
 from app.schemas.activity_events import ActivityEventType
 from app.schemas.alert import AlertStatus
 from app.schemas.alerts import FindingConfidence
+from app.schemas.indicators import MaliceLevel
 from app.services.activity_event import ActivityEventService
 
 logger = structlog.get_logger(__name__)
@@ -281,3 +283,91 @@ async def search_alerts(
             "page": page,
             "page_size": page_size,
         }, default=_json_serial)
+
+
+_VALID_MALICE = sorted(m.value for m in MaliceLevel)
+
+
+@mcp_server.tool()
+async def update_alert_malice(
+    alert_uuid: str,
+    ctx: Context,
+    malice: str | None = None,
+) -> str:
+    """Set or reset the malice override on an alert.
+
+    When malice is provided, the alert's effective malice is overridden to the
+    given value (analyst verdict). When malice is null/omitted, any existing
+    override is cleared and the alert returns to computing malice from its
+    indicators.
+
+    Args:
+        alert_uuid: UUID of the alert to update.
+        malice: Malice verdict to set. Valid values: "Pending", "Benign",
+                "Suspicious", "Malicious". Pass null to reset to computed.
+
+    Returns:
+        JSON with the updated alert UUID, malice override, and timestamp.
+    """
+    try:
+        parsed_uuid = _uuid.UUID(alert_uuid)
+    except ValueError:
+        return json.dumps({"error": f"Invalid UUID: {alert_uuid}"})
+
+    if malice is not None and malice not in _VALID_MALICE:
+        return json.dumps({
+            "error": f"Invalid malice '{malice}'. Must be one of: {_VALID_MALICE}"
+        })
+
+    reset = malice is None
+
+    async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "alerts:write")
+        if scope_err:
+            return scope_err
+
+        repo = AlertRepository(session)
+        alert = await repo.get_by_uuid(parsed_uuid)
+        if alert is None:
+            return json.dumps({"error": f"Alert not found: {alert_uuid}"})
+
+        prev_malice = alert.malice_override
+
+        await repo.patch(
+            alert,
+            malice_override=malice,
+            reset_malice_override=reset,
+        )
+
+        activity_svc = ActivityEventService(session)
+        await activity_svc.write(
+            ActivityEventType.ALERT_MALICE_UPDATED,
+            actor_type="mcp",
+            actor_key_prefix=ctx.client_id,
+            alert_id=alert.id,
+            references={
+                "from_malice": prev_malice,
+                "to_malice": malice,
+                "malice_source": "reset" if reset else "analyst",
+            },
+        )
+
+        await session.commit()
+
+        # Compute effective malice for the response
+        effective_malice = malice
+        if reset:
+            indicator_repo = IndicatorRepository(session)
+            indicators = await indicator_repo.list_for_alert(alert.id)
+            malice_order = {"Malicious": 3, "Suspicious": 2, "Benign": 1, "Pending": 0}
+            effective_malice = "Pending"
+            for ind in indicators:
+                if malice_order.get(ind.malice, 0) > malice_order.get(effective_malice, 0):
+                    effective_malice = ind.malice
+
+        return json.dumps({
+            "alert_uuid": alert_uuid,
+            "malice_override": malice,
+            "effective_malice": effective_malice,
+            "updated_at": datetime.now(UTC).isoformat(),
+        })

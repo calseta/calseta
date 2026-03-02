@@ -19,7 +19,10 @@ from app.db.session import AsyncSessionLocal
 from app.integrations.enrichment.registry import enrichment_registry
 from app.mcp.scope import check_scope
 from app.mcp.server import mcp_server
-from app.schemas.indicators import IndicatorType
+from app.repositories.indicator_repository import IndicatorRepository
+from app.schemas.activity_events import ActivityEventType
+from app.schemas.indicators import IndicatorType, MaliceLevel
+from app.services.activity_event import ActivityEventService
 from app.services.enrichment import EnrichmentService
 
 logger = structlog.get_logger(__name__)
@@ -112,3 +115,92 @@ async def enrich_indicator(
         "results": results,
         "provider_count": len(results),
     }, default=_json_serial)
+
+
+_VALID_MALICE = sorted(m.value for m in MaliceLevel)
+
+
+@mcp_server.tool()
+async def update_indicator_malice(
+    indicator_uuid: str,
+    ctx: Context,
+    malice: str | None = None,
+) -> str:
+    """Set or reset the malice verdict on an indicator.
+
+    When malice is provided, the indicator's malice is set to the given value
+    (analyst override) and will not be changed by re-enrichment. When malice is
+    null/omitted, the override is cleared and malice is recomputed from
+    stored enrichment results.
+
+    Args:
+        indicator_uuid: UUID of the indicator to update.
+        malice: Malice verdict to set. Valid values: "Pending", "Benign",
+                "Suspicious", "Malicious". Pass null to reset to enrichment.
+
+    Returns:
+        JSON with the updated indicator UUID, malice, source, and timestamp.
+    """
+    import uuid as _uuid
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from app.db.models.alert_indicator import AlertIndicator
+
+    try:
+        _uuid.UUID(indicator_uuid)
+    except ValueError:
+        return json.dumps({"error": f"Invalid UUID: {indicator_uuid}"})
+
+    if malice is not None and malice not in _VALID_MALICE:
+        return json.dumps({
+            "error": f"Invalid malice '{malice}'. Must be one of: {_VALID_MALICE}"
+        })
+
+    async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "alerts:write")
+        if scope_err:
+            return scope_err
+
+        repo = IndicatorRepository(session)
+        indicator = await repo.get_by_uuid(indicator_uuid)
+        if indicator is None:
+            return json.dumps({"error": f"Indicator not found: {indicator_uuid}"})
+
+        prev_malice = indicator.malice
+        now = datetime.now(UTC)
+
+        await repo.patch_malice(indicator, malice=malice, now=now)
+
+        # Find an associated alert for the activity event FK
+        alert_link = await session.execute(
+            select(AlertIndicator.alert_id)
+            .where(AlertIndicator.indicator_id == indicator.id)
+            .limit(1)
+        )
+        alert_id = alert_link.scalar_one_or_none()
+
+        activity_svc = ActivityEventService(session)
+        await activity_svc.write(
+            ActivityEventType.INDICATOR_MALICE_UPDATED,
+            actor_type="mcp",
+            actor_key_prefix=ctx.client_id,
+            alert_id=alert_id,
+            references={
+                "from_malice": prev_malice,
+                "to_malice": indicator.malice,
+                "malice_source": indicator.malice_source,
+                "indicator_type": indicator.type,
+                "indicator_value": indicator.value,
+            },
+        )
+
+        await session.commit()
+
+        return json.dumps({
+            "indicator_uuid": indicator_uuid,
+            "malice": indicator.malice,
+            "malice_source": indicator.malice_source,
+            "updated_at": now.isoformat(),
+        })

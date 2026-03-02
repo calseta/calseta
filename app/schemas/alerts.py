@@ -15,7 +15,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.alert import AlertCloseClassification, AlertSeverity, AlertStatus
-from app.schemas.indicators import EnrichedIndicator
+from app.schemas.indicators import EnrichedIndicator, MaliceLevel
 
 
 class AlertMetadata(BaseModel):
@@ -56,6 +56,10 @@ class AlertResponse(BaseModel):
     tags: list[str]
     detection_rule_id: int | None
     raw_payload: dict[str, Any] | None = None
+    malice: str | None = None  # Computed: override > worst-of-indicators > "Pending"
+    malice_override: str | None = None
+    malice_override_source: str | None = None
+    malice_override_at: datetime | None = None
     indicators: list[EnrichedIndicator] = Field(default_factory=list)
     agent_findings: list[dict[str, Any]] | None = None
     created_at: datetime
@@ -90,6 +94,8 @@ class AlertPatch(BaseModel):
     severity: AlertSeverity | None = None
     close_classification: AlertCloseClassification | None = None
     tags: list[str] | None = None
+    malice_override: MaliceLevel | None = None
+    reset_malice_override: bool = False
 
 
 class FindingConfidence(StrEnum):

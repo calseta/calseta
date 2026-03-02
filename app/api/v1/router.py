@@ -17,6 +17,7 @@ from app.api.v1 import (
     detection_rules,
     enrichments,
     indicator_mappings,
+    indicators,
     ingest,
     metrics,
     sources,
@@ -29,6 +30,7 @@ v1_router.include_router(api_keys.router)
 v1_router.include_router(alerts.router)
 v1_router.include_router(ingest.router)
 v1_router.include_router(indicator_mappings.router)
+v1_router.include_router(indicators.router)
 v1_router.include_router(detection_rules.router)
 v1_router.include_router(enrichments.router)
 v1_router.include_router(context_documents.router)

@@ -50,6 +50,13 @@ class Alert(TimestampMixin, UUIDMixin, Base):
     triaged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Malice override (analyst verdict at alert level)
+    malice_override: Mapped[str | None] = mapped_column(Text)
+    malice_override_source: Mapped[str | None] = mapped_column(Text)
+    malice_override_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+
     # Payload and tags
     raw_payload: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")

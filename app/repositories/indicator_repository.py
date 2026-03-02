@@ -88,12 +88,60 @@ class IndicatorRepository:
         malice: str,
         enrichment_results: dict[str, Any],
     ) -> None:
-        """Update enrichment results and set is_enriched=True."""
+        """Update enrichment results and set is_enriched=True.
+
+        Skips malice update when malice_source is 'analyst' (sticky override).
+        """
         existing = indicator.enrichment_results or {}
         indicator.enrichment_results = {**existing, **enrichment_results}
-        indicator.malice = malice
+        if indicator.malice_source != "analyst":
+            indicator.malice = malice
         indicator.is_enriched = True
         await self._db.flush()
+
+    async def patch_malice(
+        self,
+        indicator: Indicator,
+        malice: str | None,
+        now: datetime,
+    ) -> None:
+        """Set analyst malice override or reset to enrichment-computed value.
+
+        Args:
+            indicator: The indicator ORM object.
+            malice: New malice value, or None to reset to enrichment.
+            now: Current timestamp.
+        """
+        if malice is not None:
+            indicator.malice = malice
+            indicator.malice_source = "analyst"
+            indicator.malice_overridden_at = now
+        else:
+            # Reset to enrichment-computed value
+            indicator.malice = self._compute_malice_from_enrichment(indicator)
+            indicator.malice_source = "enrichment"
+            indicator.malice_overridden_at = None
+        await self._db.flush()
+
+    @staticmethod
+    def _compute_malice_from_enrichment(indicator: Indicator) -> str:
+        """Recompute malice from stored enrichment_results JSONB.
+
+        Applies worst-case aggregation: Malicious > Suspicious > Benign > Pending.
+        """
+        malice_order = {"Malicious": 3, "Suspicious": 2, "Benign": 1, "Pending": 0}
+        worst = "Pending"
+        results = indicator.enrichment_results or {}
+        for _provider, data in results.items():
+            if not isinstance(data, dict):
+                continue
+            extracted = data.get("extracted", {})
+            if isinstance(extracted, dict):
+                verdict = extracted.get("verdict") or extracted.get("malice")
+                if isinstance(verdict, str) and verdict in malice_order:
+                    if malice_order[verdict] > malice_order[worst]:
+                        worst = verdict
+        return worst
 
     async def count_for_alert(self, alert_id: int) -> int:
         """Return count of indicators linked to the given alert."""

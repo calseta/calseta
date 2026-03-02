@@ -162,6 +162,8 @@ class AlertRepository:
         severity: AlertSeverity | None = None,
         tags: list[str] | None = None,
         close_classification: str | None = None,
+        malice_override: str | None = None,
+        reset_malice_override: bool = False,
     ) -> Alert:
         """Apply partial updates to an alert."""
         now = datetime.now(UTC)
@@ -188,6 +190,14 @@ class AlertRepository:
             alert.tags = tags
         if close_classification is not None:
             alert.close_classification = close_classification
+        if reset_malice_override:
+            alert.malice_override = None
+            alert.malice_override_source = None
+            alert.malice_override_at = None
+        elif malice_override is not None:
+            alert.malice_override = malice_override
+            alert.malice_override_source = "analyst"
+            alert.malice_override_at = now
 
         await self._db.flush()
         await self._db.refresh(alert)

@@ -22,4 +22,10 @@ class Indicator(TimestampMixin, UUIDMixin, Base):
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_enriched: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     malice: Mapped[str] = mapped_column(Text, nullable=False, default="Pending")
+    malice_source: Mapped[str] = mapped_column(
+        Text, nullable=False, default="enrichment", server_default="enrichment"
+    )
+    malice_overridden_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     enrichment_results: Mapped[dict[str, Any] | None] = mapped_column(JSONB)

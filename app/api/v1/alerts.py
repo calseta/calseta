@@ -6,6 +6,8 @@ GET    /v1/alerts/{uuid}                     — Get alert detail (includes indi
 PATCH  /v1/alerts/{uuid}                     — Update alert (status, severity, tags, classification)
 DELETE /v1/alerts/{uuid}                     — Delete alert
 POST   /v1/alerts/{uuid}/findings           — Add an agent finding to an alert
+GET    /v1/alerts/{uuid}/indicators         — List indicators for an alert
+POST   /v1/alerts/{uuid}/indicators         — Add indicators to an alert
 GET    /v1/alerts/{uuid}/activity           — List activity events for an alert
 GET    /v1/alerts/{uuid}/relationship-graph — Alert-indicator-sibling relationship graph
 """
@@ -44,7 +46,12 @@ from app.schemas.alerts import (
 )
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.context_documents import ContextDocumentResponse
-from app.schemas.indicators import EnrichedIndicator, IndicatorResponse
+from app.schemas.indicators import (
+    EnrichedIndicator,
+    IndicatorAddRequest,
+    IndicatorAddResponse,
+    IndicatorResponse,
+)
 from app.schemas.relationship_graph import (
     AlertRelationshipGraph,
     GraphAlertNode,
@@ -82,10 +89,24 @@ def _build_indicator(ind: object) -> EnrichedIndicator:
         last_seen=ind.last_seen,
         is_enriched=ind.is_enriched,
         malice=ind.malice,
+        malice_source=ind.malice_source,
+        malice_overridden_at=ind.malice_overridden_at,
         enrichment_results=_filter_enrichment_results(ind.enrichment_results),
         created_at=ind.created_at,
         updated_at=ind.updated_at,
     )
+
+
+def _compute_dominant_malice(indicators: list[EnrichedIndicator]) -> str:
+    """Compute worst-case malice across indicators."""
+    malice_order = ["Malicious", "Suspicious", "Benign", "Pending"]
+    worst = "Pending"
+    for ind in indicators:
+        wi = malice_order.index(worst) if worst in malice_order else len(malice_order)
+        ci = malice_order.index(ind.malice) if ind.malice in malice_order else len(malice_order)
+        if ci < wi:
+            worst = ind.malice
+    return worst
 
 
 def _build_metadata(
@@ -171,6 +192,12 @@ async def get_alert(
 
     response = AlertResponse.model_validate(alert)
     response.indicators = enriched_indicators
+    # Compute effective malice: override > worst-of-indicators > "Pending"
+    response.malice = (
+        alert.malice_override
+        if alert.malice_override
+        else _compute_dominant_malice(enriched_indicators)
+    )
 
     return DataResponse(data=response, meta=metadata.model_dump())
 
@@ -204,6 +231,7 @@ async def patch_alert(
 
     prev_status = alert.status
     prev_severity = alert.severity
+    prev_malice_override = alert.malice_override
 
     updated = await alert_repo.patch(
         alert,
@@ -213,6 +241,8 @@ async def patch_alert(
         close_classification=body.close_classification.value
         if body.close_classification
         else None,
+        malice_override=body.malice_override.value if body.malice_override else None,
+        reset_malice_override=body.reset_malice_override,
     )
 
     # Activity events for significant transitions
@@ -251,12 +281,44 @@ async def patch_alert(
             },
         )
 
+    # Malice override activity event
+    new_malice_override = updated.malice_override
+    if body.reset_malice_override and prev_malice_override is not None:
+        await activity_svc.write(
+            ActivityEventType.ALERT_MALICE_UPDATED,
+            actor_type="api",
+            actor_key_prefix=auth.key_prefix,
+            alert_id=alert.id,
+            references={
+                "from_malice": prev_malice_override,
+                "to_malice": None,
+                "malice_source": "reset",
+            },
+        )
+    elif body.malice_override is not None and body.malice_override.value != prev_malice_override:
+        await activity_svc.write(
+            ActivityEventType.ALERT_MALICE_UPDATED,
+            actor_type="api",
+            actor_key_prefix=auth.key_prefix,
+            alert_id=alert.id,
+            references={
+                "from_malice": prev_malice_override,
+                "to_malice": new_malice_override,
+                "malice_source": "analyst",
+            },
+        )
+
     indicators = await indicator_repo.list_for_alert(updated.id)
     enriched_indicators = [_build_indicator(i) for i in indicators]
     metadata = _build_metadata(updated, len(enriched_indicators))
 
     response = AlertResponse.model_validate(updated)
     response.indicators = enriched_indicators
+    response.malice = (
+        updated.malice_override
+        if updated.malice_override
+        else _compute_dominant_malice(enriched_indicators)
+    )
 
     return DataResponse(data=response, meta=metadata.model_dump())
 
@@ -333,6 +395,42 @@ async def add_finding(
             posted_at=now,
         )
     )
+
+
+@router.post(
+    "/{alert_uuid}/enrich",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def enrich_alert(
+    alert_uuid: UUID,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    queue: Annotated[TaskQueueBase, Depends(get_queue)],
+) -> DataResponse[dict]:  # type: ignore[type-arg]
+    """
+    Re-trigger the enrichment pipeline for an alert.
+
+    Queues the enrich_alert task which re-runs the full 3-pass indicator
+    extraction + enrichment pipeline. Safe to call multiple times (idempotent).
+    """
+    alert_repo = AlertRepository(db)
+    alert = await alert_repo.get_by_uuid(alert_uuid)
+    if alert is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Alert not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    await queue.enqueue(
+        "enrich_alert",
+        {"alert_id": alert.id},
+        queue="enrichment",
+        delay_seconds=0,
+        priority=0,
+    )
+
+    return DataResponse(data={"message": "Enrichment queued"})
 
 
 @router.get(
@@ -443,6 +541,8 @@ async def list_alert_indicators(
             type=ind.type,  # type: ignore[arg-type]
             value=ind.value,
             malice=ind.malice,
+            malice_source=ind.malice_source,
+            malice_overridden_at=ind.malice_overridden_at,
             first_seen=ind.first_seen,
             last_seen=ind.last_seen,
             is_enriched=ind.is_enriched,
@@ -453,6 +553,101 @@ async def list_alert_indicators(
         for ind in indicators
     ]
     return DataResponse(data=result)
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/alerts/{uuid}/indicators
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{alert_uuid}/indicators",
+    response_model=DataResponse[IndicatorAddResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_indicators(
+    alert_uuid: UUID,
+    body: IndicatorAddRequest,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    queue: Annotated[TaskQueueBase, Depends(get_queue)],
+    enrich: bool = Query(default=True),
+) -> DataResponse[IndicatorAddResponse]:
+    """
+    Add one or more indicators to an alert.
+
+    Each indicator is upserted globally (idempotent on type+value) and linked
+    to the alert. If ``enrich=true`` (default), an enrichment task is queued.
+    """
+    alert_repo = AlertRepository(db)
+    indicator_repo = IndicatorRepository(db)
+    activity_svc = ActivityEventService(db)
+
+    alert = await alert_repo.get_by_uuid(alert_uuid)
+    if alert is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Alert not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    now = datetime.now(UTC)
+    added_indicators = []
+    for item in body.indicators:
+        indicator = await indicator_repo.upsert(item.type.value, item.value.strip(), now)
+        await indicator_repo.link_to_alert(indicator.id, alert.id)
+        added_indicators.append(indicator)
+
+    enrich_requested = False
+    if enrich:
+        await queue.enqueue(
+            "enrich_alert",
+            {"alert_id": alert.id},
+            queue="enrichment",
+            delay_seconds=0,
+            priority=0,
+        )
+        enrich_requested = True
+
+    await activity_svc.write(
+        ActivityEventType.ALERT_INDICATORS_ADDED,
+        actor_type="api",
+        actor_key_prefix=auth.key_prefix,
+        alert_id=alert.id,
+        references={
+            "indicator_count": len(added_indicators),
+            "indicators": [
+                {"type": ind.type, "value": ind.value} for ind in added_indicators
+            ],
+            "enrich_requested": enrich_requested,
+        },
+    )
+
+    result_indicators = [
+        IndicatorResponse(
+            uuid=str(ind.uuid),
+            type=ind.type,  # type: ignore[arg-type]
+            value=ind.value,
+            malice=ind.malice,
+            malice_source=ind.malice_source,
+            malice_overridden_at=ind.malice_overridden_at,
+            first_seen=ind.first_seen,
+            last_seen=ind.last_seen,
+            is_enriched=ind.is_enriched,
+            enrichment_results=_filter_enrichment_results(ind.enrichment_results),
+            created_at=ind.created_at,
+            updated_at=ind.updated_at,
+        )
+        for ind in added_indicators
+    ]
+
+    return DataResponse(
+        data=IndicatorAddResponse(
+            added_count=len(result_indicators),
+            indicators=result_indicators,
+            enrich_requested=enrich_requested,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
