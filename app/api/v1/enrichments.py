@@ -66,11 +66,15 @@ async def enrich_on_demand(
     """
     providers = enrichment_registry.list_for_type(body.type)
     if not providers:
-        raise CalsetaException(
-            code="NO_PROVIDERS",
-            message=f"No configured providers support indicator type '{body.type}'",
-            status_code=422,
+        # No configured providers — return 200 with empty results rather than
+        # erroring, so callers can handle gracefully.
+        payload = OnDemandEnrichmentResponse(
+            type=body.type,
+            value=body.value,
+            results={},
+            enriched_at=datetime.now(UTC),
         )
+        return DataResponse(data=payload)
 
     # Pre-check cache to record which providers already have a cached result.
     # The service will re-check the same in-memory cache — negligible overhead.
