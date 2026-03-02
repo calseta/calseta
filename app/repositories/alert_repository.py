@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -11,6 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.alert import Alert
 from app.schemas.alert import AlertSeverity, AlertStatus, CalsetaAlert
+
+
+def _generate_fingerprint(title: str, source_name: str, raw_payload: dict[str, Any]) -> str:
+    """Generate a consistent fingerprint for deduplication.
+
+    Uses MD5 hash of title + source_name + sorted raw_payload JSON.
+    """
+    payload_str = json.dumps(raw_payload, sort_keys=True, default=str)
+    hash_input = f"{title}\x00{source_name}\x00{payload_str}"
+    return hashlib.md5(hash_input.encode()).hexdigest()
 
 
 class AlertRepository:
@@ -23,17 +35,20 @@ class AlertRepository:
         raw_payload: dict[str, Any],
     ) -> Alert:
         """Persist a new alert. Returns the created ORM object with id populated."""
+        fingerprint = _generate_fingerprint(
+            normalized.title, normalized.source_name, raw_payload
+        )
         alert = Alert(
             uuid=uuid.uuid4(),
             title=normalized.title,
             severity=normalized.severity.value,
-            severity_id=normalized.get_severity_id(),
             source_name=normalized.source_name,
             occurred_at=normalized.occurred_at,
             raw_payload=raw_payload,
             tags=normalized.tags,
             status=AlertStatus.PENDING_ENRICHMENT.value,
             is_enriched=False,
+            fingerprint=fingerprint,
         )
         self._db.add(alert)
         await self._db.flush()
@@ -143,9 +158,7 @@ class AlertRepository:
                 if alert.acknowledged_at is None:
                     alert.acknowledged_at = now
         if severity is not None:
-            from app.schemas.alert import SEVERITY_ID_MAP
             alert.severity = severity.value
-            alert.severity_id = SEVERITY_ID_MAP.get(severity, 0)
         if tags is not None:
             alert.tags = tags
         if close_classification is not None:
