@@ -251,7 +251,7 @@ Thin adapter over the REST API. No independent business logic.
 
 ## Out of Scope for v1
 
-Do not implement: frontend UI, incidents entity, pull/polling sources, user management/RBAC, analytics dashboard, containerized agent hosting, multi-tenancy, SSO/OAuth, alternative queue backends beyond procrastinate, MITRE auto-tagging, Slack SOC bot (v2.2 roadmap — distinct from `SlackApprovalNotifier` which **is** in v1 scope as the targeted approval notification/callback handler for the workflow approval gate), execution rules engine (rule-based condition→action automation), named secrets store (database-backed `tenant_secrets` table), knowledge base integrations (Confluence/GitHub/GitLab automated sync).
+Do not implement: frontend UI, incidents entity, pull/polling sources, user management/RBAC, analytics dashboard, containerized agent hosting, multi-tenancy, SSO/OAuth, alternative queue backends beyond procrastinate, MITRE auto-tagging, Slack SOC bot (v2.2 roadmap — distinct from `SlackApprovalNotifier` which **is** in v1 scope as the targeted approval notification/callback handler for the workflow approval gate), execution rules engine (rule-based condition→action automation), named secrets store (database-backed `tenant_secrets` table), database-driven indicator types (runtime-configurable via `indicator_types` table), knowledge base integrations (Confluence/GitHub/GitLab automated sync).
 
 Architecture must not preclude these. If you discover something related, log it in your completion log — do not implement it.
 

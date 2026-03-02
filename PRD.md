@@ -2504,6 +2504,16 @@ Lightweight incident entity for teams without external ticketing. Groups alerts,
 
 **Bidirectional Status Sync:** When an alert is closed in Calseta, optionally propagate closure back to the originating source SIEM. Requires a new optional `async sync_status(alert_ref: str, close_classification: str) -> bool` method on `AlertSourceBase`. Sources with API support: Sentinel (incident close), Elastic (case update), Splunk (notable status update). Generic webhook sources have no upstream to sync. Configurable per `source_integration` (opt-in). Best-effort and non-blocking — sync failures create an `activity_event` (`alert_sync_failed`) but never block alert closure.
 
+**Database-Driven Indicator Types (v1.1):** Replace the hardcoded `IndicatorType` StrEnum with an `indicator_types` database table as the runtime source of truth. The 8 built-in types (`ip`, `domain`, `hash_md5`, `hash_sha1`, `hash_sha256`, `url`, `email`, `account`) become system-seeded rows (`is_system=true`). Custom types (e.g., `registry_key`, `file_path`, `cve`, `ja3_hash`) can be created via `POST /v1/indicator-types` and immediately used for indicator extraction, enrichment, and workflows. Architecture:
+- New `indicator_types` table: `slug` (unique TEXT), `display_name`, `icon_hint`, `default_cache_ttl_seconds`, `is_system`, `is_active`
+- CRUD API: `GET/POST/PATCH/DELETE /v1/indicator-types` (admin scope for writes)
+- In-memory cache (same pattern as `indicator_mapping_cache.py`) for validation without per-request DB queries
+- Enrichment providers change `supported_types` from `list[IndicatorType]` to `list[str]` — custom providers can declare support for any type slug
+- Frontend fetches types dynamically from API instead of hardcoding dropdown options
+- `IndicatorType` StrEnum remains as convenience constants for built-in source plugins — not used for validation
+- No FK from `indicators.type` to `indicator_types.slug` — kept loose for ingestion speed
+- v1 prerequisite: all DB columns already store indicator types as TEXT; this change is purely application-layer validation
+
 **v1.2 — Pull-Based Alert Sources + Execution Rules**
 Add polling to the alert source plugin system. Implement for at least one major source. For environments where webhook egress is restricted. Also includes: rule-based automation engine (`execution_rules` table) — deterministic condition→action dispatch that fires workflows based on alert field conditions without requiring an agent. Pairs with the existing alert trigger system to give teams a no-LLM automation layer for high-confidence response patterns.
 
