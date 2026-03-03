@@ -93,9 +93,9 @@ async def execute_workflow(
         if workflow is None:
             return json.dumps({"error": f"Workflow not found: {workflow_uuid}"})
 
-        if not workflow.is_active or workflow.state == "draft":
+        if workflow.state != "active":
             return json.dumps({
-                "error": "Workflow cannot be executed: inactive or in draft state."
+                "error": f"Workflow cannot be executed: state is '{workflow.state}'."
             })
 
         # Resolve alert if provided

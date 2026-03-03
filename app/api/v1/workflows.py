@@ -297,12 +297,12 @@ async def execute_workflow(
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    if not workflow.is_active or workflow.state == "draft":
+    if workflow.state != "active":
         raise CalsetaException(
             code="WORKFLOW_NOT_EXECUTABLE",
             message=(
-                "Workflow cannot be executed: it is either inactive or in 'draft' state. "
-                "Set state='active' and is_active=True before executing."
+                "Workflow cannot be executed: state is "
+                f"'{workflow.state}'. Set state to 'active' before executing."
             ),
             status_code=status.HTTP_400_BAD_REQUEST,
         )
@@ -569,10 +569,10 @@ async def test_workflow(
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    if not workflow.is_active:
+    if workflow.state != "active":
         raise CalsetaException(
             code="WORKFLOW_NOT_EXECUTABLE",
-            message="Workflow is inactive — set is_active=True before testing",
+            message=f"Workflow is in '{workflow.state}' state — set state to 'active' before testing",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
