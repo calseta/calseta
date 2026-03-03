@@ -19,6 +19,8 @@ class WorkflowApprovalRequestResponse(BaseModel):
 
     uuid: uuid.UUID
     workflow_id: int
+    workflow_name: str | None = None
+    workflow_uuid: uuid.UUID | None = None
     trigger_type: str
     trigger_context: dict[str, Any] | None
     reason: str

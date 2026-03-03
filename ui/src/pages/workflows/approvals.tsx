@@ -50,6 +50,11 @@ export function ApprovalsPage() {
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
                     <StatusIcon status={req.status} />
+                    {req.workflow_name && (
+                      <span className="text-sm font-medium text-foreground">
+                        {req.workflow_name}
+                      </span>
+                    )}
                     <Badge
                       variant="outline"
                       className={cn(

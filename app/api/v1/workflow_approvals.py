@@ -79,8 +79,26 @@ async def list_approval_requests(
     result = await db.execute(stmt)
     rows = list(result.scalars().all())
 
+    # Batch-load workflow names for all rows
+    wf_ids = {r.workflow_id for r in rows}
+    wf_map: dict[int, tuple[str, str]] = {}
+    if wf_ids:
+        wf_result = await db.execute(
+            select(Workflow.id, Workflow.name, Workflow.uuid).where(Workflow.id.in_(wf_ids))
+        )
+        for wf_id, wf_name, wf_uuid in wf_result.all():
+            wf_map[wf_id] = (wf_name, str(wf_uuid))
+
+    data = []
+    for r in rows:
+        resp = WorkflowApprovalRequestResponse.model_validate(r)
+        if r.workflow_id in wf_map:
+            resp.workflow_name = wf_map[r.workflow_id][0]
+            resp.workflow_uuid = wf_map[r.workflow_id][1]
+        data.append(resp)
+
     return PaginatedResponse(
-        data=[WorkflowApprovalRequestResponse.model_validate(r) for r in rows],
+        data=data,
         meta=PaginationMeta.from_total(
             total=total, page=pagination.page, page_size=pagination.page_size
         ),
@@ -102,6 +120,8 @@ async def get_approval_request(
 
     from app.db.models.workflow_approval_request import WorkflowApprovalRequest as WAR
 
+    from app.db.models.workflow import Workflow
+
     result = await db.execute(select(WAR).where(WAR.uuid == approval_uuid))
     request = result.scalar_one_or_none()
     if request is None:
@@ -110,7 +130,15 @@ async def get_approval_request(
             message=f"Approval request {approval_uuid} not found",
             status_code=status.HTTP_404_NOT_FOUND,
         )
-    return DataResponse(data=WorkflowApprovalRequestResponse.model_validate(request))
+    resp = WorkflowApprovalRequestResponse.model_validate(request)
+    wf_result = await db.execute(
+        select(Workflow.name, Workflow.uuid).where(Workflow.id == request.workflow_id)
+    )
+    wf_row = wf_result.one_or_none()
+    if wf_row:
+        resp.workflow_name = wf_row[0]
+        resp.workflow_uuid = str(wf_row[1])
+    return DataResponse(data=resp)
 
 
 # ---------------------------------------------------------------------------
@@ -124,9 +152,9 @@ async def get_approval_request(
 )
 async def approve_workflow(
     approval_uuid: UUID,
-    body: WorkflowApproveRequest,
     auth: _Execute,
     db: Annotated[AsyncSession, Depends(get_db)],
+    body: WorkflowApproveRequest | None = None,
 ) -> DataResponse[WorkflowApprovalRequestResponse]:
     """
     Approve a pending workflow approval request.
@@ -137,10 +165,11 @@ async def approve_workflow(
     from app.workflows.approval import process_approval_decision
 
     try:
+        responder = (body.responder_id if body else None) or str(auth.key_prefix)
         request = await process_approval_decision(
             approval_uuid=approval_uuid,
             approved=True,
-            responder_id=body.responder_id or str(auth.key_prefix),
+            responder_id=responder,
             db=db,
         )
         await db.commit()
@@ -179,9 +208,9 @@ async def approve_workflow(
 )
 async def reject_workflow(
     approval_uuid: UUID,
-    body: WorkflowRejectRequest,
     auth: _Execute,
     db: Annotated[AsyncSession, Depends(get_db)],
+    body: WorkflowRejectRequest | None = None,
 ) -> DataResponse[WorkflowApprovalRequestResponse]:
     """
     Reject a pending workflow approval request.
@@ -192,10 +221,11 @@ async def reject_workflow(
     from app.workflows.approval import process_approval_decision
 
     try:
+        responder = (body.responder_id if body else None) or str(auth.key_prefix)
         request = await process_approval_decision(
             approval_uuid=approval_uuid,
             approved=False,
-            responder_id=body.responder_id or str(auth.key_prefix),
+            responder_id=responder,
             db=db,
         )
         await db.commit()

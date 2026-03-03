@@ -234,6 +234,8 @@ export interface WorkflowRun {
 export interface WorkflowApproval {
   uuid: string;
   workflow_id: number;
+  workflow_name: string | null;
+  workflow_uuid: string | null;
   trigger_type: string;
   trigger_context: Record<string, unknown> | null;
   reason: string;
