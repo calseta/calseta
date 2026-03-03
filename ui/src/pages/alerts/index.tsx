@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts } from "@/hooks/use-api";
-import { useAlertTableState } from "@/hooks/use-alert-table-state";
+import { useTableState } from "@/hooks/use-table-state";
 import { formatDate, severityColor, statusColor } from "@/lib/format";
 import { ChevronLeft, ChevronRight, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -87,7 +87,7 @@ export function AlertsListPage() {
     hasActiveFiltersOrSort,
     hasActiveFilters,
     params,
-  } = useAlertTableState();
+  } = useTableState({ status: [] as string[], severity: [] as string[], source_name: [] as string[] });
 
   const { data, isLoading, refetch, isFetching } = useAlerts(params);
 

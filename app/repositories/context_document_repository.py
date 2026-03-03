@@ -10,6 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.context_document import ContextDocument
 
+# Whitelist of columns that can be used for sorting
+_SORT_COLUMNS: dict[str, str] = {
+    "title": "title",
+    "document_type": "document_type",
+    "updated_at": "updated_at",
+    "created_at": "created_at",
+}
+
 
 class ContextDocumentRepository:
     def __init__(self, db: AsyncSession) -> None:
@@ -51,8 +59,10 @@ class ContextDocumentRepository:
     async def list_documents(
         self,
         *,
-        document_type: str | None = None,
+        document_type: list[str] | str | None = None,
         is_global: bool | None = None,
+        sort_by: str | None = None,
+        sort_order: str | None = None,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[ContextDocument], int]:
@@ -62,8 +72,9 @@ class ContextDocumentRepository:
         count_stmt = select(func.count()).select_from(ContextDocument)
 
         if document_type is not None:
-            stmt = stmt.where(ContextDocument.document_type == document_type)
-            count_stmt = count_stmt.where(ContextDocument.document_type == document_type)
+            vals = document_type if isinstance(document_type, list) else [document_type]
+            stmt = stmt.where(ContextDocument.document_type.in_(vals))
+            count_stmt = count_stmt.where(ContextDocument.document_type.in_(vals))
         if is_global is not None:
             stmt = stmt.where(ContextDocument.is_global == is_global)
             count_stmt = count_stmt.where(ContextDocument.is_global == is_global)
@@ -71,12 +82,17 @@ class ContextDocumentRepository:
         total_result = await self._db.execute(count_stmt)
         total = total_result.scalar_one()
 
+        # Dynamic sort
+        order_clause = None
+        if sort_by and sort_by in _SORT_COLUMNS:
+            col = getattr(ContextDocument, _SORT_COLUMNS[sort_by])
+            order_clause = col.asc() if sort_order == "asc" else col.desc()
+
+        if order_clause is None:
+            order_clause = ContextDocument.created_at.desc()
+
         offset = (page - 1) * page_size
-        stmt = (
-            stmt.order_by(ContextDocument.created_at.desc())
-            .offset(offset)
-            .limit(page_size)
-        )
+        stmt = stmt.order_by(order_clause).offset(offset).limit(page_size)
         result = await self._db.execute(stmt)
         return list(result.scalars().all()), total
 

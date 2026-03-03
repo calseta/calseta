@@ -1,4 +1,4 @@
-import type { SortOrder } from "@/hooks/use-alert-table-state";
+import type { SortOrder } from "@/hooks/use-table-state";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 

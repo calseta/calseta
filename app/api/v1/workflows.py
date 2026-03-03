@@ -83,6 +83,9 @@ def _assert_valid_code(code: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+_WORKFLOW_SORT_FIELDS = {"name", "state", "risk_level", "updated_at", "created_at"}
+
+
 @router.get("", response_model=PaginatedResponse[WorkflowSummary])
 async def list_workflows(
     auth: _Read,
@@ -90,13 +93,36 @@ async def list_workflows(
     db: Annotated[AsyncSession, Depends(get_db)],
     workflow_type: str | None = Query(None),
     state: str | None = Query(None),
+    risk_level: str | None = Query(None),
     is_active: bool | None = Query(None),
+    sort_by: str | None = Query(None),
+    sort_order: str | None = Query(None),
 ) -> PaginatedResponse[WorkflowSummary]:
+    if sort_by and sort_by not in _WORKFLOW_SORT_FIELDS:
+        raise CalsetaException(
+            code="VALIDATION_ERROR",
+            message=f"sort_by must be one of: {sorted(_WORKFLOW_SORT_FIELDS)}",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    if sort_order and sort_order not in ("asc", "desc"):
+        raise CalsetaException(
+            code="VALIDATION_ERROR",
+            message="sort_order must be 'asc' or 'desc'",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Parse comma-separated multi-value filters
+    state_list = [s.strip() for s in state.split(",") if s.strip()] if state else None
+    risk_list = [s.strip() for s in risk_level.split(",") if s.strip()] if risk_level else None
+
     repo = WorkflowRepository(db)
     workflows, total = await repo.list_workflows(
         workflow_type=workflow_type,
-        state=state,
+        state=state_list,
+        risk_level=risk_list,
         is_active=is_active,
+        sort_by=sort_by,
+        sort_order=sort_order,
         page=pagination.page,
         page_size=pagination.page_size,
     )

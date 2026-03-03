@@ -35,10 +35,13 @@ import {
 } from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkflows, useCreateWorkflow } from "@/hooks/use-api";
+import { useTableState } from "@/hooks/use-table-state";
 import { relativeTime, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/copyable-text";
-import { ShieldCheck, Code, Lock, Plus, RefreshCw } from "lucide-react";
+import { SortableColumnHeader } from "@/components/sortable-column-header";
+import { ColumnFilterPopover } from "@/components/column-filter-popover";
+import { ShieldCheck, Code, Lock, Plus, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
 
 const WF_COLUMNS: ColumnDef[] = [
   { key: "name", initialWidth: 220, minWidth: 120 },
@@ -50,6 +53,27 @@ const WF_COLUMNS: ColumnDef[] = [
   { key: "version", initialWidth: 70, minWidth: 60 },
   { key: "updated", initialWidth: 130, minWidth: 100 },
 ];
+
+const STATE_OPTIONS = [
+  { value: "active", label: "active", colorClass: "text-teal bg-teal/10 border-teal/30" },
+  { value: "draft", label: "draft", colorClass: "text-amber bg-amber/10 border-amber/30" },
+  { value: "inactive", label: "inactive", colorClass: "text-dim bg-dim/10 border-dim/30" },
+];
+
+const RISK_OPTIONS = [
+  { value: "critical", label: "critical", colorClass: riskColor("critical") },
+  { value: "high", label: "high", colorClass: riskColor("high") },
+  { value: "medium", label: "medium", colorClass: riskColor("medium") },
+  { value: "low", label: "low", colorClass: riskColor("low") },
+];
+
+// Map UI column keys to API sort_by values
+const SORT_KEY_MAP: Record<string, string> = {
+  name: "name",
+  state: "state",
+  risk: "risk_level",
+  updated: "updated_at",
+};
 
 const WORKFLOW_TEMPLATE = `async def run(ctx):
     """
@@ -69,13 +93,43 @@ const WORKFLOW_TEMPLATE = `async def run(ctx):
 `;
 
 export function WorkflowsListPage() {
-  const { data, isLoading, refetch, isFetching } = useWorkflows({ page_size: 50 });
+  const {
+    page,
+    setPage,
+    pageSize,
+    handlePageSizeChange,
+    sort,
+    updateSort,
+    filters,
+    updateFilter,
+    clearAll,
+    hasActiveFiltersOrSort,
+    hasActiveFilters,
+    params,
+  } = useTableState({ state: [] as string[], risk_level: [] as string[] });
+
+  const { data, isLoading, refetch, isFetching } = useWorkflows(params);
   const createWorkflow = useCreateWorkflow();
   const workflows = data?.data ?? [];
+  const meta = data?.meta;
 
   const [open, setOpen] = useState(false);
   const [riskLevel, setRiskLevel] = useState("low");
   const [requiresApproval, setRequiresApproval] = useState(false);
+
+  // Sort handler maps UI column keys to API sort_by values
+  function handleSort(uiKey: string) {
+    const apiKey = SORT_KEY_MAP[uiKey] ?? uiKey;
+    updateSort(apiKey);
+  }
+
+  // Reverse-map current sort column back to UI key for SortableColumnHeader comparison
+  const reverseSortKeyMap: Record<string, string> = Object.fromEntries(
+    Object.entries(SORT_KEY_MAP).map(([ui, api]) => [api, ui]),
+  );
+  const uiSort = sort
+    ? { column: reverseSortKeyMap[sort.column] ?? sort.column, order: sort.order }
+    : null;
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -115,9 +169,25 @@ export function WorkflowsListPage() {
             >
               <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
             </Button>
-            <span className="text-xs text-dim">
-              {data?.meta?.total ?? 0} workflows
-            </span>
+            {hasActiveFiltersOrSort && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAll}
+                className="h-7 px-2 text-xs text-dim hover:text-foreground gap-1"
+              >
+                <X className="h-3 w-3" />
+                Reset filters
+              </Button>
+            )}
+            {meta && (
+              <span className="text-xs text-dim">
+                {meta.total} workflow{meta.total !== 1 ? "s" : ""}
+                {hasActiveFilters && (
+                  <span className="text-teal ml-1">(filtered)</span>
+                )}
+              </span>
+            )}
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -189,14 +259,58 @@ export function WorkflowsListPage() {
           <ResizableTable storageKey="workflows" columns={WF_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="name" className="text-dim text-xs">Name</ResizableTableHead>
+                <ResizableTableHead columnKey="name" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Name"
+                    sortKey="name"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                  />
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
-                <ResizableTableHead columnKey="state" className="text-dim text-xs">State</ResizableTableHead>
+                <ResizableTableHead columnKey="state" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="State"
+                    sortKey="state"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                    filterElement={
+                      <ColumnFilterPopover
+                        label="State"
+                        options={STATE_OPTIONS}
+                        selected={filters.state}
+                        onChange={(v) => updateFilter("state", v)}
+                      />
+                    }
+                  />
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="type" className="text-dim text-xs">Type</ResizableTableHead>
-                <ResizableTableHead columnKey="risk" className="text-dim text-xs">Risk</ResizableTableHead>
+                <ResizableTableHead columnKey="risk" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Risk"
+                    sortKey="risk"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                    filterElement={
+                      <ColumnFilterPopover
+                        label="Risk"
+                        options={RISK_OPTIONS}
+                        selected={filters.risk_level}
+                        onChange={(v) => updateFilter("risk_level", v)}
+                      />
+                    }
+                  />
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="approval" className="text-dim text-xs">Approval</ResizableTableHead>
                 <ResizableTableHead columnKey="version" className="text-dim text-xs">Version</ResizableTableHead>
-                <ResizableTableHead columnKey="updated" className="text-dim text-xs">Updated</ResizableTableHead>
+                <ResizableTableHead columnKey="updated" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Updated"
+                    sortKey="updated"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                  />
+                </ResizableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -285,6 +399,51 @@ export function WorkflowsListPage() {
             </TableBody>
           </ResizableTable>
         </div>
+
+        {/* Pagination */}
+        {meta && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-dim">Rows per page</span>
+              <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="h-7 w-[80px] bg-card border-border text-xs text-dim">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                  <SelectItem value="250">250</SelectItem>
+                  <SelectItem value="500">500</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-dim">
+                Page {meta.page} of {meta.total_pages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= meta.total_pages}
+                onClick={() => setPage((p) => p + 1)}
+                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );

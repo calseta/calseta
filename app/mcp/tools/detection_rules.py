@@ -13,9 +13,26 @@ from datetime import datetime
 
 import structlog
 from mcp.server.fastmcp import Context
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 
 from app.db.models.detection_rule import DetectionRule
+
+# CASE expression for severity ordering in MCP queries
+_MCP_SEVERITY_ORDER = case(
+    (DetectionRule.severity == "Critical", 5),
+    (DetectionRule.severity == "High", 4),
+    (DetectionRule.severity == "Medium", 3),
+    (DetectionRule.severity == "Low", 2),
+    (DetectionRule.severity == "Informational", 1),
+    (DetectionRule.severity == "Pending", 0),
+    else_=0,
+)
+
+_MCP_SORT_COLUMNS: dict[str, str] = {
+    "name": "name",
+    "source_name": "source_name",
+    "created_at": "created_at",
+}
 from app.db.session import AsyncSessionLocal
 from app.mcp.scope import check_scope
 from app.mcp.server import mcp_server
@@ -39,6 +56,8 @@ async def search_detection_rules(
     mitre_technique: str | None = None,
     source_name: str | None = None,
     is_active: bool | None = None,
+    sort_by: str | None = None,
+    sort_order: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> str:
@@ -52,6 +71,8 @@ async def search_detection_rules(
         mitre_technique: Filter by MITRE technique ID (e.g. "T1566").
         source_name: Filter by alert source (e.g. "sentinel", "elastic").
         is_active: Filter by active status (true/false).
+        sort_by: Sort field. Valid values: "name", "source_name", "severity", "created_at".
+        sort_order: Sort direction. Valid values: "asc", "desc".
         page: Page number (1-indexed, default 1).
         page_size: Results per page (default 20, max 100).
 
@@ -87,8 +108,14 @@ async def search_detection_rules(
             count_stmt = count_stmt.where(technique_filter)
 
         if source_name:
-            stmt = stmt.where(DetectionRule.source_name == source_name)
-            count_stmt = count_stmt.where(DetectionRule.source_name == source_name)
+            # Support comma-separated multi-value
+            vals = [s.strip() for s in source_name.split(",") if s.strip()]
+            if len(vals) == 1:
+                stmt = stmt.where(DetectionRule.source_name == vals[0])
+                count_stmt = count_stmt.where(DetectionRule.source_name == vals[0])
+            else:
+                stmt = stmt.where(DetectionRule.source_name.in_(vals))
+                count_stmt = count_stmt.where(DetectionRule.source_name.in_(vals))
 
         if is_active is not None:
             stmt = stmt.where(DetectionRule.is_active == is_active)
@@ -97,8 +124,21 @@ async def search_detection_rules(
         total_result = await session.execute(count_stmt)
         total: int = total_result.scalar_one()
 
+        # Dynamic sort
+        order_clause = None
+        if sort_by and sort_by in _MCP_SORT_COLUMNS:
+            col = getattr(DetectionRule, _MCP_SORT_COLUMNS[sort_by])
+            order_clause = col.asc() if sort_order == "asc" else col.desc()
+        elif sort_by == "severity":
+            order_clause = (
+                _MCP_SEVERITY_ORDER.asc() if sort_order == "asc" else _MCP_SEVERITY_ORDER.desc()
+            )
+
+        if order_clause is None:
+            order_clause = DetectionRule.created_at.desc()
+
         offset = (page - 1) * page_size
-        stmt = stmt.order_by(DetectionRule.created_at.desc()).offset(offset).limit(page_size)
+        stmt = stmt.order_by(order_clause).offset(offset).limit(page_size)
         result = await session.execute(stmt)
         rules = list(result.scalars().all())
 

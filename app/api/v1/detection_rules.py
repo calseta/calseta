@@ -40,18 +40,44 @@ def _to_response(rule: object) -> DetectionRuleResponse:
     return DetectionRuleResponse.model_validate(rule)
 
 
+_DR_SORT_FIELDS = {"name", "source_name", "severity", "created_at"}
+
+
 @router.get("", response_model=PaginatedResponse[DetectionRuleResponse])
 async def list_detection_rules(
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
     source_name: str | None = Query(None),
+    severity: str | None = Query(None),
     is_active: bool | None = Query(None),
+    sort_by: str | None = Query(None),
+    sort_order: str | None = Query(None),
 ) -> PaginatedResponse[DetectionRuleResponse]:
+    if sort_by and sort_by not in _DR_SORT_FIELDS:
+        raise CalsetaException(
+            code="VALIDATION_ERROR",
+            message=f"sort_by must be one of: {sorted(_DR_SORT_FIELDS)}",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    if sort_order and sort_order not in ("asc", "desc"):
+        raise CalsetaException(
+            code="VALIDATION_ERROR",
+            message="sort_order must be 'asc' or 'desc'",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Parse comma-separated multi-value filters
+    source_list = [s.strip() for s in source_name.split(",") if s.strip()] if source_name else None
+    severity_list = [s.strip() for s in severity.split(",") if s.strip()] if severity else None
+
     repo = DetectionRuleRepository(db)
     rules, total = await repo.list(
-        source_name=source_name,
+        source_name=source_list,
+        severity=severity_list,
         is_active=is_active,
+        sort_by=sort_by,
+        sort_order=sort_order,
         page=pagination.page,
         page_size=pagination.page_size,
     )

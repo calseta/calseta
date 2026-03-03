@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +14,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   TableBody,
   TableCell,
@@ -31,9 +39,12 @@ import {
   useCreateDetectionRule,
   useDeleteDetectionRule,
 } from "@/hooks/use-api";
-import { formatDate } from "@/lib/format";
+import { useTableState } from "@/hooks/use-table-state";
+import { formatDate, severityColor } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
-import { Plus, Trash2, RefreshCw } from "lucide-react";
+import { SortableColumnHeader } from "@/components/sortable-column-header";
+import { ColumnFilterPopover } from "@/components/column-filter-popover";
+import { Plus, Trash2, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DR_COLUMNS: ColumnDef[] = [
@@ -46,14 +57,68 @@ const DR_COLUMNS: ColumnDef[] = [
   { key: "actions", initialWidth: 44, minWidth: 44, maxWidth: 44 },
 ];
 
+const SOURCE_OPTIONS = [
+  { value: "sentinel", label: "Sentinel" },
+  { value: "elastic", label: "Elastic" },
+  { value: "splunk", label: "Splunk" },
+  { value: "generic", label: "Generic" },
+];
+
+const SEVERITY_OPTIONS = [
+  { value: "Critical", label: "Critical", colorClass: severityColor("Critical") },
+  { value: "High", label: "High", colorClass: severityColor("High") },
+  { value: "Medium", label: "Medium", colorClass: severityColor("Medium") },
+  { value: "Low", label: "Low", colorClass: severityColor("Low") },
+  { value: "Informational", label: "Informational", colorClass: severityColor("Informational") },
+  { value: "Pending", label: "Pending", colorClass: severityColor("Pending") },
+];
+
+// Map UI column keys to API sort_by values
+const SORT_KEY_MAP: Record<string, string> = {
+  name: "name",
+  source: "source_name",
+  severity: "severity",
+  created: "created_at",
+};
+
 export function DetectionRulesPage() {
-  const { data, isLoading, refetch, isFetching } = useDetectionRules({ page_size: 100 });
+  const {
+    page,
+    setPage,
+    pageSize,
+    handlePageSizeChange,
+    sort,
+    updateSort,
+    filters,
+    updateFilter,
+    clearAll,
+    hasActiveFiltersOrSort,
+    hasActiveFilters,
+    params,
+  } = useTableState({ source_name: [] as string[], severity: [] as string[] });
+
+  const { data, isLoading, refetch, isFetching } = useDetectionRules(params);
   const createRule = useCreateDetectionRule();
   const deleteRule = useDeleteDetectionRule();
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ uuid: string; name: string } | null>(null);
 
   const rules = data?.data ?? [];
+  const meta = data?.meta;
+
+  // Sort handler maps UI column keys to API sort_by values
+  function handleSort(uiKey: string) {
+    const apiKey = SORT_KEY_MAP[uiKey] ?? uiKey;
+    updateSort(apiKey);
+  }
+
+  // Reverse-map current sort column back to UI key
+  const reverseSortKeyMap: Record<string, string> = Object.fromEntries(
+    Object.entries(SORT_KEY_MAP).map(([ui, api]) => [api, ui]),
+  );
+  const uiSort = sort
+    ? { column: reverseSortKeyMap[sort.column] ?? sort.column, order: sort.order }
+    : null;
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -113,9 +178,25 @@ export function DetectionRulesPage() {
             >
               <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
             </Button>
-            <span className="text-xs text-dim">
-              {data?.meta?.total ?? 0} rules
-            </span>
+            {hasActiveFiltersOrSort && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAll}
+                className="h-7 px-2 text-xs text-dim hover:text-foreground gap-1"
+              >
+                <X className="h-3 w-3" />
+                Reset filters
+              </Button>
+            )}
+            {meta && (
+              <span className="text-xs text-dim">
+                {meta.total} rule{meta.total !== 1 ? "s" : ""}
+                {hasActiveFilters && (
+                  <span className="text-teal ml-1">(filtered)</span>
+                )}
+              </span>
+            )}
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -171,12 +252,56 @@ export function DetectionRulesPage() {
           <ResizableTable storageKey="detection-rules" columns={DR_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="name" className="text-dim text-xs">Name</ResizableTableHead>
+                <ResizableTableHead columnKey="name" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Name"
+                    sortKey="name"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                  />
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
-                <ResizableTableHead columnKey="source" className="text-dim text-xs">Source</ResizableTableHead>
-                <ResizableTableHead columnKey="severity" className="text-dim text-xs">Severity</ResizableTableHead>
+                <ResizableTableHead columnKey="source" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Source"
+                    sortKey="source"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                    filterElement={
+                      <ColumnFilterPopover
+                        label="Source"
+                        options={SOURCE_OPTIONS}
+                        selected={filters.source_name}
+                        onChange={(v) => updateFilter("source_name", v)}
+                      />
+                    }
+                  />
+                </ResizableTableHead>
+                <ResizableTableHead columnKey="severity" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Severity"
+                    sortKey="severity"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                    filterElement={
+                      <ColumnFilterPopover
+                        label="Severity"
+                        options={SEVERITY_OPTIONS}
+                        selected={filters.severity}
+                        onChange={(v) => updateFilter("severity", v)}
+                      />
+                    }
+                  />
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="mitre" className="text-dim text-xs">MITRE</ResizableTableHead>
-                <ResizableTableHead columnKey="created" className="text-dim text-xs">Created (UTC)</ResizableTableHead>
+                <ResizableTableHead columnKey="created" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Created (UTC)"
+                    sortKey="created"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                  />
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
@@ -204,7 +329,18 @@ export function DetectionRulesPage() {
                         <CopyableText text={rule.uuid} mono className="text-[11px] text-dim" />
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{rule.source_name ?? "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{rule.severity ?? "—"}</TableCell>
+                      <TableCell>
+                        {rule.severity ? (
+                          <Badge
+                            variant="outline"
+                            className={cn("text-[11px] font-medium", severityColor(rule.severity))}
+                          >
+                            {rule.severity}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-dim">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs text-dim">
                         {rule.mitre_tactics?.length > 0 && <span>{rule.mitre_tactics.join(", ")}</span>}
                         {rule.mitre_techniques?.length > 0 && <span className="ml-1">/ {rule.mitre_techniques.join(", ")}</span>}
@@ -233,6 +369,51 @@ export function DetectionRulesPage() {
             </TableBody>
           </ResizableTable>
         </div>
+
+        {/* Pagination */}
+        {meta && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-dim">Rows per page</span>
+              <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="h-7 w-[80px] bg-card border-border text-xs text-dim">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                  <SelectItem value="250">250</SelectItem>
+                  <SelectItem value="500">500</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-dim">
+                Page {meta.page} of {meta.total_pages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= meta.total_pages}
+                onClick={() => setPage((p) => p + 1)}
+                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <ConfirmDialog

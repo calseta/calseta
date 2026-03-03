@@ -5,11 +5,29 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.detection_rule import DetectionRule
 from app.schemas.detection_rules import DetectionRuleCreate, DetectionRulePatch
+
+# Whitelist of columns that can be used for sorting
+_SORT_COLUMNS: dict[str, str] = {
+    "name": "name",
+    "source_name": "source_name",
+    "created_at": "created_at",
+}
+
+# CASE expression for severity ordering
+_SEVERITY_ORDER = case(
+    (DetectionRule.severity == "Critical", 5),
+    (DetectionRule.severity == "High", 4),
+    (DetectionRule.severity == "Medium", 3),
+    (DetectionRule.severity == "Low", 2),
+    (DetectionRule.severity == "Informational", 1),
+    (DetectionRule.severity == "Pending", 0),
+    else_=0,
+)
 
 
 class DetectionRuleRepository:
@@ -57,8 +75,11 @@ class DetectionRuleRepository:
     async def list(
         self,
         *,
-        source_name: str | None = None,
+        source_name: list[str] | str | None = None,
+        severity: list[str] | str | None = None,
         is_active: bool | None = None,
+        sort_by: str | None = None,
+        sort_order: str | None = None,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[DetectionRule], int]:
@@ -69,8 +90,13 @@ class DetectionRuleRepository:
         count_stmt = select(func.count()).select_from(DetectionRule)
 
         if source_name:
-            stmt = stmt.where(DetectionRule.source_name == source_name)
-            count_stmt = count_stmt.where(DetectionRule.source_name == source_name)
+            vals = source_name if isinstance(source_name, list) else [source_name]
+            stmt = stmt.where(DetectionRule.source_name.in_(vals))
+            count_stmt = count_stmt.where(DetectionRule.source_name.in_(vals))
+        if severity:
+            vals = severity if isinstance(severity, list) else [severity]
+            stmt = stmt.where(DetectionRule.severity.in_(vals))
+            count_stmt = count_stmt.where(DetectionRule.severity.in_(vals))
         if is_active is not None:
             stmt = stmt.where(DetectionRule.is_active == is_active)
             count_stmt = count_stmt.where(DetectionRule.is_active == is_active)
@@ -78,8 +104,21 @@ class DetectionRuleRepository:
         total_result = await self._db.execute(count_stmt)
         total = total_result.scalar_one()
 
+        # Dynamic sort
+        order_clause = None
+        if sort_by and sort_by in _SORT_COLUMNS:
+            col = getattr(DetectionRule, _SORT_COLUMNS[sort_by])
+            order_clause = col.asc() if sort_order == "asc" else col.desc()
+        elif sort_by == "severity":
+            order_clause = (
+                _SEVERITY_ORDER.asc() if sort_order == "asc" else _SEVERITY_ORDER.desc()
+            )
+
+        if order_clause is None:
+            order_clause = DetectionRule.created_at.desc()
+
         offset = (page - 1) * page_size
-        stmt = stmt.order_by(DetectionRule.created_at.desc()).offset(offset).limit(page_size)
+        stmt = stmt.order_by(order_clause).offset(offset).limit(page_size)
         result = await self._db.execute(stmt)
         return list(result.scalars().all()), total
 

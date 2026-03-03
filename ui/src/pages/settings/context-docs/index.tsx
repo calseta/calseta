@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -15,6 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   TableBody,
   TableCell,
@@ -33,9 +40,12 @@ import {
   useCreateContextDocument,
   useDeleteContextDocument,
 } from "@/hooks/use-api";
+import { useTableState } from "@/hooks/use-table-state";
 import { formatDate } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
-import { Plus, Trash2, FileText, BookOpen, RefreshCw } from "lucide-react";
+import { SortableColumnHeader } from "@/components/sortable-column-header";
+import { ColumnFilterPopover } from "@/components/column-filter-popover";
+import { Plus, Trash2, FileText, BookOpen, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TargetingRuleBuilder } from "@/components/targeting-rules/targeting-rule-builder";
 import { type TargetingRules, serializeTargetingRules } from "@/components/targeting-rules/types";
@@ -51,8 +61,58 @@ const CD_COLUMNS: ColumnDef[] = [
   { key: "actions", initialWidth: 44, minWidth: 44, maxWidth: 44 },
 ];
 
+const TYPE_OPTIONS = [
+  { value: "runbook", label: "runbook" },
+  { value: "sop", label: "sop" },
+  { value: "ir_plan", label: "ir_plan" },
+  { value: "playbook", label: "playbook" },
+  { value: "detection_guide", label: "detection_guide" },
+  { value: "other", label: "other" },
+];
+
+const SCOPE_OPTIONS = [
+  { value: "global", label: "Global", colorClass: "text-amber bg-amber/10 border-amber/30" },
+  { value: "targeted", label: "Targeted", colorClass: "text-dim border-border" },
+];
+
+// Map UI column keys to API sort_by values
+const SORT_KEY_MAP: Record<string, string> = {
+  title: "title",
+  type: "document_type",
+  updated: "updated_at",
+};
+
 export function ContextDocsPage() {
-  const { data, isLoading, refetch, isFetching } = useContextDocuments({ page_size: 100 });
+  const {
+    page,
+    setPage,
+    pageSize,
+    handlePageSizeChange,
+    sort,
+    updateSort,
+    filters,
+    updateFilter,
+    clearAll,
+    hasActiveFiltersOrSort,
+    hasActiveFilters,
+    params: rawParams,
+  } = useTableState({ document_type: [] as string[], scope: [] as string[] });
+
+  // Transform scope filter to is_global API param
+  const apiParams = useMemo(() => {
+    const p = { ...rawParams };
+    const scopeVal = p.scope as string | undefined;
+    delete p.scope;
+    if (scopeVal === "global") {
+      p.is_global = true;
+    } else if (scopeVal === "targeted") {
+      p.is_global = false;
+    }
+    // If both selected (or neither), don't filter by is_global
+    return p;
+  }, [rawParams]);
+
+  const { data, isLoading, refetch, isFetching } = useContextDocuments(apiParams);
   const createDoc = useCreateContextDocument();
   const deleteDoc = useDeleteContextDocument();
   const [open, setOpen] = useState(false);
@@ -61,6 +121,21 @@ export function ContextDocsPage() {
   const [targetingRules, setTargetingRules] = useState<TargetingRules | null>(null);
 
   const docs = data?.data ?? [];
+  const meta = data?.meta;
+
+  // Sort handler maps UI column keys to API sort_by values
+  function handleSort(uiKey: string) {
+    const apiKey = SORT_KEY_MAP[uiKey] ?? uiKey;
+    updateSort(apiKey);
+  }
+
+  // Reverse-map current sort column back to UI key
+  const reverseSortKeyMap: Record<string, string> = Object.fromEntries(
+    Object.entries(SORT_KEY_MAP).map(([ui, api]) => [api, ui]),
+  );
+  const uiSort = sort
+    ? { column: reverseSortKeyMap[sort.column] ?? sort.column, order: sort.order }
+    : null;
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -115,7 +190,25 @@ export function ContextDocsPage() {
             >
               <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
             </Button>
-            <span className="text-xs text-dim">{docs.length} documents</span>
+            {hasActiveFiltersOrSort && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAll}
+                className="h-7 px-2 text-xs text-dim hover:text-foreground gap-1"
+              >
+                <X className="h-3 w-3" />
+                Reset filters
+              </Button>
+            )}
+            {meta && (
+              <span className="text-xs text-dim">
+                {meta.total} document{meta.total !== 1 ? "s" : ""}
+                {hasActiveFilters && (
+                  <span className="text-teal ml-1">(filtered)</span>
+                )}
+              </span>
+            )}
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -185,13 +278,52 @@ export function ContextDocsPage() {
           <ResizableTable storageKey="context-docs" columns={CD_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="title" className="text-dim text-xs">Title</ResizableTableHead>
+                <ResizableTableHead columnKey="title" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Title"
+                    sortKey="title"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                  />
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
-                <ResizableTableHead columnKey="type" className="text-dim text-xs">Type</ResizableTableHead>
-                <ResizableTableHead columnKey="scope" className="text-dim text-xs">Scope</ResizableTableHead>
+                <ResizableTableHead columnKey="type" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Type"
+                    sortKey="type"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                    filterElement={
+                      <ColumnFilterPopover
+                        label="Type"
+                        options={TYPE_OPTIONS}
+                        selected={filters.document_type}
+                        onChange={(v) => updateFilter("document_type", v)}
+                      />
+                    }
+                  />
+                </ResizableTableHead>
+                <ResizableTableHead columnKey="scope" className="text-dim text-xs">
+                  <span className="flex items-center gap-1">
+                    <span className="text-xs">Scope</span>
+                    <ColumnFilterPopover
+                      label="Scope"
+                      options={SCOPE_OPTIONS}
+                      selected={filters.scope}
+                      onChange={(v) => updateFilter("scope", v)}
+                    />
+                  </span>
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="tags" className="text-dim text-xs">Tags</ResizableTableHead>
                 <ResizableTableHead columnKey="version" className="text-dim text-xs">Version</ResizableTableHead>
-                <ResizableTableHead columnKey="updated" className="text-dim text-xs">Updated (UTC)</ResizableTableHead>
+                <ResizableTableHead columnKey="updated" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Updated (UTC)"
+                    sortKey="updated"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                  />
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
@@ -270,6 +402,51 @@ export function ContextDocsPage() {
             </TableBody>
           </ResizableTable>
         </div>
+
+        {/* Pagination */}
+        {meta && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-dim">Rows per page</span>
+              <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="h-7 w-[80px] bg-card border-border text-xs text-dim">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                  <SelectItem value="250">250</SelectItem>
+                  <SelectItem value="500">500</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-dim">
+                Page {meta.page} of {meta.total_pages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= meta.total_pages}
+                onClick={() => setPage((p) => p + 1)}
+                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <ConfirmDialog

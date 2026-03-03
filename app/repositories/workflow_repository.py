@@ -5,10 +5,27 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.workflow import Workflow
+
+# Whitelist of columns that can be used for sorting
+_SORT_COLUMNS: dict[str, str] = {
+    "name": "name",
+    "state": "state",
+    "updated_at": "updated_at",
+    "created_at": "created_at",
+}
+
+# CASE expression for risk_level ordering
+_RISK_ORDER = case(
+    (Workflow.risk_level == "critical", 4),
+    (Workflow.risk_level == "high", 3),
+    (Workflow.risk_level == "medium", 2),
+    (Workflow.risk_level == "low", 1),
+    else_=0,
+)
 
 
 class WorkflowRepository:
@@ -77,8 +94,11 @@ class WorkflowRepository:
         self,
         *,
         workflow_type: str | None = None,
-        state: str | None = None,
+        state: list[str] | str | None = None,
+        risk_level: list[str] | str | None = None,
         is_active: bool | None = None,
+        sort_by: str | None = None,
+        sort_order: str | None = None,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[Workflow], int]:
@@ -91,8 +111,13 @@ class WorkflowRepository:
             stmt = stmt.where(Workflow.workflow_type == workflow_type)
             count_stmt = count_stmt.where(Workflow.workflow_type == workflow_type)
         if state is not None:
-            stmt = stmt.where(Workflow.state == state)
-            count_stmt = count_stmt.where(Workflow.state == state)
+            vals = state if isinstance(state, list) else [state]
+            stmt = stmt.where(Workflow.state.in_(vals))
+            count_stmt = count_stmt.where(Workflow.state.in_(vals))
+        if risk_level is not None:
+            vals = risk_level if isinstance(risk_level, list) else [risk_level]
+            stmt = stmt.where(Workflow.risk_level.in_(vals))
+            count_stmt = count_stmt.where(Workflow.risk_level.in_(vals))
         if is_active is not None:
             stmt = stmt.where(Workflow.is_active == is_active)
             count_stmt = count_stmt.where(Workflow.is_active == is_active)
@@ -100,12 +125,21 @@ class WorkflowRepository:
         total_result = await self._db.execute(count_stmt)
         total = total_result.scalar_one()
 
+        # Dynamic sort
+        order_clause = None
+        if sort_by and sort_by in _SORT_COLUMNS:
+            col = getattr(Workflow, _SORT_COLUMNS[sort_by])
+            order_clause = col.asc() if sort_order == "asc" else col.desc()
+        elif sort_by == "risk_level":
+            order_clause = (
+                _RISK_ORDER.asc() if sort_order == "asc" else _RISK_ORDER.desc()
+            )
+
+        if order_clause is None:
+            order_clause = Workflow.created_at.desc()
+
         offset = (page - 1) * page_size
-        stmt = (
-            stmt.order_by(Workflow.created_at.desc())
-            .offset(offset)
-            .limit(page_size)
-        )
+        stmt = stmt.order_by(order_clause).offset(offset).limit(page_size)
         result = await self._db.execute(stmt)
         return list(result.scalars().all()), total
 

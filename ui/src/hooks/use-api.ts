@@ -174,7 +174,7 @@ export function usePatchIndicator() {
 }
 
 // Workflows
-export function useWorkflows(params?: Record<string, string | number | undefined>) {
+export function useWorkflows(params?: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams();
   if (params) {
     for (const [k, v] of Object.entries(params)) {
@@ -282,7 +282,7 @@ export function useRejectWorkflow() {
 }
 
 // Detection Rules
-export function useDetectionRules(params?: Record<string, string | number | undefined>) {
+export function useDetectionRules(params?: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams();
   if (params) {
     for (const [k, v] of Object.entries(params)) {
@@ -333,7 +333,7 @@ export function useDetectionRule(uuid: string) {
 }
 
 // Context Documents
-export function useContextDocuments(params?: Record<string, string | number | undefined>) {
+export function useContextDocuments(params?: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams();
   if (params) {
     for (const [k, v] of Object.entries(params)) {

@@ -8,23 +8,19 @@ export interface SortState {
   order: SortOrder;
 }
 
-export interface FilterState {
-  status: string[];
-  severity: string[];
-  source_name: string[];
-}
-
-const EMPTY_FILTERS: FilterState = {
-  status: [],
-  severity: [],
-  source_name: [],
-};
-
-export function useAlertTableState() {
+/**
+ * Generic table state hook for sorting, filtering, and pagination.
+ *
+ * `F` is the shape of the filter state — a record of string arrays keyed by
+ * filter name.  Example: `{ status: [], severity: [], source_name: [] }`.
+ */
+export function useTableState<F extends Record<string, string[]>>(
+  initialFilters: F,
+) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = usePageSize();
   const [sort, setSort] = useState<SortState | null>(null);
-  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<F>(initialFilters);
 
   // Three-state sort cycle: desc -> asc -> clear
   const updateSort = useCallback((column: string) => {
@@ -37,7 +33,7 @@ export function useAlertTableState() {
   }, []);
 
   const updateFilter = useCallback(
-    (key: keyof FilterState, values: string[]) => {
+    (key: keyof F & string, values: string[]) => {
       setFilters((prev) => ({ ...prev, [key]: values }));
       setPage(1);
     },
@@ -46,28 +42,24 @@ export function useAlertTableState() {
 
   const clearAll = useCallback(() => {
     setSort(null);
-    setFilters(EMPTY_FILTERS);
+    setFilters(initialFilters);
     setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const hasActiveFiltersOrSort = useMemo(
     () =>
       sort !== null ||
-      filters.status.length > 0 ||
-      filters.severity.length > 0 ||
-      filters.source_name.length > 0,
+      Object.values(filters).some((arr) => (arr as string[]).length > 0),
     [sort, filters],
   );
 
   const hasActiveFilters = useMemo(
-    () =>
-      filters.status.length > 0 ||
-      filters.severity.length > 0 ||
-      filters.source_name.length > 0,
+    () => Object.values(filters).some((arr) => (arr as string[]).length > 0),
     [filters],
   );
 
-  // Build params for useAlerts()
+  // Build params for the API query hook
   const params = useMemo(() => {
     const p: Record<string, string | number | boolean | undefined> = {
       page,
@@ -77,9 +69,10 @@ export function useAlertTableState() {
       p.sort_by = sort.column;
       p.sort_order = sort.order;
     }
-    if (filters.status.length > 0) p.status = filters.status.join(",");
-    if (filters.severity.length > 0) p.severity = filters.severity.join(",");
-    if (filters.source_name.length > 0) p.source_name = filters.source_name.join(",");
+    for (const [key, values] of Object.entries(filters)) {
+      const arr = values as string[];
+      if (arr.length > 0) p[key] = arr.join(",");
+    }
     return p;
   }, [page, pageSize, sort, filters]);
 
