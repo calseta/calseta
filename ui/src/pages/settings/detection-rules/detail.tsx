@@ -13,6 +13,134 @@ import { useDetectionRule, usePatchDetectionRule } from "@/hooks/use-api";
 import { formatDate, severityColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Shield, AlertTriangle, Radio } from "lucide-react";
+import type { DetectionRule } from "@/lib/types";
+
+function buildDocumentationTemplate(rule: DetectionRule): string {
+  const name = rule.name || "Rule Name";
+  const enabled = rule.is_active ? "yes" : "no";
+  const createdBy = rule.created_by || "";
+  const frequency = rule.run_frequency || "";
+  const severity = rule.severity?.toLowerCase() || "";
+  const tactics = rule.mitre_tactics?.length
+    ? rule.mitre_tactics.join(", ")
+    : "";
+  const techniques = rule.mitre_techniques?.length
+    ? rule.mitre_techniques.join(", ")
+    : "";
+  const subtechniques = rule.mitre_subtechniques?.length
+    ? rule.mitre_subtechniques.join(", ")
+    : "";
+  const dataSources = rule.data_sources?.length
+    ? rule.data_sources.map((ds) => `* \`${ds}\``).join("\n")
+    : "* ";
+  const ruleId = rule.source_rule_id || "";
+
+  return `# ${name}
+
+## Overview
+
+>
+
+---
+
+## Metadata
+
+* **ID:** \`${ruleId}\`
+* **Enabled:** \`${enabled}\`
+* **Created By:** \`${createdBy}\`
+* **Runs Every:** \`${frequency}\`
+* **Severity:** \`${severity}\`
+
+---
+
+## Query
+
+\`\`\`
+\`\`\`
+
+---
+
+## Threshold *(optional)*
+
+* **Field:** \`\`
+* **Threshold:** \`\`
+
+---
+
+## Alert Suppression *(optional)*
+
+* **Suppression Field:** \`\`
+* **Suppression Duration:** \`\`
+
+---
+
+## Machine Learning Job *(optional)*
+
+>
+
+---
+
+## MITRE ATT&CK
+
+* **Tactics:** \`${tactics}\`
+* **Techniques:** \`${techniques}\`
+* **Sub-Techniques:** \`${subtechniques}\`
+
+---
+
+## Goal
+
+>
+
+---
+
+## Strategy Abstract
+
+>
+
+---
+
+## Data Sources
+
+${dataSources}
+
+---
+
+## Blind Spots & Assumptions
+
+*
+
+---
+
+## False Positives
+
+*
+
+---
+
+## Validation
+
+>
+
+---
+
+## Priority
+
+>
+
+---
+
+## Responses
+
+*
+
+---
+
+## Additional Notes
+
+*
+`;
+}
 
 export function DetectionRuleDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
@@ -213,6 +341,7 @@ export function DetectionRuleDetailPage() {
           content={rule.documentation ?? ""}
           onSave={handleSaveDoc}
           isSaving={patchRule.isPending}
+          templateContent={buildDocumentationTemplate(rule)}
         />
       </div>
     </AppLayout>

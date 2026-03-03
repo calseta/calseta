@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { MarkdownPreview } from "@/components/markdown-preview";
-import { Save, Pencil, Eye } from "lucide-react";
+import { Save, Pencil, Eye, FileText } from "lucide-react";
 
 interface DocumentationEditorProps {
   content: string;
@@ -13,6 +13,7 @@ interface DocumentationEditorProps {
   placeholder?: string;
   rows?: number;
   title?: string;
+  templateContent?: string;
 }
 
 export function DocumentationEditor({
@@ -22,6 +23,7 @@ export function DocumentationEditor({
   placeholder = "Write documentation in markdown...",
   rows = 16,
   title = "Documentation",
+  templateContent,
 }: DocumentationEditorProps) {
   const [editContent, setEditContent] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -31,7 +33,6 @@ export function DocumentationEditor({
   function handleSave() {
     onSave(effectiveContent);
     setEditing(false);
-    setEditContent(null);
   }
 
   function handleCancel() {
@@ -41,6 +42,12 @@ export function DocumentationEditor({
 
   function handleEdit() {
     setEditContent(content);
+    setEditing(true);
+  }
+
+  function handleUseTemplate() {
+    if (!templateContent) return;
+    setEditContent(templateContent);
     setEditing(true);
   }
 
@@ -72,15 +79,28 @@ export function DocumentationEditor({
               </Button>
             </>
           ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleEdit}
-              className="border-border text-xs"
-            >
-              <Pencil className="h-3 w-3 mr-1" />
-              Edit
-            </Button>
+            <>
+              {templateContent && !content && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleUseTemplate}
+                  className="border-border text-xs"
+                >
+                  <FileText className="h-3 w-3 mr-1" />
+                  Use Template
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleEdit}
+                className="border-border text-xs"
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                Edit
+              </Button>
+            </>
           )}
         </div>
       </CardHeader>
