@@ -23,19 +23,33 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
-  Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  ResizableTable,
+  ResizableTableHead,
+  type ColumnDef,
+} from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkflows, useCreateWorkflow } from "@/hooks/use-api";
 import { relativeTime, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/copyable-text";
 import { ShieldCheck, Code, Lock, Plus, RefreshCw } from "lucide-react";
+
+const WF_COLUMNS: ColumnDef[] = [
+  { key: "name", initialWidth: 220, minWidth: 120 },
+  { key: "uuid", initialWidth: 140, minWidth: 100 },
+  { key: "state", initialWidth: 80, minWidth: 70 },
+  { key: "type", initialWidth: 110, minWidth: 80 },
+  { key: "risk", initialWidth: 80, minWidth: 70 },
+  { key: "approval", initialWidth: 80, minWidth: 60 },
+  { key: "version", initialWidth: 70, minWidth: 60 },
+  { key: "updated", initialWidth: 130, minWidth: 100 },
+];
 
 const WORKFLOW_TEMPLATE = `async def run(ctx):
     """
@@ -172,17 +186,17 @@ export function WorkflowsListPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card">
-          <Table>
+          <ResizableTable storageKey="workflows" columns={WF_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-dim text-xs">Name</TableHead>
-                <TableHead className="text-dim text-xs">UUID</TableHead>
-                <TableHead className="text-dim text-xs">State</TableHead>
-                <TableHead className="text-dim text-xs">Type</TableHead>
-                <TableHead className="text-dim text-xs">Risk</TableHead>
-                <TableHead className="text-dim text-xs">Approval</TableHead>
-                <TableHead className="text-dim text-xs">Version</TableHead>
-                <TableHead className="text-dim text-xs">Updated</TableHead>
+                <ResizableTableHead columnKey="name" className="text-dim text-xs">Name</ResizableTableHead>
+                <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
+                <ResizableTableHead columnKey="state" className="text-dim text-xs">State</ResizableTableHead>
+                <ResizableTableHead columnKey="type" className="text-dim text-xs">Type</ResizableTableHead>
+                <ResizableTableHead columnKey="risk" className="text-dim text-xs">Risk</ResizableTableHead>
+                <ResizableTableHead columnKey="approval" className="text-dim text-xs">Approval</ResizableTableHead>
+                <ResizableTableHead columnKey="version" className="text-dim text-xs">Version</ResizableTableHead>
+                <ResizableTableHead columnKey="updated" className="text-dim text-xs">Updated</ResizableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -269,7 +283,7 @@ export function WorkflowsListPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </ResizableTable>
         </div>
       </div>
     </AppLayout>

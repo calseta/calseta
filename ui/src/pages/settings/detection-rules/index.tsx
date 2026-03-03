@@ -14,13 +14,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  ResizableTable,
+  ResizableTableHead,
+  type ColumnDef,
+} from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
@@ -32,6 +35,16 @@ import { formatDate } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
 import { Plus, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const DR_COLUMNS: ColumnDef[] = [
+  { key: "name", initialWidth: 260, minWidth: 140 },
+  { key: "uuid", initialWidth: 140, minWidth: 100 },
+  { key: "source", initialWidth: 110, minWidth: 80 },
+  { key: "severity", initialWidth: 90, minWidth: 70 },
+  { key: "mitre", initialWidth: 200, minWidth: 100 },
+  { key: "created", initialWidth: 160, minWidth: 120 },
+  { key: "actions", initialWidth: 44, minWidth: 44, maxWidth: 44 },
+];
 
 export function DetectionRulesPage() {
   const { data, isLoading, refetch, isFetching } = useDetectionRules({ page_size: 100 });
@@ -155,16 +168,16 @@ export function DetectionRulesPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card">
-          <Table>
+          <ResizableTable storageKey="detection-rules" columns={DR_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-dim text-xs">Name</TableHead>
-                <TableHead className="text-dim text-xs">UUID</TableHead>
-                <TableHead className="text-dim text-xs">Source</TableHead>
-                <TableHead className="text-dim text-xs">Severity</TableHead>
-                <TableHead className="text-dim text-xs">MITRE</TableHead>
-                <TableHead className="text-dim text-xs">Created (UTC)</TableHead>
-                <TableHead className="text-dim text-xs w-10" />
+                <ResizableTableHead columnKey="name" className="text-dim text-xs">Name</ResizableTableHead>
+                <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
+                <ResizableTableHead columnKey="source" className="text-dim text-xs">Source</ResizableTableHead>
+                <ResizableTableHead columnKey="severity" className="text-dim text-xs">Severity</ResizableTableHead>
+                <ResizableTableHead columnKey="mitre" className="text-dim text-xs">MITRE</ResizableTableHead>
+                <ResizableTableHead columnKey="created" className="text-dim text-xs">Created (UTC)</ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -218,7 +231,7 @@ export function DetectionRulesPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </ResizableTable>
         </div>
       </div>
 

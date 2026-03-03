@@ -16,13 +16,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
-  Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  ResizableTable,
+  ResizableTableHead,
+  type ColumnDef,
+} from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
@@ -36,6 +39,17 @@ import { Plus, Trash2, FileText, BookOpen, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TargetingRuleBuilder } from "@/components/targeting-rules/targeting-rule-builder";
 import { type TargetingRules, serializeTargetingRules } from "@/components/targeting-rules/types";
+
+const CD_COLUMNS: ColumnDef[] = [
+  { key: "title", initialWidth: 240, minWidth: 140 },
+  { key: "uuid", initialWidth: 140, minWidth: 100 },
+  { key: "type", initialWidth: 100, minWidth: 70 },
+  { key: "scope", initialWidth: 80, minWidth: 70 },
+  { key: "tags", initialWidth: 180, minWidth: 80 },
+  { key: "version", initialWidth: 70, minWidth: 60 },
+  { key: "updated", initialWidth: 160, minWidth: 120 },
+  { key: "actions", initialWidth: 44, minWidth: 44, maxWidth: 44 },
+];
 
 export function ContextDocsPage() {
   const { data, isLoading, refetch, isFetching } = useContextDocuments({ page_size: 100 });
@@ -168,17 +182,17 @@ export function ContextDocsPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card">
-          <Table>
+          <ResizableTable storageKey="context-docs" columns={CD_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-dim text-xs">Title</TableHead>
-                <TableHead className="text-dim text-xs">UUID</TableHead>
-                <TableHead className="text-dim text-xs">Type</TableHead>
-                <TableHead className="text-dim text-xs">Scope</TableHead>
-                <TableHead className="text-dim text-xs">Tags</TableHead>
-                <TableHead className="text-dim text-xs">Version</TableHead>
-                <TableHead className="text-dim text-xs">Updated (UTC)</TableHead>
-                <TableHead className="text-dim text-xs w-10" />
+                <ResizableTableHead columnKey="title" className="text-dim text-xs">Title</ResizableTableHead>
+                <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
+                <ResizableTableHead columnKey="type" className="text-dim text-xs">Type</ResizableTableHead>
+                <ResizableTableHead columnKey="scope" className="text-dim text-xs">Scope</ResizableTableHead>
+                <ResizableTableHead columnKey="tags" className="text-dim text-xs">Tags</ResizableTableHead>
+                <ResizableTableHead columnKey="version" className="text-dim text-xs">Version</ResizableTableHead>
+                <ResizableTableHead columnKey="updated" className="text-dim text-xs">Updated (UTC)</ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -254,7 +268,7 @@ export function ContextDocsPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </ResizableTable>
         </div>
       </div>
 

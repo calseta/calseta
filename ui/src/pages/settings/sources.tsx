@@ -20,18 +20,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  ResizableTable,
+  ResizableTableHead,
+  type ColumnDef,
+} from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useSources, useCreateSource, useDeleteSource } from "@/hooks/use-api";
 import { formatDate } from "@/lib/format";
 import { Plus, Trash2 } from "lucide-react";
+
+const SRC_COLUMNS: ColumnDef[] = [
+  { key: "source", initialWidth: 160, minWidth: 100 },
+  { key: "display_name", initialWidth: 200, minWidth: 120 },
+  { key: "status", initialWidth: 90, minWidth: 70 },
+  { key: "created", initialWidth: 160, minWidth: 120 },
+  { key: "actions", initialWidth: 44, minWidth: 44, maxWidth: 44 },
+];
 
 const AVAILABLE_SOURCES = [
   { value: "sentinel", label: "Microsoft Sentinel" },
@@ -129,14 +140,14 @@ export function SourcesPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card">
-          <Table>
+          <ResizableTable storageKey="sources" columns={SRC_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-dim text-xs">Source</TableHead>
-                <TableHead className="text-dim text-xs">Display Name</TableHead>
-                <TableHead className="text-dim text-xs">Status</TableHead>
-                <TableHead className="text-dim text-xs">Created (UTC)</TableHead>
-                <TableHead className="text-dim text-xs w-10" />
+                <ResizableTableHead columnKey="source" className="text-dim text-xs">Source</ResizableTableHead>
+                <ResizableTableHead columnKey="display_name" className="text-dim text-xs">Display Name</ResizableTableHead>
+                <ResizableTableHead columnKey="status" className="text-dim text-xs">Status</ResizableTableHead>
+                <ResizableTableHead columnKey="created" className="text-dim text-xs">Created (UTC)</ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -178,7 +189,7 @@ export function SourcesPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </ResizableTable>
         </div>
       </div>
 

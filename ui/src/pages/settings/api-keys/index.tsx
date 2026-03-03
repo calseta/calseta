@@ -14,19 +14,32 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  ResizableTable,
+  ResizableTableHead,
+  type ColumnDef,
+} from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiKeys, useCreateApiKey, useDeactivateApiKey } from "@/hooks/use-api";
 import { relativeTime } from "@/lib/format";
 import { Plus, Ban, Copy, Check, Key, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const AK_COLUMNS: ColumnDef[] = [
+  { key: "prefix", initialWidth: 140, minWidth: 100 },
+  { key: "name", initialWidth: 160, minWidth: 100 },
+  { key: "scopes", initialWidth: 280, minWidth: 120 },
+  { key: "status", initialWidth: 80, minWidth: 70 },
+  { key: "last_used", initialWidth: 110, minWidth: 80 },
+  { key: "created", initialWidth: 110, minWidth: 80 },
+  { key: "actions", initialWidth: 44, minWidth: 44, maxWidth: 44 },
+];
 
 export function ApiKeysPage() {
   const { data, isLoading, refetch, isFetching } = useApiKeys();
@@ -175,16 +188,16 @@ export function ApiKeysPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card">
-          <Table>
+          <ResizableTable storageKey="api-keys" columns={AK_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-dim text-xs">Prefix</TableHead>
-                <TableHead className="text-dim text-xs">Name</TableHead>
-                <TableHead className="text-dim text-xs">Scopes</TableHead>
-                <TableHead className="text-dim text-xs">Status</TableHead>
-                <TableHead className="text-dim text-xs">Last Used</TableHead>
-                <TableHead className="text-dim text-xs">Created</TableHead>
-                <TableHead className="text-dim text-xs w-10" />
+                <ResizableTableHead columnKey="prefix" className="text-dim text-xs">Prefix</ResizableTableHead>
+                <ResizableTableHead columnKey="name" className="text-dim text-xs">Name</ResizableTableHead>
+                <ResizableTableHead columnKey="scopes" className="text-dim text-xs">Scopes</ResizableTableHead>
+                <ResizableTableHead columnKey="status" className="text-dim text-xs">Status</ResizableTableHead>
+                <ResizableTableHead columnKey="last_used" className="text-dim text-xs">Last Used</ResizableTableHead>
+                <ResizableTableHead columnKey="created" className="text-dim text-xs">Created</ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -270,7 +283,7 @@ export function ApiKeysPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </ResizableTable>
         </div>
       </div>
 

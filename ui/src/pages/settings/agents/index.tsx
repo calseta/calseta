@@ -15,13 +15,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  ResizableTable,
+  ResizableTableHead,
+  type ColumnDef,
+} from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useAgents, useCreateAgent, useDeleteAgent } from "@/hooks/use-api";
@@ -29,6 +32,16 @@ import { relativeTime } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
 import { Plus, Trash2, Bot, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const AGENT_COLUMNS: ColumnDef[] = [
+  { key: "agent", initialWidth: 180, minWidth: 120 },
+  { key: "uuid", initialWidth: 140, minWidth: 100 },
+  { key: "endpoint", initialWidth: 220, minWidth: 120 },
+  { key: "status", initialWidth: 80, minWidth: 70 },
+  { key: "triggers", initialWidth: 150, minWidth: 80 },
+  { key: "registered", initialWidth: 120, minWidth: 80 },
+  { key: "actions", initialWidth: 44, minWidth: 44, maxWidth: 44 },
+];
 
 export function AgentsPage() {
   const { data, isLoading, refetch, isFetching } = useAgents();
@@ -127,16 +140,16 @@ export function AgentsPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card">
-          <Table>
+          <ResizableTable storageKey="agents" columns={AGENT_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-dim text-xs">Agent</TableHead>
-                <TableHead className="text-dim text-xs">UUID</TableHead>
-                <TableHead className="text-dim text-xs">Endpoint URL</TableHead>
-                <TableHead className="text-dim text-xs">Status</TableHead>
-                <TableHead className="text-dim text-xs">Triggers</TableHead>
-                <TableHead className="text-dim text-xs">Registered</TableHead>
-                <TableHead className="text-dim text-xs w-10" />
+                <ResizableTableHead columnKey="agent" className="text-dim text-xs">Agent</ResizableTableHead>
+                <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
+                <ResizableTableHead columnKey="endpoint" className="text-dim text-xs">Endpoint URL</ResizableTableHead>
+                <ResizableTableHead columnKey="status" className="text-dim text-xs">Status</ResizableTableHead>
+                <ResizableTableHead columnKey="triggers" className="text-dim text-xs">Triggers</ResizableTableHead>
+                <ResizableTableHead columnKey="registered" className="text-dim text-xs">Registered</ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -197,7 +210,7 @@ export function AgentsPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </ResizableTable>
         </div>
       </div>
 

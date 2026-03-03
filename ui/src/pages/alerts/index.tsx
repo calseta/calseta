@@ -4,19 +4,31 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  ResizableTable,
+  ResizableTableHead,
+  type ColumnDef,
+} from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts } from "@/hooks/use-api";
 import { formatDate, severityColor, statusColor } from "@/lib/format";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/copyable-text";
+
+const COLUMNS: ColumnDef[] = [
+  { key: "title", initialWidth: 320, minWidth: 160 },
+  { key: "uuid", initialWidth: 140, minWidth: 100 },
+  { key: "status", initialWidth: 110, minWidth: 80 },
+  { key: "severity", initialWidth: 100, minWidth: 80 },
+  { key: "source", initialWidth: 110, minWidth: 80 },
+  { key: "time", initialWidth: 160, minWidth: 120 },
+];
 
 export function AlertsListPage() {
   const [page, setPage] = useState(1);
@@ -53,15 +65,15 @@ export function AlertsListPage() {
 
         {/* Table */}
         <div className="rounded-lg border border-border bg-card">
-          <Table>
+          <ResizableTable storageKey="alerts" columns={COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-dim text-xs">Title</TableHead>
-                <TableHead className="text-dim text-xs">UUID</TableHead>
-                <TableHead className="text-dim text-xs">Status</TableHead>
-                <TableHead className="text-dim text-xs">Severity</TableHead>
-                <TableHead className="text-dim text-xs">Source</TableHead>
-                <TableHead className="text-dim text-xs">Time (UTC)</TableHead>
+                <ResizableTableHead columnKey="title" className="text-dim text-xs">Title</ResizableTableHead>
+                <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
+                <ResizableTableHead columnKey="status" className="text-dim text-xs">Status</ResizableTableHead>
+                <ResizableTableHead columnKey="severity" className="text-dim text-xs">Severity</ResizableTableHead>
+                <ResizableTableHead columnKey="source" className="text-dim text-xs">Source</ResizableTableHead>
+                <ResizableTableHead columnKey="time" className="text-dim text-xs">Time (UTC)</ResizableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -81,7 +93,7 @@ export function AlertsListPage() {
                       key={alert.uuid}
                       className="border-border hover:bg-accent/50 cursor-pointer"
                     >
-                      <TableCell>
+                      <TableCell className="truncate">
                         <Link
                           to="/alerts/$uuid"
                           params={{ uuid: alert.uuid }}
@@ -141,7 +153,7 @@ export function AlertsListPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </ResizableTable>
         </div>
 
         {/* Pagination */}
