@@ -56,11 +56,11 @@ export function AlertsListPage() {
           <Table>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-dim text-xs">Severity</TableHead>
                 <TableHead className="text-dim text-xs">Title</TableHead>
-                <TableHead className="text-dim text-xs">Status</TableHead>
-                <TableHead className="text-dim text-xs">Source</TableHead>
                 <TableHead className="text-dim text-xs">UUID</TableHead>
+                <TableHead className="text-dim text-xs">Status</TableHead>
+                <TableHead className="text-dim text-xs">Severity</TableHead>
+                <TableHead className="text-dim text-xs">Source</TableHead>
                 <TableHead className="text-dim text-xs">Time (UTC)</TableHead>
               </TableRow>
             </TableHeader>
@@ -68,10 +68,10 @@ export function AlertsListPage() {
               {isLoading
                 ? Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i} className="border-border">
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-60" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     </TableRow>
@@ -81,14 +81,6 @@ export function AlertsListPage() {
                       key={alert.uuid}
                       className="border-border hover:bg-accent/50 cursor-pointer"
                     >
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={cn("text-[11px] font-medium", severityColor(alert.severity))}
-                        >
-                          {alert.severity}
-                        </Badge>
-                      </TableCell>
                       <TableCell>
                         <Link
                           to="/alerts/$uuid"
@@ -111,6 +103,13 @@ export function AlertsListPage() {
                         )}
                       </TableCell>
                       <TableCell>
+                        <CopyableText
+                          text={alert.uuid}
+                          mono
+                          className="text-[11px] text-dim"
+                        />
+                      </TableCell>
+                      <TableCell>
                         <Badge
                           variant="outline"
                           className={cn("text-[11px]", statusColor(alert.status))}
@@ -118,15 +117,16 @@ export function AlertsListPage() {
                           {alert.status}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn("text-[11px] font-medium", severityColor(alert.severity))}
+                        >
+                          {alert.severity}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {alert.source_name}
-                      </TableCell>
-                      <TableCell>
-                        <CopyableText
-                          text={alert.uuid}
-                          mono
-                          className="text-[11px] text-dim"
-                        />
                       </TableCell>
                       <TableCell className="text-xs text-dim whitespace-nowrap">
                         {formatDate(alert.created_at)}
