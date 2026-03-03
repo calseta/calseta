@@ -61,7 +61,7 @@ export function AlertsListPage() {
                 <TableHead className="text-dim text-xs">Status</TableHead>
                 <TableHead className="text-dim text-xs">Source</TableHead>
                 <TableHead className="text-dim text-xs">UUID</TableHead>
-                <TableHead className="text-dim text-xs">Time</TableHead>
+                <TableHead className="text-dim text-xs">Time (UTC)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
