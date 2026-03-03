@@ -8,7 +8,7 @@ function loadPageSize(): number {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PAGE_SIZE;
     const n = parseInt(raw, 10);
-    return [10, 25, 50, 100].includes(n) ? n : DEFAULT_PAGE_SIZE;
+    return [10, 25, 50, 100, 250, 500].includes(n) ? n : DEFAULT_PAGE_SIZE;
   } catch {
     return DEFAULT_PAGE_SIZE;
   }

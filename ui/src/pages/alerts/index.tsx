@@ -176,7 +176,7 @@ export function AlertsListPage() {
             <div className="flex items-center gap-2">
               <span className="text-xs text-dim">Rows per page</span>
               <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
-                <SelectTrigger className="h-7 w-[62px] bg-card border-border text-xs text-dim">
+                <SelectTrigger className="h-7 w-[70px] bg-card border-border text-xs text-dim">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
@@ -184,6 +184,8 @@ export function AlertsListPage() {
                   <SelectItem value="25">25</SelectItem>
                   <SelectItem value="50">50</SelectItem>
                   <SelectItem value="100">100</SelectItem>
+                  <SelectItem value="250">250</SelectItem>
+                  <SelectItem value="500">500</SelectItem>
                 </SelectContent>
               </Select>
             </div>
