@@ -131,6 +131,10 @@ def _build_metadata(
     )
 
 
+_ALLOWED_SORT_BY = {"title", "status", "severity", "source_name", "occurred_at", "created_at"}
+_ALLOWED_SORT_ORDER = {"asc", "desc"}
+
+
 @router.get("", response_model=PaginatedResponse[AlertSummary])
 async def list_alerts(
     auth: _Read,
@@ -144,17 +148,40 @@ async def list_alerts(
     from_time: datetime | None = Query(None),
     to_time: datetime | None = Query(None),
     tags: list[str] | None = Query(None),
+    sort_by: str | None = Query(None),
+    sort_order: str | None = Query(None),
 ) -> PaginatedResponse[AlertSummary]:
+    # Validate sort params
+    if sort_by and sort_by not in _ALLOWED_SORT_BY:
+        raise CalsetaException(
+            code="VALIDATION_ERROR",
+            message=f"Invalid sort_by '{sort_by}'. Must be one of: {sorted(_ALLOWED_SORT_BY)}",
+            status_code=400,
+        )
+    if sort_order and sort_order not in _ALLOWED_SORT_ORDER:
+        raise CalsetaException(
+            code="VALIDATION_ERROR",
+            message=f"Invalid sort_order '{sort_order}'. Must be 'asc' or 'desc'.",
+            status_code=400,
+        )
+
+    # Parse comma-separated multi-value filters into lists
+    status_list = [s.strip() for s in status.split(",") if s.strip()] if status else None
+    severity_list = [s.strip() for s in severity.split(",") if s.strip()] if severity else None
+    source_list = [s.strip() for s in source_name.split(",") if s.strip()] if source_name else None
+
     repo = AlertRepository(db)
     alerts, total = await repo.list_alerts(
-        status=status,
-        severity=severity,
-        source_name=source_name,
+        status=status_list,
+        severity=severity_list,
+        source_name=source_list,
         is_enriched=is_enriched,
         detection_rule_uuid=detection_rule_uuid,
         from_time=from_time,
         to_time=to_time,
         tags=tags,
+        sort_by=sort_by,
+        sort_order=sort_order,
         page=pagination.page,
         page_size=pagination.page_size,
     )

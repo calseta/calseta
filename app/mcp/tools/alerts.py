@@ -200,6 +200,9 @@ async def update_alert_status(
         })
 
 
+_ALLOWED_SORT_BY = {"title", "status", "severity", "source_name", "occurred_at", "created_at"}
+
+
 @mcp_server.tool()
 async def search_alerts(
     ctx: Context,
@@ -210,6 +213,8 @@ async def search_alerts(
     from_time: str | None = None,
     to_time: str | None = None,
     tags: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> str:
@@ -217,12 +222,18 @@ async def search_alerts(
 
     Args:
         status: Filter by alert status (e.g. "Open", "Closed", "enriched").
+                Comma-separated for multiple values (e.g. "Open,Triaging").
         severity: Filter by severity (e.g. "High", "Critical").
+                  Comma-separated for multiple values (e.g. "High,Critical").
         source_name: Filter by source (e.g. "sentinel", "elastic").
+                     Comma-separated for multiple values.
         is_enriched: Filter by enrichment state (true/false).
         from_time: ISO 8601 start time for occurred_at filter.
         to_time: ISO 8601 end time for occurred_at filter.
         tags: Comma-separated list of tags to filter by.
+        sort_by: Column to sort by. Valid values: "title", "status",
+                 "severity", "source_name", "occurred_at", "created_at".
+        sort_order: Sort direction — "asc" or "desc" (default "desc").
         page: Page number (1-indexed, default 1).
         page_size: Results per page (default 20, max 100).
 
@@ -242,7 +253,20 @@ async def search_alerts(
         except ValueError:
             return json.dumps({"error": f"Invalid to_time format: {to_time}"})
 
+    if sort_by and sort_by not in _ALLOWED_SORT_BY:
+        return json.dumps({
+            "error": f"Invalid sort_by '{sort_by}'. Must be one of: {sorted(_ALLOWED_SORT_BY)}"
+        })
+    if sort_order and sort_order not in ("asc", "desc"):
+        return json.dumps({
+            "error": f"Invalid sort_order '{sort_order}'. Must be 'asc' or 'desc'."
+        })
+
     parsed_tags = [t.strip() for t in tags.split(",")] if tags else None
+    # Parse comma-separated multi-value filters into lists
+    status_list = [s.strip() for s in status.split(",") if s.strip()] if status else None
+    severity_list = [s.strip() for s in severity.split(",") if s.strip()] if severity else None
+    source_list = [s.strip() for s in source_name.split(",") if s.strip()] if source_name else None
     page_size = min(page_size, 100)
 
     async with AsyncSessionLocal() as session:
@@ -252,13 +276,15 @@ async def search_alerts(
 
         repo = AlertRepository(session)
         alerts, total = await repo.list_alerts(
-            status=status,
-            severity=severity,
-            source_name=source_name,
+            status=status_list,
+            severity=severity_list,
+            source_name=source_list,
             is_enriched=is_enriched,
             from_time=parsed_from,
             to_time=parsed_to,
             tags=parsed_tags,
+            sort_by=sort_by,
+            sort_order=sort_order,
             page=page,
             page_size=page_size,
         )

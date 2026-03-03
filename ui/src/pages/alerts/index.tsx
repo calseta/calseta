@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
@@ -23,11 +22,13 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts } from "@/hooks/use-api";
-import { usePageSize } from "@/hooks/use-page-size";
+import { useAlertTableState } from "@/hooks/use-alert-table-state";
 import { formatDate, severityColor, statusColor } from "@/lib/format";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/copyable-text";
+import { SortableColumnHeader } from "@/components/sortable-column-header";
+import { ColumnFilterPopover } from "@/components/column-filter-popover";
 
 const COLUMNS: ColumnDef[] = [
   { key: "title", initialWidth: 320, minWidth: 160 },
@@ -38,22 +39,74 @@ const COLUMNS: ColumnDef[] = [
   { key: "time", initialWidth: 160, minWidth: 120 },
 ];
 
-export function AlertsListPage() {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = usePageSize();
+const STATUS_OPTIONS = [
+  { value: "pending_enrichment", label: "pending_enrichment", colorClass: statusColor("pending_enrichment") },
+  { value: "enriched", label: "enriched", colorClass: statusColor("enriched") },
+  { value: "Open", label: "Open", colorClass: statusColor("Open") },
+  { value: "Triaging", label: "Triaging", colorClass: statusColor("Triaging") },
+  { value: "Escalated", label: "Escalated", colorClass: statusColor("Escalated") },
+  { value: "Closed", label: "Closed", colorClass: statusColor("Closed") },
+];
 
-  const { data, isLoading, refetch, isFetching } = useAlerts({
+const SEVERITY_OPTIONS = [
+  { value: "Critical", label: "Critical", colorClass: severityColor("Critical") },
+  { value: "High", label: "High", colorClass: severityColor("High") },
+  { value: "Medium", label: "Medium", colorClass: severityColor("Medium") },
+  { value: "Low", label: "Low", colorClass: severityColor("Low") },
+  { value: "Informational", label: "Informational", colorClass: severityColor("Informational") },
+  { value: "Pending", label: "Pending", colorClass: severityColor("Pending") },
+];
+
+const SOURCE_OPTIONS = [
+  { value: "sentinel", label: "Sentinel" },
+  { value: "elastic", label: "Elastic" },
+  { value: "splunk", label: "Splunk" },
+  { value: "generic", label: "Generic" },
+];
+
+// Map UI column keys to API sort_by values
+const SORT_KEY_MAP: Record<string, string> = {
+  title: "title",
+  status: "status",
+  severity: "severity",
+  source: "source_name",
+  time: "occurred_at",
+};
+
+export function AlertsListPage() {
+  const {
     page,
-    page_size: pageSize,
-  });
+    setPage,
+    pageSize,
+    handlePageSizeChange,
+    sort,
+    updateSort,
+    filters,
+    updateFilter,
+    clearAll,
+    hasActiveFiltersOrSort,
+    hasActiveFilters,
+    params,
+  } = useAlertTableState();
+
+  const { data, isLoading, refetch, isFetching } = useAlerts(params);
 
   const alerts = data?.data ?? [];
   const meta = data?.meta;
 
-  function handlePageSizeChange(value: string) {
-    setPageSize(Number(value));
-    setPage(1);
+  // Sort handler maps UI column keys to API sort_by values
+  function handleSort(uiKey: string) {
+    const apiKey = SORT_KEY_MAP[uiKey] ?? uiKey;
+    updateSort(apiKey);
   }
+
+  // Reverse-map current sort column back to UI key for SortableColumnHeader comparison
+  const reverseSortKeyMap: Record<string, string> = Object.fromEntries(
+    Object.entries(SORT_KEY_MAP).map(([ui, api]) => [api, ui]),
+  );
+  const uiSort = sort
+    ? { column: reverseSortKeyMap[sort.column] ?? sort.column, order: sort.order }
+    : null;
 
   return (
     <AppLayout title="Alerts">
@@ -69,9 +122,23 @@ export function AlertsListPage() {
             >
               <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
             </Button>
+            {hasActiveFiltersOrSort && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAll}
+                className="h-7 px-2 text-xs text-dim hover:text-foreground gap-1"
+              >
+                <X className="h-3 w-3" />
+                Reset filters
+              </Button>
+            )}
             {meta && (
               <span className="text-xs text-dim">
                 {meta.total} alert{meta.total !== 1 ? "s" : ""}
+                {hasActiveFilters && (
+                  <span className="text-teal ml-1">(filtered)</span>
+                )}
               </span>
             )}
           </div>
@@ -82,12 +149,71 @@ export function AlertsListPage() {
           <ResizableTable storageKey="alerts" columns={COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="title" className="text-dim text-xs">Title</ResizableTableHead>
+                <ResizableTableHead columnKey="title" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Title"
+                    sortKey="title"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                  />
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
-                <ResizableTableHead columnKey="status" className="text-dim text-xs">Status</ResizableTableHead>
-                <ResizableTableHead columnKey="severity" className="text-dim text-xs">Severity</ResizableTableHead>
-                <ResizableTableHead columnKey="source" className="text-dim text-xs">Source</ResizableTableHead>
-                <ResizableTableHead columnKey="time" className="text-dim text-xs">Time (UTC)</ResizableTableHead>
+                <ResizableTableHead columnKey="status" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Status"
+                    sortKey="status"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                    filterElement={
+                      <ColumnFilterPopover
+                        label="Status"
+                        options={STATUS_OPTIONS}
+                        selected={filters.status}
+                        onChange={(v) => updateFilter("status", v)}
+                      />
+                    }
+                  />
+                </ResizableTableHead>
+                <ResizableTableHead columnKey="severity" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Severity"
+                    sortKey="severity"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                    filterElement={
+                      <ColumnFilterPopover
+                        label="Severity"
+                        options={SEVERITY_OPTIONS}
+                        selected={filters.severity}
+                        onChange={(v) => updateFilter("severity", v)}
+                      />
+                    }
+                  />
+                </ResizableTableHead>
+                <ResizableTableHead columnKey="source" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Source"
+                    sortKey="source"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                    filterElement={
+                      <ColumnFilterPopover
+                        label="Source"
+                        options={SOURCE_OPTIONS}
+                        selected={filters.source_name}
+                        onChange={(v) => updateFilter("source_name", v)}
+                      />
+                    }
+                  />
+                </ResizableTableHead>
+                <ResizableTableHead columnKey="time" className="text-dim text-xs">
+                  <SortableColumnHeader
+                    label="Time (UTC)"
+                    sortKey="time"
+                    currentSort={uiSort}
+                    onSort={handleSort}
+                  />
+                </ResizableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -176,7 +302,7 @@ export function AlertsListPage() {
             <div className="flex items-center gap-2">
               <span className="text-xs text-dim">Rows per page</span>
               <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
-                <SelectTrigger className="h-7 w-[70px] bg-card border-border text-xs text-dim">
+                <SelectTrigger className="h-7 w-[80px] bg-card border-border text-xs text-dim">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">

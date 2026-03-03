@@ -7,11 +7,30 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.alert import Alert
 from app.schemas.alert import AlertSeverity, AlertStatus, CalsetaAlert
+
+# Whitelist of columns that can be used for sorting
+_SORT_COLUMNS: dict[str, Any] = {
+    "title": "title",
+    "status": "status",
+    "source_name": "source_name",
+    "occurred_at": "occurred_at",
+    "created_at": "created_at",
+}
+
+# CASE expression for severity ordering (no severity_id column in DB)
+_SEVERITY_ORDER = case(
+    (Alert.severity == "Critical", 5),
+    (Alert.severity == "High", 4),
+    (Alert.severity == "Medium", 3),
+    (Alert.severity == "Low", 2),
+    (Alert.severity == "Informational", 1),
+    else_=0,
+)
 
 
 def generate_fingerprint(
@@ -95,14 +114,16 @@ class AlertRepository:
     async def list_alerts(
         self,
         *,
-        status: str | None = None,
-        severity: str | None = None,
-        source_name: str | None = None,
+        status: list[str] | str | None = None,
+        severity: list[str] | str | None = None,
+        source_name: list[str] | str | None = None,
         is_enriched: bool | None = None,
         detection_rule_uuid: uuid.UUID | None = None,
         from_time: datetime | None = None,
         to_time: datetime | None = None,
         tags: list[str] | None = None,
+        sort_by: str | None = None,
+        sort_order: str | None = None,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[Alert], int]:
@@ -112,15 +133,19 @@ class AlertRepository:
         stmt = select(Alert)
         count_stmt = select(func.count()).select_from(Alert)
 
+        # Multi-value filters: accept both str and list[str]
         if status:
-            stmt = stmt.where(Alert.status == status)
-            count_stmt = count_stmt.where(Alert.status == status)
+            vals = status if isinstance(status, list) else [status]
+            stmt = stmt.where(Alert.status.in_(vals))
+            count_stmt = count_stmt.where(Alert.status.in_(vals))
         if severity:
-            stmt = stmt.where(Alert.severity == severity)
-            count_stmt = count_stmt.where(Alert.severity == severity)
+            vals = severity if isinstance(severity, list) else [severity]
+            stmt = stmt.where(Alert.severity.in_(vals))
+            count_stmt = count_stmt.where(Alert.severity.in_(vals))
         if source_name:
-            stmt = stmt.where(Alert.source_name == source_name)
-            count_stmt = count_stmt.where(Alert.source_name == source_name)
+            vals = source_name if isinstance(source_name, list) else [source_name]
+            stmt = stmt.where(Alert.source_name.in_(vals))
+            count_stmt = count_stmt.where(Alert.source_name.in_(vals))
         if is_enriched is not None:
             stmt = stmt.where(Alert.is_enriched == is_enriched)
             count_stmt = count_stmt.where(Alert.is_enriched == is_enriched)
@@ -145,12 +170,21 @@ class AlertRepository:
         total_result = await self._db.execute(count_stmt)
         total = total_result.scalar_one()
 
+        # Dynamic sort
+        order_clause = None
+        if sort_by and sort_by in _SORT_COLUMNS:
+            col = getattr(Alert, _SORT_COLUMNS[sort_by])
+            order_clause = col.asc() if sort_order == "asc" else col.desc()
+        elif sort_by == "severity":
+            order_clause = (
+                _SEVERITY_ORDER.asc() if sort_order == "asc" else _SEVERITY_ORDER.desc()
+            )
+
+        if order_clause is None:
+            order_clause = Alert.occurred_at.desc()
+
         offset = (page - 1) * page_size
-        stmt = (
-            stmt.order_by(Alert.occurred_at.desc())
-            .offset(offset)
-            .limit(page_size)
-        )
+        stmt = stmt.order_by(order_clause).offset(offset).limit(page_size)
         result = await self._db.execute(stmt)
         return list(result.scalars().all()), total
 
