@@ -96,6 +96,10 @@ _BUILTIN_PROVIDERS: list[dict] = [
                         "Key": "{{auth.api_key}}",
                         "Accept": "application/json",
                     },
+                    "query_params": {
+                        "ipAddress": "{{indicator.value}}",
+                        "maxAgeInDays": "90",
+                    },
                     "timeout_seconds": 30,
                     "expected_status": [200],
                 }
@@ -431,14 +435,21 @@ _BUILTIN_FIELD_EXTRACTIONS = _build_extractions()
 async def seed_builtin_providers(db: AsyncSession) -> None:
     """Idempotently insert all builtin enrichment provider configs."""
     inserted = 0
+    updated = 0
 
     for defn in _BUILTIN_PROVIDERS:
-        existing = await db.execute(
+        result = await db.execute(
             select(EnrichmentProvider).where(
                 EnrichmentProvider.provider_name == defn["provider_name"]
             )
         )
-        if existing.scalar_one_or_none() is not None:
+        existing = result.scalar_one_or_none()
+
+        if existing is not None:
+            # Update http_config on existing builtins if it has changed
+            if existing.http_config != defn["http_config"]:
+                existing.http_config = defn["http_config"]
+                updated += 1
             continue
 
         db.add(
@@ -461,9 +472,13 @@ async def seed_builtin_providers(db: AsyncSession) -> None:
         )
         inserted += 1
 
-    if inserted > 0:
+    if inserted > 0 or updated > 0:
         await db.flush()
-        logger.info("builtin_enrichment_providers_seeded", count=inserted)
+        logger.info(
+            "builtin_enrichment_providers_seeded",
+            inserted=inserted,
+            updated=updated,
+        )
     else:
         logger.debug("builtin_enrichment_providers_already_seeded")
 

@@ -123,6 +123,10 @@ class GenericHttpEnrichmentEngine:
                     "timeout": float(timeout),
                 }
 
+                # Handle query parameters
+                if "query_params" in step:
+                    request_kwargs["params"] = resolver.resolve_value(step["query_params"])
+
                 # Handle body
                 if "json_body" in step:
                     request_kwargs["json"] = resolver.resolve_value(step["json_body"])
