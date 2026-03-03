@@ -15,6 +15,7 @@ import {
   SidebarSection,
   DetailPageField,
 } from "@/components/detail-page";
+import { CopyableText } from "@/components/copyable-text";
 import { useApiKey, usePatchApiKey, useDeactivateApiKey } from "@/hooks/use-api";
 import { formatDate, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ import {
   Ban,
   Save,
   Loader2,
+  Lock,
 } from "lucide-react";
 
 const ALL_SCOPES = [
@@ -43,7 +45,7 @@ const ALL_SOURCES = ["sentinel", "elastic", "splunk", "generic"];
 
 export function ApiKeyDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
-  const { data, isLoading } = useApiKey(uuid);
+  const { data, isLoading, refetch, isFetching } = useApiKey(uuid);
   const patchApiKey = usePatchApiKey();
   const deactivateKey = useDeactivateApiKey();
 
@@ -147,6 +149,8 @@ export function ApiKeyDetailPage() {
         <DetailPageHeader
           backTo="/settings/api-keys"
           title={apiKey.name}
+          onRefresh={() => refetch()}
+          isRefreshing={isFetching}
           badges={
             <>
               <Badge
@@ -207,6 +211,11 @@ export function ApiKeyDetailPage() {
               icon: Clock,
               value: apiKey.last_used_at ? relativeTime(apiKey.last_used_at) : "Never",
             },
+            {
+              label: "Scopes",
+              icon: Lock,
+              value: `${apiKey.scopes.length} of ${ALL_SCOPES.length}`,
+            },
           ]}
         />
 
@@ -214,8 +223,8 @@ export function ApiKeyDetailPage() {
           sidebar={
             <DetailPageSidebar>
               <SidebarSection title="Details">
-                <DetailPageField label="UUID" value={apiKey.uuid.slice(0, 8) + "..."} mono />
-                <DetailPageField label="Key Prefix" value={apiKey.key_prefix + "..."} mono />
+                <DetailPageField label="UUID" value={<CopyableText text={apiKey.uuid} mono className="text-xs" />} />
+                <DetailPageField label="Key Prefix" value={<CopyableText text={apiKey.key_prefix + "..."} mono className="text-xs" />} />
                 <DetailPageField label="Name" value={apiKey.name} />
                 <DetailPageField label="Created" value={formatDate(apiKey.created_at)} />
                 <DetailPageField

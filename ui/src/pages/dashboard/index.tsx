@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMetricsSummary, useApprovals } from "@/hooks/use-api";
 import { formatSeconds, formatPercent } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   ShieldAlert,
   Clock,
@@ -12,6 +14,7 @@ import {
   TrendingUp,
   Timer,
   Target,
+  RefreshCw,
 } from "lucide-react";
 import {
   BarChart,
@@ -33,7 +36,7 @@ const severityColors: Record<string, string> = {
 };
 
 export function DashboardPage() {
-  const { data: metricsResp, isLoading: metricsLoading } = useMetricsSummary();
+  const { data: metricsResp, isLoading: metricsLoading, refetch, isFetching } = useMetricsSummary();
   const { data: approvalsResp } = useApprovals("pending");
 
   const metrics = metricsResp?.data;
@@ -69,6 +72,18 @@ export function DashboardPage() {
   return (
     <AppLayout title="Dashboard">
       <div className="space-y-6">
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="h-8 w-8 p-0 text-dim hover:text-teal"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+          </Button>
+        </div>
+
         {/* KPI Cards — Row 1 */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <KpiCard

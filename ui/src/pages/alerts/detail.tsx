@@ -109,7 +109,7 @@ const indicatorIcons: Record<string, React.ComponentType<{ className?: string }>
 
 export function AlertDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
-  const { data: alertResp, isLoading } = useAlert(uuid);
+  const { data: alertResp, isLoading, refetch, isFetching } = useAlert(uuid);
   const { data: activityResp } = useAlertActivity(uuid);
   const { data: contextResp } = useAlertContext(uuid);
   const patchAlert = usePatchAlert();
@@ -228,6 +228,8 @@ export function AlertDetailPage() {
         <DetailPageHeader
           backTo="/alerts"
           title={alert.title}
+          onRefresh={() => refetch()}
+          isRefreshing={isFetching}
           badges={
             <>
               <Badge

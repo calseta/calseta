@@ -22,7 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts } from "@/hooks/use-api";
 import { relativeTime, severityColor, statusColor } from "@/lib/format";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, X, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STATUSES = [
@@ -48,7 +48,7 @@ export function AlertsListPage() {
   const [severity, setSeverity] = useState<string>("");
   const [source, setSource] = useState<string>("");
 
-  const { data, isLoading } = useAlerts({
+  const { data, isLoading, refetch, isFetching } = useAlerts({
     page,
     page_size: 25,
     status: status || undefined,
@@ -118,11 +118,22 @@ export function AlertsListPage() {
             </Button>
           )}
 
-          {meta && (
-            <span className="ml-auto text-xs text-dim">
-              {meta.total} alert{meta.total !== 1 ? "s" : ""}
-            </span>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="h-8 w-8 p-0 text-dim hover:text-teal"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+            </Button>
+            {meta && (
+              <span className="text-xs text-dim">
+                {meta.total} alert{meta.total !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Table */}

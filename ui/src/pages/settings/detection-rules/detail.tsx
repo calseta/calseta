@@ -16,7 +16,7 @@ import { Shield, AlertTriangle, Radio } from "lucide-react";
 
 export function DetectionRuleDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
-  const { data, isLoading } = useDetectionRule(uuid);
+  const { data, isLoading, refetch, isFetching } = useDetectionRule(uuid);
   const patchRule = usePatchDetectionRule();
 
   const rule = data?.data;
@@ -56,6 +56,8 @@ export function DetectionRuleDetailPage() {
         <DetailPageHeader
           backTo="/settings/detection-rules"
           title={rule.name}
+          onRefresh={() => refetch()}
+          isRefreshing={isFetching}
           subtitle={
             <div className="flex flex-wrap gap-3 text-xs text-dim">
               {rule.source_rule_id && <span>Rule ID: {rule.source_rule_id}</span>}

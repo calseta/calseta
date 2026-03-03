@@ -64,7 +64,7 @@ const WORKFLOW_STATES = ["draft", "active", "inactive"];
 
 export function WorkflowDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
-  const { data: wfResp, isLoading } = useWorkflow(uuid);
+  const { data: wfResp, isLoading, refetch, isFetching } = useWorkflow(uuid);
   const { data: runsResp } = useWorkflowRuns(uuid);
   const patchWorkflow = usePatchWorkflow();
   const testWorkflow = useTestWorkflow();
@@ -205,6 +205,8 @@ export function WorkflowDetailPage() {
         <DetailPageHeader
           backTo="/workflows"
           title={wf.name}
+          onRefresh={() => refetch()}
+          isRefreshing={isFetching}
           badges={
             <>
               <Badge

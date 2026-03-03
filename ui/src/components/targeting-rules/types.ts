@@ -1,5 +1,19 @@
-export type TargetingField = "source_name" | "severity" | "severity_id" | "tags";
-export type TargetingOp = "eq" | "in" | "contains" | "gte" | "lte";
+export type TargetingField =
+  | "source_name"
+  | "severity"
+  | "title"
+  | "tags"
+  | "indicator_type"
+  | "indicator_value";
+
+export type TargetingOp =
+  | "eq"
+  | "in"
+  | "contains"
+  | "starts_with"
+  | "ends_with"
+  | "gte"
+  | "lte";
 
 export interface TargetingRule {
   field: TargetingField;
@@ -31,14 +45,25 @@ export const FIELD_CONFIGS: Record<TargetingField, FieldConfig> = {
     valueType: "select",
     options: ["Pending", "Informational", "Low", "Medium", "High", "Critical"],
   },
-  severity_id: {
-    label: "Severity ID",
-    allowedOps: ["eq", "gte", "lte"],
-    valueType: "number",
+  title: {
+    label: "Alert Title",
+    allowedOps: ["eq", "contains", "starts_with", "ends_with"],
+    valueType: "text",
   },
   tags: {
     label: "Tags",
     allowedOps: ["contains"],
+    valueType: "text",
+  },
+  indicator_type: {
+    label: "Indicator Type",
+    allowedOps: ["eq", "in"],
+    valueType: "select",
+    options: ["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"],
+  },
+  indicator_value: {
+    label: "Indicator Value",
+    allowedOps: ["eq", "contains", "starts_with", "ends_with"],
     valueType: "text",
   },
 };
@@ -47,6 +72,8 @@ export const OP_LABELS: Record<TargetingOp, string> = {
   eq: "equals",
   in: "is one of",
   contains: "contains",
+  starts_with: "starts with",
+  ends_with: "ends with",
   gte: ">=",
   lte: "<=",
 };

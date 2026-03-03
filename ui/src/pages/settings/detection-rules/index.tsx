@@ -29,10 +29,11 @@ import {
   useDeleteDetectionRule,
 } from "@/hooks/use-api";
 import { relativeTime } from "@/lib/format";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function DetectionRulesPage() {
-  const { data, isLoading } = useDetectionRules({ page_size: 100 });
+  const { data, isLoading, refetch, isFetching } = useDetectionRules({ page_size: 100 });
   const createRule = useCreateDetectionRule();
   const deleteRule = useDeleteDetectionRule();
   const [open, setOpen] = useState(false);
@@ -88,9 +89,20 @@ export function DetectionRulesPage() {
     <AppLayout title="Detection Rules">
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <span className="text-xs text-dim">
-            {data?.meta?.total ?? 0} rules
-          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="h-8 w-8 p-0 text-dim hover:text-teal"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+            </Button>
+            <span className="text-xs text-dim">
+              {data?.meta?.total ?? 0} rules
+            </span>
+          </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="bg-teal text-white hover:bg-teal-dim">

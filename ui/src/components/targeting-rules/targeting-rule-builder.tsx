@@ -112,7 +112,15 @@ function TargetingRuleRow({
       <Input
         value={String(rule.value)}
         onChange={(e) => onChange({ ...rule, value: e.target.value })}
-        placeholder={rule.field === "tags" ? "Tag value" : "Value"}
+        placeholder={
+          rule.field === "tags"
+            ? "Tag value"
+            : rule.field === "title"
+              ? "Alert title"
+              : rule.field === "indicator_value"
+                ? "e.g. 192.168.1.1, evil.com"
+                : "Value"
+        }
         className="bg-surface border-border text-xs h-8 flex-1 min-w-32"
       />
     );
@@ -121,7 +129,7 @@ function TargetingRuleRow({
   return (
     <div className="flex items-center gap-2">
       <Select value={rule.field} onValueChange={handleFieldChange}>
-        <SelectTrigger className="bg-surface border-border text-xs h-8 w-32">
+        <SelectTrigger className="bg-surface border-border text-xs h-8 w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="bg-card border-border">
@@ -134,7 +142,7 @@ function TargetingRuleRow({
       </Select>
 
       <Select value={rule.op} onValueChange={handleOpChange}>
-        <SelectTrigger className="bg-surface border-border text-xs h-8 w-28">
+        <SelectTrigger className="bg-surface border-border text-xs h-8 w-32">
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="bg-card border-border">

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 
 interface DetailPageHeaderProps {
   backTo: string;
@@ -8,6 +10,8 @@ interface DetailPageHeaderProps {
   badges?: ReactNode;
   actions?: ReactNode;
   subtitle?: ReactNode;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export function DetailPageHeader({
@@ -16,6 +20,8 @@ export function DetailPageHeader({
   badges,
   actions,
   subtitle,
+  onRefresh,
+  isRefreshing,
 }: DetailPageHeaderProps) {
   return (
     <div className="flex items-start gap-4">
@@ -31,7 +37,20 @@ export function DetailPageHeader({
         </h2>
         {subtitle && <div className="mt-1">{subtitle}</div>}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      <div className="flex items-center gap-2 shrink-0">
+        {onRefresh && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="h-8 w-8 p-0 text-dim hover:text-teal"
+          >
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          </Button>
+        )}
+        {actions}
+      </div>
     </div>
   );
 }

@@ -12,6 +12,13 @@ import {
   DocumentationEditor,
 } from "@/components/detail-page";
 import { useContextDocument, usePatchContextDocument } from "@/hooks/use-api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { BookOpen, FileText, Globe, GitBranch, Pencil, Save, X } from "lucide-react";
 import {
   TargetingRuleBuilder,
@@ -25,7 +32,7 @@ import {
 
 export function ContextDocDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
-  const { data, isLoading } = useContextDocument(uuid);
+  const { data, isLoading, refetch, isFetching } = useContextDocument(uuid);
   const patchDoc = usePatchContextDocument();
   const [editingRules, setEditingRules] = useState(false);
   const [draftRules, setDraftRules] = useState<TargetingRules | null>(null);
@@ -88,6 +95,8 @@ export function ContextDocDetailPage() {
         <DetailPageHeader
           backTo="/settings/context-docs"
           title={doc.title}
+          onRefresh={() => refetch()}
+          isRefreshing={isFetching}
           badges={
             <>
               <Badge
@@ -124,7 +133,34 @@ export function ContextDocDetailPage() {
             {
               label: "Scope",
               icon: Globe,
-              value: doc.is_global ? "Global" : "Targeted",
+              value: (
+                <Select
+                  value={doc.is_global ? "global" : "targeted"}
+                  onValueChange={(v) => {
+                    const newIsGlobal = v === "global";
+                    const body: Record<string, unknown> = { is_global: newIsGlobal };
+                    if (newIsGlobal) body.targeting_rules = null;
+                    patchDoc.mutate(
+                      { uuid, body },
+                      {
+                        onSuccess: () => {
+                          toast.success(newIsGlobal ? "Scope set to Global" : "Scope set to Targeted");
+                          if (newIsGlobal) setEditingRules(false);
+                        },
+                        onError: () => toast.error("Failed to update scope"),
+                      },
+                    );
+                  }}
+                >
+                  <SelectTrigger className={`h-7 w-full text-xs border ${doc.is_global ? "text-amber bg-amber/10 border-amber/30" : "text-foreground border-border"}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="global">Global</SelectItem>
+                    <SelectItem value="targeted">Targeted</SelectItem>
+                  </SelectContent>
+                </Select>
+              ),
             },
             {
               label: "Version",

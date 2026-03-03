@@ -26,10 +26,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useAgents, useCreateAgent, useDeleteAgent } from "@/hooks/use-api";
 import { relativeTime } from "@/lib/format";
-import { Plus, Trash2, Bot } from "lucide-react";
+import { Plus, Trash2, Bot, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function AgentsPage() {
-  const { data, isLoading } = useAgents();
+  const { data, isLoading, refetch, isFetching } = useAgents();
   const createAgent = useCreateAgent();
   const deleteAgent = useDeleteAgent();
   const [open, setOpen] = useState(false);
@@ -75,7 +76,18 @@ export function AgentsPage() {
     <AppLayout title="Agent Registrations">
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <span className="text-xs text-dim">{agents.length} agents</span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="h-8 w-8 p-0 text-dim hover:text-teal"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+            </Button>
+            <span className="text-xs text-dim">{agents.length} agents</span>
+          </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="bg-teal text-white hover:bg-teal-dim">

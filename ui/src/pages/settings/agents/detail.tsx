@@ -61,7 +61,7 @@ const RETRY_OPTIONS = [0, 1, 2, 3, 4, 5];
 
 export function AgentDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
-  const { data, isLoading } = useAgent(uuid);
+  const { data, isLoading, refetch, isFetching } = useAgent(uuid);
   const patchAgent = usePatchAgent();
   const testAgent = useTestAgent();
 
@@ -288,6 +288,8 @@ export function AgentDetailPage() {
         <DetailPageHeader
           backTo="/settings/agents"
           title={agent.name}
+          onRefresh={() => refetch()}
+          isRefreshing={isFetching}
           badges={
             <>
               <Badge

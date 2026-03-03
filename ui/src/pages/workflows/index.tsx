@@ -34,7 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkflows, useCreateWorkflow } from "@/hooks/use-api";
 import { relativeTime, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { ShieldCheck, Code, Lock, Plus } from "lucide-react";
+import { ShieldCheck, Code, Lock, Plus, RefreshCw } from "lucide-react";
 
 const WORKFLOW_TEMPLATE = `async def run(ctx):
     """
@@ -54,7 +54,7 @@ const WORKFLOW_TEMPLATE = `async def run(ctx):
 `;
 
 export function WorkflowsListPage() {
-  const { data, isLoading } = useWorkflows({ page_size: 50 });
+  const { data, isLoading, refetch, isFetching } = useWorkflows({ page_size: 50 });
   const createWorkflow = useCreateWorkflow();
   const workflows = data?.data ?? [];
 
@@ -90,9 +90,20 @@ export function WorkflowsListPage() {
     <AppLayout title="Workflows">
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <span className="text-xs text-dim">
-            {data?.meta?.total ?? 0} workflows
-          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="h-8 w-8 p-0 text-dim hover:text-teal"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+            </Button>
+            <span className="text-xs text-dim">
+              {data?.meta?.total ?? 0} workflows
+            </span>
+          </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="bg-teal text-white hover:bg-teal-dim">
