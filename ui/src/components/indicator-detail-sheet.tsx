@@ -29,6 +29,7 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
+import { RunWorkflowButton } from "@/components/run-workflow-button";
 
 const MALICE_OPTIONS = ["Pending", "Benign", "Suspicious", "Malicious"];
 
@@ -147,22 +148,31 @@ export function IndicatorDetailSheet({
                 )}
               </div>
 
-              {/* Re-enrich */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleReEnrich}
-                disabled={enrichAlert.isPending}
-                className="h-7 text-xs text-teal border-teal/30 hover:bg-teal/10"
-              >
-                <RefreshCw
-                  className={cn(
-                    "h-3.5 w-3.5 mr-1",
-                    enrichAlert.isPending && "animate-spin",
-                  )}
-                />
-                Re-enrich
-              </Button>
+              {/* Actions */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReEnrich}
+                  disabled={enrichAlert.isPending}
+                  className="h-7 text-xs text-teal border-teal/30 hover:bg-teal/10"
+                >
+                  <RefreshCw
+                    className={cn(
+                      "h-3.5 w-3.5 mr-1",
+                      enrichAlert.isPending && "animate-spin",
+                    )}
+                  />
+                  Re-enrich
+                </Button>
+                {indicator && (
+                  <RunWorkflowButton
+                    indicatorType={indicator.type}
+                    indicatorValue={indicator.value}
+                    alertUuid={alertUuid}
+                  />
+                )}
+              </div>
 
               {/* Provider cards */}
               {detail.enrichment_results &&

@@ -22,6 +22,7 @@ Registered tasks:
   Wave 4: send_approval_notification_task (queue: dispatch)        ← added in Wave 4
   Wave 4: execute_approved_workflow_task  (queue: workflows)       ← added in Wave 4
   Wave 5: dispatch_agent_webhooks         (queue: dispatch)        ← added in Wave 5
+  dispatch_single_agent_webhook            (queue: dispatch)        ← manual single-agent dispatch
   Wave 9: sandbox_reset                   (queue: default, periodic) ← conditional on SANDBOX_MODE
 """
 
@@ -467,6 +468,59 @@ async def dispatch_agent_webhooks_task(alert_id: int) -> None:
 
         except Exception:
             await session.rollback()
+            raise
+
+
+# ---------------------------------------------------------------------------
+# Dispatch single agent webhook (dispatch queue)
+# ---------------------------------------------------------------------------
+
+
+@procrastinate_app.task(
+    name="dispatch_single_agent_webhook",
+    queue="dispatch",
+    retry=procrastinate.RetryStrategy(max_attempts=1, wait=0),
+)
+async def dispatch_single_agent_webhook_task(alert_id: int, agent_id: int) -> None:
+    """
+    Dispatch an alert to a single specific agent (bypasses trigger matching).
+
+    Enqueued by POST /v1/alerts/{uuid}/dispatch-agent for manual agent runs.
+    """
+    import structlog as _structlog
+
+    from app.db.session import AsyncSessionLocal
+    from app.services.agent_dispatch import build_webhook_payload, dispatch_to_agent
+
+    _logger = _structlog.get_logger()
+
+    async with AsyncSessionLocal() as session:
+        try:
+            from app.db.models.agent_registration import AgentRegistration
+            from sqlalchemy import select
+
+            agent_result = await session.execute(
+                select(AgentRegistration).where(AgentRegistration.id == agent_id)
+            )
+            agent = agent_result.scalar_one_or_none()
+            if agent is None:
+                _logger.warning("dispatch_single_agent_not_found", agent_id=agent_id)
+                return
+
+            payload = await build_webhook_payload(alert_id, session)
+            if not payload:
+                _logger.warning("dispatch_single_alert_not_found", alert_id=alert_id)
+                return
+
+            await dispatch_to_agent(agent, alert_id, payload, session)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            _logger.exception(
+                "dispatch_single_agent_failed",
+                agent_id=agent_id,
+                alert_id=alert_id,
+            )
             raise
 
 

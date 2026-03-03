@@ -45,6 +45,7 @@ import { ActivityEventReferences } from "@/components/activity/activity-event-re
 import { AddIndicatorsForm } from "@/components/add-indicators-form";
 import { IndicatorDetailSheet } from "@/components/indicator-detail-sheet";
 import { AlertGraph } from "@/components/alert-graph/alert-graph";
+import { RunAgentButton } from "@/components/run-agent-button";
 import {
   Table,
   TableBody,
@@ -230,6 +231,7 @@ export function AlertDetailPage() {
           title={alert.title}
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
+          actions={<RunAgentButton alertUuid={uuid} />}
           badges={
             <>
               <Badge

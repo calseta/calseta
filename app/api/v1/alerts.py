@@ -57,6 +57,7 @@ from app.schemas.relationship_graph import (
     GraphAlertNode,
     GraphIndicatorNode,
 )
+from app.repositories.agent_repository import AgentRepository
 from app.services.activity_event import ActivityEventService
 from app.services.agent_trigger import get_matching_agents
 from app.services.context_targeting import get_applicable_documents
@@ -838,5 +839,70 @@ async def trigger_agents(
         data={
             "queued_agent_count": len(matching_agents),
             "agent_names": [a.name for a in matching_agents],
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/alerts/{uuid}/dispatch-agent
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{alert_uuid}/dispatch-agent",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def dispatch_agent(
+    alert_uuid: UUID,
+    agent_uuid: Annotated[UUID, Query(description="UUID of the agent to dispatch to")],
+    auth: Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_WRITE))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    queue: Annotated[TaskQueueBase, Depends(get_queue)],
+) -> DataResponse[dict]:  # type: ignore[type-arg]
+    """
+    Dispatch an alert to a specific registered agent.
+
+    Bypasses trigger matching — sends the full enriched alert payload to
+    the specified agent regardless of its trigger criteria. Useful for
+    manual investigation or re-running an agent against a specific alert.
+    """
+    alert_repo = AlertRepository(db)
+    alert = await alert_repo.get_by_uuid(alert_uuid)
+    if alert is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Alert not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    agent_repo = AgentRepository(db)
+    agent = await agent_repo.get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    if not agent.is_active:
+        raise CalsetaException(
+            code="AGENT_INACTIVE",
+            message=f"Agent '{agent.name}' is inactive.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    await queue.enqueue(
+        "dispatch_single_agent_webhook",
+        {"alert_id": alert.id, "agent_id": agent.id},
+        queue="dispatch",
+        delay_seconds=0,
+        priority=0,
+    )
+
+    return DataResponse(
+        data={
+            "agent_uuid": str(agent.uuid),
+            "agent_name": agent.name,
+            "alert_uuid": str(alert.uuid),
         }
     )

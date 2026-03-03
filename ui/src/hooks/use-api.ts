@@ -465,6 +465,19 @@ export function useTestAgent() {
   });
 }
 
+export function useDispatchAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ alertUuid, agentUuid }: { alertUuid: string; agentUuid: string }) =>
+      api.post<DataResponse<{ agent_uuid: string; agent_name: string; alert_uuid: string }>>(
+        `/alerts/${alertUuid}/dispatch-agent?agent_uuid=${agentUuid}`,
+      ),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["alert-activity", vars.alertUuid] });
+    },
+  });
+}
+
 // API Keys
 export function useApiKeys() {
   return useQuery({

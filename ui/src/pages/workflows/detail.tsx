@@ -33,6 +33,7 @@ import {
   DetailPageField,
   DocumentationEditor,
 } from "@/components/detail-page";
+import { WorkflowCodeEditor } from "@/components/workflow-code-editor";
 import {
   useWorkflow,
   useWorkflowRuns,
@@ -376,15 +377,13 @@ export function WorkflowDetailPage() {
 
             {/* Code Editor */}
             <TabsContent value="code" className="mt-4 space-y-3">
-              <div className="rounded-lg border border-border bg-surface overflow-hidden">
-                <textarea
-                  value={code ?? ""}
-                  onChange={(e) => setCode(e.target.value)}
-                  className="w-full h-[500px] p-4 bg-transparent text-sm font-mono text-foreground resize-none outline-none"
-                  spellCheck={false}
-                />
-              </div>
-              <div className="flex gap-2">
+              <WorkflowCodeEditor
+                value={code ?? ""}
+                onChange={(val) => setCode(val)}
+                onSave={handleSave}
+                height="500px"
+              />
+              <div className="flex items-center gap-3">
                 <Button
                   size="sm"
                   onClick={handleSave}
@@ -394,6 +393,11 @@ export function WorkflowDetailPage() {
                   <Save className="h-3.5 w-3.5 mr-1.5" />
                   Save
                 </Button>
+                {code !== wf.code && (
+                  <span className="text-[11px] text-dim">
+                    Unsaved changes &middot; {navigator.platform?.includes("Mac") ? "Cmd" : "Ctrl"}+S to save
+                  </span>
+                )}
               </div>
             </TabsContent>
 
