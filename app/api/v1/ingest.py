@@ -98,7 +98,14 @@ async def webhook_ingest(
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
-    raw_payload = await request.json()
+    try:
+        raw_payload = await request.json()
+    except Exception:
+        raise CalsetaException(
+            code="INVALID_JSON",
+            message="Request body is not valid JSON.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     if not isinstance(raw_payload, dict):
         raise CalsetaException(
             code="INVALID_PAYLOAD",
