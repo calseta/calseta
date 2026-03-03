@@ -1,11 +1,19 @@
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function relativeTime(iso: string): string {
   return formatDistanceToNow(new Date(iso), { addSuffix: true });
 }
 
 export function formatDate(iso: string): string {
-  return format(new Date(iso), "MMM d, yyyy HH:mm");
+  const d = new Date(iso);
+  const mon = MONTHS[d.getUTCMonth()];
+  const day = d.getUTCDate();
+  const year = d.getUTCFullYear();
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${mon} ${day}, ${year} ${hh}:${mm}`;
 }
 
 export function formatSeconds(seconds: number | null): string {
