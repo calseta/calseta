@@ -3,14 +3,6 @@ import { Link } from "@tanstack/react-router";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -21,104 +13,27 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts } from "@/hooks/use-api";
-import { relativeTime, severityColor, statusColor } from "@/lib/format";
-import { ChevronLeft, ChevronRight, Search, X, RefreshCw } from "lucide-react";
+import { formatDate, severityColor, statusColor } from "@/lib/format";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const STATUSES = [
-  "pending_enrichment",
-  "enriched",
-  "Open",
-  "Triaging",
-  "Escalated",
-  "Closed",
-];
-const SEVERITIES = [
-  "Critical",
-  "High",
-  "Medium",
-  "Low",
-  "Informational",
-  "Pending",
-];
+import { CopyableText } from "@/components/copyable-text";
 
 export function AlertsListPage() {
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<string>("");
-  const [severity, setSeverity] = useState<string>("");
-  const [source, setSource] = useState<string>("");
 
   const { data, isLoading, refetch, isFetching } = useAlerts({
     page,
     page_size: 25,
-    status: status || undefined,
-    severity: severity || undefined,
-    source_name: source || undefined,
   });
 
   const alerts = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!(status || severity || source);
 
   return (
     <AppLayout title="Alerts">
       <div className="space-y-4">
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
-            <SelectTrigger className="w-44 bg-card border-border text-sm">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent className="bg-card border-border">
-              {STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={severity} onValueChange={(v) => { setSeverity(v); setPage(1); }}>
-            <SelectTrigger className="w-40 bg-card border-border text-sm">
-              <SelectValue placeholder="All severities" />
-            </SelectTrigger>
-            <SelectContent className="bg-card border-border">
-              {SEVERITIES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-dim" />
-            <Input
-              placeholder="Source name..."
-              value={source}
-              onChange={(e) => { setSource(e.target.value); setPage(1); }}
-              className="w-44 pl-9 bg-card border-border text-sm"
-            />
-          </div>
-
-          {hasFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setStatus("");
-                setSeverity("");
-                setSource("");
-                setPage(1);
-              }}
-              className="text-dim hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5 mr-1" />
-              Clear
-            </Button>
-          )}
-
-          <div className="ml-auto flex items-center gap-2">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
@@ -145,6 +60,7 @@ export function AlertsListPage() {
                 <TableHead className="text-dim text-xs">Title</TableHead>
                 <TableHead className="text-dim text-xs">Status</TableHead>
                 <TableHead className="text-dim text-xs">Source</TableHead>
+                <TableHead className="text-dim text-xs">UUID</TableHead>
                 <TableHead className="text-dim text-xs">Time</TableHead>
               </TableRow>
             </TableHeader>
@@ -156,7 +72,8 @@ export function AlertsListPage() {
                       <TableCell><Skeleton className="h-5 w-60" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     </TableRow>
                   ))
                 : alerts.map((alert) => (
@@ -204,14 +121,21 @@ export function AlertsListPage() {
                       <TableCell className="text-xs text-muted-foreground">
                         {alert.source_name}
                       </TableCell>
-                      <TableCell className="text-xs text-dim">
-                        {relativeTime(alert.created_at)}
+                      <TableCell>
+                        <CopyableText
+                          text={alert.uuid}
+                          mono
+                          className="text-[11px] text-dim"
+                        />
+                      </TableCell>
+                      <TableCell className="text-xs text-dim whitespace-nowrap">
+                        {formatDate(alert.created_at)}
                       </TableCell>
                     </TableRow>
                   ))}
               {!isLoading && alerts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-dim py-12">
+                  <TableCell colSpan={6} className="text-center text-sm text-dim py-12">
                     No alerts found
                   </TableCell>
                 </TableRow>
