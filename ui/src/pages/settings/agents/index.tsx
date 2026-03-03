@@ -26,6 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useAgents, useCreateAgent, useDeleteAgent } from "@/hooks/use-api";
 import { relativeTime } from "@/lib/format";
+import { CopyableText } from "@/components/copyable-text";
 import { Plus, Trash2, Bot, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -130,6 +131,7 @@ export function AgentsPage() {
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-dim text-xs">Agent</TableHead>
+                <TableHead className="text-dim text-xs">UUID</TableHead>
                 <TableHead className="text-dim text-xs">Endpoint URL</TableHead>
                 <TableHead className="text-dim text-xs">Status</TableHead>
                 <TableHead className="text-dim text-xs">Triggers</TableHead>
@@ -141,7 +143,7 @@ export function AgentsPage() {
               {isLoading
                 ? Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i} className="border-border">
-                      {Array.from({ length: 6 }).map((_, j) => (
+                      {Array.from({ length: 7 }).map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>
                       ))}
                     </TableRow>
@@ -157,8 +159,11 @@ export function AgentsPage() {
                           <span className="text-sm text-foreground hover:text-teal">{agent.name}</span>
                         </Link>
                       </TableCell>
-                      <TableCell className="text-xs text-dim font-mono max-w-48 truncate">
-                        {agent.endpoint_url}
+                      <TableCell>
+                        <CopyableText text={agent.uuid} mono className="text-[11px] text-dim" />
+                      </TableCell>
+                      <TableCell>
+                        <CopyableText text={agent.endpoint_url} mono className="text-[11px] text-dim max-w-48 truncate" />
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={agent.is_active ? "text-teal bg-teal/10 border-teal/30 text-[11px]" : "text-dim bg-dim/10 border-dim/30 text-[11px]"}>
@@ -186,7 +191,7 @@ export function AgentsPage() {
                   ))}
               {!isLoading && agents.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-dim py-12">
+                  <TableCell colSpan={7} className="text-center text-sm text-dim py-12">
                     No agents registered
                   </TableCell>
                 </TableRow>

@@ -34,6 +34,7 @@ import {
   DocumentationEditor,
 } from "@/components/detail-page";
 import { WorkflowCodeEditor } from "@/components/workflow-code-editor";
+import { CopyableText } from "@/components/copyable-text";
 import {
   useWorkflow,
   useWorkflowRuns,
@@ -324,6 +325,14 @@ export function WorkflowDetailPage() {
         <DetailPageLayout
           sidebar={
             <DetailPageSidebar>
+              <SidebarSection title="Identity">
+                <div>
+                  <span className="text-xs text-muted-foreground">UUID</span>
+                  <div className="mt-1">
+                    <CopyableText text={wf.uuid} mono className="text-[11px] text-dim" />
+                  </div>
+                </div>
+              </SidebarSection>
               <SidebarSection title="Configuration">
                 <DetailPageField label="Type" value={wf.workflow_type ?? "—"} />
                 {wf.indicator_types.length > 0 && (

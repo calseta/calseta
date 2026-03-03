@@ -34,6 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkflows, useCreateWorkflow } from "@/hooks/use-api";
 import { relativeTime, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { CopyableText } from "@/components/copyable-text";
 import { ShieldCheck, Code, Lock, Plus, RefreshCw } from "lucide-react";
 
 const WORKFLOW_TEMPLATE = `async def run(ctx):
@@ -175,6 +176,7 @@ export function WorkflowsListPage() {
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-dim text-xs">Name</TableHead>
+                <TableHead className="text-dim text-xs">UUID</TableHead>
                 <TableHead className="text-dim text-xs">State</TableHead>
                 <TableHead className="text-dim text-xs">Type</TableHead>
                 <TableHead className="text-dim text-xs">Risk</TableHead>
@@ -187,7 +189,7 @@ export function WorkflowsListPage() {
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <TableRow key={i} className="border-border">
-                      {Array.from({ length: 7 }).map((_, j) => (
+                      {Array.from({ length: 8 }).map((_, j) => (
                         <TableCell key={j}>
                           <Skeleton className="h-5 w-20" />
                         </TableCell>
@@ -214,6 +216,9 @@ export function WorkflowsListPage() {
                             {wf.name}
                           </div>
                         </Link>
+                      </TableCell>
+                      <TableCell>
+                        <CopyableText text={wf.uuid} mono className="text-[11px] text-dim" />
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -258,7 +263,7 @@ export function WorkflowsListPage() {
                   ))}
               {!isLoading && workflows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-dim py-12">
+                  <TableCell colSpan={8} className="text-center text-sm text-dim py-12">
                     No workflows configured
                   </TableCell>
                 </TableRow>

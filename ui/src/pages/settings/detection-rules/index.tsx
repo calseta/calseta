@@ -29,6 +29,7 @@ import {
   useDeleteDetectionRule,
 } from "@/hooks/use-api";
 import { relativeTime } from "@/lib/format";
+import { CopyableText } from "@/components/copyable-text";
 import { Plus, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -158,6 +159,7 @@ export function DetectionRulesPage() {
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-dim text-xs">Name</TableHead>
+                <TableHead className="text-dim text-xs">UUID</TableHead>
                 <TableHead className="text-dim text-xs">Source</TableHead>
                 <TableHead className="text-dim text-xs">Severity</TableHead>
                 <TableHead className="text-dim text-xs">MITRE</TableHead>
@@ -169,7 +171,7 @@ export function DetectionRulesPage() {
               {isLoading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i} className="border-border">
-                      {Array.from({ length: 6 }).map((_, j) => (
+                      {Array.from({ length: 7 }).map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>
                       ))}
                     </TableRow>
@@ -184,6 +186,9 @@ export function DetectionRulesPage() {
                         >
                           {rule.name}
                         </Link>
+                      </TableCell>
+                      <TableCell>
+                        <CopyableText text={rule.uuid} mono className="text-[11px] text-dim" />
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{rule.source_name ?? "—"}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{rule.severity ?? "—"}</TableCell>
@@ -207,7 +212,7 @@ export function DetectionRulesPage() {
                   ))}
               {!isLoading && rules.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-dim py-12">
+                  <TableCell colSpan={7} className="text-center text-sm text-dim py-12">
                     No detection rules configured
                   </TableCell>
                 </TableRow>

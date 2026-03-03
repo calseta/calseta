@@ -31,6 +31,7 @@ import {
   useDeleteContextDocument,
 } from "@/hooks/use-api";
 import { relativeTime } from "@/lib/format";
+import { CopyableText } from "@/components/copyable-text";
 import { Plus, Trash2, FileText, BookOpen, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TargetingRuleBuilder } from "@/components/targeting-rules/targeting-rule-builder";
@@ -171,6 +172,7 @@ export function ContextDocsPage() {
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-dim text-xs">Title</TableHead>
+                <TableHead className="text-dim text-xs">UUID</TableHead>
                 <TableHead className="text-dim text-xs">Type</TableHead>
                 <TableHead className="text-dim text-xs">Scope</TableHead>
                 <TableHead className="text-dim text-xs">Tags</TableHead>
@@ -183,7 +185,7 @@ export function ContextDocsPage() {
               {isLoading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i} className="border-border">
-                      {Array.from({ length: 7 }).map((_, j) => (
+                      {Array.from({ length: 8 }).map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>
                       ))}
                     </TableRow>
@@ -203,6 +205,9 @@ export function ContextDocsPage() {
                           )}
                           {doc.title}
                         </Link>
+                      </TableCell>
+                      <TableCell>
+                        <CopyableText text={doc.uuid} mono className="text-[11px] text-dim" />
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{doc.document_type}</TableCell>
                       <TableCell>
@@ -229,7 +234,7 @@ export function ContextDocsPage() {
                   ))}
               {!isLoading && docs.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-dim py-12">
+                  <TableCell colSpan={8} className="text-center text-sm text-dim py-12">
                     No context documents yet
                   </TableCell>
                 </TableRow>
