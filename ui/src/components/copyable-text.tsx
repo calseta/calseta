@@ -24,13 +24,14 @@ export function CopyableText({ text, className, mono }: CopyableTextProps) {
   return (
     <span
       className={cn(
-        "group inline-flex items-center gap-1.5 cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 transition-colors hover:bg-surface-hover",
+        "group relative inline-flex items-center cursor-pointer rounded py-0.5 transition-all hover:bg-surface-hover",
+        "pl-0 pr-1.5 hover:pl-[18px]",
         mono && "font-mono",
         className,
       )}
       onClick={handleCopy}
     >
-      <span className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      <span className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
         {copied ? (
           <Check className="h-3 w-3 text-teal" />
         ) : (
