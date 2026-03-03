@@ -14,8 +14,16 @@ import {
   ResizableTableHead,
   type ColumnDef,
 } from "@/components/ui/resizable-table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts } from "@/hooks/use-api";
+import { usePageSize } from "@/hooks/use-page-size";
 import { formatDate, severityColor, statusColor } from "@/lib/format";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,14 +40,20 @@ const COLUMNS: ColumnDef[] = [
 
 export function AlertsListPage() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSize();
 
   const { data, isLoading, refetch, isFetching } = useAlerts({
     page,
-    page_size: 25,
+    page_size: pageSize,
   });
 
   const alerts = data?.data ?? [];
   const meta = data?.meta;
+
+  function handlePageSizeChange(value: string) {
+    setPageSize(Number(value));
+    setPage(1);
+  }
 
   return (
     <AppLayout title="Alerts">
@@ -157,29 +171,45 @@ export function AlertsListPage() {
         </div>
 
         {/* Pagination */}
-        {meta && meta.total_pages > 1 && (
-          <div className="flex items-center justify-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="bg-card border-border text-muted-foreground"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-xs text-dim">
-              Page {meta.page} of {meta.total_pages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= meta.total_pages}
-              onClick={() => setPage((p) => p + 1)}
-              className="bg-card border-border text-muted-foreground"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+        {meta && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-dim">Rows per page</span>
+              <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="h-7 w-[62px] bg-card border-border text-xs text-dim">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-dim">
+                Page {meta.page} of {meta.total_pages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= meta.total_pages}
+                onClick={() => setPage((p) => p + 1)}
+                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
