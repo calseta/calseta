@@ -48,7 +48,19 @@ _UI_CSP = (
     "frame-ancestors 'none'"
 )
 
-_API_PREFIXES = ("/v1/", "/health", "/docs", "/redoc", "/openapi.json")
+# CSP for OpenAPI docs (Swagger UI + ReDoc) — they load JS/CSS from CDN.
+_DOCS_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "img-src 'self' data: https://cdn.jsdelivr.net https://fastapi.tiangolo.com; "
+    "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'"
+)
+
+_API_PREFIXES = ("/v1/", "/health")
+_DOCS_PREFIXES = ("/redoc", "/openapi.json")
 
 _HSTS_VALUE = "max-age=63072000; includeSubDomains"
 
@@ -61,11 +73,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         for header, value in _COMMON_HEADERS:
             response.headers[header] = value
 
-        # Use strict CSP for API routes, permissive CSP for the admin UI.
-        is_api = any(request.url.path.startswith(p) for p in _API_PREFIXES)
-        response.headers["Content-Security-Policy"] = (
-            _API_CSP if is_api else _UI_CSP
-        )
+        # Use strict CSP for API routes, docs-specific CSP for Swagger/ReDoc,
+        # and permissive CSP for the admin UI.
+        path = request.url.path
+        if any(path.startswith(p) for p in _API_PREFIXES):
+            csp = _API_CSP
+        elif any(path.startswith(p) for p in _DOCS_PREFIXES):
+            csp = _DOCS_CSP
+        else:
+            csp = _UI_CSP
+        response.headers["Content-Security-Policy"] = csp
 
         if settings.HTTPS_ENABLED and settings.SECURITY_HEADER_HSTS_ENABLED:
             response.headers["Strict-Transport-Security"] = _HSTS_VALUE

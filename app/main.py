@@ -154,7 +154,7 @@ def create_app() -> FastAPI:
         title="Calseta AI",
         version=settings.APP_VERSION,
         description="SOC data platform for AI agent consumption",
-        docs_url="/docs",
+        docs_url=None,
         redoc_url="/redoc",
         lifespan=lifespan,
     )

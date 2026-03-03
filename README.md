@@ -73,6 +73,8 @@ docker compose exec api python -m app.cli.create_api_key \
 # Save the printed key (cai_...) — it's shown once, never again
 ```
 
+API reference docs are available at `http://localhost:8000/redoc` once the stack is running.
+
 Full setup guide at `docs/DEVELOPMENT.md`. Production deployment at `docs/HOW_TO_DEPLOY.md`.
 
 ---
