@@ -12,7 +12,7 @@ import {
   LogOut,
 } from "lucide-react";
 
-const LOGO_PATH = "/logo.svg";
+const LOGO_PATH = "/logo.png";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { Separator } from "@/components/ui/separator";
