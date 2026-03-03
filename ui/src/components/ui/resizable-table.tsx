@@ -100,7 +100,7 @@ function ResizableTableHead({
       <div className="overflow-hidden text-ellipsis">{children}</div>
       {ctx && (
         <div
-          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-teal/40 active:bg-teal/60 transition-colors z-10"
+          className="absolute right-0 top-2 bottom-2 w-[3px] rounded-full cursor-col-resize bg-border hover:bg-teal/50 active:bg-teal/70 transition-colors z-10"
           onMouseDown={(e) => ctx.onResizeStart(columnKey, e)}
           role="separator"
           aria-orientation="vertical"
