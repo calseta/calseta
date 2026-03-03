@@ -127,6 +127,7 @@ export function WorkflowDetailPage() {
 
   function handleSaveEdit() {
     const body: Record<string, unknown> = { ...editDraft };
+    delete body.notifier_hint; // UI-only field
     if (body.workflow_type === "") body.workflow_type = null;
     if (body.approval_channel === "") body.approval_channel = null;
     if (body.time_saved_minutes === 0) body.time_saved_minutes = null;
@@ -651,13 +652,44 @@ export function WorkflowDetailPage() {
               {(editDraft.requires_approval as boolean) && (
                 <>
                   <div className="space-y-1.5">
-                    <Label className="text-sm text-muted-foreground">Approval Channel</Label>
+                    <Label className="text-sm text-muted-foreground">Notifier</Label>
+                    <Select
+                      value={(editDraft.notifier_hint as string) ?? "slack"}
+                      onValueChange={(v) => updateDraft("notifier_hint", v)}
+                    >
+                      <SelectTrigger className="bg-card border-border text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="slack">Slack</SelectItem>
+                        <SelectItem value="teams">Microsoft Teams</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-dim">
+                      Set globally via <span className="font-mono">APPROVAL_NOTIFIER</span> env var
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">
+                      {(editDraft.notifier_hint ?? "slack") === "slack"
+                        ? "Slack Channel"
+                        : "Teams Webhook URL"}
+                    </Label>
                     <Input
                       value={(editDraft.approval_channel as string) ?? ""}
                       onChange={(e) => updateDraft("approval_channel", e.target.value)}
-                      placeholder="#soc-approvals"
-                      className="bg-card border-border text-sm"
+                      placeholder={
+                        (editDraft.notifier_hint ?? "slack") === "slack"
+                          ? "C0123456789"
+                          : "https://outlook.office.com/webhook/..."
+                      }
+                      className="bg-card border-border text-sm font-mono"
                     />
+                    <p className="text-[10px] text-dim">
+                      {(editDraft.notifier_hint ?? "slack") === "slack"
+                        ? "Use the channel ID (right-click channel → View channel details → copy ID at bottom)"
+                        : "Paste the incoming webhook URL from your Teams channel connector"}
+                    </p>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-sm text-muted-foreground">Approval Timeout (seconds)</Label>

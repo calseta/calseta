@@ -192,6 +192,14 @@ async def patch_workflow(
     if body.code is not None:
         _assert_valid_code(body.code)
 
+    # Keep is_active in sync with state transitions when not explicitly set
+    is_active = body.is_active
+    if body.state is not None and is_active is None:
+        if body.state == "active":
+            is_active = True
+        elif body.state in ("inactive", "draft"):
+            is_active = False
+
     workflow = await repo.patch(
         workflow,
         name=body.name,
@@ -201,7 +209,7 @@ async def patch_workflow(
         state=body.state,
         timeout_seconds=body.timeout_seconds,
         retry_count=body.retry_count,
-        is_active=body.is_active,
+        is_active=is_active,
         tags=body.tags,
         time_saved_minutes=body.time_saved_minutes,
         requires_approval=body.requires_approval,
