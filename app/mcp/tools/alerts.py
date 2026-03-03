@@ -17,7 +17,7 @@ import structlog
 from mcp.server.fastmcp import Context
 
 from app.db.session import AsyncSessionLocal
-from app.mcp.scope import check_scope
+from app.mcp.scope import _resolve_client_id, check_scope
 from app.mcp.server import mcp_server
 from app.repositories.alert_repository import AlertRepository
 from app.repositories.indicator_repository import IndicatorRepository
@@ -101,7 +101,7 @@ async def post_alert_finding(
         await activity_svc.write(
             ActivityEventType.ALERT_FINDING_ADDED,
             actor_type="mcp",
-            actor_key_prefix=ctx.client_id,
+            actor_key_prefix=_resolve_client_id(ctx),
             alert_id=alert.id,
             references={"finding_id": finding_id, "agent_name": agent_name},
         )
@@ -168,12 +168,13 @@ async def update_alert_status(
             close_classification=close_classification,
         )
 
+        resolved_client_id = _resolve_client_id(ctx)
         activity_svc = ActivityEventService(session)
         if status == AlertStatus.CLOSED:
             await activity_svc.write(
                 ActivityEventType.ALERT_CLOSED,
                 actor_type="mcp",
-                actor_key_prefix=ctx.client_id,
+                actor_key_prefix=resolved_client_id,
                 alert_id=alert.id,
                 references={
                     "from_status": prev_status,
@@ -184,7 +185,7 @@ async def update_alert_status(
             await activity_svc.write(
                 ActivityEventType.ALERT_STATUS_UPDATED,
                 actor_type="mcp",
-                actor_key_prefix=ctx.client_id,
+                actor_key_prefix=resolved_client_id,
                 alert_id=alert.id,
                 references={"from_status": prev_status, "to_status": status},
             )
@@ -343,7 +344,7 @@ async def update_alert_malice(
         await activity_svc.write(
             ActivityEventType.ALERT_MALICE_UPDATED,
             actor_type="mcp",
-            actor_key_prefix=ctx.client_id,
+            actor_key_prefix=_resolve_client_id(ctx),
             alert_id=alert.id,
             references={
                 "from_malice": prev_malice,

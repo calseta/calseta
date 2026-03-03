@@ -17,7 +17,7 @@ from app.cache.factory import get_cache_backend
 from app.cache.keys import make_enrichment_key
 from app.db.session import AsyncSessionLocal
 from app.integrations.enrichment.registry import enrichment_registry
-from app.mcp.scope import check_scope
+from app.mcp.scope import _resolve_client_id, check_scope
 from app.mcp.server import mcp_server
 from app.repositories.indicator_repository import IndicatorRepository
 from app.schemas.activity_events import ActivityEventType
@@ -185,7 +185,7 @@ async def update_indicator_malice(
         await activity_svc.write(
             ActivityEventType.INDICATOR_MALICE_UPDATED,
             actor_type="mcp",
-            actor_key_prefix=ctx.client_id,
+            actor_key_prefix=_resolve_client_id(ctx),
             alert_id=alert_id,
             references={
                 "from_malice": prev_malice,

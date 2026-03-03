@@ -15,7 +15,7 @@ import structlog
 from mcp.server.fastmcp import Context
 
 from app.db.session import AsyncSessionLocal
-from app.mcp.scope import check_scope
+from app.mcp.scope import _resolve_client_id, check_scope
 from app.mcp.server import mcp_server
 from app.repositories.workflow_repository import WorkflowRepository
 from app.repositories.workflow_run_repository import WorkflowRunRepository
@@ -135,7 +135,7 @@ async def execute_workflow(
             approval_req = await create_approval_request(
                 workflow=workflow,
                 trigger_type="agent",
-                trigger_agent_key_prefix=ctx.client_id,
+                trigger_agent_key_prefix=_resolve_client_id(ctx),
                 trigger_context=trigger_context,
                 reason=reason,
                 confidence=confidence,
