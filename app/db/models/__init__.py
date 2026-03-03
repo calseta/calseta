@@ -9,6 +9,7 @@ from app.db.models.api_key import APIKey
 from app.db.models.context_document import ContextDocument
 from app.db.models.detection_rule import DetectionRule
 from app.db.models.enrichment_field_extraction import EnrichmentFieldExtraction
+from app.db.models.enrichment_provider import EnrichmentProvider
 from app.db.models.indicator import Indicator
 from app.db.models.indicator_field_mapping import IndicatorFieldMapping
 from app.db.models.source_integration import SourceIntegration
@@ -26,6 +27,7 @@ __all__ = [
     "ContextDocument",
     "DetectionRule",
     "EnrichmentFieldExtraction",
+    "EnrichmentProvider",
     "Indicator",
     "IndicatorFieldMapping",
     "SourceIntegration",

@@ -15,6 +15,7 @@ from app.api.v1 import (
     approvals,
     context_documents,
     detection_rules,
+    enrichment_providers,
     enrichments,
     indicator_mappings,
     indicators,
@@ -33,6 +34,7 @@ v1_router.include_router(indicator_mappings.router)
 v1_router.include_router(indicators.router)
 v1_router.include_router(detection_rules.router)
 v1_router.include_router(enrichments.router)
+v1_router.include_router(enrichment_providers.router)
 v1_router.include_router(context_documents.router)
 v1_router.include_router(workflows.router)
 v1_router.include_router(workflows.workflow_runs_router)

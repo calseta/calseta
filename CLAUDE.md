@@ -86,7 +86,7 @@ app/
     v1/                  # All routes under /v1/
   integrations/
     sources/             # Alert source plugins (AlertSourceBase subclasses)
-    enrichment/          # Enrichment provider plugins (EnrichmentProviderBase subclasses)
+    enrichment/          # Enrichment provider system (DB-driven via DatabaseDrivenProvider adapter)
     community/           # Community-contributed plugins
   workflows/             # WorkflowContext, WorkflowResult, execution engine
   queue/                 # TaskQueueBase + backends (procrastinate, celery, sqs, azure)
@@ -114,7 +114,8 @@ Every table includes: `id` (serial PK), `uuid` (UUID, external-facing), `created
 - **detection_rules** — detection library with MITRE fields and free-form `documentation` TEXT
 - **indicators** — extracted IOCs; **global entity**, one row per unique `(type, value)` pair; `first_seen`, `last_seen` TIMESTAMP; `malice` TEXT enum; `enrichment_results` JSONB; unique constraint on `(type, value)`
 - **alert_indicators** — many-to-many join between alerts and indicators; composite unique on `(alert_id, indicator_id)`; same IOC in 50 alerts = 1 indicator row + 50 join rows
-- **enrichment_field_extractions** — configurable field extraction schema for enrichment provider responses; `provider_name`, `indicator_type`, `source_path` (dot-notation into raw response), `target_key` (key in `extracted` dict surfaced to agents), `value_type`, `is_system`, `is_active`, `description`; system defaults seeded at startup; both `extracted` subset and full `raw` response are persisted per provider in `indicators.enrichment_results`
+- **enrichment_providers** — runtime-configurable enrichment provider configs; `provider_name` (unique), `display_name`, `is_builtin`, `is_active`, `supported_indicator_types` TEXT[], `http_config` JSONB (templated HTTP steps), `auth_type`, `auth_config` JSONB (encrypted at rest), `env_var_mapping` JSONB (builtin env var fallback), `malice_rules` JSONB (threshold-based verdict rules), `cache_ttl_by_type` JSONB; 4 builtins seeded at startup; custom providers added via CRUD API at `/v1/enrichment-providers`; `DatabaseDrivenProvider` adapter wraps each row as an `EnrichmentProviderBase` implementation
+- **enrichment_field_extractions** — configurable field extraction schema for enrichment provider responses; `provider_name`, `indicator_type`, `source_path` (dot-notation into raw response), `target_key` (key in `extracted` dict surfaced to agents), `value_type`, `is_system`, `is_active`, `description`; ~64 system defaults seeded at startup for builtins; both `extracted` subset and full `raw` response are persisted per provider in `indicators.enrichment_results`
 - **context_documents** — runbooks, IR plans, SOPs; `targeting_rules` JSONB, `content` TEXT
 - **workflows** — Python automation functions; `code` TEXT, `code_version` INTEGER, `state` TEXT (`draft`/`active`/`inactive`), `documentation` TEXT; includes `requires_approval` BOOLEAN, `approval_channel`, `approval_timeout_seconds`, `risk_level` for human-in-the-loop approval gate
 - **workflow_runs** — execution audit log; `log_output` TEXT, `result` JSONB, `code_version_executed` INTEGER
@@ -145,18 +146,20 @@ class AlertSourceBase(ABC):
 
 `CalsetaAlert` is the Calseta agent-native schema — clean field names designed for AI consumption (`title`, `severity`, `severity_id`, `occurred_at`, `source_name`, etc.). Not OCSF. Source-specific fields that don't map are preserved in `raw_payload` by the caller, not this method.
 
-### Enrichment Provider Plugin (`EnrichmentProviderBase`)
-```python
-class EnrichmentProviderBase(ABC):
-    provider_name: str
-    display_name: str
-    supported_types: list[IndicatorType]
-    cache_ttl_seconds: int
+### Enrichment Provider System (Database-Driven)
 
-    async def enrich(self, value: str, indicator_type: IndicatorType) -> EnrichmentResult: ...
+Enrichment providers are **database-driven** — each provider is a row in the `enrichment_providers` table with templated HTTP configs, malice threshold rules, and field extraction mappings. A single adapter class (`DatabaseDrivenProvider`) implements the `EnrichmentProviderBase` ABC for all providers. Adding a new provider requires zero code changes — either seed it as a builtin in `app/seed/enrichment_providers.py` or add it at runtime via `POST /v1/enrichment-providers`.
+
+```python
+class EnrichmentProviderBase(ABC):                    # Internal ABC (the port)
+    async def enrich(self, value, indicator_type) -> EnrichmentResult: ...
     def is_configured(self) -> bool: ...
+
+class DatabaseDrivenProvider(EnrichmentProviderBase):  # The single adapter
+    # Wraps a DB row; delegates HTTP execution to GenericHttpEnrichmentEngine
 ```
-`enrich()` must never raise — catch all errors and return `success=False`.
+
+`enrich()` must never raise — catch all errors and return `success=False`. The `EnrichmentService` pipeline is completely unchanged by the database-driven architecture. See `app/integrations/enrichment/CONTEXT.md` for full details.
 
 ### Task Queue (`TaskQueueBase`)
 ```python
@@ -331,7 +334,7 @@ If logic appears in two places, extract it. Never copy-paste business logic betw
 
 ### Ports and Adapters — core never imports adapters
 
-`AlertSourceBase`, `EnrichmentProviderBase`, `TaskQueueBase` are the ports. Concrete implementations (Sentinel, VirusTotal, procrastinate) are the adapters. Services and routes only ever import the base class. This is what makes plugins swappable and tests fast.
+`AlertSourceBase`, `EnrichmentProviderBase`, `TaskQueueBase` are the ports. Concrete implementations (Sentinel, `DatabaseDrivenProvider`, procrastinate) are the adapters. Services and routes only ever import the base class. This is what makes plugins swappable and tests fast.
 
 ### Explicit over implicit
 

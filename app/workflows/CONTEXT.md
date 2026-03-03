@@ -100,7 +100,7 @@ Orchestrates: load indicator from DB, build `WorkflowContext`, call `run_workflo
 
 3. **WorkflowLogger captures to in-memory buffer, not structlog.** Workflow code calls `ctx.log.info(...)` which appends to a list. After execution, `logger.render()` serializes all entries as newline-delimited JSON. This output is stored in `workflow_runs.log_output`. Keeps workflow logs isolated from platform logs and prevents untrusted code from polluting structured log output.
 
-4. **Integration clients are separate from enrichment providers.** `OktaClient` and `EntraClient` in `context.py` are action-oriented (suspend user, revoke sessions) while `OktaProvider` and `EntraProvider` in `app/integrations/enrichment/` are read-oriented (look up user data). They share API credentials but serve fundamentally different purposes.
+4. **Integration clients are separate from enrichment providers.** `OktaClient` and `EntraClient` in `context.py` are action-oriented (suspend user, revoke sessions) while the Okta and Entra enrichment providers (database-driven, configured in the `enrichment_providers` table) are read-oriented (look up user data). They share API credentials but serve fundamentally different purposes.
 
 5. **Approval gate is in the service layer, not middleware.** The gate check happens in the workflow execute route handler and MCP tool, not as middleware. This allows the gate to access the workflow's `requires_approval` flag and the request's `trigger_source` without additional DB lookups.
 

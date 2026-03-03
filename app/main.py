@@ -65,7 +65,12 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
 async def _on_startup() -> None:
     """Run all startup tasks. Failures are logged but never crash the server."""
     from app.db.session import AsyncSessionLocal
+    from app.integrations.enrichment.registry import enrichment_registry
     from app.seed.builtin_workflows import seed_builtin_workflows
+    from app.seed.enrichment_providers import (
+        seed_builtin_field_extractions,
+        seed_builtin_providers,
+    )
     from app.seed.indicator_mappings import seed_system_mappings
     from app.services.indicator_mapping_cache import load_normalized_mappings
 
@@ -75,19 +80,44 @@ async def _on_startup() -> None:
             await seed_builtin_workflows(db, settings)
             await load_normalized_mappings(db)
 
+            # Enrichment provider seeding — isolated so a missing migration
+            # (0006) doesn't break the other seed tasks that already work.
+            try:
+                await seed_builtin_providers(db)
+                await seed_builtin_field_extractions(db)
+            except Exception as exc:
+                logger.warning(
+                    "enrichment_provider_seed_skipped",
+                    error=str(exc),
+                    hint=(
+                        "Run 'alembic upgrade head' to apply the "
+                        "enrichment_providers migration"
+                    ),
+                )
+
             if settings.SANDBOX_MODE:
                 from app.seed.sandbox import seed_sandbox
 
                 await seed_sandbox(db)
 
             await db.commit()
+
+            # Load enrichment providers from DB into the in-memory registry.
+            # If the table doesn't exist yet, this is a no-op.
+            try:
+                await enrichment_registry.load_from_database(db)
+            except Exception as exc:
+                logger.warning(
+                    "enrichment_registry_load_skipped",
+                    error=str(exc),
+                )
     except Exception as exc:
         logger.warning(
             "startup_seed_failed",
             error=str(exc),
             hint=(
-                "Indicator field mappings or built-in workflows may be missing — "
-                "extraction pipeline and workflow catalog may be degraded"
+                "Indicator field mappings or built-in workflows "
+                "may be missing — pipeline may be degraded"
             ),
         )
 

@@ -151,7 +151,7 @@ Route handlers never import SQLAlchemy models directly. Services never construct
 
 If you find yourself writing the same logic in two places, extract it. The rule of three: write it once, write it twice, extract it on the third.
 
-**Ports and adapters for all integrations.** External systems are accessed only through abstract base classes (`AlertSourceBase`, `EnrichmentProviderBase`, `TaskQueueBase`). Core business logic never imports a concrete adapter. This is what makes the plugin system work and what makes tests fast — mock the interface, not the network.
+**Ports and adapters for all integrations.** External systems are accessed only through abstract base classes (`AlertSourceBase`, `EnrichmentProviderBase`, `TaskQueueBase`). Core business logic never imports a concrete adapter (enrichment providers use a single `DatabaseDrivenProvider` adapter for all DB-driven configs). This is what makes the plugin system work and what makes tests fast — mock the interface, not the network.
 
 **Explicit over implicit.** No magic. No hidden global state. No monkeypatching. If a function needs something, it receives it as a parameter. If behavior is configurable, the config key is documented in `.env.example`. The goal: a new contributor should be able to understand any function by reading only that function and its type signatures.
 
@@ -403,12 +403,12 @@ POST /v1/enrichments
 
 Supports ad-hoc use cases: Slack SOC bot commands, agent-initiated enrichment during investigation, manual analyst lookups. Results are cached so subsequent requests for the same indicator are fast.
 
-#### Enrichment Provider Plugin System
+#### Enrichment Provider System (Database-Driven)
 
-Each enrichment provider implements `EnrichmentProviderBase`:
+Enrichment providers are **database-driven** — each provider is a row in the `enrichment_providers` table with templated HTTP configs, malice threshold rules, and field extraction mappings. A single adapter class (`DatabaseDrivenProvider`) implements the `EnrichmentProviderBase` ABC for all providers. Adding a new provider requires zero code changes — either seed it as a builtin or add it at runtime via the CRUD API.
 
 ```python
-class EnrichmentProviderBase(ABC):
+class EnrichmentProviderBase(ABC):                    # Internal ABC (the port)
     provider_name: str
     display_name: str
     supported_types: list[IndicatorType]
@@ -421,6 +421,10 @@ class EnrichmentProviderBase(ABC):
     @abstractmethod
     def is_configured(self) -> bool:
         """Return True if valid credentials are present."""
+
+class DatabaseDrivenProvider(EnrichmentProviderBase):  # The single adapter
+    # Wraps a DB row; delegates HTTP execution to GenericHttpEnrichmentEngine
+    # Credential resolution: DB auth_config (encrypted) → env var fallback
 ```
 
 `EnrichmentResult` carries both the full provider response and the enrichment outcome:
@@ -434,7 +438,9 @@ class EnrichmentResult:
     error: str | None = None
 ```
 
-The provider plugin is responsible only for making the API call and returning `EnrichmentResult`. It does **not** decide what fields to surface. That is the job of the enrichment field extraction configuration described in the next section.
+The provider is responsible only for making the API call and returning `EnrichmentResult`. It does **not** decide what fields to surface. That is the job of the enrichment field extraction configuration described in the next section. The `GenericHttpEnrichmentEngine` handles templated HTTP execution (single and multi-step), `MaliceRuleEvaluator` derives verdicts from configurable threshold rules, and `FieldExtractor` applies extraction rules from the `enrichment_field_extractions` table.
+
+Provider management is available via CRUD API at `/v1/enrichment-providers` (list, create, update, delete, test, activate, deactivate). Builtin providers (VT, AbuseIPDB, Okta, Entra) are seeded at startup and cannot be deleted. Custom and community providers are added at runtime with no restart needed.
 
 #### Enrichment Response Field Extraction
 
@@ -2164,7 +2170,7 @@ Candidates for post-v1 pre-built workflows include: VirusTotal URL/file submissi
 Both plugin systems (alert sources and enrichment providers) are explicitly designed for community contribution. Ships with:
 - `docs/HOW_TO_ADD_ALERT_SOURCE.md`
 - `docs/HOW_TO_ADD_ENRICHMENT_PROVIDER.md`
-Each with a complete worked example, stub class template, and a reminder to fetch and commit API documentation as `docs/integrations/{name}/api_notes.md` before beginning implementation.
+Each with a complete worked example and a reminder to fetch and commit API documentation as `docs/integrations/{name}/api_notes.md` before beginning implementation. For enrichment providers, community contributions are JSON configs (not Python code) — see `docs/COMMUNITY_INTEGRATIONS.md`.
 
 ---
 
@@ -2322,7 +2328,7 @@ Semantic versioning: `v{major}.{minor}.{patch}`
 
 ### Extensibility
 - New alert source: one new file, no core changes required
-- New enrichment provider: one new file, no core changes required
+- New enrichment provider: one API call or JSON config, no code changes required
 - New MCP tool: one new function, register in tool list
 - Every extension point has a worked example in `docs/`
 
