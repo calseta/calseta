@@ -30,7 +30,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useSources, useCreateSource, useDeleteSource } from "@/hooks/use-api";
-import { relativeTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { Plus, Trash2 } from "lucide-react";
 
 const AVAILABLE_SOURCES = [
@@ -135,7 +135,7 @@ export function SourcesPage() {
                 <TableHead className="text-dim text-xs">Source</TableHead>
                 <TableHead className="text-dim text-xs">Display Name</TableHead>
                 <TableHead className="text-dim text-xs">Status</TableHead>
-                <TableHead className="text-dim text-xs">Created</TableHead>
+                <TableHead className="text-dim text-xs">Created (UTC)</TableHead>
                 <TableHead className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
@@ -157,7 +157,7 @@ export function SourcesPage() {
                           {src.is_active ? "active" : "inactive"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-dim">{relativeTime(src.created_at)}</TableCell>
+                      <TableCell className="text-xs text-dim whitespace-nowrap">{formatDate(src.created_at)}</TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"

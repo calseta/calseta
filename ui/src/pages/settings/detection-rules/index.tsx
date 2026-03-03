@@ -28,7 +28,7 @@ import {
   useCreateDetectionRule,
   useDeleteDetectionRule,
 } from "@/hooks/use-api";
-import { relativeTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
 import { Plus, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -163,7 +163,7 @@ export function DetectionRulesPage() {
                 <TableHead className="text-dim text-xs">Source</TableHead>
                 <TableHead className="text-dim text-xs">Severity</TableHead>
                 <TableHead className="text-dim text-xs">MITRE</TableHead>
-                <TableHead className="text-dim text-xs">Created</TableHead>
+                <TableHead className="text-dim text-xs">Created (UTC)</TableHead>
                 <TableHead className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
@@ -197,7 +197,7 @@ export function DetectionRulesPage() {
                         {rule.mitre_techniques?.length > 0 && <span className="ml-1">/ {rule.mitre_techniques.join(", ")}</span>}
                         {!rule.mitre_tactics?.length && !rule.mitre_techniques?.length && "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-dim">{relativeTime(rule.created_at)}</TableCell>
+                      <TableCell className="text-xs text-dim whitespace-nowrap">{formatDate(rule.created_at)}</TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"

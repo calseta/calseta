@@ -30,7 +30,7 @@ import {
   useCreateContextDocument,
   useDeleteContextDocument,
 } from "@/hooks/use-api";
-import { relativeTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
 import { Plus, Trash2, FileText, BookOpen, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -177,7 +177,7 @@ export function ContextDocsPage() {
                 <TableHead className="text-dim text-xs">Scope</TableHead>
                 <TableHead className="text-dim text-xs">Tags</TableHead>
                 <TableHead className="text-dim text-xs">Version</TableHead>
-                <TableHead className="text-dim text-xs">Updated</TableHead>
+                <TableHead className="text-dim text-xs">Updated (UTC)</TableHead>
                 <TableHead className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
@@ -209,17 +209,31 @@ export function ContextDocsPage() {
                       <TableCell>
                         <CopyableText text={doc.uuid} mono className="text-[11px] text-dim" />
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{doc.document_type}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[11px] text-dim border-border">
+                          {doc.document_type}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={`text-[11px] ${doc.is_global ? "text-amber bg-amber/10 border-amber/30" : "text-dim border-border"}`}>
                           {doc.is_global ? "global" : "targeted"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-dim max-w-32 truncate">
-                        {doc.tags?.length > 0 ? doc.tags.join(", ") : "—"}
+                      <TableCell>
+                        {doc.tags?.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {doc.tags.map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-[10px] text-dim border-border font-normal">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-dim">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs text-dim font-mono">v{doc.version}</TableCell>
-                      <TableCell className="text-xs text-dim">{relativeTime(doc.updated_at)}</TableCell>
+                      <TableCell className="text-xs text-dim whitespace-nowrap">{formatDate(doc.updated_at)}</TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"

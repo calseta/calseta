@@ -219,8 +219,14 @@ export function ApiKeysPage() {
                           {k.name}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-xs text-dim max-w-40 truncate">
-                        {k.scopes.join(", ")}
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 max-w-64">
+                          {k.scopes.map((scope) => (
+                            <code key={scope} className="text-[10px] font-mono text-dim bg-surface px-1.5 py-0.5 rounded border border-border">
+                              {scope}
+                            </code>
+                          ))}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge
