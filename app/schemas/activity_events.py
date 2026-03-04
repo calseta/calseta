@@ -36,6 +36,9 @@ class ActivityEventType(StrEnum):
     WORKFLOW_APPROVAL_REQUESTED = "workflow_approval_requested"
     WORKFLOW_APPROVAL_RESPONDED = "workflow_approval_responded"
 
+    # Agent events
+    AGENT_WEBHOOK_DISPATCHED = "agent_webhook_dispatched"
+
     # Detection rule events
     DETECTION_RULE_CREATED = "detection_rule_created"
     DETECTION_RULE_UPDATED = "detection_rule_updated"

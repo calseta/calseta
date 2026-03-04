@@ -17,6 +17,8 @@ import { ContextDocDetailPage } from "@/pages/settings/context-docs/detail";
 import { SourcesPage } from "@/pages/settings/sources";
 import { AgentsPage } from "@/pages/settings/agents/index";
 import { AgentDetailPage } from "@/pages/settings/agents/detail";
+import { EnrichmentProvidersPage } from "@/pages/settings/enrichment-providers";
+import { EnrichmentProviderDetailPage } from "@/pages/settings/enrichment-providers/detail";
 import { ApiKeysPage } from "@/pages/settings/api-keys";
 import { ApiKeyDetailPage } from "@/pages/settings/api-keys/detail";
 
@@ -102,6 +104,18 @@ const agentDetailRoute = createRoute({
   component: AgentDetailPage,
 });
 
+const enrichmentProvidersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/enrichment-providers",
+  component: EnrichmentProvidersPage,
+});
+
+const enrichmentProviderDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/enrichment-providers/$uuid",
+  component: EnrichmentProviderDetailPage,
+});
+
 const apiKeysRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/api-keys",
@@ -126,6 +140,8 @@ const routeTree = rootRoute.addChildren([
   contextDocsRoute,
   contextDocDetailRoute,
   sourcesRoute,
+  enrichmentProvidersRoute,
+  enrichmentProviderDetailRoute,
   agentsRoute,
   agentDetailRoute,
   apiKeysRoute,

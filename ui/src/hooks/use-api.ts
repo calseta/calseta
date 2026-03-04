@@ -19,6 +19,8 @@ import type {
   ApiKeyResponse,
   ActivityEvent,
   HealthResponse,
+  EnrichmentProvider,
+  EnrichmentProviderTestResult,
 } from "@/lib/types";
 
 // Health
@@ -524,5 +526,89 @@ export function useDeactivateApiKey() {
       qc.invalidateQueries({ queryKey: ["api-key", uuid] });
       qc.invalidateQueries({ queryKey: ["api-keys"] });
     },
+  });
+}
+
+// Enrichment Providers
+export function useEnrichmentProviders(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["enrichment-providers", qs],
+    queryFn: () =>
+      api.get<PaginatedResponse<EnrichmentProvider>>(`/enrichment-providers${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useEnrichmentProvider(uuid: string) {
+  return useQuery({
+    queryKey: ["enrichment-provider", uuid],
+    queryFn: () => api.get<DataResponse<EnrichmentProvider>>(`/enrichment-providers/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function useCreateEnrichmentProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<EnrichmentProvider>>("/enrichment-providers", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["enrichment-providers"] }),
+  });
+}
+
+export function usePatchEnrichmentProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<EnrichmentProvider>>(`/enrichment-providers/${uuid}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["enrichment-providers"] });
+      qc.invalidateQueries({ queryKey: ["enrichment-provider", vars.uuid] });
+    },
+  });
+}
+
+export function useDeleteEnrichmentProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/enrichment-providers/${uuid}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["enrichment-providers"] }),
+  });
+}
+
+export function useActivateEnrichmentProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      api.post<DataResponse<EnrichmentProvider>>(`/enrichment-providers/${uuid}/activate`),
+    onSuccess: (_data, uuid) => {
+      qc.invalidateQueries({ queryKey: ["enrichment-providers"] });
+      qc.invalidateQueries({ queryKey: ["enrichment-provider", uuid] });
+    },
+  });
+}
+
+export function useDeactivateEnrichmentProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      api.post<DataResponse<EnrichmentProvider>>(`/enrichment-providers/${uuid}/deactivate`),
+    onSuccess: (_data, uuid) => {
+      qc.invalidateQueries({ queryKey: ["enrichment-providers"] });
+      qc.invalidateQueries({ queryKey: ["enrichment-provider", uuid] });
+    },
+  });
+}
+
+export function useTestEnrichmentProvider() {
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: { indicator_type: string; indicator_value: string } }) =>
+      api.post<DataResponse<EnrichmentProviderTestResult>>(`/enrichment-providers/${uuid}/test`, body),
   });
 }

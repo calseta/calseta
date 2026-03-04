@@ -9,6 +9,7 @@ import {
   Radar,
   Bot,
   FileCode2,
+  Microscope,
   LogOut,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ const settingsNav = [
   { to: "/settings/detection-rules", icon: Radar, label: "Detection Rules" },
   { to: "/settings/context-docs", icon: BookOpen, label: "Context Docs" },
   { to: "/settings/sources", icon: FileCode2, label: "Sources" },
+  { to: "/settings/enrichment-providers", icon: Microscope, label: "Enrichments" },
   { to: "/settings/agents", icon: Bot, label: "Agents" },
   { to: "/settings/api-keys", icon: Key, label: "API Keys" },
 ];
