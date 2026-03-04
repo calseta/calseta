@@ -72,7 +72,6 @@ export const INDICATOR_TYPES = [
 export const TEMPLATE_VARIABLES: { variable: string; description: string }[] = [
   { variable: "{{value}}", description: "The indicator value being enriched" },
   { variable: "{{type}}", description: "The indicator type (ip, domain, hash_md5, etc.)" },
-  { variable: "{{api_key}}", description: "The configured API key from auth_config" },
   { variable: "{{prev.status}}", description: "HTTP status code from the previous step" },
   { variable: "{{prev.body}}", description: "Parsed JSON body from the previous step" },
   { variable: "{{prev.headers}}", description: "Response headers from the previous step" },
