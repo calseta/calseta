@@ -16,12 +16,15 @@ export interface PaginatedResponse<T> {
 
 // Alerts
 export type AlertStatus =
-  | "pending_enrichment"
-  | "enriched"
   | "Open"
   | "Triaging"
   | "Escalated"
   | "Closed";
+
+export type EnrichmentStatus =
+  | "Pending"
+  | "Enriched"
+  | "Failed";
 
 export type AlertSeverity =
   | "Pending"
@@ -46,6 +49,7 @@ export interface AlertSummary {
   severity: AlertSeverity;
   severity_id: number;
   status: AlertStatus;
+  enrichment_status: EnrichmentStatus;
   source_name: string;
   occurred_at: string;
   ingested_at: string;
@@ -348,6 +352,37 @@ export interface GraphIndicatorNode {
 export interface AlertRelationshipGraph {
   alert: GraphAlertNode;
   indicators: GraphIndicatorNode[];
+}
+
+// Enrichment Providers
+export interface EnrichmentProvider {
+  uuid: string;
+  provider_name: string;
+  display_name: string;
+  description: string | null;
+  is_builtin: boolean;
+  is_active: boolean;
+  supported_indicator_types: string[];
+  http_config: Record<string, unknown>;
+  auth_type: string;
+  has_credentials: boolean;
+  is_configured: boolean;
+  env_var_mapping: Record<string, string> | null;
+  default_cache_ttl_seconds: number;
+  cache_ttl_by_type: Record<string, number> | null;
+  malice_rules: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EnrichmentProviderTestResult {
+  success: boolean;
+  provider_name: string;
+  indicator_type: string;
+  indicator_value: string;
+  extracted: Record<string, unknown> | null;
+  error_message: string | null;
+  duration_ms: number;
 }
 
 // Health

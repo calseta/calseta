@@ -126,8 +126,8 @@ async def update_alert_status(
 
     Args:
         alert_uuid: UUID of the alert to update.
-        status: New status value. Valid values: "pending_enrichment", "enriched",
-                "Open", "Triaging", "Escalated", "Closed".
+        status: New status value. Valid values: "Open", "Triaging",
+                "Escalated", "Closed".
         close_classification: Required when setting status to "Closed". Example
                 values: "True Positive - Suspicious Activity",
                 "False Positive - Incorrect Detection Logic".
@@ -210,6 +210,7 @@ async def search_alerts(
     severity: str | None = None,
     source_name: str | None = None,
     is_enriched: bool | None = None,
+    enrichment_status: str | None = None,
     from_time: str | None = None,
     to_time: str | None = None,
     tags: str | None = None,
@@ -221,13 +222,16 @@ async def search_alerts(
     """Search alerts by filter criteria.
 
     Args:
-        status: Filter by alert status (e.g. "Open", "Closed", "enriched").
+        status: Filter by alert status (e.g. "Open", "Closed", "Triaging").
                 Comma-separated for multiple values (e.g. "Open,Triaging").
         severity: Filter by severity (e.g. "High", "Critical").
                   Comma-separated for multiple values (e.g. "High,Critical").
         source_name: Filter by source (e.g. "sentinel", "elastic").
                      Comma-separated for multiple values.
         is_enriched: Filter by enrichment state (true/false).
+        enrichment_status: Filter by enrichment pipeline status
+                          (e.g. "Pending", "Enriched", "Failed").
+                          Comma-separated for multiple values.
         from_time: ISO 8601 start time for occurred_at filter.
         to_time: ISO 8601 end time for occurred_at filter.
         tags: Comma-separated list of tags to filter by.
@@ -267,6 +271,11 @@ async def search_alerts(
     status_list = [s.strip() for s in status.split(",") if s.strip()] if status else None
     severity_list = [s.strip() for s in severity.split(",") if s.strip()] if severity else None
     source_list = [s.strip() for s in source_name.split(",") if s.strip()] if source_name else None
+    enrichment_status_list = (
+        [s.strip() for s in enrichment_status.split(",") if s.strip()]
+        if enrichment_status
+        else None
+    )
     page_size = min(page_size, 100)
 
     async with AsyncSessionLocal() as session:
@@ -280,6 +289,7 @@ async def search_alerts(
             severity=severity_list,
             source_name=source_list,
             is_enriched=is_enriched,
+            enrichment_status=enrichment_status_list,
             from_time=parsed_from,
             to_time=parsed_to,
             tags=parsed_tags,
@@ -295,6 +305,7 @@ async def search_alerts(
                 "title": a.title,
                 "severity": a.severity,
                 "status": a.status,
+                "enrichment_status": a.enrichment_status,
                 "source_name": a.source_name,
                 "occurred_at": a.occurred_at.isoformat(),
                 "is_enriched": a.is_enriched,

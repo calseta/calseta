@@ -113,7 +113,19 @@ async def enrich_alert_task(alert_id: int) -> None:
 
             # Step 2: Enrich all indicators
             enrichment_svc = EnrichmentService(session, cache)
-            await enrichment_svc.enrich_alert(alert_id)
+            try:
+                await enrichment_svc.enrich_alert(alert_id)
+            except Exception:
+                _logger.exception("enrich_alert_task_failed", alert_id=alert_id)
+                # Mark enrichment as failed so status doesn't stay stuck
+                try:
+                    alert = await alert_repo.get_by_id(alert_id)
+                    if alert is not None:
+                        await alert_repo.mark_enrichment_failed(alert)
+                except Exception:
+                    _logger.exception(
+                        "mark_enrichment_failed_error", alert_id=alert_id
+                    )
             await session.commit()
         except Exception:
             await session.rollback()
@@ -436,6 +448,8 @@ async def dispatch_agent_webhooks_task(alert_id: int) -> None:
 
     from app.db.session import AsyncSessionLocal
     from app.repositories.alert_repository import AlertRepository
+    from app.schemas.activity_events import ActivityEventType
+    from app.services.activity_event import ActivityEventService
     from app.services.agent_dispatch import build_webhook_payload, dispatch_to_agent
     from app.services.agent_trigger import get_matching_agents
 
@@ -456,7 +470,31 @@ async def dispatch_agent_webhooks_task(alert_id: int) -> None:
 
             for agent in agents:
                 try:
-                    await dispatch_to_agent(agent, alert_id, payload, session)
+                    result = await dispatch_to_agent(agent, alert_id, payload, session)
+
+                    # Write activity event for the dispatch
+                    try:
+                        activity_svc = ActivityEventService(session)
+                        await activity_svc.write(
+                            ActivityEventType.AGENT_WEBHOOK_DISPATCHED,
+                            actor_type="system",
+                            actor_key_prefix=None,
+                            alert_id=alert_id,
+                            references={
+                                "agent_name": agent.name,
+                                "agent_uuid": str(agent.uuid),
+                                "status": result.get("status", "unknown"),
+                                "status_code": result.get("status_code"),
+                                "attempt_count": result.get("attempt_count", 0),
+                            },
+                        )
+                    except Exception:
+                        _logger.exception(
+                            "agent_dispatch_activity_event_failed",
+                            agent_uuid=str(agent.uuid),
+                            alert_id=alert_id,
+                        )
+
                     await session.commit()
                 except Exception:
                     await session.rollback()
@@ -512,7 +550,34 @@ async def dispatch_single_agent_webhook_task(alert_id: int, agent_id: int) -> No
                 _logger.warning("dispatch_single_alert_not_found", alert_id=alert_id)
                 return
 
-            await dispatch_to_agent(agent, alert_id, payload, session)
+            result = await dispatch_to_agent(agent, alert_id, payload, session)
+
+            # Write activity event for the dispatch
+            try:
+                from app.schemas.activity_events import ActivityEventType
+                from app.services.activity_event import ActivityEventService
+
+                activity_svc = ActivityEventService(session)
+                await activity_svc.write(
+                    ActivityEventType.AGENT_WEBHOOK_DISPATCHED,
+                    actor_type="system",
+                    actor_key_prefix=None,
+                    alert_id=alert_id,
+                    references={
+                        "agent_name": agent.name,
+                        "agent_uuid": str(agent.uuid),
+                        "status": result.get("status", "unknown"),
+                        "status_code": result.get("status_code"),
+                        "attempt_count": result.get("attempt_count", 0),
+                    },
+                )
+            except Exception:
+                _logger.exception(
+                    "agent_dispatch_activity_event_failed",
+                    agent_id=agent_id,
+                    alert_id=alert_id,
+                )
+
             await session.commit()
         except Exception:
             await session.rollback()

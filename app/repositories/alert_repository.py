@@ -11,7 +11,7 @@ from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.alert import Alert
-from app.schemas.alert import AlertSeverity, AlertStatus, CalsetaAlert
+from app.schemas.alert import AlertSeverity, AlertStatus, EnrichmentStatus, CalsetaAlert
 
 # Whitelist of columns that can be used for sorting
 _SORT_COLUMNS: dict[str, Any] = {
@@ -67,7 +67,8 @@ class AlertRepository:
             occurred_at=normalized.occurred_at,
             raw_payload=raw_payload,
             tags=normalized.tags,
-            status=AlertStatus.PENDING_ENRICHMENT.value,
+            status=AlertStatus.OPEN.value,
+            enrichment_status=EnrichmentStatus.PENDING.value,
             is_enriched=False,
             fingerprint=fingerprint,
         )
@@ -118,6 +119,7 @@ class AlertRepository:
         severity: list[str] | str | None = None,
         source_name: list[str] | str | None = None,
         is_enriched: bool | None = None,
+        enrichment_status: list[str] | str | None = None,
         detection_rule_uuid: uuid.UUID | None = None,
         from_time: datetime | None = None,
         to_time: datetime | None = None,
@@ -149,6 +151,10 @@ class AlertRepository:
         if is_enriched is not None:
             stmt = stmt.where(Alert.is_enriched == is_enriched)
             count_stmt = count_stmt.where(Alert.is_enriched == is_enriched)
+        if enrichment_status:
+            vals = enrichment_status if isinstance(enrichment_status, list) else [enrichment_status]
+            stmt = stmt.where(Alert.enrichment_status.in_(vals))
+            count_stmt = count_stmt.where(Alert.enrichment_status.in_(vals))
         if from_time:
             stmt = stmt.where(Alert.occurred_at >= from_time)
             count_stmt = count_stmt.where(Alert.occurred_at >= from_time)
@@ -207,9 +213,9 @@ class AlertRepository:
             alert.status = status.value
             # Set lifecycle timestamps on first transition
             if (
-                status in (AlertStatus.OPEN, AlertStatus.TRIAGING, AlertStatus.ESCALATED)
+                status in (AlertStatus.TRIAGING, AlertStatus.ESCALATED)
                 and alert.acknowledged_at is None
-                and prev_status in (AlertStatus.ENRICHED.value, AlertStatus.OPEN.value)
+                and prev_status == AlertStatus.OPEN.value
             ):
                 alert.acknowledged_at = now
             if status == AlertStatus.TRIAGING and alert.triaged_at is None:
@@ -256,5 +262,9 @@ class AlertRepository:
     async def mark_enriched(self, alert: Alert) -> None:
         alert.is_enriched = True
         alert.enriched_at = datetime.now(UTC)
-        alert.status = AlertStatus.ENRICHED.value
+        alert.enrichment_status = EnrichmentStatus.ENRICHED.value
+        await self._db.flush()
+
+    async def mark_enrichment_failed(self, alert: Alert) -> None:
+        alert.enrichment_status = EnrichmentStatus.FAILED.value
         await self._db.flush()

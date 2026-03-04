@@ -128,6 +128,7 @@ class EnrichmentService:
 
         Must never raise — catches and logs all errors.
         """
+        alert = None
         try:
             alert = await self._alert_repo.get_by_id(alert_id)
             if alert is None:
@@ -202,6 +203,14 @@ class EnrichmentService:
 
         except Exception:
             logger.exception("enrich_alert_pipeline_failed", alert_id=alert_id)
+            # Mark enrichment as failed so the alert doesn't stay stuck at Pending
+            try:
+                if alert is not None:
+                    await self._alert_repo.mark_enrichment_failed(alert)
+            except Exception:
+                logger.exception(
+                    "mark_enrichment_failed_error", alert_id=alert_id
+                )
 
     async def _write_enrichment_event(
         self,

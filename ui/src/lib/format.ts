@@ -47,10 +47,6 @@ export function severityColor(severity: string): string {
 
 export function statusColor(status: string): string {
   switch (status) {
-    case "pending_enrichment":
-      return "text-amber bg-amber/10 border-amber/30";
-    case "enriched":
-      return "text-teal-light bg-teal-light/10 border-teal-light/30";
     case "Open":
       return "text-teal bg-teal/10 border-teal/30";
     case "Triaging":
@@ -59,6 +55,19 @@ export function statusColor(status: string): string {
       return "text-red-threat bg-red-threat/10 border-red-threat/30";
     case "Closed":
       return "text-dim bg-dim/10 border-dim/30";
+    default:
+      return "text-muted-foreground bg-muted/50 border-muted";
+  }
+}
+
+export function enrichmentStatusColor(status: string): string {
+  switch (status) {
+    case "Pending":
+      return "text-amber bg-amber/10 border-amber/30";
+    case "Enriched":
+      return "text-teal bg-teal/10 border-teal/30";
+    case "Failed":
+      return "text-red-threat bg-red-threat/10 border-red-threat/30";
     default:
       return "text-muted-foreground bg-muted/50 border-muted";
   }

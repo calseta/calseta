@@ -41,7 +41,10 @@ class Alert(TimestampMixin, UUIDMixin, Base):
 
     # Status lifecycle
     status: Mapped[str] = mapped_column(
-        Text, nullable=False, default="pending_enrichment"
+        Text, nullable=False, default="Open"
+    )
+    enrichment_status: Mapped[str] = mapped_column(
+        Text, nullable=False, default="Pending"
     )
     close_classification: Mapped[str | None] = mapped_column(Text)
 

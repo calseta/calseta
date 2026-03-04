@@ -18,19 +18,31 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class AlertStatus(StrEnum):
     """
-    Alert workflow lifecycle status. Stored as TEXT with Pydantic validation.
+    Alert investigation lifecycle status. Stored as TEXT with Pydantic validation.
     Do NOT use a Postgres ENUM type — TEXT with app-level validation is easier to migrate.
 
     Transition flow:
-        pending_enrichment → enriched → Open → Triaging / Escalated → Closed
+        Open → Triaging / Escalated → Closed
     """
 
-    PENDING_ENRICHMENT = "pending_enrichment"
-    ENRICHED = "enriched"
     OPEN = "Open"
     TRIAGING = "Triaging"
     ESCALATED = "Escalated"
     CLOSED = "Closed"
+
+
+class EnrichmentStatus(StrEnum):
+    """
+    System-managed enrichment pipeline status. Stored as TEXT.
+    Set automatically by the enrichment pipeline — not user-editable.
+
+    Transition flow:
+        Pending → Enriched | Failed
+    """
+
+    PENDING = "Pending"
+    ENRICHED = "Enriched"
+    FAILED = "Failed"
 
 
 class AlertSeverity(StrEnum):

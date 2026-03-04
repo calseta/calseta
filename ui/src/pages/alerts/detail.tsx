@@ -35,6 +35,7 @@ import {
   formatDate,
   severityColor,
   statusColor,
+  enrichmentStatusColor,
   maliceColor,
   eventDotColor,
 } from "@/lib/format";
@@ -76,11 +77,9 @@ const SEVERITY_OPTIONS = ["Pending", "Informational", "Low", "Medium", "High", "
 const MALICE_OPTIONS = ["Pending", "Benign", "Suspicious", "Malicious"];
 
 // Canonical display order — dropdown always shows statuses in this sequence.
-const STATUS_ORDER = ["pending_enrichment", "enriched", "Open", "Triaging", "Escalated", "Closed"];
+const STATUS_ORDER = ["Open", "Triaging", "Escalated", "Closed"];
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
-  pending_enrichment: ["Open"],
-  enriched: ["Open"],
   Open: ["Triaging", "Escalated", "Closed"],
   Triaging: ["Open", "Escalated", "Closed"],
   Escalated: ["Open", "Triaging", "Closed"],
@@ -239,25 +238,18 @@ export function AlertDetailPage() {
               >
                 {alert.severity}
               </Badge>
-              {alert.status === "enriched" ? (
-                <Badge variant="outline" className="text-xs text-teal bg-teal/10 border-teal/30">
-                  Enriched
-                </Badge>
-              ) : (
-                <>
-                  <Badge
-                    variant="outline"
-                    className={cn("text-xs", statusColor(alert.status))}
-                  >
-                    {alert.status}
-                  </Badge>
-                  {alert.is_enriched && (
-                    <Badge variant="outline" className="text-xs text-teal bg-teal/10 border-teal/30">
-                      Enriched
-                    </Badge>
-                  )}
-                </>
-              )}
+              <Badge
+                variant="outline"
+                className={cn("text-xs", statusColor(alert.status))}
+              >
+                {alert.status}
+              </Badge>
+              <Badge
+                variant="outline"
+                className={cn("text-xs", enrichmentStatusColor(alert.enrichment_status))}
+              >
+                {alert.enrichment_status}
+              </Badge>
             </>
           }
         />

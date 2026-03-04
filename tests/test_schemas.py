@@ -19,6 +19,7 @@ from app.schemas.alert import (
     AlertSeverity,
     AlertStatus,
     CalsetaAlert,
+    EnrichmentStatus,
 )
 from app.schemas.common import (
     DataResponse,
@@ -90,17 +91,21 @@ def test_calseta_alert_severity_id_explicit_override() -> None:
 # AlertStatus enum
 # ---------------------------------------------------------------------------
 
-def test_alert_status_all_six_values() -> None:
-    """AlertStatus has exactly 6 values matching the PRD lifecycle."""
+def test_alert_status_all_four_values() -> None:
+    """AlertStatus has exactly 4 investigation lifecycle values."""
     values = {s.value for s in AlertStatus}
     assert values == {
-        "pending_enrichment",
-        "enriched",
         "Open",
         "Triaging",
         "Escalated",
         "Closed",
     }
+
+
+def test_enrichment_status_all_three_values() -> None:
+    """EnrichmentStatus has exactly 3 system-managed values."""
+    values = {s.value for s in EnrichmentStatus}
+    assert values == {"Pending", "Enriched", "Failed"}
 
 
 # ---------------------------------------------------------------------------

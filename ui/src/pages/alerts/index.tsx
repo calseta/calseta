@@ -23,7 +23,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts } from "@/hooks/use-api";
 import { useTableState } from "@/hooks/use-table-state";
-import { formatDate, severityColor, statusColor } from "@/lib/format";
+import { formatDate, severityColor, statusColor, enrichmentStatusColor } from "@/lib/format";
 import { ChevronLeft, ChevronRight, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/copyable-text";
@@ -31,21 +31,26 @@ import { SortableColumnHeader } from "@/components/sortable-column-header";
 import { ColumnFilterPopover } from "@/components/column-filter-popover";
 
 const COLUMNS: ColumnDef[] = [
-  { key: "title", initialWidth: 320, minWidth: 160 },
+  { key: "title", initialWidth: 300, minWidth: 160 },
   { key: "uuid", initialWidth: 140, minWidth: 100 },
-  { key: "status", initialWidth: 110, minWidth: 80 },
+  { key: "status", initialWidth: 100, minWidth: 80 },
+  { key: "enrichment", initialWidth: 100, minWidth: 80 },
   { key: "severity", initialWidth: 100, minWidth: 80 },
   { key: "source", initialWidth: 110, minWidth: 80 },
   { key: "time", initialWidth: 160, minWidth: 120 },
 ];
 
 const STATUS_OPTIONS = [
-  { value: "pending_enrichment", label: "pending_enrichment", colorClass: statusColor("pending_enrichment") },
-  { value: "enriched", label: "enriched", colorClass: statusColor("enriched") },
   { value: "Open", label: "Open", colorClass: statusColor("Open") },
   { value: "Triaging", label: "Triaging", colorClass: statusColor("Triaging") },
   { value: "Escalated", label: "Escalated", colorClass: statusColor("Escalated") },
   { value: "Closed", label: "Closed", colorClass: statusColor("Closed") },
+];
+
+const ENRICHMENT_STATUS_OPTIONS = [
+  { value: "Pending", label: "Pending", colorClass: enrichmentStatusColor("Pending") },
+  { value: "Enriched", label: "Enriched", colorClass: enrichmentStatusColor("Enriched") },
+  { value: "Failed", label: "Failed", colorClass: enrichmentStatusColor("Failed") },
 ];
 
 const SEVERITY_OPTIONS = [
@@ -87,7 +92,7 @@ export function AlertsListPage() {
     hasActiveFiltersOrSort,
     hasActiveFilters,
     params,
-  } = useTableState({ status: [] as string[], severity: [] as string[], source_name: [] as string[] });
+  } = useTableState({ status: [] as string[], severity: [] as string[], source_name: [] as string[], enrichment_status: [] as string[] });
 
   const { data, isLoading, refetch, isFetching } = useAlerts(params);
 
@@ -174,6 +179,17 @@ export function AlertsListPage() {
                     }
                   />
                 </ResizableTableHead>
+                <ResizableTableHead columnKey="enrichment" className="text-dim text-xs">
+                  <div className="flex items-center gap-1">
+                    <span>Enrichment</span>
+                    <ColumnFilterPopover
+                      label="Enrichment"
+                      options={ENRICHMENT_STATUS_OPTIONS}
+                      selected={filters.enrichment_status}
+                      onChange={(v) => updateFilter("enrichment_status", v)}
+                    />
+                  </div>
+                </ResizableTableHead>
                 <ResizableTableHead columnKey="severity" className="text-dim text-xs">
                   <SortableColumnHeader
                     label="Severity"
@@ -224,6 +240,7 @@ export function AlertsListPage() {
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     </TableRow>
@@ -272,6 +289,14 @@ export function AlertsListPage() {
                       <TableCell>
                         <Badge
                           variant="outline"
+                          className={cn("text-[11px]", enrichmentStatusColor(alert.enrichment_status))}
+                        >
+                          {alert.enrichment_status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
                           className={cn("text-[11px] font-medium", severityColor(alert.severity))}
                         >
                           {alert.severity}
@@ -287,7 +312,7 @@ export function AlertsListPage() {
                   ))}
               {!isLoading && alerts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-dim py-12">
+                  <TableCell colSpan={7} className="text-center text-sm text-dim py-12">
                     No alerts found
                   </TableCell>
                 </TableRow>

@@ -144,6 +144,7 @@ async def list_alerts(
     severity: str | None = Query(None),
     source_name: str | None = Query(None),
     is_enriched: bool | None = Query(None),
+    enrichment_status: str | None = Query(None),
     detection_rule_uuid: UUID | None = Query(None),
     from_time: datetime | None = Query(None),
     to_time: datetime | None = Query(None),
@@ -169,6 +170,11 @@ async def list_alerts(
     status_list = [s.strip() for s in status.split(",") if s.strip()] if status else None
     severity_list = [s.strip() for s in severity.split(",") if s.strip()] if severity else None
     source_list = [s.strip() for s in source_name.split(",") if s.strip()] if source_name else None
+    enrichment_status_list = (
+        [s.strip() for s in enrichment_status.split(",") if s.strip()]
+        if enrichment_status
+        else None
+    )
 
     repo = AlertRepository(db)
     alerts, total = await repo.list_alerts(
@@ -176,6 +182,7 @@ async def list_alerts(
         severity=severity_list,
         source_name=source_list,
         is_enriched=is_enriched,
+        enrichment_status=enrichment_status_list,
         detection_rule_uuid=detection_rule_uuid,
         from_time=from_time,
         to_time=to_time,

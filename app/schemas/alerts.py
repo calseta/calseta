@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.alert import AlertCloseClassification, AlertSeverity, AlertStatus
+from app.schemas.alert import AlertCloseClassification, AlertSeverity, AlertStatus, EnrichmentStatus
 from app.schemas.indicators import EnrichedIndicator, MaliceLevel
 
 
@@ -41,6 +41,7 @@ class AlertResponse(BaseModel):
     title: str
     severity: AlertSeverity
     status: AlertStatus
+    enrichment_status: EnrichmentStatus
     source_name: str
     occurred_at: datetime
     ingested_at: datetime
@@ -75,6 +76,7 @@ class AlertSummary(BaseModel):
     title: str
     severity: AlertSeverity
     status: AlertStatus
+    enrichment_status: EnrichmentStatus
     source_name: str
     occurred_at: datetime
     ingested_at: datetime

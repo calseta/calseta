@@ -35,7 +35,7 @@ class TestAlertList:
         sample_alert: dict[str, Any],
     ) -> None:
         resp = await test_client.get(
-            "/v1/alerts?status=pending_enrichment",
+            "/v1/alerts?status=Open",
             headers=auth_header(api_key),
         )
         assert resp.status_code == 200
