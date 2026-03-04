@@ -53,7 +53,6 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Shield,
-  Lock,
   Globe,
   Clock,
   Pencil,
@@ -384,13 +383,6 @@ export function EnrichmentProviderDetailPage() {
               ),
             },
             {
-              label: "Auth Type",
-              icon: Lock,
-              value: (
-                <span className="text-xs font-mono">{provider.auth_type}</span>
-              ),
-            },
-            {
               label: "Cache TTL",
               icon: Clock,
               value: (
@@ -425,10 +417,6 @@ export function EnrichmentProviderDetailPage() {
                 <DetailPageField
                   label="Provider Name"
                   value={<span className="font-mono text-xs">{provider.provider_name}</span>}
-                />
-                <DetailPageField
-                  label="Auth Type"
-                  value={provider.auth_type}
                 />
                 <DetailPageField
                   label="Cache TTL"
