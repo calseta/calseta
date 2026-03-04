@@ -6,7 +6,6 @@ import { Code2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StepCard } from "./step-card";
 import { UrlTemplatesEditor } from "./url-templates-editor";
-import { TemplateHint } from "./template-hint";
 import type { HttpConfig, StepFormState, UrlTemplateRow } from "./types";
 import {
   httpConfigToFormState,
@@ -145,8 +144,6 @@ export function HttpConfigBuilder({ value, onChange }: HttpConfigBuilderProps) {
           Raw JSON
         </Button>
       </div>
-
-      <TemplateHint />
 
       {/* Steps */}
       {steps.map((step, i) => (
