@@ -20,6 +20,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { KeyValueEditor } from "./key-value-editor";
+import { TemplateInput } from "./template-input";
 import type { StepFormState, BodyMode, HttpMethod } from "./types";
 import { HTTP_METHODS, METHOD_COLORS } from "./types";
 
@@ -153,12 +154,14 @@ export function StepCard({
           {/* Row 2: URL */}
           <div>
             <Label className="text-[11px] text-dim">URL</Label>
-            <Input
-              value={step.url}
-              onChange={(e) => update({ url: e.target.value })}
-              placeholder="https://api.example.com/v3/{{value}}"
-              className="bg-surface border-border text-xs h-7 font-mono mt-0.5"
-            />
+            <div className="mt-0.5">
+              <TemplateInput
+                value={step.url}
+                onChange={(url) => update({ url })}
+                placeholder="https://api.example.com/v3/{{value}}"
+                className="bg-surface border-border text-xs h-7"
+              />
+            </div>
           </div>
 
           {/* Headers */}

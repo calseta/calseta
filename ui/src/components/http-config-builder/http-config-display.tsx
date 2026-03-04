@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import type { HttpConfig, HttpStep } from "./types";
 import { parseHttpConfig, METHOD_COLORS } from "./types";
 import type { HttpMethod } from "./types";
+import { TemplatePills } from "./template-input";
 
 interface HttpConfigDisplayProps {
   config: Record<string, unknown>;
@@ -16,9 +17,9 @@ function KvList({ label, data }: { label: string; data: Record<string, string> }
       <p className="text-[10px] text-dim uppercase tracking-wide mb-0.5">{label}</p>
       <div className="space-y-0.5">
         {entries.map(([k, v]) => (
-          <div key={k} className="flex gap-2 text-[11px] font-mono">
+          <div key={k} className="flex gap-2 text-[11px] font-mono items-baseline">
             <span className="text-dim shrink-0">{k}:</span>
-            <span className="text-foreground break-all">{v}</span>
+            <TemplatePills text={v} />
           </div>
         ))}
       </div>
@@ -50,7 +51,9 @@ function StepDisplay({ step, index }: { step: HttpStep; index: number }) {
       </div>
 
       {/* URL */}
-      <p className="text-[11px] font-mono text-teal mt-1 break-all">{step.url}</p>
+      <div className="mt-1">
+        <TemplatePills text={step.url} />
+      </div>
 
       {/* Headers */}
       {step.headers && Object.keys(step.headers).length > 0 && (
@@ -124,7 +127,7 @@ export function HttpConfigDisplay({ config }: HttpConfigDisplayProps) {
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-teal border-teal/30 shrink-0">
                   {type}
                 </Badge>
-                <span className="text-[11px] font-mono text-foreground break-all">{url}</span>
+                <TemplatePills text={url} />
               </div>
             ))}
           </div>

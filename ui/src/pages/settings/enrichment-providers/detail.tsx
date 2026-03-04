@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -35,6 +34,12 @@ import {
   parseHttpConfig,
 } from "@/components/http-config-builder";
 import type { HttpConfig } from "@/components/http-config-builder";
+import {
+  MaliceRulesBuilder,
+  MaliceRulesDisplay,
+  parseMaliceRules,
+} from "@/components/malice-rules-builder";
+import type { MaliceRules } from "@/components/malice-rules-builder";
 import {
   useEnrichmentProvider,
   usePatchEnrichmentProvider,
@@ -89,17 +94,17 @@ export function EnrichmentProviderDetailPage() {
   // Indicator types editing (dirty-state)
   const [indicatorTypesDraft, setIndicatorTypesDraft] = useState<string[] | null>(null);
 
-  // Auth editing state
-  const [editingAuth, setEditingAuth] = useState(false);
-  const [authConfigDraft, setAuthConfigDraft] = useState("");
-
   // HTTP config editing state (custom only)
   const [editingHttpConfig, setEditingHttpConfig] = useState(false);
   const [httpConfigDraftObj, setHttpConfigDraftObj] = useState<HttpConfig>({ steps: [] });
 
   // Malice rules editing state
   const [editingMaliceRules, setEditingMaliceRules] = useState(false);
-  const [maliceRulesDraft, setMaliceRulesDraft] = useState("");
+  const [maliceRulesDraftObj, setMaliceRulesDraftObj] = useState<MaliceRules>({
+    rules: [],
+    default_verdict: "Pending",
+    not_found_verdict: "Pending",
+  });
 
   // Test state
   const [testIndicatorType, setTestIndicatorType] = useState("ip");
@@ -189,34 +194,6 @@ export function EnrichmentProviderDetailPage() {
     );
   }
 
-  // --- Auth ---
-  function startEditingAuth() {
-    setAuthConfigDraft(
-      provider!.has_credentials ? '{"note": "Leave empty to keep existing credentials"}' : "{}",
-    );
-    setEditingAuth(true);
-  }
-
-  function handleSaveAuth() {
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(authConfigDraft || "{}");
-    } catch {
-      toast.error("Invalid JSON");
-      return;
-    }
-    patchProvider.mutate(
-      { uuid, body: { auth_config: parsed } },
-      {
-        onSuccess: () => {
-          toast.success("Authentication updated");
-          setEditingAuth(false);
-        },
-        onError: () => toast.error("Failed to update authentication"),
-      },
-    );
-  }
-
   // --- HTTP Config (custom only) ---
   function startEditingHttpConfig() {
     const parsed = parseHttpConfig(provider!.http_config);
@@ -239,20 +216,16 @@ export function EnrichmentProviderDetailPage() {
 
   // --- Malice Rules ---
   function startEditingMaliceRules() {
-    setMaliceRulesDraft(JSON.stringify(provider!.malice_rules ?? {}, null, 2));
+    const parsed = parseMaliceRules(provider!.malice_rules);
+    setMaliceRulesDraftObj(
+      parsed ?? { rules: [], default_verdict: "Pending", not_found_verdict: "Pending" },
+    );
     setEditingMaliceRules(true);
   }
 
   function handleSaveMaliceRules() {
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(maliceRulesDraft || "{}");
-    } catch {
-      toast.error("Invalid JSON");
-      return;
-    }
     patchProvider.mutate(
-      { uuid, body: { malice_rules: parsed } },
+      { uuid, body: { malice_rules: maliceRulesDraftObj as unknown as Record<string, unknown> } },
       {
         onSuccess: () => {
           toast.success("Malice rules updated");
@@ -576,89 +549,6 @@ export function EnrichmentProviderDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* Authentication */}
-              <Card className="bg-card border-border">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-foreground">
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-3.5 w-3.5 text-dim" />
-                      Authentication
-                    </div>
-                  </CardTitle>
-                  {!editingAuth ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={startEditingAuth}
-                      className="h-7 text-xs text-dim hover:text-teal"
-                    >
-                      <Pencil className="h-3 w-3 mr-1" />
-                      Edit
-                    </Button>
-                  ) : (
-                    <div className="flex gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingAuth(false)}
-                        className="h-7 text-xs text-dim"
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Cancel
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveAuth}
-                        disabled={patchProvider.isPending}
-                        className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                      >
-                        <Save className="h-3 w-3 mr-1" />
-                        Save
-                      </Button>
-                    </div>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  {editingAuth ? (
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Auth Config (JSON)</Label>
-                        <Textarea
-                          value={authConfigDraft}
-                          onChange={(e) => setAuthConfigDraft(e.target.value)}
-                          rows={6}
-                          className="mt-1 bg-surface border-border text-sm font-mono"
-                        />
-                        <p className="text-[11px] text-dim mt-1">
-                          Encrypted at rest. Provide the full auth configuration for this provider.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Auth Type</span>
-                        <span className="text-xs text-foreground font-mono">{provider.auth_type}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Credentials</span>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[11px]",
-                            provider.has_credentials
-                              ? "text-teal border-teal/30"
-                              : "text-dim border-border",
-                          )}
-                        >
-                          {provider.has_credentials ? "configured" : "not set"}
-                        </Badge>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
               {/* HTTP Configuration */}
               <Card className="bg-card border-border">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -759,16 +649,12 @@ export function EnrichmentProviderDetailPage() {
                 </CardHeader>
                 <CardContent>
                   {editingMaliceRules ? (
-                    <Textarea
-                      value={maliceRulesDraft}
-                      onChange={(e) => setMaliceRulesDraft(e.target.value)}
-                      rows={8}
-                      className="bg-surface border-border text-sm font-mono"
+                    <MaliceRulesBuilder
+                      value={maliceRulesDraftObj}
+                      onChange={setMaliceRulesDraftObj}
                     />
-                  ) : provider.malice_rules && Object.keys(provider.malice_rules).length > 0 ? (
-                    <JsonViewer data={provider.malice_rules} defaultExpanded={2} />
                   ) : (
-                    <p className="text-xs text-dim">No malice rules configured</p>
+                    <MaliceRulesDisplay rules={provider.malice_rules} />
                   )}
                 </CardContent>
               </Card>
