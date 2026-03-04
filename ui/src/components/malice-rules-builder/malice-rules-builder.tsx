@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -16,7 +15,6 @@ import { RuleRow } from "./rule-row";
 import type { MaliceRules, MaliceVerdict, RuleFormState } from "./types";
 import {
   VERDICTS,
-  VERDICT_COLORS,
   maliceRulesToFormState,
   formStateToMaliceRules,
   createEmptyRule,
@@ -233,22 +231,12 @@ function VerdictSelect({
       <p className="text-[10px] text-dim/60 mb-1">{description}</p>
       <Select value={value} onValueChange={(v) => onChange(v as MaliceVerdict)}>
         <SelectTrigger className="h-7 bg-surface border-border text-xs" size="sm">
-          <Badge
-            variant="outline"
-            className={cn("text-[10px] px-1.5 py-0 h-4", VERDICT_COLORS[value])}
-          >
-            {value}
-          </Badge>
+          <SelectValue />
         </SelectTrigger>
-        <SelectContent className="bg-card border-border">
+        <SelectContent position="popper" className="bg-card border-border">
           {VERDICTS.map((v) => (
             <SelectItem key={v} value={v} className="text-xs">
-              <Badge
-                variant="outline"
-                className={cn("text-[10px] px-1.5 py-0 h-4", VERDICT_COLORS[v])}
-              >
-                {v}
-              </Badge>
+              {v}
             </SelectItem>
           ))}
         </SelectContent>

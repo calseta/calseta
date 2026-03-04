@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,10 +7,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import { ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import type { RuleFormState, RuleOperator, MaliceVerdict } from "./types";
-import { OPERATORS, VERDICTS, VERDICT_COLORS } from "./types";
+import { OPERATORS, VERDICTS } from "./types";
 
 interface RuleRowProps {
   rule: RuleFormState;
@@ -55,7 +53,7 @@ export function RuleRow({
         <SelectTrigger className="h-7 bg-surface border-border text-xs font-mono w-24 shrink-0" size="sm">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent className="bg-card border-border">
+        <SelectContent position="popper" className="bg-card border-border">
           {OPERATORS.map((op) => (
             <SelectItem key={op.value} value={op.value} className="text-xs font-mono">
               {op.label}
@@ -78,22 +76,12 @@ export function RuleRow({
       {/* Verdict */}
       <Select value={rule.verdict} onValueChange={(v) => update({ verdict: v as MaliceVerdict })}>
         <SelectTrigger className="h-7 bg-surface border-border text-xs w-28 shrink-0" size="sm">
-          <Badge
-            variant="outline"
-            className={cn("text-[10px] px-1.5 py-0 h-4", VERDICT_COLORS[rule.verdict])}
-          >
-            {rule.verdict}
-          </Badge>
+          <SelectValue />
         </SelectTrigger>
-        <SelectContent className="bg-card border-border">
+        <SelectContent position="popper" className="bg-card border-border">
           {VERDICTS.map((v) => (
             <SelectItem key={v} value={v} className="text-xs">
-              <Badge
-                variant="outline"
-                className={cn("text-[10px] px-1.5 py-0 h-4", VERDICT_COLORS[v])}
-              >
-                {v}
-              </Badge>
+              {v}
             </SelectItem>
           ))}
         </SelectContent>
