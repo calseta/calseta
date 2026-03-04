@@ -10,7 +10,7 @@ import {
   useApproveWorkflow,
   useRejectWorkflow,
 } from "@/hooks/use-api";
-import { relativeTime, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CheckCircle, XCircle, Clock, Shield } from "lucide-react";
 import { useState } from "react";
@@ -82,7 +82,7 @@ export function ApprovalsPage() {
                       <Clock className="h-3 w-3" />
                       Expires: {formatDate(req.expires_at)}
                     </span>
-                    <span>{relativeTime(req.created_at)}</span>
+                    <span>{formatDate(req.created_at)}</span>
                   </div>
                   {req.trigger_context && (
                     <pre className="mt-1 text-[11px] text-dim font-mono">

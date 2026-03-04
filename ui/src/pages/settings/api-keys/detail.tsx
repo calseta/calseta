@@ -17,7 +17,7 @@ import {
 } from "@/components/detail-page";
 import { CopyableText } from "@/components/copyable-text";
 import { useApiKey, usePatchApiKey, useDeactivateApiKey } from "@/hooks/use-api";
-import { formatDate, relativeTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   Key,
@@ -209,7 +209,7 @@ export function ApiKeyDetailPage() {
             {
               label: "Last Used",
               icon: Clock,
-              value: apiKey.last_used_at ? relativeTime(apiKey.last_used_at) : "Never",
+              value: apiKey.last_used_at ? formatDate(apiKey.last_used_at) : "Never",
             },
             {
               label: "Scopes",
@@ -229,7 +229,7 @@ export function ApiKeyDetailPage() {
                 <DetailPageField label="Created" value={formatDate(apiKey.created_at)} />
                 <DetailPageField
                   label="Last Used"
-                  value={apiKey.last_used_at ? relativeTime(apiKey.last_used_at) : "Never"}
+                  value={apiKey.last_used_at ? formatDate(apiKey.last_used_at) : "Never"}
                 />
                 <DetailPageField
                   label="Expires"

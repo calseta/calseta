@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useNavigate } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
-import { severityColor, statusColor, relativeTime } from "@/lib/format";
+import { severityColor, statusColor, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { GraphAlertNode } from "@/lib/types";
 
@@ -27,7 +27,7 @@ export const AlertCurrentNode = memo(function AlertCurrentNode({
       </p>
       <div className="flex items-center gap-2 mt-1">
         <span className="text-[10px] text-dim">{alert.source_name}</span>
-        <span className="text-[10px] text-dim">{relativeTime(alert.occurred_at)}</span>
+        <span className="text-[10px] text-dim">{formatDate(alert.occurred_at)}</span>
       </div>
     </div>
   );
@@ -56,7 +56,7 @@ export const AlertSiblingNode = memo(function AlertSiblingNode({
       <p className="text-[11px] text-foreground truncate max-w-[180px]">
         {alert.title}
       </p>
-      <span className="text-[9px] text-dim">{relativeTime(alert.occurred_at)}</span>
+      <span className="text-[9px] text-dim">{formatDate(alert.occurred_at)}</span>
     </div>
   );
 });

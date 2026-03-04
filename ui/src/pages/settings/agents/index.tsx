@@ -28,7 +28,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useAgents, useCreateAgent, useDeleteAgent } from "@/hooks/use-api";
-import { relativeTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
 import { Plus, Trash2, Bot, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -189,7 +189,7 @@ export function AgentsPage() {
                           ...agent.trigger_on_sources.map((s) => `src:${s}`),
                         ].join(", ") || "all"}
                       </TableCell>
-                      <TableCell className="text-xs text-dim">{relativeTime(agent.created_at)}</TableCell>
+                      <TableCell className="text-xs text-dim">{formatDate(agent.created_at)}</TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"

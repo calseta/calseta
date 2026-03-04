@@ -36,7 +36,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkflows, useCreateWorkflow } from "@/hooks/use-api";
 import { useTableState } from "@/hooks/use-table-state";
-import { relativeTime, riskColor } from "@/lib/format";
+import { formatDate, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/copyable-text";
 import { SortableColumnHeader } from "@/components/sortable-column-header";
@@ -385,7 +385,7 @@ export function WorkflowsListPage() {
                         v{wf.code_version}
                       </TableCell>
                       <TableCell className="text-xs text-dim">
-                        {relativeTime(wf.updated_at)}
+                        {formatDate(wf.updated_at)}
                       </TableCell>
                     </TableRow>
                   ))}

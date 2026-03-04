@@ -36,7 +36,7 @@ import {
   serializeTargetingRules,
 } from "@/components/targeting-rules/types";
 import { useAgent, usePatchAgent, useTestAgent } from "@/hooks/use-api";
-import { formatDate, relativeTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import {
   Globe,
   Clock,
@@ -441,7 +441,7 @@ export function AgentDetailPage() {
                   )}
                 />
                 <DetailPageField label="Created" value={formatDate(agent.created_at)} />
-                <DetailPageField label="Updated" value={relativeTime(agent.updated_at)} />
+                <DetailPageField label="Updated" value={formatDate(agent.updated_at)} />
               </SidebarSection>
             </DetailPageSidebar>
           }

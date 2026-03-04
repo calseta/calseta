@@ -20,7 +20,7 @@ import {
 import { CopyableText } from "@/components/copyable-text";
 import { JsonViewer } from "@/components/json-viewer";
 import { useIndicatorDetail, useEnrichAlert, usePatchIndicator } from "@/hooks/use-api";
-import { relativeTime, maliceColor } from "@/lib/format";
+import { formatDate, maliceColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   RefreshCw,
@@ -128,8 +128,8 @@ export function IndicatorDetailSheet({
             <>
               {/* Metadata */}
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-dim">
-                <span>First seen: {relativeTime(detail.first_seen)}</span>
-                <span>Last seen: {relativeTime(detail.last_seen)}</span>
+                <span>First seen: {formatDate(detail.first_seen)}</span>
+                <span>Last seen: {formatDate(detail.last_seen)}</span>
                 <span>
                   {detail.is_enriched ? "Enriched" : "Not enriched"}
                 </span>
@@ -231,7 +231,7 @@ function ProviderCard({
         </div>
         {enrichedAt && (
           <span className="text-[11px] text-dim">
-            {relativeTime(enrichedAt)}
+            {formatDate(enrichedAt)}
           </span>
         )}
       </div>

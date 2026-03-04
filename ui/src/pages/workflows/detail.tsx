@@ -42,7 +42,7 @@ import {
   useTestWorkflow,
   useExecuteWorkflow,
 } from "@/hooks/use-api";
-import { formatDate, relativeTime, riskColor } from "@/lib/format";
+import { formatDate, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   Play,
@@ -498,7 +498,7 @@ export function WorkflowDetailPage() {
                             {run.duration_ms != null && (
                               <span>{run.duration_ms}ms</span>
                             )}
-                            <span>{relativeTime(run.created_at)}</span>
+                            <span>{formatDate(run.created_at)}</span>
                           </div>
                         </div>
                         {run.log_output && (

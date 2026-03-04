@@ -3,7 +3,6 @@ import {
   severityColor,
   statusColor,
   maliceColor,
-  relativeTime,
   formatDate,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -45,7 +44,7 @@ function AlertTooltipContent({ data }: { data: GraphAlertNode }) {
       <div className="text-[11px] text-dim space-y-0.5">
         <div>Source: {data.source_name}</div>
         <div>Occurred: {formatDate(data.occurred_at)}</div>
-        <div>{relativeTime(data.occurred_at)}</div>
+        <div>{formatDate(data.occurred_at)}</div>
       </div>
       {data.tags.length > 0 && (
         <div className="flex flex-wrap gap-1">

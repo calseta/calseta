@@ -33,7 +33,6 @@ import {
 } from "@/hooks/use-api";
 import {
   formatDate,
-  relativeTime,
   severityColor,
   statusColor,
   maliceColor,
@@ -557,10 +556,10 @@ export function AlertDetailPage() {
                                 {enrichmentCount > 0 ? enrichmentCount : "—"}
                               </TableCell>
                               <TableCell className="text-xs text-dim">
-                                {relativeTime(ind.first_seen)}
+                                {formatDate(ind.first_seen)}
                               </TableCell>
                               <TableCell className="text-xs text-dim">
-                                {relativeTime(ind.last_seen)}
+                                {formatDate(ind.last_seen)}
                               </TableCell>
                             </TableRow>
                           );
@@ -602,7 +601,7 @@ export function AlertDetailPage() {
                             )}
                           </div>
                           <span className="text-[11px] text-dim">
-                            {relativeTime(f.posted_at)}
+                            {formatDate(f.posted_at)}
                           </span>
                         </div>
                         <p className="mt-2 text-sm text-foreground whitespace-pre-wrap">
@@ -670,7 +669,7 @@ export function AlertDetailPage() {
                             {formatEventType(ev.event_type)}
                           </span>
                           <span className="text-[11px] text-dim">
-                            {relativeTime(ev.created_at)}
+                            {formatDate(ev.created_at)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">

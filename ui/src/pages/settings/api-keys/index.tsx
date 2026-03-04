@@ -27,7 +27,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiKeys, useCreateApiKey, useDeactivateApiKey } from "@/hooks/use-api";
-import { relativeTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { Plus, Ban, Copy, Check, Key, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -255,11 +255,11 @@ export function ApiKeysPage() {
                       </TableCell>
                       <TableCell className="text-xs text-dim">
                         {k.last_used_at
-                          ? relativeTime(k.last_used_at)
+                          ? formatDate(k.last_used_at)
                           : "never"}
                       </TableCell>
                       <TableCell className="text-xs text-dim">
-                        {relativeTime(k.created_at)}
+                        {formatDate(k.created_at)}
                       </TableCell>
                       <TableCell>
                         {k.is_active && (
