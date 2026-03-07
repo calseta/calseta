@@ -30,7 +30,7 @@ from app.schemas.workflow_approvals import (
 
 router = APIRouter(prefix="/workflow-approvals", tags=["workflow-approvals"])
 
-_Execute = Annotated[AuthContext, Depends(require_scope(Scope.WORKFLOWS_EXECUTE))]
+_Approve = Annotated[AuthContext, Depends(require_scope(Scope.APPROVALS_WRITE))]
 
 
 # ---------------------------------------------------------------------------
@@ -40,7 +40,7 @@ _Execute = Annotated[AuthContext, Depends(require_scope(Scope.WORKFLOWS_EXECUTE)
 
 @router.get("", response_model=PaginatedResponse[WorkflowApprovalRequestResponse])
 async def list_approval_requests(
-    auth: _Execute,
+    auth: _Approve,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
     approval_status: str | None = Query(None, alias="status"),
@@ -94,7 +94,7 @@ async def list_approval_requests(
         resp = WorkflowApprovalRequestResponse.model_validate(r)
         if r.workflow_id in wf_map:
             resp.workflow_name = wf_map[r.workflow_id][0]
-            resp.workflow_uuid = wf_map[r.workflow_id][1]
+            resp.workflow_uuid = UUID(wf_map[r.workflow_id][1])
         data.append(resp)
 
     return PaginatedResponse(
@@ -113,14 +113,13 @@ async def list_approval_requests(
 @router.get("/{approval_uuid}", response_model=DataResponse[WorkflowApprovalRequestResponse])
 async def get_approval_request(
     approval_uuid: UUID,
-    auth: _Execute,
+    auth: _Approve,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[WorkflowApprovalRequestResponse]:
     from sqlalchemy import select
 
-    from app.db.models.workflow_approval_request import WorkflowApprovalRequest as WAR
-
     from app.db.models.workflow import Workflow
+    from app.db.models.workflow_approval_request import WorkflowApprovalRequest as WAR
 
     result = await db.execute(select(WAR).where(WAR.uuid == approval_uuid))
     request = result.scalar_one_or_none()
@@ -137,7 +136,7 @@ async def get_approval_request(
     wf_row = wf_result.one_or_none()
     if wf_row:
         resp.workflow_name = wf_row[0]
-        resp.workflow_uuid = str(wf_row[1])
+        resp.workflow_uuid = wf_row[1]
     return DataResponse(data=resp)
 
 
@@ -152,7 +151,7 @@ async def get_approval_request(
 )
 async def approve_workflow(
     approval_uuid: UUID,
-    auth: _Execute,
+    auth: _Approve,
     db: Annotated[AsyncSession, Depends(get_db)],
     body: WorkflowApproveRequest | None = None,
 ) -> DataResponse[WorkflowApprovalRequestResponse]:
@@ -208,7 +207,7 @@ async def approve_workflow(
 )
 async def reject_workflow(
     approval_uuid: UUID,
-    auth: _Execute,
+    auth: _Approve,
     db: Annotated[AsyncSession, Depends(get_db)],
     body: WorkflowRejectRequest | None = None,
 ) -> DataResponse[WorkflowApprovalRequestResponse]:

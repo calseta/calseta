@@ -1,4 +1,4 @@
-# Calseta AI — CLAUDE.md
+# Calseta — CLAUDE.md
 
 This file is the primary reference for any AI agent or developer working in this repository. Read it fully before writing code.
 
@@ -6,7 +6,7 @@ This file is the primary reference for any AI agent or developer working in this
 
 ## What This Project Is
 
-Calseta AI is an open-source, single-tenant, self-hostable SOC data platform built for AI agent consumption. It is **not** an AI SOC product — it does not build or run AI agents. It is the data infrastructure layer: ingest security alerts, normalize to a clean agent-readable schema, enrich with threat intelligence, and expose context-rich data via REST API and MCP server so that customer-built agents can investigate and respond effectively.
+Calseta is an open-source, single-tenant, self-hostable SOC data platform built for AI agent consumption. It is **not** an AI SOC product — it does not build or run AI agents. It is the data infrastructure layer: ingest security alerts, normalize to a clean agent-readable schema, enrich with threat intelligence, and expose context-rich data via REST API and MCP server so that customer-built agents can investigate and respond effectively.
 
 Full requirements are in `PRD.md`. Full execution plan is in `PROJECT_PLAN.md`.
 
@@ -199,7 +199,7 @@ Every workflow is an `async def run(ctx: WorkflowContext) -> WorkflowResult` fun
 - Stored as bcrypt hash; `key_prefix` (first 8 chars) stored for display
 - Full key shown once on creation, never again
 - Header: `Authorization: Bearer cai_xxxxx`
-- Scopes: `alerts:read`, `alerts:write`, `enrichments:read`, `workflows:read`, `workflows:execute`, `agents:read`, `agents:write`, `admin`
+- Scopes: `alerts:read`, `alerts:write`, `enrichments:read`, `workflows:read`, `workflows:execute`, `approvals:write`, `agents:read`, `agents:write`, `admin`
 - Auth is abstracted via DI — v1 implements API key auth; architecture is BetterAuth-ready
 
 ---

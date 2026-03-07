@@ -55,6 +55,7 @@ class Scope(StrEnum):
     WORKFLOWS_READ = "workflows:read"
     WORKFLOWS_WRITE = "workflows:write"
     WORKFLOWS_EXECUTE = "workflows:execute"
+    APPROVALS_WRITE = "approvals:write"
     AGENTS_READ = "agents:read"
     AGENTS_WRITE = "agents:write"
     ADMIN = "admin"             # Superscope -- passes every check

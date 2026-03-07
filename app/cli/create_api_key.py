@@ -6,8 +6,10 @@ any authenticated API calls are possible.
 
 Usage:
     python -m app.cli.create_api_key --name bootstrap-admin --scopes admin
-    python -m app.cli.create_api_key --name sentinel-ingest --scopes alerts:write --allowed-sources sentinel
-    python -m app.cli.create_api_key --name read-only --scopes alerts:read workflows:read
+    python -m app.cli.create_api_key --name sentinel-ingest \
+        --scopes alerts:write --allowed-sources sentinel
+    python -m app.cli.create_api_key --name read-only \
+        --scopes alerts:read workflows:read
 
 Docker:
     docker compose exec api python -m app.cli.create_api_key --name bootstrap-admin --scopes admin
@@ -36,6 +38,7 @@ VALID_SCOPES = [
     "workflows:read",
     "workflows:write",
     "workflows:execute",
+    "approvals:write",
     "agents:read",
     "agents:write",
 ]
@@ -48,8 +51,10 @@ def _parse_args() -> argparse.Namespace:
         epilog=(
             "Examples:\n"
             "  python -m app.cli.create_api_key --name bootstrap-admin --scopes admin\n"
-            "  python -m app.cli.create_api_key --name my-agent --scopes alerts:read alerts:write enrichments:read\n"
-            "  python -m app.cli.create_api_key --name sentinel-only --scopes alerts:write --allowed-sources sentinel"
+            "  python -m app.cli.create_api_key --name my-agent \\\n"
+            "      --scopes alerts:read alerts:write enrichments:read\n"
+            "  python -m app.cli.create_api_key --name sentinel-only \\\n"
+            "      --scopes alerts:write --allowed-sources sentinel"
         ),
     )
     parser.add_argument(
@@ -67,7 +72,10 @@ def _parse_args() -> argparse.Namespace:
         "--allowed-sources",
         nargs="*",
         default=None,
-        help="Restrict key to specific alert sources (e.g. sentinel elastic). Omit for unrestricted.",
+        help=(
+            "Restrict key to specific alert sources "
+            "(e.g. sentinel elastic). Omit for unrestricted."
+        ),
     )
     parser.add_argument(
         "--expires-at",
