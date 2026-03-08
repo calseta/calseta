@@ -118,7 +118,7 @@ docs-openapi-check:
 # Start lab: DB + migrations + seed + all services + UI
 lab:
 	@echo "Setting lab environment..."
-	@cp .env.lab.example .env
+	@if [ ! -f .env ]; then cp .env.lab.example .env; echo "Created .env from .env.lab.example"; else echo ".env already exists, skipping copy"; fi
 	docker compose up -d db
 	@echo "Waiting for PostgreSQL to be ready..."
 	@until docker compose exec db pg_isready -U postgres > /dev/null 2>&1; do sleep 1; done

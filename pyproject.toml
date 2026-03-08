@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "calseta"
 version = "0.1.0"
-description = "SOC data platform for AI agent consumption"
+description = "SOC data platform for security agent consumption"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 dependencies = [

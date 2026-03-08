@@ -24,6 +24,7 @@ class Alert(TimestampMixin, UUIDMixin, Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     severity: Mapped[str] = mapped_column(Text, nullable=False, default="Pending")
     source_name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     source_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

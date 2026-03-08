@@ -85,11 +85,19 @@ class SplunkSource(AlertSourceBase):
             with suppress(ValueError, TypeError, OverflowError):
                 occurred_at = datetime.fromtimestamp(float(raw_time), tz=UTC)
 
+        description = result.get("signature") or result.get("search_name") or None
+        # If description equals title, try _raw field
+        if description and description == str(title):
+            raw_log = result.get("_raw")
+            if raw_log:
+                description = str(raw_log)
+
         return CalsetaAlert(
             title=str(title),
             severity=severity,
             occurred_at=occurred_at,
             source_name=self.source_name,
+            description=str(description) if description else None,
         )
 
     def extract_indicators(self, raw: dict) -> list[IndicatorExtract]:  # type: ignore[type-arg]

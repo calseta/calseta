@@ -25,6 +25,9 @@ Usage:
     python run_study.py --run --models openai
     python run_study.py --run --models all
 
+    # Run a specific study number
+    python run_study.py --run --study 2
+
     # Just ingest fixtures
     python run_study.py --ingest
 
@@ -67,7 +70,7 @@ from naive_agent import AgentMetrics, NaiveAgent  # noqa: E402
 # ---------------------------------------------------------------------------
 
 FIXTURES_DIR = CASE_STUDY_DIR / "fixtures"
-RESULTS_DIR = CASE_STUDY_DIR / "results"
+RESULTS_BASE_DIR = CASE_STUDY_DIR / "results"
 
 # Fixture metadata: filename, source_name, scenario label
 SCENARIOS = [
@@ -145,8 +148,29 @@ def load_env() -> dict[str, str]:
 # Fixture ingestion
 # ---------------------------------------------------------------------------
 
+def _resolve_study_dir(study_num: int) -> Path:
+    """Resolve the results directory for a given study number."""
+    return RESULTS_BASE_DIR / f"study_{study_num}"
+
+
+def _next_study_num() -> int:
+    """Auto-detect the next available study number."""
+    num = 1
+    while _resolve_study_dir(num).exists():
+        num += 1
+    return num
+
+
+def _latest_study_num() -> int:
+    """Find the most recent study number (at least 1)."""
+    num = 1
+    while _resolve_study_dir(num + 1).exists():
+        num += 1
+    return num
+
+
 def ingest_fixtures(
-    base_url: str, api_key: str
+    base_url: str, api_key: str, results_dir: Path
 ) -> dict[str, str]:
     """
     Ingest all 5 fixture alerts into a running Calseta instance.
@@ -199,8 +223,8 @@ def ingest_fixtures(
     client.close()
 
     # Save UUIDs for later use
-    uuid_file = RESULTS_DIR / "alert_uuids.json"
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    uuid_file = results_dir / "alert_uuids.json"
     with open(uuid_file, "w") as f:
         json.dump(uuids, f, indent=2)
     print(f"\n  Alert UUIDs saved to {uuid_file}")
@@ -213,14 +237,30 @@ def ingest_fixtures(
     return uuids
 
 
-def load_uuids() -> dict[str, str]:
-    """Load previously saved alert UUIDs."""
-    uuid_file = RESULTS_DIR / "alert_uuids.json"
-    if not uuid_file.exists():
-        print(f"ERROR: {uuid_file} not found. Run with --ingest first.")
-        sys.exit(1)
-    with open(uuid_file) as f:
-        return json.load(f)
+def load_uuids(results_dir: Path) -> dict[str, str]:
+    """Load previously saved alert UUIDs.
+
+    Checks the current study dir first, then falls back to searching
+    previous study dirs (most recent first) since UUIDs persist across runs.
+    """
+    # Check current study dir
+    uuid_file = results_dir / "alert_uuids.json"
+    if uuid_file.exists():
+        with open(uuid_file) as f:
+            return json.load(f)
+
+    # Fall back to previous study dirs (most recent first)
+    num = _latest_study_num()
+    while num >= 1:
+        fallback = _resolve_study_dir(num) / "alert_uuids.json"
+        if fallback.exists():
+            print(f"  Using alert UUIDs from {fallback}")
+            with open(fallback) as f:
+                return json.load(f)
+        num -= 1
+
+    print(f"ERROR: alert_uuids.json not found in any study dir. Run with --ingest first.")
+    sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -337,12 +377,17 @@ def _build_agents(
     return agents
 
 
-async def run_study(env: dict[str, str], models_flag: str = "claude") -> None:
+async def run_study(
+    env: dict[str, str], models_flag: str = "claude", results_dir: Path | None = None
+) -> None:
     """Run the full study: all agents, all scenarios, multiple runs."""
+    if results_dir is None:
+        results_dir = _resolve_study_dir(_next_study_num())
+
     runs_per = int(env.get("RUNS_PER_SCENARIO", "3"))
 
     # Load alert UUIDs (from previous ingest)
-    uuids = load_uuids()
+    uuids = load_uuids(results_dir)
 
     # Build agent list based on --models flag
     agents = _build_agents(env, models_flag)
@@ -351,9 +396,9 @@ async def run_study(env: dict[str, str], models_flag: str = "claude") -> None:
         sys.exit(1)
 
     # Prepare results CSV
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    csv_path = RESULTS_DIR / "raw_metrics.csv"
-    findings_dir = RESULTS_DIR / "findings"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = results_dir / "raw_metrics.csv"
+    findings_dir = results_dir / "findings"
     findings_dir.mkdir(parents=True, exist_ok=True)
 
     fieldnames = [
@@ -593,12 +638,26 @@ def main() -> None:
         default="claude",
         help="Which model provider(s) to run (default: claude)",
     )
+    parser.add_argument(
+        "--study",
+        type=int,
+        default=0,
+        help="Study run number (default: auto-detect next available)",
+    )
     args = parser.parse_args()
 
     if not args.ingest and not args.run:
         parser.print_help()
         print("\nSpecify --ingest, --run, or both (--ingest --run).")
         sys.exit(1)
+
+    # Resolve study directory
+    if args.study > 0:
+        study_num = args.study
+    else:
+        study_num = _next_study_num()
+    results_dir = _resolve_study_dir(study_num)
+    print(f"  Study directory: {results_dir}")
 
     env = load_env()
 
@@ -608,10 +667,10 @@ def main() -> None:
         if not calseta_key:
             print("ERROR: CALSETA_API_KEY is required for ingestion")
             sys.exit(1)
-        ingest_fixtures(calseta_url, calseta_key)
+        ingest_fixtures(calseta_url, calseta_key, results_dir)
 
     if args.run:
-        asyncio.run(run_study(env, models_flag=args.models))
+        asyncio.run(run_study(env, models_flag=args.models, results_dir=results_dir))
 
 
 if __name__ == "__main__":

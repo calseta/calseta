@@ -448,7 +448,7 @@ class OpenAICalsetaAgent:
             "You are a SOC analyst AI agent investigating a security alert. "
             "You have been given a pre-structured alert payload from Calseta "
             "that includes:\n"
-            "- The normalized alert with clean field names\n"
+            "- The normalized alert with clean field names and description\n"
             "- All indicators of compromise, already extracted and enriched\n"
             "- Detection rule documentation explaining what triggered the alert\n"
             "- Applicable runbooks and SOPs for handling this alert type\n\n"
@@ -459,8 +459,17 @@ class OpenAICalsetaAgent:
             "- Analysis of each enriched indicator and its risk level\n"
             "- Overall verdict (True Positive / False Positive / Needs Investigation)\n"
             "- Recommended next steps\n\n"
-            "All enrichment has already been done for you — do NOT request "
-            "additional lookups. Focus on analysis and synthesis."
+            "CRITICAL RULES:\n"
+            "- All enrichment has already been done for you — do NOT request "
+            "additional lookups.\n"
+            "- ONLY use data explicitly provided below. Do NOT invent, fabricate, "
+            "or assume enrichment results, threat scores, or intelligence data "
+            "that is not present in the provided context.\n"
+            "- If an indicator has no enrichment data or a 'Pending' malice "
+            "verdict, state that explicitly — do NOT fill in fictional values.\n"
+            "- Pay close attention to the alert description — it contains key "
+            "contextual details about the attack pattern, timing, and scope.\n"
+            "- Focus on analysis and synthesis of the provided data only."
         )
 
     def _build_alert_context(
@@ -482,6 +491,26 @@ class OpenAICalsetaAgent:
         tags = alert.get("tags", [])
         if tags:
             sections.append(f"- Tags: {', '.join(tags)}")
+
+        # Include alert description — contains critical attack pattern context.
+        # Prefer top-level description (first-class normalized field), with
+        # raw_payload extraction as fallback for older Calseta instances.
+        description = alert.get("description", "")
+        if not description:
+            raw = alert.get("raw_payload") or {}
+            # Sentinel: properties.description
+            description = (raw.get("properties") or {}).get("description", "")
+            # Splunk: result.signature or search_name
+            if not description:
+                result = raw.get("result") or {}
+                description = result.get("signature", "") or raw.get("search_name", "")
+            # Elastic: message or rule.description
+            if not description:
+                description = raw.get("message", "")
+            if not description:
+                description = (raw.get("rule") or {}).get("description", "")
+        if description:
+            sections.append(f"\n### Alert Description\n{description}")
         sections.append("")
 
         indicators = alert.get("indicators", [])

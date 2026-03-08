@@ -109,6 +109,12 @@ class ElasticSource(AlertSourceBase):
         else:
             occurred_at = datetime.now().astimezone()
 
+        # Description: prefer rule description, fall back to reason
+        description = _get(raw, "kibana.alert.rule.description") or _get(raw, "kibana.alert.reason") or None
+        # If description equals title, prefer reason as description
+        if description and description == str(title):
+            description = _get(raw, "kibana.alert.reason") or None
+
         # Tags from rule tags
         tags: list[str] = []
         rule_tags = _get(raw, "kibana.alert.rule.tags")
@@ -120,6 +126,7 @@ class ElasticSource(AlertSourceBase):
             severity=severity,
             occurred_at=occurred_at,
             source_name=self.source_name,
+            description=str(description) if description else None,
             tags=tags,
         )
 

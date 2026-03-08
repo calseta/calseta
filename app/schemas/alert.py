@@ -94,6 +94,8 @@ class CalsetaAlert(BaseModel):
     severity: AlertSeverity
     occurred_at: datetime
     source_name: str
+    # Optional alert narrative / description from source SIEM
+    description: str | None = None
 
     # Optional normalized fields used by Pass 2 indicator extraction
     src_ip: str | None = None

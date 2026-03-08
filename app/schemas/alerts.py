@@ -41,6 +41,7 @@ class AlertResponse(BaseModel):
 
     uuid: uuid.UUID
     title: str
+    description: str | None = None
     severity: AlertSeverity
     status: AlertStatus
     enrichment_status: EnrichmentStatus
@@ -78,6 +79,7 @@ class AlertSummary(BaseModel):
 
     uuid: uuid.UUID
     title: str
+    description: str | None = None
     severity: AlertSeverity
     status: AlertStatus
     enrichment_status: EnrichmentStatus

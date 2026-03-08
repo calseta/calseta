@@ -227,6 +227,7 @@ export function AlertDetailPage() {
         <DetailPageHeader
           backTo="/alerts"
           title={alert.title}
+          subtitle={alert.description ? <p className="text-sm text-dim leading-relaxed">{alert.description}</p> : undefined}
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
           actions={<RunAgentButton alertUuid={uuid} />}
@@ -253,6 +254,7 @@ export function AlertDetailPage() {
             </>
           }
         />
+
 
         <DetailPageStatusCards
           items={[

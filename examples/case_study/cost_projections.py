@@ -24,7 +24,7 @@ from typing import Any
 
 
 CASE_STUDY_DIR = Path(__file__).parent
-DEFAULT_RESULTS_DIR = CASE_STUDY_DIR / "results"
+RESULTS_BASE_DIR = CASE_STUDY_DIR / "results"
 
 # Engineering time estimates (hours) for building and maintaining the agent
 NAIVE_ENG_HOURS_LOW = 40
@@ -404,6 +404,19 @@ def generate_markdown_report(
 # CLI
 # ---------------------------------------------------------------------------
 
+def _resolve_study_dir(study_num: int) -> Path:
+    """Resolve the results directory for a given study number."""
+    return RESULTS_BASE_DIR / f"study_{study_num}"
+
+
+def _latest_study_num() -> int:
+    """Find the most recent study number (at least 1)."""
+    num = 1
+    while _resolve_study_dir(num + 1).exists():
+        num += 1
+    return num
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate cost projections from case study metrics"
@@ -411,16 +424,30 @@ def main() -> None:
     parser.add_argument(
         "--results-dir",
         type=Path,
-        default=DEFAULT_RESULTS_DIR,
-        help="Directory containing raw_metrics.csv (default: results/)",
+        default=None,
+        help="Directory containing raw_metrics.csv (overrides --study)",
+    )
+    parser.add_argument(
+        "--study",
+        type=int,
+        default=0,
+        help="Study run number (default: most recent)",
     )
     args = parser.parse_args()
 
-    rows = load_metrics(args.results_dir)
+    # Resolve results directory
+    if args.results_dir is not None:
+        results_dir = args.results_dir
+    elif args.study > 0:
+        results_dir = _resolve_study_dir(args.study)
+    else:
+        results_dir = _resolve_study_dir(_latest_study_num())
+
+    rows = load_metrics(results_dir)
     averages = compute_averages(rows)
 
     print_terminal_table(averages)
-    generate_markdown_report(averages, args.results_dir)
+    generate_markdown_report(averages, results_dir)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,8 @@
 Finding Evaluator — Blind LLM Judge.
 
 Reads the saved findings from both agents and scores them on three dimensions
-using Claude as an independent judge. The judge receives findings in randomized
+using an LLM as an independent judge. Supports both Claude and OpenAI (including
+Azure OpenAI) as the judge model. The judge receives findings in randomized
 order without knowing which approach produced them (blind evaluation).
 
 Scoring dimensions (each 0-10):
@@ -14,12 +15,24 @@ Scoring dimensions (each 0-10):
 Usage:
     python evaluate_findings.py
 
-    # Custom results directory
-    python evaluate_findings.py --results-dir ./results
+    # Use OpenAI as judge
+    python evaluate_findings.py --model openai
+
+    # Evaluate a specific study
+    python evaluate_findings.py --study 2
+
+    # Custom results directory (overrides --study)
+    python evaluate_findings.py --results-dir ./results/study_1
 
 Environment variables:
-    ANTHROPIC_API_KEY  - Required for the judge LLM
-    CLAUDE_MODEL       - Model for evaluation (default: claude-sonnet-4-20250514)
+    ANTHROPIC_API_KEY           - Required for Claude judge
+    CLAUDE_MODEL                - Claude model (default: claude-sonnet-4-20250514)
+    OPENAI_API_KEY              - Required for OpenAI judge (direct)
+    OPENAI_MODEL                - OpenAI model (default: gpt-4o)
+    AZURE_OPENAI_ENDPOINT       - Azure OpenAI endpoint (takes priority over direct)
+    AZURE_OPENAI_API_KEY        - Azure OpenAI API key
+    AZURE_OPENAI_DEPLOYMENT     - Azure deployment name
+    AZURE_OPENAI_API_VERSION    - Azure API version (default: 2024-10-21)
 """
 
 from __future__ import annotations
@@ -34,15 +47,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import anthropic
-
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
 CASE_STUDY_DIR = Path(__file__).parent
-DEFAULT_RESULTS_DIR = CASE_STUDY_DIR / "results"
+RESULTS_BASE_DIR = CASE_STUDY_DIR / "results"
 FIXTURES_DIR = CASE_STUDY_DIR / "fixtures"
 
 SCENARIOS = [
@@ -190,18 +201,170 @@ def build_judge_prompt(
 
 
 # ---------------------------------------------------------------------------
+# LLM abstraction
+# ---------------------------------------------------------------------------
+
+def _call_judge(
+    client: Any,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    provider: str,
+) -> str:
+    """Call the judge LLM and return the response text."""
+    if provider == "openai":
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=1024,
+            temperature=0,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        return response.choices[0].message.content or ""
+    else:
+        response = client.messages.create(
+            model=model,
+            max_tokens=1024,
+            temperature=0,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        return "".join(b.text for b in response.content if b.type == "text")
+
+
+def _model_short_name(model: str) -> str:
+    """Return a short name for output file naming."""
+    if "claude" in model.lower():
+        return "claude"
+    if "gpt" in model.lower():
+        return "gpt4o"
+    return model.split("-")[0]
+
+
+# ---------------------------------------------------------------------------
+# Study directory helpers
+# ---------------------------------------------------------------------------
+
+def _resolve_study_dir(study_num: int) -> Path:
+    """Resolve the results directory for a given study number."""
+    return RESULTS_BASE_DIR / f"study_{study_num}"
+
+
+def _latest_study_num() -> int:
+    """Find the most recent study number (at least 1)."""
+    num = 1
+    while _resolve_study_dir(num + 1).exists():
+        num += 1
+    return num
+
+
+# ---------------------------------------------------------------------------
+# JSON parsing helpers
+# ---------------------------------------------------------------------------
+
+def _parse_judge_json(response_text: str) -> dict[str, Any]:
+    """Parse judge response into a dict, handling markdown fences and extra text.
+
+    Tries multiple strategies:
+    1. Direct JSON parse
+    2. Strip markdown code fences (```json ... ```)
+    3. Extract first JSON object between { and } via brace matching
+    """
+    cleaned = response_text.strip()
+
+    # Strategy 1: direct parse
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: strip markdown code fences
+    if "```" in cleaned:
+        # Extract content between first ``` and last ```
+        fence_start = cleaned.find("```")
+        fence_end = cleaned.rfind("```")
+        if fence_start != fence_end:
+            inner = cleaned[fence_start:fence_end]
+            # Remove the opening fence line (```json or ```)
+            first_newline = inner.find("\n")
+            if first_newline != -1:
+                inner = inner[first_newline + 1:]
+            try:
+                return json.loads(inner.strip())
+            except json.JSONDecodeError:
+                pass
+
+    # Strategy 3: find first { and its matching } via brace counting
+    start = cleaned.find("{")
+    if start != -1:
+        depth = 0
+        for i in range(start, len(cleaned)):
+            if cleaned[i] == "{":
+                depth += 1
+            elif cleaned[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(cleaned[start:i + 1])
+                    except json.JSONDecodeError:
+                        break
+
+    # All strategies failed — raise with context for debugging
+    preview = cleaned[:300] if len(cleaned) > 300 else cleaned
+    raise json.JSONDecodeError(
+        f"Could not extract JSON from judge response. Preview: {preview!r}",
+        cleaned,
+        0,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Evaluator
 # ---------------------------------------------------------------------------
 
-def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
+def evaluate_findings(
+    results_dir: Path, env: dict[str, str], provider: str = "claude"
+) -> None:
     """Run blind evaluation on all saved findings."""
-    anthropic_key = env.get("ANTHROPIC_API_KEY", "")
-    if not anthropic_key:
-        print("ERROR: ANTHROPIC_API_KEY is required")
-        sys.exit(1)
 
-    judge_model = env.get("CLAUDE_MODEL", "claude-sonnet-4-20250514")
-    client = anthropic.Anthropic(api_key=anthropic_key)
+    # Initialize judge client
+    if provider == "openai":
+        import openai as openai_mod
+
+        azure_endpoint = env.get("AZURE_OPENAI_ENDPOINT", "")
+        azure_key = env.get("AZURE_OPENAI_API_KEY", "")
+        if azure_endpoint and azure_key:
+            from openai import AzureOpenAI
+
+            client = AzureOpenAI(
+                api_key=azure_key,
+                azure_endpoint=azure_endpoint,
+                api_version=env.get("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+            )
+            judge_model = env.get(
+                "AZURE_OPENAI_DEPLOYMENT",
+                env.get("OPENAI_MODEL", "gpt-4o"),
+            )
+        else:
+            openai_key = env.get("OPENAI_API_KEY", "")
+            if not openai_key:
+                print("ERROR: OPENAI_API_KEY or AZURE_OPENAI_API_KEY is required for OpenAI judge")
+                sys.exit(1)
+            client = openai_mod.OpenAI(api_key=openai_key)
+            judge_model = env.get("OPENAI_MODEL", "gpt-4o")
+    else:
+        import anthropic
+
+        anthropic_key = env.get("ANTHROPIC_API_KEY", "")
+        if not anthropic_key:
+            print("ERROR: ANTHROPIC_API_KEY is required for Claude judge")
+            sys.exit(1)
+        client = anthropic.Anthropic(api_key=anthropic_key)
+        judge_model = env.get("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+
+    model_short = _model_short_name(judge_model)
 
     findings_dir = results_dir / "findings"
     if not findings_dir.exists():
@@ -215,6 +378,7 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
         sys.exit(1)
 
     print(f"\n=== Evaluating {len(finding_files)} findings ===")
+    print(f"  Judge provider: {provider}")
     print(f"  Judge model: {judge_model}")
     print(f"  Results dir: {results_dir}\n")
 
@@ -287,20 +451,11 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
         prompt = build_judge_prompt(item["scenario"], item["finding"])
 
         try:
-            response = client.messages.create(
-                model=judge_model,
-                max_tokens=1024,
-                temperature=0,
-                system=JUDGE_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": prompt}],
+            response_text = _call_judge(
+                client, judge_model, JUDGE_SYSTEM_PROMPT, prompt, provider
             )
 
-            response_text = "".join(
-                b.text for b in response.content if b.type == "text"
-            )
-
-            # Parse JSON response
-            score_data = json.loads(response_text)
+            score_data = _parse_judge_json(response_text)
 
             scores.append({
                 "file": item["file"],
@@ -322,13 +477,13 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
                 f"R:{score_data.get('actionability', '?')})"
             )
 
-        except json.JSONDecodeError:
-            print("FAILED (invalid JSON from judge)")
+        except json.JSONDecodeError as jde:
+            print(f"FAILED (invalid JSON from judge: {jde.msg[:120]})")
         except Exception as exc:
             print(f"FAILED ({exc})")
 
-    # Write scores CSV
-    scores_path = results_dir / "quality_scores.csv"
+    # Write scores CSV with model-specific filename
+    scores_path = results_dir / f"quality_scores_{model_short}.csv"
     fieldnames = [
         "file",
         "scenario",
@@ -350,12 +505,16 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
 
     print(f"\n  Quality scores written to {scores_path}")
 
-    # Print summary
-    _print_quality_summary(scores)
+    # Print summary and write analysis file
+    _print_quality_summary(scores, results_dir, model_short)
 
 
-def _print_quality_summary(scores: list[dict[str, Any]]) -> None:
-    """Print quality score summary by model and approach."""
+def _print_quality_summary(
+    scores: list[dict[str, Any]],
+    results_dir: Path,
+    judge_model_short: str,
+) -> None:
+    """Print quality score summary by model and approach, and write analysis markdown."""
     from collections import defaultdict
 
     # Group by model and approach
@@ -373,6 +532,22 @@ def _print_quality_summary(scores: list[dict[str, Any]]) -> None:
     )
     print("-" * 80)
 
+    # Collect summary data for markdown output
+    md_lines: list[str] = []
+    md_lines.append(f"# Quality Analysis — Judge: {judge_model_short}")
+    md_lines.append("")
+    md_lines.append(
+        f"Generated at {datetime.now(timezone.utc).isoformat()} "
+        f"using {judge_model_short} as the blind judge."
+    )
+    md_lines.append("")
+    md_lines.append("## Overall Averages")
+    md_lines.append("")
+    md_lines.append(
+        "| Model | Approach | Completeness | Accuracy | Actionability | Overall |"
+    )
+    md_lines.append("|---|---|---|---|---|---|")
+
     for model in sorted(by_model_approach.keys()):
         for approach in ["naive", "calseta"]:
             items = by_model_approach[model].get(approach, [])
@@ -388,6 +563,10 @@ def _print_quality_summary(scores: list[dict[str, Any]]) -> None:
                 f"{model:<15} {approach:<12} {avg_c:>14.1f} {avg_a:>10.1f} "
                 f"{avg_r:>15.1f} {avg_overall:>10.1f}"
             )
+            md_lines.append(
+                f"| {model} | {approach} | {avg_c:.1f} | {avg_a:.1f} "
+                f"| {avg_r:.1f} | {avg_overall:.1f} |"
+            )
 
     # Per-scenario breakdown grouped by model
     by_model_scenario: dict[str, dict[str, dict[str, list[dict[str, Any]]]]] = (
@@ -398,8 +577,19 @@ def _print_quality_summary(scores: list[dict[str, Any]]) -> None:
         by_model_scenario[model][s["scenario"]][s["approach"]].append(s)
 
     print("\n=== Per-Scenario Breakdown ===\n")
+    md_lines.append("")
+    md_lines.append("## Per-Scenario Breakdown")
+    md_lines.append("")
+
     for model in sorted(by_model_scenario.keys()):
         print(f"  [{model}]")
+        md_lines.append(f"### {model}")
+        md_lines.append("")
+        md_lines.append(
+            "| Scenario | Approach | Completeness | Accuracy | Actionability |"
+        )
+        md_lines.append("|---|---|---|---|---|")
+
         for scenario_label in dict.fromkeys(
             s["scenario"] for s in scores if s.get("model") == model
         ):
@@ -416,7 +606,19 @@ def _print_quality_summary(scores: list[dict[str, Any]]) -> None:
                     f"      {approach:<10} — Completeness: {avg_c:.1f}, "
                     f"Accuracy: {avg_a:.1f}, Actionability: {avg_r:.1f}"
                 )
+                md_lines.append(
+                    f"| {scenario_label} | {approach} | {avg_c:.1f} "
+                    f"| {avg_a:.1f} | {avg_r:.1f} |"
+                )
             print()
+
+        md_lines.append("")
+
+    # Write analysis markdown
+    analysis_path = results_dir / f"quality_analysis_{judge_model_short}.md"
+    with open(analysis_path, "w") as f:
+        f.write("\n".join(md_lines) + "\n")
+    print(f"  Quality analysis written to {analysis_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -434,7 +636,16 @@ def load_env() -> dict[str, str]:
                     if line and not line.startswith("#") and "=" in line:
                         key, _, val = line.partition("=")
                         env[key.strip()] = val.strip().strip("\"'")
-    for key in ["ANTHROPIC_API_KEY", "CLAUDE_MODEL"]:
+    for key in [
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_MODEL",
+        "OPENAI_API_KEY",
+        "OPENAI_MODEL",
+        "AZURE_OPENAI_ENDPOINT",
+        "AZURE_OPENAI_API_KEY",
+        "AZURE_OPENAI_DEPLOYMENT",
+        "AZURE_OPENAI_API_VERSION",
+    ]:
         val = os.environ.get(key)
         if val:
             env[key] = val
@@ -448,12 +659,34 @@ def main() -> None:
     parser.add_argument(
         "--results-dir",
         type=Path,
-        default=DEFAULT_RESULTS_DIR,
-        help="Directory containing findings (default: results/)",
+        default=None,
+        help="Directory containing findings (overrides --study)",
+    )
+    parser.add_argument(
+        "--model",
+        choices=["claude", "openai"],
+        default="claude",
+        help="LLM provider to use as judge (default: claude)",
+    )
+    parser.add_argument(
+        "--study",
+        type=int,
+        default=0,
+        help="Study run number to evaluate (default: most recent)",
     )
     args = parser.parse_args()
+
+    # Resolve results directory
+    if args.results_dir is not None:
+        results_dir = args.results_dir
+    elif args.study > 0:
+        results_dir = _resolve_study_dir(args.study)
+    else:
+        # Find most recent study dir
+        results_dir = _resolve_study_dir(_latest_study_num())
+
     env = load_env()
-    evaluate_findings(args.results_dir, env)
+    evaluate_findings(results_dir, env, provider=args.model)
 
 
 if __name__ == "__main__":

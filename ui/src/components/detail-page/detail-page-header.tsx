@@ -24,33 +24,33 @@ export function DetailPageHeader({
   isRefreshing,
 }: DetailPageHeaderProps) {
   return (
-    <div className="flex items-start gap-4">
-      <Link to={backTo} className="mt-1">
-        <ArrowLeft className="h-5 w-5 text-dim hover:text-foreground transition-colors" />
-      </Link>
-      <div className="flex-1 min-w-0">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 flex-wrap">
+          <Link to={backTo}>
+            <ArrowLeft className="h-5 w-5 text-dim hover:text-foreground transition-colors" />
+          </Link>
           {badges}
         </div>
-        <h2 className="mt-2 text-xl font-heading font-extrabold tracking-tight text-foreground">
-          {title}
-        </h2>
-        {subtitle && <div className="mt-1">{subtitle}</div>}
+        <div className="flex items-center gap-2 shrink-0">
+          {onRefresh && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="h-8 w-8 p-0 text-dim hover:text-teal"
+            >
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+            </Button>
+          )}
+          {actions}
+        </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {onRefresh && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            className="h-8 w-8 p-0 text-dim hover:text-teal"
-          >
-            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-          </Button>
-        )}
-        {actions}
-      </div>
+      <h2 className="text-xl font-heading font-extrabold tracking-tight text-foreground">
+        {title}
+      </h2>
+      {subtitle && <div className="mt-1">{subtitle}</div>}
     </div>
   );
 }

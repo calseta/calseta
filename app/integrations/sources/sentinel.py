@@ -73,6 +73,8 @@ class SentinelSource(AlertSourceBase):
         else:
             occurred_at = datetime.now().astimezone()
 
+        description = props.get("description")
+
         # Tags from labels
         tags: list[str] = []
         for label in props.get("labels", []):
@@ -84,6 +86,7 @@ class SentinelSource(AlertSourceBase):
             severity=severity,
             occurred_at=occurred_at,
             source_name=self.source_name,
+            description=description,
             tags=tags,
         )
 

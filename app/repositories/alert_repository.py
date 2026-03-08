@@ -64,6 +64,7 @@ class AlertRepository:
             title=normalized.title,
             severity=normalized.severity.value,
             source_name=normalized.source_name,
+            description=normalized.description,
             occurred_at=normalized.occurred_at,
             raw_payload=raw_payload,
             tags=normalized.tags,
