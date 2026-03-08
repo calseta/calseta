@@ -293,13 +293,24 @@ class CalsetaAgent:
         )
 
         # Single LLM call — no tool loop needed because all enrichment is done
-        response = self.llm_client.messages.create(
-            model=self.model,
-            max_tokens=4096,
-            temperature=0,
-            system=self._build_system_prompt(),
-            messages=[{"role": "user", "content": user_message}],
-        )
+        # Retry with backoff on rate limit errors
+        response = None
+        for attempt in range(5):
+            try:
+                response = self.llm_client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    temperature=0,
+                    system=self._build_system_prompt(),
+                    messages=[{"role": "user", "content": user_message}],
+                )
+                break
+            except anthropic.RateLimitError:
+                wait = 2 ** attempt * 5
+                print(f"[rate limited, waiting {wait}s]... ", end="", flush=True)
+                time.sleep(wait)
+        if response is None:
+            raise RuntimeError("Rate limited after 5 retries")
 
         metrics.input_tokens = response.usage.input_tokens
         metrics.output_tokens = response.usage.output_tokens

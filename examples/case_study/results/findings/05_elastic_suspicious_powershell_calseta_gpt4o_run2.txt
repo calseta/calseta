@@ -1,0 +1,67 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Title**: Suspicious PowerShell Execution with Encoded Command
+- **Severity**: High
+- **Status**: Open
+- **Tags**: PowerShell, EncodedCommand, LivingOffTheLand, T1059.001, T1027, DefenseEvasion, Execution
+
+The alert is classified as high severity due to the execution of a suspicious PowerShell command with an encoded payload, which is a common technique used for obfuscation and defense evasion. The presence of multiple malicious indicators further elevates the risk.
+
+### Analysis of Enriched Indicators
+
+1. **IP: 10.0.1.10**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: This IP is associated with a TOR network, has a high abuse confidence score, and numerous reports of malicious activity. It is not a known asset and is classified as an external unknown.
+
+2. **IP: 198.51.100.99**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: Similar to the first IP, this is also a TOR exit node with a high number of abuse reports and a high abuse confidence score. It is not a known asset and is classified as an external unknown.
+
+3. **DOMAIN: c2-relay.darkops.net**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: This domain is tagged as a command and control (C2) server, indicating its use in coordinating malicious activities. It has a negative reputation and is associated with malware.
+
+4. **URL: https://c2-relay.darkops.net/stager.ps1**
+   - **Malice Verdict**: Pending
+   - **Risk Level**: High (due to association with a known malicious domain)
+   - **Details**: The URL is likely used to deliver a malicious PowerShell script, given its association with a C2 domain.
+
+5. **HASH_SHA256: de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: This hash is associated with the Emotet trojan, a well-known malware family. It has a high detection ratio on VirusTotal and is identified as a malicious executable.
+
+6. **ACCOUNT: SYSTEM (Jorge Martinez)**
+   - **Malice Verdict**: Pending
+   - **Risk Level**: Medium
+   - **Details**: The account is active and belongs to a Senior Engineer with privileged access. There are no immediate risk flags, but the account's involvement in the alert requires further investigation.
+
+### Overall Verdict
+- **True Positive**: The alert is a true positive, given the presence of multiple malicious indicators, including a known C2 domain, malicious IPs, and a malware hash associated with Emotet.
+
+### Recommended Next Steps
+
+1. **Immediate Actions**:
+   - Isolate the host using the endpoint agent to prevent further network communication.
+   - Verify the hash on VirusTotal to confirm the malware family classification.
+   - Identify and interview the user (Jorge Martinez) to gather more context about the activity.
+
+2. **Analysis**:
+   - Decode any encoded PowerShell commands to identify additional C2 domains or IPs.
+   - Check for any outbound connections to the identified C2 domain/IP from other hosts.
+   - Scope the incident by searching for the same hash across all endpoints in the last 7 days.
+
+3. **Containment**:
+   - Block the identified malicious domains and IPs at the firewall.
+   - Ensure the endpoint agent has quarantined the malicious file.
+   - Collect forensic artifacts, including memory dumps and event logs, for further analysis.
+
+4. **Communication**:
+   - Notify the security team and relevant stakeholders about the incident.
+   - Prepare a report summarizing the findings and actions taken.
+
+By following these steps, the organization can effectively contain the threat and prevent further compromise.

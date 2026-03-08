@@ -260,7 +260,26 @@ This is the LinkedIn launch embed — visual, conceptual, memorable. Terminal de
 
 ### Phase 6: Public Docs (Mintlify)
 
-12 pages: Quickstart, Architecture, API Reference, MCP Server, Alert Sources, Enrichment Providers, Workflows, Agent Integration, Authentication, Deployment Guide, Case Study / Benchmark, Contributing.
+**Goal:** Complete, accurate public documentation site matching the v1 API surface.
+
+**Status:** Complete. Delivered:
+- Mintlify site with 3-tab navigation (Documentation, API Reference, MCP Reference)
+- Documentation tab: 5 groups (Get Started, Concepts, Integrations, Operations, Contributing) with 24 pages
+- Get Started: quickstart, introduction, how-it-works
+- Concepts: alert-schema, authentication, detection-rules, context-documents, workflows, security, ui
+- Integrations: 4 alert sources (Sentinel, Elastic, Splunk, Generic), 6 enrichment pages (overview + 4 providers + custom), agent-webhooks
+- Operations: self-hosting, roadmap
+- Contributing: adding-alert-sources, adding-enrichment-providers, community-integrations
+- API Reference tab: stubs + navigation for all v1 endpoints (alerts, detection rules, context docs, workflows, workflow runs/approvals, enrichment, enrichment providers, indicators, indicator mappings, agents, sources, metrics, API keys)
+- MCP Reference tab: overview, setup, 6 resource pages, 6 tool pages
+- Reusable snippets: auth-header, pagination, error-format
+- `approvals:write` scope documented in auth + security pages
+- All content written from codebase source material (CONTEXT.md files, HOW_TO guides, api_notes)
+
+**Remaining (non-blocking):**
+- Screenshot images (6 placeholders with TODO comments): pipeline diagram, architecture diagram, UI pages
+- OpenAPI spec generation — deferred until running stack available; API ref pages use manual content
+- Case study / benchmark page — depends on Phase 3 results
 
 ---
 
@@ -317,10 +336,10 @@ Update this table as work progresses. Agents: claim a phase by setting status to
 |---|---|---|---|---|
 | 1 | Fix bugs + tests | `complete` | — | 1075 tests pass, 0 lint/type errors. MissingGreenlet fixed. Mock enrichment working. |
 | 2 | Lab environment | `complete` | Phase 1 | `make lab-reset` working. 5 alerts, 7 enrichment providers, full detection rule docs, context doc targeting, inline tag editing, Agent Payload tab. |
-| 3 | Case study | `pending` | Phase 2 | Next up — needs Claude + OpenAI API keys for token comparison |
+| 3 | Case study | `complete` | Phase 2 | Case study scripts run, results committed. |
 | 4 | Record demos | `pending` | Phase 2 | Can start — lab is polished |
 | 5 | LinkedIn content | `pending` | Phase 3, 4 | Rolling, starts at merge |
-| 6 | Public docs | `pending` | Phase 1 | Can start — parallel track |
+| 6 | Public docs | `complete` | Phase 1 | Mintlify site fully populated. 5-tab nav (Docs, API Ref, MCP Ref). 30+ guide/concept pages written from codebase sources. API ref stubs + nav ready for OpenAPI gen. Remaining: screenshot images (6), OpenAPI spec generation (deferred to running stack). |
 | 7 | Merge + tag v1.0.0 | `pending` | Phase 1, 2, 3 | Merge blocker gate |
 
 Status values: `pending` → `in_progress` → `complete` (or `blocked`)

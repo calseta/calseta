@@ -1,0 +1,75 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Classification:** Data Exfiltration via Tor Network  
+**Severity:** HIGH (Confirmed)  
+**Alert Type:** Anomalous Outbound Data Transfer
+
+This alert represents a high-severity security incident involving potential data exfiltration through Tor network infrastructure to a malicious domain.
+
+## Analysis of Enriched Indicators
+
+### IP Addresses (10.0.8.55 & 45.33.32.156)
+**Risk Level: CRITICAL**
+- Both IPs are confirmed Tor exit nodes operated by Zwiebelfreunde e.V.
+- AbuseIPDB shows maximum abuse confidence score (100%) with 2,847 reports
+- VirusTotal confirms malicious classification with negative reputation scores (-42)
+- Recent abuse reports (last reported 2026-03-06) indicate active malicious use
+- Zero previous sightings in internal network, indicating new threat vectors
+
+### Account (svc_backup)
+**Risk Level: HIGH**
+- **Critical Discrepancy:** Account name suggests service account ("svc_backup") but enrichment shows human user Jorge Martinez
+- User has elevated privileges: member of GlobalAdmins and AWS-ReadOnly groups
+- Account shows normal employment status but privileged access creates high impact potential
+- Recent password change (2026-01-10) and active status with compliant devices
+- Member of "privileged_access" insider threat monitoring group
+
+### Domain (suspicious-cloud-sync.com)
+**Risk Level: CRITICAL**
+- VirusTotal confirms malicious classification with C2 and malware tags
+- Negative reputation score (-15) with 8 malicious detections
+- Domain creation date suggests relatively new infrastructure (late 2023)
+- Name mimics legitimate cloud sync services (potential typosquatting)
+
+### URL (https://suspicious-cloud-sync.com/api/v2/upload)
+**Risk Level: HIGH**
+- Upload endpoint on confirmed malicious domain
+- API structure suggests automated data exfiltration capability
+- HTTPS encryption would obscure payload inspection
+
+## Overall Verdict: TRUE POSITIVE
+
+This is a confirmed security incident involving data exfiltration. The combination of:
+- Tor network usage for anonymization
+- Connection to confirmed malicious C2 infrastructure
+- Privileged account involvement
+- Upload API endpoint targeting
+
+Creates a high-confidence assessment of malicious activity.
+
+## Recommended Next Steps
+
+### Immediate Actions (0-15 minutes)
+1. **Network Isolation:** Immediately isolate any systems associated with the svc_backup account
+2. **Account Suspension:** Disable the svc_backup/j.martinez account across all systems (Okta, Entra, AWS)
+3. **Block Infrastructure:** Add both Tor IPs and suspicious-cloud-sync.com to firewall/proxy block lists
+
+### Investigation Phase (15 minutes - 2 hours)
+4. **Timeline Analysis:** Review all network activity for the svc_backup account in the 48 hours preceding the alert
+5. **Data Quantification:** Determine volume and type of data transferred to the malicious endpoint
+6. **Lateral Movement Check:** Search for any connections to the malicious domain from other internal systems
+7. **Account Compromise Assessment:** Review authentication logs for unusual login patterns or locations
+
+### Evidence Preservation
+8. **Log Retention:** Preserve all network flow logs, proxy logs, and authentication logs for the investigation window
+9. **Endpoint Forensics:** If the user's devices (JMartinez-MBP, JMartinez-iPhone) show suspicious activity, initiate forensic collection
+10. **DLP Review:** Check for any Data Loss Prevention policy violations during the timeframe
+
+### Stakeholder Notification
+11. **Management Escalation:** Notify VP of Engineering (Sunita Patel) given the user's department
+12. **Legal/Compliance:** Engage legal team for potential data breach notification requirements
+13. **HR Coordination:** Coordinate with HR regarding the employee's access and potential insider threat implications
+
+This incident requires immediate containment and thorough investigation given the confirmed malicious indicators and potential for significant data loss.

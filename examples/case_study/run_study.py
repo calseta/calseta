@@ -122,6 +122,10 @@ def load_env() -> dict[str, str]:
     for key in [
         "ANTHROPIC_API_KEY",
         "OPENAI_API_KEY",
+        "AZURE_OPENAI_ENDPOINT",
+        "AZURE_OPENAI_API_KEY",
+        "AZURE_OPENAI_DEPLOYMENT",
+        "AZURE_OPENAI_API_VERSION",
         "VIRUSTOTAL_API_KEY",
         "ABUSEIPDB_API_KEY",
         "CALSETA_BASE_URL",
@@ -176,8 +180,13 @@ def ingest_fixtures(
             resp.raise_for_status()
             data = resp.json()
 
-            # Extract UUID from response
-            alert_uuid = data.get("data", {}).get("uuid") or data.get("uuid", "")
+            # Extract UUID from response (field is "alert_uuid" in ingest response)
+            resp_data = data.get("data", data)
+            alert_uuid = (
+                resp_data.get("alert_uuid")
+                or resp_data.get("uuid")
+                or data.get("alert_uuid", "")
+            )
             uuids[scenario["fixture"]] = alert_uuid
             print(f"OK -> {alert_uuid}")
 
@@ -279,11 +288,24 @@ def _build_agents(
     if run_openai:
         from openai_agent import OpenAICalsetaAgent, OpenAINaiveAgent  # noqa: E402
 
-        openai_key = env.get("OPENAI_API_KEY", "")
+        # Azure OpenAI takes priority over direct OpenAI
+        azure_endpoint = env.get("AZURE_OPENAI_ENDPOINT", "")
+        azure_key = env.get("AZURE_OPENAI_API_KEY", "")
+        azure_deployment = env.get("AZURE_OPENAI_DEPLOYMENT", "")
+        azure_api_version = env.get("AZURE_OPENAI_API_VERSION", "2024-10-21")
+
+        if azure_endpoint and azure_key:
+            openai_key = azure_key
+            openai_model = azure_deployment or env.get("OPENAI_MODEL", "gpt-4o")
+            print(f"  Using Azure OpenAI: {azure_endpoint} / {openai_model}")
+        else:
+            openai_key = env.get("OPENAI_API_KEY", "")
+            openai_model = env.get("OPENAI_MODEL", "gpt-4o")
+            azure_endpoint = ""
+
         if not openai_key:
-            print("ERROR: OPENAI_API_KEY is required for OpenAI models")
+            print("ERROR: OPENAI_API_KEY or AZURE_OPENAI_API_KEY is required for OpenAI models")
             sys.exit(1)
-        openai_model = env.get("OPENAI_MODEL", "gpt-4o")
 
         agents.append((
             "naive",
@@ -292,6 +314,8 @@ def _build_agents(
                 virustotal_api_key=vt_key,
                 abuseipdb_api_key=abuseipdb_key,
                 model=openai_model,
+                azure_endpoint=azure_endpoint,
+                api_version=azure_api_version,
             ),
             "naive",
             openai_model,
@@ -303,6 +327,8 @@ def _build_agents(
                 calseta_base_url=calseta_url,
                 calseta_api_key=calseta_key,
                 model=openai_model,
+                azure_endpoint=azure_endpoint,
+                api_version=azure_api_version,
             ),
             "calseta",
             openai_model,

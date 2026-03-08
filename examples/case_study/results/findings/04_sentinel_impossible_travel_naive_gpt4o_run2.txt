@@ -1,0 +1,38 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Type:** Impossible travel activity detected
+- **Severity:** High
+- **Description:** The alert indicates a suspicious login activity for user `r.chen@contoso.com`, who authenticated from two geographically distant locations (New York, US and Moscow, Russia) within a short time frame, making physical travel impossible. The Moscow sign-in originated from an IP address not previously associated with the user account, which has Global Administrator privileges in Azure AD.
+
+#### Indicators of Compromise and Enrichment Results
+
+1. **IP Address: 91.234.56.78 (Moscow, Russia)**
+   - **VirusTotal Lookup:** No malicious activity detected. The IP is associated with SC Technological Srl, a fixed line ISP in Germany.
+   - **AbuseIPDB Lookup:** No reports of abuse. Abuse confidence score is 0.
+
+2. **IP Address: 203.0.113.25 (New York, US)**
+   - **VirusTotal Lookup:** No malicious activity detected. The IP is part of a reserved range used for documentation and testing.
+   - **AbuseIPDB Lookup:** One report of abuse related to a block due to an attack detected by fail2ban.
+
+3. **Account: r.chen@contoso.com**
+   - **Risk Assessment:** High risk due to Global Administrator privileges and suspicious login activity.
+
+4. **URL: https://portal.azure.com**
+   - **VirusTotal Lookup:** No malicious activity detected. The URL is clean and associated with Microsoft Azure services.
+
+#### Risk Assessment for Each Indicator
+- **IP Address 91.234.56.78:** Low risk based on threat intelligence results, but high risk due to association with suspicious login activity.
+- **IP Address 203.0.113.25:** Low risk based on threat intelligence results, but needs further investigation due to a report of abuse.
+- **Account r.chen@contoso.com:** High risk due to potential compromise and high privileges.
+- **URL https://portal.azure.com:** Low risk as it is a legitimate Microsoft Azure portal URL.
+
+#### Overall Verdict
+- **Needs Investigation:** The alert is potentially a true positive due to the impossible travel activity and the high privileges of the account involved. Further investigation is required to confirm the legitimacy of the Moscow login.
+
+#### Recommended Next Steps
+1. **Verify Account Activity:** Check recent activity logs for the account `r.chen@contoso.com` to identify any other suspicious activities or anomalies.
+2. **Review Access Logs:** Analyze access logs for the Azure portal and other critical resources to identify any unauthorized access attempts.
+3. **Contact User:** Reach out to Robert Chen to verify if he was aware of the login from Moscow and if he has shared his credentials with anyone.
+4. **Implement Security Measures:** Consider enforcing multi-factor authentication (MFA) and reviewing access permissions for high-privilege accounts.
+5. **Investigate Abuse Report:** Look into the abuse report for IP 203.0.113.25 to determine if it is related to the current incident.

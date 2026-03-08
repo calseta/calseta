@@ -5,17 +5,23 @@ Mirrors the Anthropic naive and Calseta agents using OpenAI's GPT-4o model
 and function-calling API. Validates that Calseta's token reduction holds
 across LLM providers.
 
+Supports both OpenAI direct and Azure OpenAI endpoints. For Azure, pass
+azure_endpoint and api_version to the constructor, or set env vars
+AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT,
+and optionally AZURE_OPENAI_API_VERSION.
+
 Usage:
     from openai_agent import OpenAINaiveAgent, OpenAICalsetaAgent
 
+    # Direct OpenAI
     naive = OpenAINaiveAgent(openai_api_key="sk-...", virustotal_api_key="...",
                              abuseipdb_api_key="...")
-    result = await naive.investigate(raw_alert_json, source_name="sentinel")
 
-    calseta = OpenAICalsetaAgent(openai_api_key="sk-...",
-                                  calseta_base_url="http://localhost:8000",
-                                  calseta_api_key="cai_...")
-    result = await calseta.investigate(alert_uuid="f47ac10b-...")
+    # Azure OpenAI
+    naive = OpenAINaiveAgent(openai_api_key="azure-key",
+                             azure_endpoint="https://my.openai.azure.com",
+                             model="my-gpt4o-deployment",
+                             virustotal_api_key="...", abuseipdb_api_key="...")
 
 Requires:
     pip install openai httpx
@@ -32,6 +38,29 @@ import httpx
 import openai
 
 from naive_agent import AgentMetrics
+
+
+# ---------------------------------------------------------------------------
+# Client factory — OpenAI direct vs Azure OpenAI
+# ---------------------------------------------------------------------------
+
+def _create_openai_client(
+    api_key: str,
+    azure_endpoint: str = "",
+    api_version: str = "2024-10-21",
+) -> openai.OpenAI:
+    """
+    Create an OpenAI client. If azure_endpoint is set, returns an
+    AzureOpenAI client; otherwise returns a standard OpenAI client.
+    """
+    if azure_endpoint:
+        from openai import AzureOpenAI
+        return AzureOpenAI(
+            api_key=api_key,
+            azure_endpoint=azure_endpoint,
+            api_version=api_version,
+        )
+    return openai.OpenAI(api_key=api_key)
 
 
 # ---------------------------------------------------------------------------
@@ -162,8 +191,14 @@ class OpenAINaiveAgent:
         virustotal_api_key: str = "",
         abuseipdb_api_key: str = "",
         model: str = "gpt-4o",
+        azure_endpoint: str = "",
+        api_version: str = "2024-10-21",
     ) -> None:
-        self.client = openai.OpenAI(api_key=openai_api_key)
+        self.client = _create_openai_client(
+            api_key=openai_api_key,
+            azure_endpoint=azure_endpoint,
+            api_version=api_version,
+        )
         self.vt_key = virustotal_api_key
         self.abuseipdb_key = abuseipdb_api_key
         self.model = model
@@ -339,8 +374,14 @@ class OpenAICalsetaAgent:
         calseta_base_url: str = "http://localhost:8000",
         calseta_api_key: str = "",
         model: str = "gpt-4o",
+        azure_endpoint: str = "",
+        api_version: str = "2024-10-21",
     ) -> None:
-        self.client = openai.OpenAI(api_key=openai_api_key)
+        self.client = _create_openai_client(
+            api_key=openai_api_key,
+            azure_endpoint=azure_endpoint,
+            api_version=api_version,
+        )
         self.model = model
         self.calseta_base_url = calseta_base_url.rstrip("/")
         self.http = httpx.Client(

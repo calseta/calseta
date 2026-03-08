@@ -1,0 +1,65 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Title**: Suspicious PowerShell Execution with Encoded Command
+- **Severity**: High
+- **Status**: Open
+- **Tags**: PowerShell, EncodedCommand, LivingOffTheLand, T1059.001, T1027, DefenseEvasion, Execution
+
+The alert is classified as high severity due to the execution of a suspicious PowerShell command with an encoded payload, which is a common technique used for obfuscation and defense evasion. The presence of multiple malicious indicators further supports the high severity classification.
+
+### Analysis of Enriched Indicators
+
+1. **IP: 10.0.1.10**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: This IP is associated with a TOR network, has a high abuse confidence score, and numerous reports of malicious activity. It is not a known asset and is classified as external_unknown.
+
+2. **IP: 198.51.100.99**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: Similar to the first IP, this is also associated with a TOR network and has a high abuse confidence score. It is not a known asset and is classified as external_unknown.
+
+3. **DOMAIN: c2-relay.darkops.net**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: The domain is tagged with 'c2' and 'malware', indicating it is likely used for command and control purposes. It has a negative reputation and multiple reports of malicious activity.
+
+4. **URL: https://c2-relay.darkops.net/stager.ps1**
+   - **Malice Verdict**: Pending
+   - **Risk Level**: Medium to High
+   - **Details**: The URL is associated with a known malicious domain, suggesting it may be used to deliver or execute malicious payloads.
+
+5. **HASH_SHA256: de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: The hash is associated with 'emotet' and 'trojan' tags, indicating it is a known malware sample. It has a high detection ratio on VirusTotal.
+
+6. **ACCOUNT: SYSTEM (Jorge Martinez)**
+   - **Malice Verdict**: Pending
+   - **Risk Level**: Medium
+   - **Details**: The account is active and belongs to a Senior Engineer with privileged access. There are no immediate risk flags, but the account's involvement in the alert requires further investigation.
+
+### Overall Verdict
+- **True Positive**: The alert is a true positive, given the presence of multiple malicious indicators and the high severity of the detected activity.
+
+### Recommended Next Steps
+
+1. **Immediate Actions**:
+   - Isolate the host associated with the suspicious PowerShell execution using the endpoint agent.
+   - Verify the hash on VirusTotal to confirm the malware family classification.
+   - Identify and interview Jorge Martinez to understand any recent activities that might have led to this alert.
+
+2. **Analysis**:
+   - Decode any encoded PowerShell commands to identify potential C2 domains.
+   - Check for any outbound connections to the identified C2 domain/IP from other hosts in the environment.
+   - Search for the same hash across all endpoints in the last 7 days to determine the scope of the incident.
+
+3. **Containment**:
+   - Block the identified malicious domains and IPs at the firewall.
+   - Ensure the endpoint agent has quarantined the malicious file.
+   - Collect forensic artifacts such as memory dumps, event logs, and prefetch files for further analysis.
+
+4. **Further Investigation**:
+   - Review Jorge Martinez's account activity for any anomalies or unauthorized access.
+   - Assess the need for additional security measures or user training to prevent similar incidents in the future.

@@ -1,0 +1,65 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Title**: Anomalous Outbound Data Transfer
+- **Severity**: High
+- **Status**: Open
+- **Source**: Splunk
+- **Occurred**: 2024-03-01T15:00:00Z
+
+The alert is classified as a high-severity incident due to the detection of anomalous outbound data transfer involving potentially malicious IP addresses and domains. The use of TOR exit nodes and a suspicious domain further elevates the risk level.
+
+### Analysis of Enriched Indicators
+
+#### IP: 10.0.8.55
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+  - **Details**: This IP is associated with TOR, has a high abuse confidence score (100), and numerous reports (2847). It is not whitelisted and is classified as malicious by multiple sources.
+
+#### IP: 45.33.32.156
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+  - **Details**: Similar to the previous IP, this is also a TOR exit node with a high abuse confidence score and numerous reports. It is flagged as malicious by multiple threat intelligence sources.
+
+#### ACCOUNT: svc_backup
+- **Malice Verdict**: Pending
+- **Risk Level**: Medium
+  - **Details**: The account belongs to Jorge Martinez, a Senior Engineer with access to sensitive groups. There are no immediate risk flags, but the account's involvement in the data transfer needs further investigation.
+
+#### URL: https://suspicious-cloud-sync.com/api/v2/upload
+- **Malice Verdict**: Pending
+- **Risk Level**: Medium
+  - **Details**: The URL is associated with a domain flagged as malicious. Further investigation is needed to determine the nature of the data being transferred.
+
+#### DOMAIN: suspicious-cloud-sync.com
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+  - **Details**: The domain is associated with command and control (C2) activities and malware. It has a negative reputation and multiple malicious reports.
+
+### Overall Verdict
+- **Verdict**: True Positive
+
+The alert is a true positive, indicating a potential data exfiltration attempt using malicious IPs and domains. The involvement of TOR and a suspicious domain suggests an attempt to obfuscate the data transfer.
+
+### Recommended Next Steps
+
+1. **Block Malicious Indicators**:
+   - Add the identified malicious IPs and domain to the firewall and proxy block lists to prevent further data exfiltration.
+
+2. **Preserve Evidence**:
+   - Retain network flow logs and proxy logs for the investigation window to support further analysis.
+
+3. **Investigate User Account**:
+   - Conduct a detailed review of the `svc_backup` account activities, focusing on recent logins and data access patterns.
+
+4. **Review Data Loss Prevention (DLP) Alerts**:
+   - Check for any triggered DLP policies that might provide additional context on the data being transferred.
+
+5. **Isolate Affected Devices**:
+   - If any devices are identified as part of the data transfer, consider isolating them for further forensic analysis.
+
+6. **Notify Relevant Stakeholders**:
+   - Inform the security team and management about the incident and the steps being taken to mitigate the risk.
+
+7. **Conduct a Timeline Analysis**:
+   - Analyze the timeline of events to determine if the data transfer occurred during unusual hours or from unexpected locations.

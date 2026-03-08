@@ -1,0 +1,52 @@
+### Investigation Summary
+
+**Alert Classification and Severity Assessment:**
+- **Title:** Brute force sign-in attempts from TOR network detected
+- **Description:** Multiple failed sign-in attempts from a known TOR exit node IP address targeting user account j.martinez@contoso.com. 47 failed attempts observed over a 15-minute window followed by one successful authentication. The source IP 185.220.101.34 is a documented TOR exit relay. This pattern is consistent with credential stuffing or brute force attacks routed through anonymization networks to evade IP-based detection.
+- **Severity:** High
+
+**Indicators of Compromise:**
+1. **IP Address:** 185.220.101.34
+   - **VirusTotal Results:**
+     - **Reputation:** -25
+     - **Malicious Detections:** 17
+     - **Suspicious Detections:** 5
+     - **Harmless Detections:** 43
+     - **Tags:** TOR
+     - **ASN:** 60729 (Stiftung Erneuerbare Freiheit)
+   - **AbuseIPDB Results:**
+     - **Abuse Confidence Score:** 100
+     - **Total Reports:** 143
+     - **Usage Type:** Commercial
+     - **ISP:** Network for Tor-Exit traffic
+     - **Domain:** for-privacy.net
+     - **Hostnames:** tor-exit-34.for-privacy.net
+     - **Is TOR:** True
+
+2. **Account:** j.martinez@contoso.com
+   - **No additional threat intelligence available for accounts.**
+
+**Risk Assessment for Each Indicator:**
+- **IP Address 185.220.101.34:**
+  - **Risk Level:** High
+  - **Reason:** The IP is a known TOR exit node with a high abuse confidence score and numerous reports of malicious activity, including brute force attacks, phishing, and other suspicious activities.
+
+- **Account j.martinez@contoso.com:**
+  - **Risk Level:** Moderate
+  - **Reason:** The account was targeted in a brute force attack, indicating potential compromise or exposure to credential stuffing.
+
+**Overall Verdict:**
+- **True Positive:** The alert is consistent with known malicious activity from TOR exit nodes, and the IP has a high abuse confidence score with multiple reports of malicious behavior.
+
+**Recommended Next Steps:**
+1. **Immediate Actions:**
+   - Block the IP address 185.220.101.34 at the network perimeter to prevent further access attempts.
+   - Force a password reset for the account j.martinez@contoso.com and review recent activity for signs of compromise.
+
+2. **Further Investigation:**
+   - Conduct a thorough review of logs to identify any other suspicious activity related to the IP or account.
+   - Monitor for any additional sign-in attempts from TOR exit nodes or other anonymization services.
+
+3. **Long-term Actions:**
+   - Implement additional security measures such as multi-factor authentication for sensitive accounts.
+   - Consider deploying threat intelligence solutions to better detect and respond to anonymized attacks.

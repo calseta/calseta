@@ -1,0 +1,38 @@
+### Investigation Summary
+
+**Alert Classification and Severity Assessment:**
+- **Alert Type:** Anomalous Outbound Data Transfer Detected
+- **Severity:** High
+- **Category:** Exfiltration
+- **Rule Name:** Anomalous Outbound Data Transfer
+- **Signature:** Data Exfiltration - Anomalous Volume
+
+**Indicators of Compromise and Enrichment Results:**
+
+1. **Source IP: 10.0.8.55**
+   - **VirusTotal:** Clean, no malicious detections.
+   - **AbuseIPDB:** Reserved IP, no reports, abuse confidence score: 0.
+   - **Risk Assessment:** Low risk, as it is a private IP address used internally.
+
+2. **Destination IP: 45.33.32.156**
+   - **VirusTotal:** 4 malicious detections, 1 suspicious detection.
+   - **AbuseIPDB:** 3 reports, associated with honeypot and bot activity, abuse confidence score: 0.
+   - **Risk Assessment:** High risk, due to multiple malicious detections and abuse reports.
+
+3. **Domain: suspicious-cloud-sync.com**
+   - **VirusTotal:** No malicious detections, undetected by all engines.
+   - **Risk Assessment:** Moderate risk, as the domain name suggests potential suspicious activity, but no current detections.
+
+4. **URL: https://suspicious-cloud-sync.com/api/v2/upload**
+   - **VirusTotal:** Not found (HTTP 404 error).
+   - **Risk Assessment:** Unable to assess due to lack of data, but associated with a suspicious domain.
+
+**Overall Verdict:**
+- **Needs Investigation:** The destination IP shows signs of malicious activity, and the domain name is suspicious. Further investigation is required to determine the legitimacy of the data transfer.
+
+**Recommended Next Steps:**
+1. **Block or Monitor Traffic:** Consider blocking or closely monitoring traffic to the destination IP (45.33.32.156) and domain (suspicious-cloud-sync.com).
+2. **Investigate User Activity:** Review the activity of the user account `svc_backup` and the application `custom_sync.exe` for any unauthorized or unusual behavior.
+3. **Network Analysis:** Conduct a deeper network analysis to identify any other potential indicators of compromise or related suspicious activity.
+4. **Contact Linode:** Reach out to Linode (associated with the destination IP) for further information regarding the reported malicious activity.
+5. **Review Firewall Rules:** Ensure firewall rules are appropriately configured to prevent unauthorized data exfiltration.

@@ -1,0 +1,45 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Type:** Suspicious PowerShell Execution with Encoded Command
+- **Category:** Defense Evasion
+- **Severity:** High
+- **Risk Score:** 87
+
+#### Indicators of Compromise and Enrichment Results
+
+1. **Domain:** `c2-relay.darkops.net`
+   - **VirusTotal:** Not found
+   - **Risk Assessment:** Needs further investigation as it is associated with a suspicious activity.
+
+2. **IP Address:** `198.51.100.99`
+   - **VirusTotal:** 
+     - **Reputation:** 0 (harmless)
+     - **Analysis:** 58 harmless, 0 malicious detections
+     - **Tags:** Private, reserved for documentation and sample configurations
+   - **AbuseIPDB:**
+     - **Abuse Confidence Score:** 0
+     - **Reports:** 5 reports, associated with test alerts and security threats
+   - **Risk Assessment:** Low risk due to being a reserved IP for documentation purposes, but reported for test alerts.
+
+3. **URL:** `https://c2-relay.darkops.net/stager.ps1`
+   - **VirusTotal:** Not found
+   - **Risk Assessment:** Needs further investigation due to association with suspicious activity.
+
+4. **File Hash (SHA256):** `de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c`
+   - **VirusTotal:**
+     - **Total Votes:** 20 harmless, 4 malicious
+     - **Sigma Analysis:** High and medium-level rules triggered
+     - **Sandbox Verdicts:** Mixed results (malicious and harmless)
+   - **Risk Assessment:** Medium risk due to mixed verdicts and malicious votes.
+
+#### Overall Verdict
+- **Verdict:** Needs Investigation
+  - The alert involves a suspicious PowerShell execution with encoded commands, potentially downloading a payload from a domain not found in VirusTotal, and using a reserved IP address. The file hash has mixed results, indicating potential malicious activity.
+
+#### Recommended Next Steps
+1. **Domain Investigation:** Conduct further investigation on `c2-relay.darkops.net` to determine its legitimacy and any associated malicious activities.
+2. **Network Traffic Analysis:** Monitor network traffic for any connections to `198.51.100.99` and `c2-relay.darkops.net`.
+3. **File Analysis:** Perform a detailed analysis of the file associated with the hash `de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c` to understand its behavior and potential impact.
+4. **Host Monitoring:** Ensure continuous monitoring of the host `DC01` for any further suspicious activities.
+5. **Incident Response:** Consider initiating an incident response process to mitigate potential threats associated with this alert.

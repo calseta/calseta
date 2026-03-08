@@ -200,7 +200,7 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
         print("ERROR: ANTHROPIC_API_KEY is required")
         sys.exit(1)
 
-    model = env.get("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+    judge_model = env.get("CLAUDE_MODEL", "claude-sonnet-4-20250514")
     client = anthropic.Anthropic(api_key=anthropic_key)
 
     findings_dir = results_dir / "findings"
@@ -215,7 +215,7 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
         sys.exit(1)
 
     print(f"\n=== Evaluating {len(finding_files)} findings ===")
-    print(f"  Model: {model}")
+    print(f"  Judge model: {judge_model}")
     print(f"  Results dir: {results_dir}\n")
 
     # Build evaluation pairs (randomized for blind judging)
@@ -229,13 +229,13 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
         fixture_key = ""
         approach = ""
         run_label = ""
-        model = "unknown"
+        finding_model = "unknown"
 
         if len(parts) >= 4 and parts[-1].startswith("run"):
             # New format: fixture_approach_model_runN
             fixture_key = parts[0]
             approach = parts[1]
-            model = parts[2]
+            finding_model = parts[2]
             run_label = parts[3]
         elif len(parts) >= 3 and parts[-1].startswith("run"):
             # Fallback: try 2-part split (old format)
@@ -265,7 +265,7 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
             "file": fpath.name,
             "fixture": fixture_key,
             "approach": approach,
-            "model": model,
+            "model": finding_model,
             "run": run_label,
             "scenario": scenario,
             "finding": finding_text,
@@ -288,7 +288,7 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
 
         try:
             response = client.messages.create(
-                model=model,
+                model=judge_model,
                 max_tokens=1024,
                 temperature=0,
                 system=JUDGE_SYSTEM_PROMPT,

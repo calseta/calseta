@@ -1,0 +1,69 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Classification:** True Positive - Active Threat
+**Severity:** HIGH (Confirmed)
+**Alert Type:** Brute Force Attack via TOR Network
+
+This alert represents a legitimate security threat involving brute force authentication attempts against a privileged user account from a confirmed malicious TOR exit node.
+
+## Indicator Analysis
+
+### 1. Source IP: 185.220.101.34
+**Risk Level: CRITICAL**
+- **Confirmed TOR Exit Node** (Zwiebelfreunde e.V.)
+- **Abuse Confidence Score: 100%** with 2,847 total reports
+- **14 malicious verdicts** on VirusTotal with reputation score of -42
+- **Recently active** (last reported March 6, 2026)
+- **Zero previous sightings** in internal network logs
+
+### 2. Target Account: j.martinez@contoso.com
+**Risk Level: HIGH**
+- **Privileged User**: Senior Engineer with elevated access
+- **Critical Group Memberships**: GlobalAdmins (Entra), VPN-Users, AWS-ReadOnly
+- **Insider Risk Factors**: On privileged_access watchlist
+- **Account Status**: Active with compliant devices
+- **Last legitimate login**: March 6, 2026 (3 days before attack)
+- **Password last changed**: January 10, 2026 (potentially stale)
+
+### 3. Suspicious Domain: AAD-SIGNIN-SVC.contoso.com
+**Risk Level: CRITICAL**
+- **Confirmed malicious** with 8 VirusTotal detections
+- **Tagged as C2/malware** infrastructure
+- **Typosquatting attempt** mimicking legitimate Azure AD service
+- **Recent registration** (November 2023) via Namecheap
+
+## Key Findings
+
+1. **Attack Vector Confirmed**: Legitimate brute force attempt from known malicious infrastructure
+2. **High-Value Target**: Privileged account with administrative access across multiple systems
+3. **Infrastructure Compromise Indicator**: Malicious domain suggests broader campaign
+4. **Timing Correlation**: Attack occurred 5 days after user's last legitimate login
+
+## Overall Verdict: TRUE POSITIVE
+
+This is a confirmed brute force attack against a high-privilege user account from malicious TOR infrastructure, with additional indicators suggesting a coordinated campaign using typosquatted domains.
+
+## Recommended Next Steps (Immediate - within 15 minutes)
+
+### Critical Actions:
+1. **Suspend j.martinez@contoso.com account** immediately across all systems (Okta, Entra, AWS)
+2. **Revoke all active sessions** for the target account
+3. **Block IP 185.220.101.34** and entire subnet (185.220.101.0/24) at firewall
+4. **Block domain AAD-SIGNIN-SVC.contoso.com** at DNS/proxy level
+
+### Investigation Actions:
+1. **Check for successful logins** from 185.220.101.34 in the last 7 days
+2. **Search for connections** to AAD-SIGNIN-SVC.contoso.com across all network logs
+3. **Review Jorge Martinez's recent activity** for any unusual resource access
+4. **Notify user and manager** (Sunita Patel) of the incident
+
+### Follow-up (within 24 hours):
+1. **Force password reset** for j.martinez@contoso.com
+2. **Enable enhanced monitoring** for the user account post-restoration
+3. **Hunt for similar typosquatted domains** targeting the organization
+4. **Review and strengthen** conditional access policies for administrative accounts
+
+**Incident Priority: P1 - Critical**
+**Estimated Time to Resolution: 2-4 hours**

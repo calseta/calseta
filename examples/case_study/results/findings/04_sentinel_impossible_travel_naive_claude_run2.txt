@@ -1,0 +1,94 @@
+# Security Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Alert Type:** Impossible Travel Detection  
+**Severity:** HIGH (Confirmed)  
+**Classification:** Identity-based Attack / Account Compromise  
+**MITRE ATT&CK Techniques:** T1078 (Valid Accounts), T1078.004 (Cloud Accounts)
+
+## Indicators of Compromise Analysis
+
+### 1. IP Address: 91.234.56.78 (Moscow, Russia)
+**Risk Level: MEDIUM-HIGH**
+- **VirusTotal:** Clean (0/94 detections), but hosted by SC Technological SRL (Romanian hosting provider)
+- **AbuseIPDB:** Clean (0% abuse confidence, 0 reports)
+- **Geographic Discrepancy:** IP registered in Germany but geolocated to Moscow, Russia
+- **Infrastructure:** Cloud VPS hosting service - commonly used for anonymization
+- **Concern:** New IP for user, hosting provider infrastructure suitable for malicious activities
+
+### 2. IP Address: 203.0.113.25 (New York, US)
+**Risk Level: LOW-MEDIUM**
+- **VirusTotal:** Clean, marked as "private" (documentation/test range)
+- **AbuseIPDB:** Reserved IP space, 1 historical report for abuse attack
+- **Note:** This is part of RFC 5737 documentation range (203.0.113.0/24) - unusual for production use
+- **Concern:** Use of documentation IP range in production environment is suspicious
+
+### 3. User Account: r.chen@contoso.com (Robert Chen)
+**Risk Level: CRITICAL**
+- **Privileges:** Global Administrator in Azure AD
+- **Account Status:** Domain-joined, high-value target
+- **Behavioral Anomaly:** Impossible travel pattern detected
+- **Impact:** Full tenant access if compromised
+
+### 4. URL: https://portal.azure.com
+**Risk Level: LOW**
+- **VirusTotal:** Clean (0/95 detections), legitimate Microsoft service
+- **Status:** Legitimate Azure portal access
+
+## Risk Assessment Summary
+
+### High-Risk Indicators:
+1. **Impossible Travel Pattern:** 7,500 km in 32 minutes is physically impossible
+2. **Global Admin Account:** High-privilege account targeted
+3. **New IP Address:** 91.234.56.78 never previously associated with user
+4. **VPS Infrastructure:** Moscow IP hosted on cloud VPS service
+5. **Geographic Inconsistency:** IP registered in Germany but geolocated to Russia
+
+### Medium-Risk Indicators:
+1. **Documentation IP Range:** Use of RFC 5737 test range in production
+2. **Hosting Provider:** Romanian VPS provider with potential for abuse
+
+### Low-Risk Indicators:
+1. **Clean Threat Intelligence:** No current malicious detections on IPs
+2. **Legitimate Portal:** Access to genuine Azure portal
+
+## Overall Verdict: **TRUE POSITIVE**
+
+This alert represents a **confirmed security incident** indicating likely account compromise or credential theft. The impossible travel pattern combined with the high-privilege account and suspicious infrastructure strongly suggests malicious activity.
+
+## Recommended Immediate Actions:
+
+### 1. **URGENT - Account Security (Priority 1)**
+- Immediately disable/suspend r.chen@contoso.com account
+- Force password reset and revoke all active sessions
+- Require MFA re-enrollment
+- Review and revoke any recently granted permissions
+
+### 2. **Investigation Actions (Priority 1)**
+- Analyze authentication logs for both IP addresses
+- Check for any administrative actions performed from 91.234.56.78
+- Review recent privilege escalations or role assignments
+- Examine mailbox access and email forwarding rules
+- Check for any new application registrations or service principals
+
+### 3. **Containment Measures (Priority 2)**
+- Block 91.234.56.78 at firewall/conditional access policies
+- Monitor for additional impossible travel patterns
+- Review other Global Admin accounts for similar activity
+- Implement emergency access procedures for critical operations
+
+### 4. **Forensic Collection (Priority 2)**
+- Preserve authentication logs and audit trails
+- Document timeline of events
+- Collect network flow data if available
+- Prepare incident response documentation
+
+### 5. **Communication (Priority 3)**
+- Notify CISO/Security leadership immediately
+- Prepare user communication regarding account compromise
+- Consider regulatory notification requirements
+- Document lessons learned for future prevention
+
+**Confidence Level:** HIGH (95%)  
+**Recommended Response Time:** IMMEDIATE (within 15 minutes)

@@ -1,0 +1,84 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Classification:** Identity Compromise - Impossible Travel  
+**Severity:** **CRITICAL** (Escalated from High)  
+**Risk Level:** Immediate threat requiring urgent response
+
+This alert represents a sophisticated attack combining impossible travel patterns with malicious infrastructure usage, targeting a high-privilege account with Global Admin access.
+
+## Analysis of Enriched Indicators
+
+### Account Analysis: r.chen@contoso.com vs j.martinez@contoso.com
+**Risk Level: HIGH**
+- **Critical Discrepancy**: Alert references `r.chen@contoso.com` but enrichment data shows `j.martinez@contoso.com`
+- **High Privilege Target**: Jorge Martinez holds Global Admin privileges in both Okta and Entra ID
+- **Legitimate Employee**: Active full-time employee with clean HR record, no insider risk flags
+- **Recent Password Change**: Last changed 2026-01-10, potentially indicating prior compromise awareness
+- **Device Compliance**: All devices compliant with partial EDR coverage
+
+### Malicious IP Infrastructure Analysis
+**Risk Level: CRITICAL**
+
+**IP 91.234.56.78:**
+- **Verdict**: Confirmed malicious TOR exit node
+- **Threat Intelligence**: 100% abuse confidence score, 2,847 reports from 312 distinct users
+- **Infrastructure**: Zwiebelfreunde e.V. (known TOR provider)
+- **Recent Activity**: Last reported malicious activity 2026-03-06
+
+**IP 203.0.113.25:**
+- **Verdict**: Confirmed malicious TOR exit node
+- **Identical Profile**: Same threat indicators as above IP
+- **Pattern**: Multiple TOR nodes suggest sophisticated operational security
+
+### Domain Analysis: RChen-Laptop.contoso.com
+**Risk Level: CRITICAL**
+- **Verdict**: Confirmed malicious C2 infrastructure
+- **Threat Intelligence**: 8 malicious detections, tagged as C2/malware
+- **Spoofing Attempt**: Domain mimics legitimate corporate asset naming convention
+- **Registration**: Namecheap registrar (common for malicious domains)
+
+### URL Analysis: https://portal.azure.com
+**Risk Level: LOW**
+- **Verdict**: Legitimate Microsoft Azure portal
+- **Context**: Likely target of the attack given user's Azure privileges
+
+## Overall Verdict: **TRUE POSITIVE - ACTIVE COMPROMISE**
+
+### Evidence Supporting Compromise:
+1. **Impossible Travel Pattern**: Authentication from geographically impossible locations
+2. **TOR Infrastructure Usage**: Multiple confirmed malicious TOR exit nodes
+3. **C2 Domain Presence**: Malicious command and control infrastructure in the attack chain
+4. **High-Value Target**: Global Admin account with extensive privileges
+5. **Sophisticated TTPs**: Use of anonymization networks and domain spoofing
+
+### Potential Attack Scenario:
+Threat actor has likely compromised Jorge Martinez's credentials and is using TOR infrastructure to maintain anonymity while accessing Azure resources. The presence of a malicious C2 domain suggests potential malware deployment or data exfiltration capabilities.
+
+## Recommended Next Steps (IMMEDIATE - Within 15 minutes)
+
+### Critical Actions:
+1. **Account Suspension**: Immediately disable j.martinez@contoso.com in both Okta and Entra ID
+2. **Session Revocation**: Revoke all active sessions and tokens for the account
+3. **Device Isolation**: Network-isolate both JMartinez-MBP and JMartinez-iPhone
+4. **Password Reset**: Force password reset with secure out-of-band delivery
+
+### Investigation Actions:
+1. **Timeline Analysis**: Review all authentication logs for j.martinez@contoso.com in the last 7 days
+2. **Privilege Audit**: Document all resources accessed using Global Admin privileges
+3. **Network Analysis**: Search for connections to 91.234.56.78, 203.0.113.25, and RChen-Laptop.contoso.com
+4. **Lateral Movement Check**: Examine any new resource access or privilege escalations
+
+### Containment Actions:
+1. **IP Blocking**: Add both malicious IPs to firewall block lists
+2. **Domain Blocking**: Block RChen-Laptop.contoso.com at DNS and proxy levels
+3. **Conditional Access**: Implement emergency conditional access policies
+4. **User Notification**: Contact Jorge Martinez via secure channel to verify legitimate activity
+
+### Escalation:
+- **Notify**: CISO, IT Security Manager, and Jorge Martinez's manager (Sunita Patel)
+- **Incident Response**: Activate incident response team for potential data breach
+- **Legal/Compliance**: Consider notification requirements given Global Admin access
+
+**Priority**: P1 - Critical security incident requiring immediate response and executive notification.
