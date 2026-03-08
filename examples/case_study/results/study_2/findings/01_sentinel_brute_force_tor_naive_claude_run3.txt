@@ -1,0 +1,95 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+- **Alert Type:** Brute Force Authentication Attack via TOR Network
+- **Severity:** **HIGH** ✅ (Confirmed appropriate)
+- **MITRE ATT&CK Tactics:** Initial Access (T1110), Credential Access (T1110.001)
+- **Attack Pattern:** 47 failed login attempts over 15 minutes followed by 1 successful authentication
+- **Timeline:** March 1, 2026, 14:23-14:38 UTC
+
+## Indicators of Compromise Analysis
+
+### 1. IP Address: 185.220.101.34
+**Risk Level: CRITICAL** 🔴
+
+**VirusTotal Results:**
+- **Reputation Score:** -25 (Negative)
+- **Detection Rate:** 17/94 engines flagged as malicious
+- **Confirmed TOR Exit Node:** Network explicitly labeled "TOR-EXIT"
+- **ASN:** 60729 (Stiftung Erneuerbare Freiheit)
+- **Location:** Frankfurt, Germany
+
+**AbuseIPDB Results:**
+- **Abuse Confidence Score:** 100% (Maximum)
+- **Total Reports:** 143 reports from 69 distinct users
+- **Recent Activity:** Last reported March 7, 2026 (6 days after this incident)
+- **Attack Types:** SSH brute force, web application attacks, spam, phishing, port scanning
+
+**Key Findings:**
+- Documented TOR exit relay with extensive abuse history
+- Multiple recent reports of SSH brute force attacks
+- Active in credential stuffing and web application attacks
+- Hostname: tor-exit-34.for-privacy.net
+
+### 2. User Account: j.martinez@contoso.com
+**Risk Level: HIGH** 🟡
+
+**Account Details:**
+- **Display Name:** Julia Martinez
+- **Domain:** contoso.com (Microsoft Corporation - legitimate domain)
+- **Status:** Successfully compromised after brute force attack
+- **Azure AD User ID:** e8d4c6b2-a1f3-4e7d-9c5b-d0123456789a
+
+### 3. Domain: contoso.com
+**Risk Level: LOW** 🟢
+
+**VirusTotal Results:**
+- **Reputation:** Clean (0/94 engines flagged)
+- **Registrar:** MarkMonitor Inc. (Microsoft Corporation)
+- **Status:** Legitimate Microsoft domain used for examples/testing
+- **DNS:** Hosted on Azure DNS infrastructure
+
+### 4. Host: AAD-SIGNIN-SVC.contoso.com
+**Risk Level: LOW** 🟢
+- Azure Active Directory sign-in service
+- Legitimate Microsoft infrastructure component
+
+## Overall Verdict: **TRUE POSITIVE** ✅
+
+This is a **confirmed security incident** with the following evidence:
+
+1. **Confirmed TOR-based brute force attack** from a known malicious IP
+2. **Successful credential compromise** after 47 failed attempts
+3. **High-confidence threat actor** with extensive abuse history
+4. **Attack pattern consistent** with credential stuffing operations
+
+## Recommended Next Steps
+
+### Immediate Actions (0-2 hours):
+1. **Reset j.martinez@contoso.com password immediately**
+2. **Revoke all active sessions** for the compromised account
+3. **Enable MFA** if not already configured
+4. **Block IP 185.220.101.34** at network perimeter
+5. **Review account activity** for any unauthorized actions post-compromise
+
+### Short-term Actions (2-24 hours):
+1. **Audit all accounts** for similar brute force patterns
+2. **Implement TOR exit node blocking** at firewall level
+3. **Review and strengthen** account lockout policies
+4. **Check for lateral movement** from compromised account
+5. **Notify user** and conduct security awareness training
+
+### Long-term Actions (1-7 days):
+1. **Deploy conditional access policies** blocking TOR traffic
+2. **Implement advanced threat protection** for identity services
+3. **Review and update** incident response procedures
+4. **Conduct threat hunting** for similar attack patterns
+5. **Consider implementing** risk-based authentication
+
+### Monitoring and Detection:
+1. **Monitor for repeat attacks** from TOR networks
+2. **Set up alerts** for multiple failed logins from anonymization networks
+3. **Track account usage** for signs of ongoing compromise
+4. **Implement user behavior analytics** to detect anomalous activity
+
+This incident demonstrates a successful credential stuffing attack using TOR infrastructure to evade detection, requiring immediate containment and remediation actions.

@@ -1,0 +1,110 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+- **Alert Type:** Brute Force Authentication Attack via TOR Network
+- **Severity:** **HIGH** ✅ (Confirmed appropriate)
+- **MITRE ATT&CK Tactics:** Initial Access (T1110), Credential Access (T1110.001)
+- **Attack Pattern:** 47 failed login attempts over 15 minutes followed by 1 successful authentication
+
+## Indicators of Compromise Analysis
+
+### 1. IP Address: 185.220.101.34
+**Risk Level: CRITICAL** 🔴
+
+**VirusTotal Results:**
+- **Reputation Score:** -25 (Negative reputation)
+- **Malicious Detections:** 17/94 security vendors flagged as malicious
+- **TOR Classification:** Confirmed TOR exit node
+- **Network:** 185.220.101.0/24 (Stiftung Erneuerbare Freiheit)
+- **ASN:** AS60729 (ForPrivacyNET)
+- **Location:** Frankfurt, Germany
+
+**AbuseIPDB Results:**
+- **Abuse Confidence Score:** 100% (Maximum risk)
+- **Total Reports:** 143 reports from 69 distinct users
+- **Confirmed TOR Node:** Yes
+- **Recent Activity:** Last reported March 7, 2026 (ongoing malicious activity)
+- **Attack Types:** SSH brute force, web application attacks, spam, phishing, vulnerability scanning
+
+**Key Findings:**
+- Documented TOR exit relay with extensive abuse history
+- Multiple recent reports of SSH brute force attacks
+- Active in credential stuffing and web application attacks
+- Used for spam and phishing campaigns
+
+### 2. User Account: j.martinez@contoso.com
+**Risk Level: HIGH** 🟡
+
+**Analysis:**
+- **Account:** Julia Martinez (j.martinez@contoso.com)
+- **Status:** Successfully compromised after brute force attack
+- **Azure AD User ID:** e8d4c6b2-a1f3-4e7d-9c5b-d0123456789a
+- **Domain Joined:** Yes
+
+### 3. Domain: contoso.com
+**Risk Level: LOW** 🟢
+
+**VirusTotal Results:**
+- **Reputation:** Clean (0 malicious detections)
+- **Registrant:** Microsoft Corporation
+- **Status:** Legitimate Microsoft test domain
+- **DNS:** Hosted on Azure DNS infrastructure
+
+## Overall Risk Assessment
+
+### Critical Risk Factors:
+1. **Confirmed TOR Exit Node:** Source IP is a documented TOR exit relay
+2. **100% Abuse Confidence:** Maximum risk score from AbuseIPDB
+3. **Successful Compromise:** Attack resulted in successful authentication
+4. **Extensive Attack History:** 143 abuse reports showing ongoing malicious activity
+5. **Recent Activity:** Continuous malicious behavior through March 2026
+
+### Attack Timeline:
+- **Start:** 2026-03-01 14:23:11 UTC
+- **End:** 2026-03-01 14:38:47 UTC
+- **Duration:** 15 minutes, 36 seconds
+- **Pattern:** 47 failed attempts → 1 successful login
+
+## Verdict: TRUE POSITIVE ✅
+
+This is a **confirmed malicious attack** with the following evidence:
+- Source IP is a known TOR exit node with maximum abuse confidence
+- Successful credential compromise after systematic brute force
+- Attack pattern consistent with credential stuffing operations
+- Extensive history of similar attacks from this IP
+
+## Recommended Next Steps
+
+### Immediate Actions (Priority 1):
+1. **Account Security:**
+   - Force password reset for j.martinez@contoso.com
+   - Revoke all active sessions for the compromised account
+   - Enable MFA if not already configured
+   - Review account permissions and recent activity
+
+2. **Network Security:**
+   - Block IP 185.220.101.34 at firewall/WAF level
+   - Consider blocking entire TOR exit node range (185.220.101.0/24)
+   - Review authentication logs for other potential compromises
+
+### Investigation Actions (Priority 2):
+3. **Forensic Analysis:**
+   - Review all authentication attempts from 185.220.101.34
+   - Check for lateral movement or privilege escalation attempts
+   - Analyze any data access or modifications by j.martinez account post-compromise
+   - Review other accounts for similar attack patterns
+
+4. **Threat Hunting:**
+   - Search for other TOR-based authentication attempts
+   - Look for credential stuffing patterns across other user accounts
+   - Monitor for any suspicious activity from the compromised account
+
+### Preventive Measures (Priority 3):
+5. **Security Enhancements:**
+   - Implement TOR exit node blocking at network perimeter
+   - Deploy adaptive authentication policies
+   - Enhance monitoring for brute force attack patterns
+   - Consider implementing CAPTCHA for repeated failed logins
+   - Review and strengthen password policies
+
+This incident represents a successful credential compromise via TOR-based brute force attack and requires immediate containment and remediation actions.

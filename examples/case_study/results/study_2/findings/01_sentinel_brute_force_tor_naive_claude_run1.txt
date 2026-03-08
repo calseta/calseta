@@ -12,75 +12,97 @@
 **Risk Level: CRITICAL** 🔴
 
 **VirusTotal Results:**
-- **Reputation Score:** -25 (Highly Malicious)
 - **Detection Rate:** 17/94 engines flagged as malicious
-- **Confirmed TOR Exit Node:** Network explicitly designated for TOR exit traffic
+- **Confirmed TOR Exit Node:** Network name "TOR-EXIT" 
 - **ASN:** 60729 (Stiftung Erneuerbare Freiheit)
 - **Location:** Frankfurt, Germany
+- **Network Description:** "Network for Tor-Exit traffic"
 
 **AbuseIPDB Results:**
 - **Abuse Confidence Score:** 100% (Maximum)
 - **Total Reports:** 143 reports from 69 distinct users
-- **Recent Activity:** Last reported March 7, 2026 (within days of this incident)
-- **Attack Types:** SSH brute force, web application attacks, spam, vulnerability scanning
+- **Recent Activity:** Last reported March 7, 2026 (6 days after this incident)
+- **Attack Types:** SSH brute force, web application attacks, spam, port scanning, malware distribution
 
-**Key Threat Intelligence:**
-- Documented TOR exit relay with extensive abuse history
-- Recent reports include SSH brute force attacks, WordPress exploitation attempts, and email spam
-- Multiple security vendors classify as malicious/suspicious
-- Consistent pattern of credential stuffing and brute force attacks
+**Key Findings:**
+- Legitimate TOR exit node being actively abused for malicious activities
+- Extensive history of brute force attacks against SSH, web applications, and email services
+- Multiple reports of credential stuffing and unauthorized access attempts
+- Consistent pattern of attacks routed through this node to evade detection
 
 ### 2. User Account: j.martinez@contoso.com
 **Risk Level: HIGH** 🟡
 
 **Analysis:**
-- **Targeted User:** Julia Martinez (Display Name from alert)
-- **Account Type:** Domain-joined Azure AD account
-- **Compromise Status:** Successfully authenticated after 47 failed attempts
-- **Impact:** Account likely compromised and requires immediate attention
+- **Account:** Julia Martinez (j.martinez@contoso.com)
+- **Azure AD User ID:** e8d4c6b2-a1f3-4e7d-9c5b-d0123456789a
+- **Domain Joined:** Yes
+- **Attack Outcome:** Account successfully compromised after 47 failed attempts
 
 ### 3. Domain: contoso.com
 **Risk Level: LOW** 🟢
 
 **VirusTotal Results:**
-- **Reputation:** Legitimate Microsoft-owned domain
 - **Detection Rate:** 0/94 engines flagged as malicious
-- **Registrar:** MarkMonitor Inc. (reputable)
+- **Registrar:** MarkMonitor Inc. (Microsoft Corporation)
+- **Status:** Legitimate Microsoft-owned domain used for testing/examples
 - **DNS:** Hosted on Azure DNS infrastructure
-- **Status:** Clean - this is the victim organization's domain
 
-## Overall Verdict: TRUE POSITIVE ✅
+## Overall Risk Assessment
 
-This is a **confirmed security incident** with the following evidence:
+### Attack Vector Analysis
+1. **TOR Network Abuse:** Attacker used legitimate TOR infrastructure to mask their true origin
+2. **Credential Attack:** Classic brute force/credential stuffing attack pattern
+3. **Successful Compromise:** Attack succeeded after 47 attempts, indicating weak password or credential reuse
+4. **Timing:** Concentrated 15-minute attack window suggests automated tooling
 
-1. **Confirmed TOR-based Attack:** Source IP is a documented TOR exit node with 100% abuse confidence
-2. **Successful Credential Compromise:** Attack pattern shows 47 failed attempts followed by successful authentication
-3. **High-Risk Source:** IP has extensive recent history of similar brute force attacks
-4. **Legitimate Target:** Attack targeted a real user account in the organization
+### Threat Actor Profile
+- **Sophistication:** Medium - Uses TOR for anonymization but relies on basic brute force
+- **Persistence:** High - IP has extensive history of similar attacks across multiple targets
+- **Intent:** Likely credential harvesting for initial access to corporate environment
 
-## Recommended Immediate Actions
+## Verdict: TRUE POSITIVE ✅
 
-### **CRITICAL (Within 1 Hour):**
-1. **Disable j.martinez@contoso.com account immediately**
-2. **Force password reset for Julia Martinez**
-3. **Review all recent activity for this account in Azure AD logs**
-4. **Check for any privilege escalation or lateral movement**
+This is a **confirmed malicious attack** with the following evidence:
+- Source IP has 100% abuse confidence score with extensive attack history
+- Successful credential compromise after systematic brute force attempt
+- Use of TOR network for anonymization indicates malicious intent
+- Attack pattern consistent with credential stuffing campaigns
 
-### **HIGH PRIORITY (Within 4 Hours):**
-1. **Block 185.220.101.34 at network perimeter**
-2. **Implement TOR exit node blocking if not already in place**
-3. **Review authentication logs for other accounts from this IP**
-4. **Enable MFA for all accounts if not already enforced**
+## Recommended Next Steps
 
-### **MEDIUM PRIORITY (Within 24 Hours):**
-1. **Conduct forensic analysis of Julia Martinez's account activity**
-2. **Review and strengthen password policies**
-3. **Implement conditional access policies blocking TOR traffic**
-4. **Monitor for any data exfiltration or unauthorized access**
+### Immediate Actions (0-4 hours)
+1. **Account Security:**
+   - Force password reset for j.martinez@contoso.com
+   - Enable MFA if not already configured
+   - Review account activity logs for post-compromise actions
+   - Check for any privilege escalation or lateral movement
 
-### **ONGOING:**
-1. **Enhance monitoring for authentication anomalies**
-2. **Consider implementing risk-based authentication**
-3. **Regular security awareness training focusing on password security**
+2. **Network Security:**
+   - Block 185.220.101.34 at perimeter firewalls
+   - Consider blocking entire TOR exit node ranges if policy permits
+   - Review authentication logs for other accounts targeted from this IP
 
-This incident represents a successful credential stuffing attack using TOR anonymization, requiring immediate containment and investigation.
+### Short-term Actions (4-24 hours)
+3. **Investigation Expansion:**
+   - Search for other authentication attempts from TOR exit nodes
+   - Review failed login patterns for other user accounts
+   - Check for any successful logins from other suspicious IPs in the same timeframe
+
+4. **Security Controls:**
+   - Implement account lockout policies if not already in place
+   - Deploy conditional access policies to block TOR traffic
+   - Enable Azure AD Identity Protection risk-based policies
+
+### Long-term Actions (1-7 days)
+5. **Monitoring Enhancement:**
+   - Create detection rules for authentication from TOR networks
+   - Implement user behavior analytics for anomalous login patterns
+   - Set up alerts for rapid-fire authentication attempts
+
+6. **User Education:**
+   - Conduct security awareness training on password security
+   - Implement password complexity requirements
+   - Consider deploying passwordless authentication methods
+
+This incident represents a successful initial access attempt that requires immediate containment and investigation to prevent further compromise.

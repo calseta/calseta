@@ -1,0 +1,64 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Title:** Impossible travel activity detected for user r.chen@contoso.com
+- **Description:** User authenticated from New York, US and Moscow, Russia within 32 minutes, which is impossible for physical travel. The Moscow sign-in originated from IP 91.234.56.78, not previously associated with the user account. The account has Global Administrator privileges in Azure AD.
+- **Severity:** High
+- **Status:** New
+- **Tactics:** InitialAccess
+- **Techniques:** T1078, T1078.004
+
+#### Indicators of Compromise and Enrichment Results
+
+1. **IP Address: 91.234.56.78**
+   - **VirusTotal:**
+     - Reputation: 0 (harmless)
+     - ASN: 49074 (SC Technological Srl)
+     - Country: Germany
+     - Last Analysis: Clean by all engines
+   - **AbuseIPDB:**
+     - Abuse Confidence Score: 0
+     - Total Reports: 0
+     - Country: Germany
+   - **Risk Assessment:** Low risk, no malicious activity detected.
+
+2. **IP Address: 203.0.113.25**
+   - **VirusTotal:**
+     - Reputation: 0 (harmless)
+     - Tags: Private
+     - Last Analysis: Clean by all engines
+   - **AbuseIPDB:**
+     - Abuse Confidence Score: 0
+     - Total Reports: 1 (reported for abuse attack by fail2ban)
+     - Country: Reserved (no specific country)
+   - **Risk Assessment:** Low risk, reported once but generally clean.
+
+3. **URL: https://portal.azure.com**
+   - **VirusTotal:**
+     - Reputation: 2 (mostly harmless)
+     - Last Analysis: Clean by all engines
+     - Categories: Information Technology
+   - **Risk Assessment:** Low risk, legitimate Microsoft Azure portal.
+
+#### Overall Verdict
+- **Verdict:** Needs Investigation
+  - The alert indicates a potential account compromise due to impossible travel activity. Although the IP addresses and URL are clean, the context of the alert (Global Administrator privileges and unusual sign-in pattern) warrants further investigation.
+
+#### Recommended Next Steps
+1. **User Account Investigation:**
+   - Verify recent activities and changes made by the user account.
+   - Check for any unauthorized access or changes in Azure AD.
+
+2. **IP Address Monitoring:**
+   - Continue monitoring IP 91.234.56.78 for any suspicious activities.
+   - Investigate the single report on IP 203.0.113.25 for potential false positives.
+
+3. **Security Measures:**
+   - Implement additional security measures for accounts with high privileges, such as multi-factor authentication.
+   - Review and update security policies related to account access and travel activities.
+
+4. **Communication:**
+   - Inform the user (r.chen@contoso.com) about the suspicious activity and advise on security best practices.
+
+5. **Further Analysis:**
+   - Conduct a deeper analysis of network logs and user activities around the time of the alert to identify any anomalies.

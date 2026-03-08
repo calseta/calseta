@@ -1,0 +1,92 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Classification:** Identity Compromise - Impossible Travel  
+**Severity:** HIGH (Confirmed)  
+**Alert Type:** True Positive - Account Compromise
+
+This alert represents a confirmed account compromise involving impossible travel patterns combined with multiple high-risk indicators.
+
+## Critical Data Inconsistency Identified
+
+**MAJOR CONCERN:** There is a significant data mismatch in the enrichment results. The alert specifically mentions user `r.chen@contoso.com`, but all enrichment data returned information for `j.martinez@contoso.com` (Jorge Martinez). This suggests either:
+- Data correlation error in the enrichment system
+- Potential account takeover where the attacker has modified account details
+- System misconfiguration linking wrong user profiles
+
+## Analysis of Enriched Indicators
+
+### Account: r.chen@contoso.com
+- **Risk Level:** CRITICAL
+- **Malice Verdict:** Pending (but highly suspicious given context)
+- **Key Concerns:**
+  - Enrichment data shows Jorge Martinez instead of R. Chen - major red flag
+  - Account has Global Administrator privileges (confirmed in alert description)
+  - The data mismatch could indicate account manipulation or system compromise
+
+### IP Address: 91.234.56.78 (Moscow location)
+- **Risk Level:** CRITICAL
+- **Malice Verdict:** Malicious
+- **Analysis:**
+  - Confirmed TOR exit node (Zwiebelfreunde e.V.)
+  - 100% abuse confidence score with 2,847 reports
+  - 14 malicious detections on VirusTotal
+  - Never previously associated with this user account
+  - Geographically impossible travel from New York (32 minutes, 7,500 km)
+
+### IP Address: 203.0.113.25
+- **Risk Level:** CRITICAL  
+- **Malice Verdict:** Malicious
+- **Analysis:**
+  - Also a TOR exit node with identical threat profile
+  - Same ASN (205100) and network owner as the Moscow IP
+  - Suggests coordinated attack infrastructure
+
+### Domain: RChen-Laptop.contoso.com
+- **Risk Level:** CRITICAL
+- **Malice Verdict:** Malicious
+- **Analysis:**
+  - Flagged as C2 (Command & Control) infrastructure
+  - 8 malicious detections on VirusTotal
+  - Suspicious that a supposed corporate laptop hostname is flagged as malware C2
+
+### URL: https://portal.azure.com
+- **Risk Level:** LOW
+- **Malice Verdict:** Pending
+- **Analysis:** Legitimate Microsoft Azure portal - expected for admin access
+
+## Overall Verdict: TRUE POSITIVE - CONFIRMED COMPROMISE
+
+### Evidence Supporting Compromise:
+1. **Impossible Travel:** 7,500 km in 32 minutes is physically impossible
+2. **TOR Usage:** Attacker used TOR network to mask true location
+3. **Malicious Infrastructure:** Multiple indicators flagged as malicious/C2
+4. **High-Privilege Target:** Global Administrator account compromised
+5. **Data Inconsistencies:** Enrichment mismatches suggest account manipulation
+
+## Recommended Immediate Actions (CRITICAL - Execute within 15 minutes)
+
+### Containment:
+1. **IMMEDIATELY suspend r.chen@contoso.com account** in both Okta and Entra ID
+2. **Revoke all active sessions** for this account across all services
+3. **Block IP ranges** 91.234.56.0/24 and 203.0.113.0/24 at firewall level
+4. **Disable Global Admin privileges** for this account pending investigation
+
+### Investigation:
+1. **Verify user identity** - Contact R. Chen through alternative channels to confirm their location and recent activity
+2. **Investigate data mismatch** - Determine why enrichment returned Jorge Martinez data for R. Chen account
+3. **Review audit logs** - Check all administrative actions performed by this account in the last 24 hours
+4. **Scan for lateral movement** - Search for any new resource access or privilege escalations
+
+### Communication:
+1. **Notify CISO immediately** - Global Admin compromise requires executive notification
+2. **Alert Identity team** - Coordinate account recovery procedures
+3. **Inform user's manager** - Coordinate legitimate user verification
+
+### Monitoring:
+1. **Monitor for reactivation attempts** from TOR networks
+2. **Watch for similar patterns** on other high-privilege accounts
+3. **Track any attempts to access the malicious C2 domain**
+
+**Estimated Impact:** HIGH - Global Administrator account compromise poses significant risk to entire Azure/M365 environment.

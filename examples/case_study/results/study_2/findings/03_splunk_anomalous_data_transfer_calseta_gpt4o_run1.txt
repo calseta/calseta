@@ -1,0 +1,46 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Title**: Anomalous Outbound Data Transfer
+- **Severity**: High
+- **Status**: Open
+- **Description**: The alert indicates a potential data exfiltration event characterized by an anomalous volume of outbound data transfer.
+
+### Analysis of Enriched Indicators
+
+#### IP: 10.0.8.55
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+  - **Details**: This IP is associated with a TOR network, indicating potential anonymity and obfuscation of activities. It has a high abuse confidence score of 100 and numerous reports (2847) indicating malicious activity. It is not whitelisted and has been reported recently.
+  
+#### IP: 45.33.32.156
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+  - **Details**: Similar to the previous IP, this is also associated with a TOR network and has identical malicious attributes, including a high abuse confidence score and numerous reports.
+
+#### ACCOUNT: svc_backup
+- **Malice Verdict**: Pending
+- **Risk Level**: Needs Further Investigation
+  - **Details**: The account is linked to a legitimate user, Jorge Martinez, a Senior Engineer. There are no immediate risk flags or insider threat indicators, but the account is part of privileged groups, which necessitates further scrutiny.
+
+#### URL: https://suspicious-cloud-sync.com/api/v2/upload
+- **Malice Verdict**: Pending
+- **Risk Level**: Needs Further Investigation
+  - **Details**: The URL is associated with a domain marked as malicious, but the specific URL verdict is pending. Further investigation is required to determine its role in the data transfer.
+
+#### DOMAIN: suspicious-cloud-sync.com
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+  - **Details**: The domain is tagged with 'c2' and 'malware' indicators, suggesting it may be used for command and control or malicious activities. It has a negative reputation and multiple malicious reports.
+
+### Overall Verdict
+- **True Positive**: The presence of multiple malicious indicators, including TOR network IPs and a domain associated with malware, strongly suggests a true positive for data exfiltration.
+
+### Recommended Next Steps
+1. **Block Malicious Indicators**: Immediately block the IPs (10.0.8.55, 45.33.32.156) and the domain (suspicious-cloud-sync.com) at the firewall and proxy level.
+2. **Preserve Evidence**: Retain network flow logs and proxy logs for the investigation window to support further analysis.
+3. **Investigate svc_backup Account**: Conduct a detailed review of the svc_backup account's recent activities, including login times and data access patterns, to determine if it was compromised.
+4. **Quantify Data Transfer**: Assess the volume of data transferred to the suspicious URL and compare it against the user's baseline to understand the scope of the exfiltration.
+5. **Review DLP Alerts**: Check for any triggered Data Loss Prevention policies that might provide additional context on the data types involved.
+6. **Isolate Affected Devices**: If any devices are identified as part of the data transfer, consider isolating them for forensic analysis.
+7. **Notify Stakeholders**: Inform relevant stakeholders, including IT security and management, about the incident and ongoing investigation efforts.

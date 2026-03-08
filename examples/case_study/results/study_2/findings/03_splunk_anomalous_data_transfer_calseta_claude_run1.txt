@@ -1,0 +1,72 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Classification:** Data Exfiltration via Tor Network  
+**Severity:** HIGH (Confirmed)  
+**Alert Type:** Anomalous Outbound Data Transfer
+
+This alert represents a high-severity data exfiltration incident involving the use of Tor infrastructure to anonymize malicious traffic. The combination of anomalous data volumes and connections to known malicious infrastructure indicates sophisticated threat actor activity.
+
+## Indicator Analysis
+
+### Malicious IP Addresses (10.0.8.55 & 45.33.32.156)
+**Risk Level: CRITICAL**
+- Both IPs are confirmed Tor exit nodes operated by Zwiebelfreunde e.V. (ASN 205100)
+- AbuseIPDB shows extremely high confidence scores (100%) with 2,847 total reports from 312 distinct users
+- VirusTotal confirms malicious classification with reputation scores of -42
+- Both tagged as 'tor' and 'proxy' infrastructure
+- No previous sightings in internal network, indicating first-time contact
+
+### Compromised Account (svc_backup)
+**Risk Level: HIGH**
+- **Critical Discrepancy Identified:** Account name "svc_backup" suggests a service account, but enrichment data shows human user "Jorge Martinez"
+- This indicates either:
+  - Account compromise where attacker renamed/repurposed the account
+  - Service account that was incorrectly mapped to human identity data
+- User has privileged access: GlobalAdmins group in Entra, AWS-ReadOnly permissions
+- Account is active with recent login activity (2026-03-06T14:22:00.000Z)
+- User is on privileged access monitoring list due to admin rights
+
+### Malicious Domain (suspicious-cloud-sync.com)
+**Risk Level: CRITICAL**
+- VirusTotal confirms malicious classification with reputation score of -15
+- Tagged as 'c2' (command and control) and 'malware' infrastructure
+- 8 security vendors classify as malicious, 1 as suspicious
+- Recently registered domain (December 2023) - typical of threat actor infrastructure
+- Domain name uses deceptive naming to appear legitimate ("cloud-sync")
+
+### Suspicious URL (https://suspicious-cloud-sync.com/api/v2/upload)
+**Risk Level: HIGH**
+- Upload endpoint on confirmed malicious domain
+- API structure suggests automated data exfiltration capability
+- No enrichment data available, but inherits risk from parent domain
+
+## Overall Verdict: TRUE POSITIVE
+
+This is a confirmed data exfiltration incident with the following key evidence:
+1. **Confirmed malicious infrastructure:** All network indicators are flagged as malicious by multiple threat intelligence sources
+2. **Tor anonymization:** Use of Tor network indicates sophisticated operational security by threat actors
+3. **Account compromise indicators:** Service account name mismatch with human user data suggests compromise
+4. **Targeted exfiltration:** API upload endpoint indicates structured data theft operation
+
+## Recommended Next Steps
+
+### Immediate Actions (0-15 minutes)
+1. **Network Isolation:** Block all traffic to 10.0.8.55, 45.33.32.156, and suspicious-cloud-sync.com at firewall/proxy level
+2. **Account Security:** Immediately disable svc_backup account and force password reset for Jorge Martinez
+3. **Asset Containment:** Network isolate Jorge Martinez's devices (JMartinez-MBP, JMartinez-iPhone) using EDR
+
+### Investigation Phase (15 minutes - 4 hours)
+4. **Data Impact Assessment:** Quantify volume of data transferred and identify file types/content
+5. **Timeline Analysis:** Review all network flows and authentication logs for the svc_backup account over past 30 days
+6. **Lateral Movement Hunt:** Search for connections to malicious IPs/domains from other internal hosts
+7. **DLP Review:** Check for any Data Loss Prevention policy violations during the transfer window
+
+### Recovery and Hardening (4+ hours)
+8. **Forensic Collection:** Preserve network flow logs, proxy logs, and endpoint artifacts from affected systems
+9. **Privilege Review:** Audit all accounts with GlobalAdmins and privileged access rights
+10. **Monitoring Enhancement:** Implement additional monitoring for Tor traffic and anomalous data transfers
+
+**Estimated Investigation Time:** 8-12 hours  
+**Stakeholders to Notify:** CISO, Legal, HR (for insider threat assessment), Data Protection Officer

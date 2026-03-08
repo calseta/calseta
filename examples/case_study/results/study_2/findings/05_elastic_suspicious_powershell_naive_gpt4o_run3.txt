@@ -1,0 +1,46 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Type:** Suspicious PowerShell Execution with Encoded Command
+- **Category:** Defense Evasion
+- **Severity:** High
+- **Risk Score:** 87
+- **Description:** The alert indicates a PowerShell execution using encoded commands, which is a common technique used by malware droppers and post-exploitation frameworks. The command attempts to download and execute a remote payload from a known command-and-control domain.
+
+#### Indicators of Compromise (IOCs) and Enrichment Results
+
+1. **IP Addresses:**
+   - **Source IP:** `10.0.1.10`
+     - **Enrichment Results:** Internal IP, typically not enriched for external threat intelligence.
+   - **Destination IP:** `198.51.100.99`
+     - **VirusTotal Results:** No malicious activity detected; categorized as a reserved IP for documentation purposes.
+     - **AbuseIPDB Results:** Abuse confidence score is 0; reported 5 times for various test alerts and IDS alerts, but no confirmed malicious activity.
+
+2. **Domains:**
+   - **Domain:** `c2-relay.darkops.net`
+     - **VirusTotal Results:** No malicious activity detected; categorized as a DGA (Domain Generation Algorithm) domain, which is often used by malware for C2 communication.
+
+3. **URLs:**
+   - **URL:** `https://c2-relay.darkops.net/stager.ps1`
+     - **VirusTotal Results:** URL not found, indicating it may be inactive or removed.
+
+4. **File Hashes:**
+   - **SHA256 Hash:** `de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c`
+     - **VirusTotal Results:** The file is identified as PowerShell executable, signed by Microsoft, and generally considered legitimate. However, sandbox analysis indicates potential malicious behavior in certain contexts.
+
+#### Risk Assessment for Each Indicator
+
+- **Destination IP (`198.51.100.99`):** Low risk due to its reserved status for documentation and lack of malicious activity.
+- **Domain (`c2-relay.darkops.net`):** Medium risk due to its categorization as a DGA domain, which is commonly used in malware operations.
+- **URL (`https://c2-relay.darkops.net/stager.ps1`):** Unable to assess risk due to unavailability.
+- **File Hash (`de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c`):** Low risk as it is a legitimate Microsoft-signed executable, but vigilance is advised due to potential misuse in malicious contexts.
+
+#### Overall Verdict
+- **Needs Investigation:** While the indicators themselves do not show direct malicious activity, the context of their use in a suspicious PowerShell execution warrants further investigation to ensure no compromise has occurred.
+
+#### Recommended Next Steps
+1. **Investigate Host Activity:** Review logs and activities on the host `DC01` to identify any unauthorized changes or suspicious behavior.
+2. **Network Traffic Analysis:** Monitor network traffic for any unusual patterns or connections to the domain `c2-relay.darkops.net`.
+3. **Review PowerShell Scripts:** Decode and analyze the PowerShell encoded command to understand its full intent and impact.
+4. **Update Security Measures:** Ensure endpoint protection and network security measures are up-to-date to prevent potential exploitation.
+5. **Conduct a Threat Hunt:** Perform a threat hunt across the network to identify any other instances of similar activity or indicators.

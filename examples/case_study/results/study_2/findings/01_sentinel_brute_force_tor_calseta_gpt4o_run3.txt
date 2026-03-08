@@ -1,0 +1,45 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Alert Title**: Brute force sign-in attempts from TOR network detected
+- **Severity**: High
+- **Classification**: This alert is classified as a high-severity identity threat due to the successful authentication following multiple failed attempts from a known TOR exit node, indicating a potential credential stuffing or brute force attack.
+
+### Analysis of Enriched Indicators
+
+1. **Account: j.martinez@contoso.com**
+   - **Malice Verdict**: Pending
+   - **Risk Level**: The account is active and holds significant privileges, being part of groups like 'GlobalAdmins' and 'Azure-Contributors'. The pending malice verdict requires further investigation to determine if the account has been compromised.
+   - **Notes**: The account's last password change was on 2026-01-10, and the last login was on 2026-03-06, which aligns with the alert's timeline.
+
+2. **IP: 185.220.101.34**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High. This IP is a known TOR exit node with a high abuse confidence score (100) and numerous reports (2847). It is confirmed malicious by both AbuseIPDB and VirusTotal.
+   - **Notes**: The IP is associated with anonymization networks, which are commonly used to mask malicious activities.
+
+3. **Domain: AAD-SIGNIN-SVC.contoso.com**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High. The domain is flagged as malicious with tags indicating command and control (C2) and malware associations. It has a negative reputation score and multiple malicious reports.
+   - **Notes**: The domain's involvement suggests potential C2 activity, which requires immediate attention.
+
+### Overall Verdict
+- **Verdict**: True Positive. The combination of a successful sign-in following multiple failed attempts from a malicious TOR exit node IP and the involvement of a malicious domain strongly indicates a compromised account scenario.
+
+### Recommended Next Steps
+
+1. **Immediate Actions**:
+   - Suspend the account `j.martinez@contoso.com` to prevent further unauthorized access.
+   - Revoke all active sessions for the account and reset the password.
+   - Notify the user and their manager about the incident.
+
+2. **Further Investigation**:
+   - Review the sign-in history for any other suspicious activities or successful authentications from unknown IPs.
+   - Assess for any lateral movement or access to new resources by the compromised account.
+   - Monitor the account for any further suspicious activities post-recovery.
+
+3. **Preventive Measures**:
+   - Enable step-up MFA for the account and consider implementing conditional access policies to block access from TOR exit nodes.
+   - Add the malicious IP and domain to the organization's firewall block list to prevent future connections.
+
+4. **Documentation**:
+   - Document the incident details, actions taken, and any findings for future reference and compliance purposes.

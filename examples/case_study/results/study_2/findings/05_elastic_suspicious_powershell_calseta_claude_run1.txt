@@ -1,0 +1,70 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Classification:** True Positive - Active Malware Infection
+**Severity:** Critical (Escalated from High)
+**MITRE ATT&CK Techniques:** T1059.001 (PowerShell), T1027 (Obfuscated Files/Information)
+
+This alert represents a confirmed malware infection involving encoded PowerShell execution attempting to download and execute a remote payload from a known command-and-control infrastructure.
+
+## Indicator Analysis
+
+### Critical Malicious Indicators
+
+**SHA256 Hash: de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c**
+- **Risk Level:** Critical
+- **Analysis:** Confirmed malicious executable (48/51 AV detections on VirusTotal)
+- **Malware Family:** Emotet trojan
+- **File Details:** Win32 EXE, 245KB, masquerading as "svchost_update.exe"
+
+**Domain: c2-relay.darkops.net**
+- **Risk Level:** Critical  
+- **Analysis:** Confirmed malicious C2 domain (8/9 security vendors flagged as malicious)
+- **Infrastructure:** Recently registered (December 2023) via Namecheap, specifically tagged for C2 activity
+
+**IP Addresses: 10.0.1.10 and 198.51.100.99**
+- **Risk Level:** Critical
+- **Analysis:** Both IPs are Tor exit nodes with 100% abuse confidence scores
+- **Threat Intelligence:** 2,847 abuse reports from 312 distinct users, consistently flagged as malicious
+- **Infrastructure:** Hosted by Zwiebelfreunde e.V. (known Tor provider)
+
+### Pending Analysis Indicators
+
+**URL: https://c2-relay.darkops.net/stager.ps1**
+- **Risk Level:** High (pending verdict but associated with confirmed malicious domain)
+
+**Account: SYSTEM**
+- **Risk Level:** Medium (legitimate system account but concerning execution context)
+- **User Context:** Jorge Martinez (j.martinez@contoso.com), Senior Engineer with privileged access
+- **Account Status:** Active with recent login activity, member of sensitive groups including GlobalAdmins
+
+## Overall Verdict: TRUE POSITIVE
+
+This is a confirmed active malware infection. The combination of:
+- Encoded PowerShell execution (common malware delivery method)
+- Confirmed Emotet trojan hash
+- Active C2 infrastructure communication via Tor
+- Privileged user account involvement
+
+Indicates a successful initial compromise with established C2 communication channels.
+
+## Recommended Immediate Actions
+
+### Critical (Execute within 15 minutes):
+1. **ISOLATE HOST IMMEDIATELY** - Network isolate the affected machine using endpoint agent
+2. **BLOCK C2 INFRASTRUCTURE** - Add c2-relay.darkops.net and associated IPs to firewall block lists
+3. **QUARANTINE MALWARE** - Ensure de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c is quarantined
+
+### High Priority (Within 1 hour):
+4. **SCOPE THE INCIDENT** - Search for the Emotet hash across all endpoints in the last 7 days
+5. **ANALYZE NETWORK TRAFFIC** - Check for any other hosts communicating with c2-relay.darkops.net
+6. **SECURE PRIVILEGED ACCOUNT** - Reset credentials for j.martinez@contoso.com and review recent access
+7. **COLLECT FORENSIC ARTIFACTS** - Memory dump, event logs, and prefetch files from affected host
+
+### Investigation Priority:
+8. **DECODE POWERSHELL PAYLOAD** - Fully analyze the encoded command to understand attack vector
+9. **THREAT HUNT** - Search for similar encoded PowerShell patterns across the environment
+10. **IMPACT ASSESSMENT** - Determine what data/systems the compromised account had access to
+
+This incident requires immediate escalation to the incident response team due to the confirmed malware infection and potential for lateral movement via the privileged user account.

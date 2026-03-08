@@ -1,0 +1,49 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Title**: Brute force sign-in attempts from TOR network detected
+- **Severity**: High
+- **Status**: Open
+- **Source**: Sentinel
+- **Tags**: TOR, BruteForce, IdentityThreat
+
+The alert is classified as a high-severity identity threat due to the successful authentication following multiple failed attempts from a known TOR exit node, indicating a potential credential stuffing or brute force attack.
+
+### Analysis of Enriched Indicators
+
+#### ACCOUNT: j.martinez@contoso.com
+- **Malice Verdict**: Pending
+- **Risk Level**: The account is active and belongs to a Senior Engineer with access to sensitive groups such as 'GlobalAdmins' and 'Azure-Contributors'. The malice verdict is pending, but the successful login after multiple failed attempts is concerning.
+
+#### IP: 185.220.101.34
+- **Malice Verdict**: Malicious
+- **Risk Level**: High. The IP is a known TOR exit node with a high abuse confidence score (100) and numerous reports (2847). It is flagged as malicious by both AbuseIPDB and VirusTotal, indicating it is used for anonymized attacks.
+
+#### DOMAIN: AAD-SIGNIN-SVC.contoso.com
+- **Malice Verdict**: Malicious
+- **Risk Level**: High. The domain is associated with command and control (C2) activities and malware, with a negative reputation score and multiple malicious reports.
+
+### Overall Verdict
+- **True Positive**: The alert is a true positive. The combination of a successful login after multiple failed attempts from a malicious TOR exit node IP and the involvement of a domain flagged for C2 activities strongly suggests a compromised account.
+
+### Recommended Next Steps
+1. **Immediate Account Actions**:
+   - Suspend the account of j.martinez@contoso.com.
+   - Revoke all active sessions and reset the account password.
+   - Notify the user and their manager, Sunita Patel, about the incident.
+
+2. **Enhance Security Measures**:
+   - Enable step-up MFA for the account and monitor for any further suspicious activity.
+   - Implement a conditional access policy to block access from the IP range associated with the TOR exit node.
+
+3. **Further Investigation**:
+   - Review the sign-in history for any other suspicious activities or successful logins from unusual locations.
+   - Assess for any lateral movement or access to new resources by the compromised account.
+
+4. **Network and Domain Actions**:
+   - Block the malicious IP and domain on the network firewall to prevent further access.
+   - Monitor for any outbound connections to the C2 domain/IP from other hosts in the environment.
+
+5. **Documentation and Reporting**:
+   - Document the incident details and actions taken.
+   - Report the incident to the security team for further analysis and to update threat intelligence databases.
