@@ -71,7 +71,7 @@ async def get_detection_rule(uuid: str) -> str:
     try:
         rule_uuid = _uuid.UUID(uuid)
     except ValueError:
-        raise ValueError(f"Invalid UUID: {uuid}")
+        raise ValueError(f"Invalid UUID: {uuid}") from None
 
     async with AsyncSessionLocal() as session:
         repo = DetectionRuleRepository(session)

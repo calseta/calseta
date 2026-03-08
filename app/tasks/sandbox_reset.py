@@ -61,19 +61,19 @@ async def reset_sandbox() -> dict[str, int]:
         # Phase 1: Delete all transient/audit data
         for table in _PHASE1_TABLES:
             result = await db.execute(text(f"DELETE FROM {table}"))  # noqa: S608
-            counts[table] = result.rowcount  # type: ignore[assignment]
+            counts[table] = result.rowcount  # type: ignore[attr-defined]
 
         # Phase 2: Delete all alerts + indicators
         for table in _PHASE2_TABLES:
             result = await db.execute(text(f"DELETE FROM {table}"))  # noqa: S608
-            counts[table] = result.rowcount  # type: ignore[assignment]
+            counts[table] = result.rowcount  # type: ignore[attr-defined]
 
         # Phase 3: Delete user-created config (is_system = FALSE)
         for table in _PHASE3_TABLES:
             result = await db.execute(
                 text(f"DELETE FROM {table} WHERE is_system = FALSE")  # noqa: S608
             )
-            counts[table] = result.rowcount  # type: ignore[assignment]
+            counts[table] = result.rowcount  # type: ignore[attr-defined]
 
         await db.flush()
 

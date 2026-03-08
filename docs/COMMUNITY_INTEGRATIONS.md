@@ -1,6 +1,6 @@
 # Community Integrations
 
-This document explains how the Calseta AI community integration ecosystem works — how providers are distributed, installed, and contributed.
+This document explains how the Calseta community integration ecosystem works — how providers are distributed, installed, and contributed.
 
 ---
 

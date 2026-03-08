@@ -1,6 +1,6 @@
-# Calseta AI -- Migration Operations Guide
+# Calseta -- Migration Operations Guide
 
-Complete guide for running, inspecting, and troubleshooting Alembic database migrations in Calseta AI.
+Complete guide for running, inspecting, and troubleshooting Alembic database migrations in Calseta.
 
 ---
 

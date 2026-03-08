@@ -15,6 +15,8 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.alert import AlertCloseClassification, AlertSeverity, AlertStatus, EnrichmentStatus
+from app.schemas.context_documents import ContextDocumentResponse
+from app.schemas.detection_rules import DetectionRuleResponse
 from app.schemas.indicators import EnrichedIndicator, MaliceLevel
 
 
@@ -62,6 +64,8 @@ class AlertResponse(BaseModel):
     malice_override_source: str | None = None
     malice_override_at: datetime | None = None
     indicators: list[EnrichedIndicator] = Field(default_factory=list)
+    detection_rule: DetectionRuleResponse | None = None
+    context_documents: list[ContextDocumentResponse] = Field(default_factory=list)
     agent_findings: list[dict[str, Any]] | None = None
     created_at: datetime
     updated_at: datetime

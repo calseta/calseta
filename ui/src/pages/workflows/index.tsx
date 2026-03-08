@@ -44,8 +44,8 @@ import { ColumnFilterPopover } from "@/components/column-filter-popover";
 import { ShieldCheck, Code, Lock, Plus, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
 
 const WF_COLUMNS: ColumnDef[] = [
-  { key: "name", initialWidth: 220, minWidth: 120 },
-  { key: "uuid", initialWidth: 140, minWidth: 100 },
+  { key: "name", initialWidth: 380, minWidth: 200 },
+  { key: "uuid", initialWidth: 280, minWidth: 200 },
   { key: "state", initialWidth: 80, minWidth: 70 },
   { key: "type", initialWidth: 110, minWidth: 80 },
   { key: "risk", initialWidth: 80, minWidth: 70 },

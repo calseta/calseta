@@ -135,7 +135,7 @@ async def execute_workflow(
             approval_req = await create_approval_request(
                 workflow=workflow,
                 trigger_type="agent",
-                trigger_agent_key_prefix=_resolve_client_id(ctx),
+                trigger_agent_key_prefix=_resolve_client_id(ctx) or "mcp_unknown",
                 trigger_context=trigger_context,
                 reason=reason,
                 confidence=confidence,

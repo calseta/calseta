@@ -11,7 +11,7 @@ The MCP (Model Context Protocol) server is a thin adapter that exposes Calseta's
 ```python
 from mcp.server.fastmcp import FastMCP
 mcp_server = FastMCP(
-    name="Calseta AI",
+    name="Calseta",
     auth=_auth_settings,
     token_verifier=CalsetaTokenVerifier(),
     host=settings.MCP_HOST,

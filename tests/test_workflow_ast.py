@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.services.workflow_ast import validate_workflow_code
 
 # ---------------------------------------------------------------------------

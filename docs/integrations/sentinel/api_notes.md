@@ -7,7 +7,7 @@ Reference: https://learn.microsoft.com/en-us/rest/api/securityinsights/incidents
 
 ## Authentication
 
-Sentinel uses Azure Active Directory OAuth2. Calseta AI uses the **client credentials flow** (application permissions, no user login):
+Sentinel uses Azure Active Directory OAuth2. Calseta uses the **client credentials flow** (application permissions, no user login):
 
 ```
 POST https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token
@@ -25,11 +25,11 @@ All subsequent requests send: `Authorization: Bearer {access_token}`
 
 Required Azure role for the service principal: **Microsoft Sentinel Reader** (read incidents) or **Microsoft Sentinel Responder** (read + update incidents).
 
-**Webhook ingest path**: Sentinel also pushes alerts to external URLs via Logic Apps automation rules. Calseta AI receives these pushes — the payload schema is the same incident object.
+**Webhook ingest path**: Sentinel also pushes alerts to external URLs via Logic Apps automation rules. Calseta receives these pushes — the payload schema is the same incident object.
 
 ---
 
-## Key Endpoints Used by Calseta AI
+## Key Endpoints Used by Calseta
 
 ### Get a single incident
 ```
@@ -102,7 +102,7 @@ When Sentinel fires a Logic Apps automation rule, the incident trigger provides 
 - `Entities` — array of entity objects (IP, Account, Host, URL, FileHash)
 - Workspace metadata: `Subscription ID`, `Workspace name`, `Workspace ID`, `Resource group name`
 
-When Calseta AI receives the webhook body, it is the full serialized incident JSON object identical to the REST API GET response.
+When Calseta receives the webhook body, it is the full serialized incident JSON object identical to the REST API GET response.
 
 ---
 
@@ -155,7 +155,7 @@ Sentinel REST API is governed by Azure Resource Manager (ARM) throttling:
 
 - **`firstActivityTimeUtc` vs `createdTimeUtc`**: Use `firstActivityTimeUtc` as `occurred_at` (when the attack happened). `createdTimeUtc` is when Sentinel created the incident (detection lag).
 - **`relatedAnalyticRuleIds` is an ARM ID array**: To get the rule name, strip the ARM path suffix — or call the Analytic Rules GET endpoint. Only the last UUID segment is needed for Calseta's `detection_rule_ref`.
-- **Alert vs Incident**: Sentinel groups multiple alerts into an incident. Calseta AI ingests at the incident level. Individual alert payloads are available via Logic Apps `Alert` trigger but have a different (less complete) schema.
+- **Alert vs Incident**: Sentinel groups multiple alerts into an incident. Calseta ingests at the incident level. Individual alert payloads are available via Logic Apps `Alert` trigger but have a different (less complete) schema.
 - **Severity `None`**: Rare — seen when rules don't set severity explicitly. Treat as `Informational` (severity_id=1).
 - **Closed incidents come via webhook too**: Automation rules fire on `IncidentCreated` and `IncidentUpdated`. Filter by `properties.status != "Closed"` on ingest, or model status mapping explicitly.
 - **Entity types are not normalized**: A `Host` entity may have `hostName`, `dnsDomain`, `ntDomain` — not all populated. Extract what's present.

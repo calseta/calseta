@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 
 const AK_COLUMNS: ColumnDef[] = [
   { key: "prefix", initialWidth: 140, minWidth: 100 },
-  { key: "name", initialWidth: 160, minWidth: 100 },
+  { key: "name", initialWidth: 300, minWidth: 160 },
   { key: "scopes", initialWidth: 280, minWidth: 120 },
   { key: "status", initialWidth: 80, minWidth: 70 },
   { key: "last_used", initialWidth: 110, minWidth: 80 },

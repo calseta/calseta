@@ -15,7 +15,6 @@ import structlog
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.errors import CalsetaException
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
 from app.cache.base import CacheBackendBase

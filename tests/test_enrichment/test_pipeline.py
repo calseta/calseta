@@ -23,8 +23,7 @@ from app.cache.keys import make_enrichment_key
 from app.cache.memory import InMemoryCache
 from app.schemas.enrichment import EnrichmentResult, EnrichmentStatus
 from app.schemas.indicators import IndicatorType
-from app.services.enrichment import EnrichmentService, _MALICE_PRIORITY, _worst_malice
-
+from app.services.enrichment import _MALICE_PRIORITY, EnrichmentService, _worst_malice
 
 # ---------------------------------------------------------------------------
 # Helpers

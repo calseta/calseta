@@ -25,6 +25,7 @@ import os
 import secrets
 from collections.abc import AsyncGenerator
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -41,10 +42,14 @@ TEST_DATABASE_URL = os.environ.get(
     os.environ.get("DATABASE_URL", ""),
 )
 
+_DB_AVAILABLE = bool(TEST_DATABASE_URL and "://" in TEST_DATABASE_URL)
+
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def db_engine() -> AsyncGenerator[object, None]:
     """Session-scoped async engine for the test database."""
+    if not _DB_AVAILABLE:
+        pytest.skip("No TEST_DATABASE_URL configured — skipping DB tests")
     engine = create_async_engine(TEST_DATABASE_URL, echo=False, pool_pre_ping=True)
     yield engine
     await engine.dispose()

@@ -1,5 +1,5 @@
 # ============================================================
-# Calseta AI — Multi-stage Dockerfile
+# Calseta — Multi-stage Dockerfile
 #
 # Targets:
 #   dev  — local development with hot reload and dev deps

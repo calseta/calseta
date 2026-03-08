@@ -13,7 +13,6 @@ These tests use the FastAPI test client with mocked enrichment providers
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import AsyncClient
@@ -21,7 +20,6 @@ from httpx import AsyncClient
 from app.schemas.enrichment import EnrichmentResult, EnrichmentStatus
 from app.schemas.indicators import IndicatorType
 from tests.integration.conftest import auth_header
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -250,7 +248,10 @@ class TestOnDemandEnrichment:
         enrichments_read_key: str,
     ) -> None:
         """All valid indicator types are accepted without 422."""
-        valid_types = ["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"]
+        valid_types = [
+            "ip", "domain", "hash_md5", "hash_sha1",
+            "hash_sha256", "url", "email", "account",
+        ]
         for itype in valid_types:
             with patch(
                 "app.api.v1.enrichments.enrichment_registry.list_for_type",

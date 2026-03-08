@@ -33,3 +33,5 @@ jobs:
       - run: make test
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test
+      - name: Check OpenAPI spec is up to date
+        run: make docs-openapi-check

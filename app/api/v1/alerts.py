@@ -20,6 +20,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import CalsetaException
@@ -31,6 +32,7 @@ from app.db.session import get_db
 from app.queue.base import TaskQueueBase
 from app.queue.dependencies import get_queue
 from app.repositories.activity_event_repository import ActivityEventRepository
+from app.repositories.agent_repository import AgentRepository
 from app.repositories.alert_repository import AlertRepository
 from app.repositories.indicator_repository import IndicatorRepository
 from app.schemas.activity_events import ActivityEventResponse, ActivityEventType
@@ -46,6 +48,7 @@ from app.schemas.alerts import (
 )
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.context_documents import ContextDocumentResponse
+from app.schemas.detection_rules import DetectionRuleResponse
 from app.schemas.indicators import (
     EnrichedIndicator,
     IndicatorAddRequest,
@@ -57,7 +60,6 @@ from app.schemas.relationship_graph import (
     GraphAlertNode,
     GraphIndicatorNode,
 )
-from app.repositories.agent_repository import AgentRepository
 from app.services.activity_event import ActivityEventService
 from app.services.agent_trigger import get_matching_agents
 from app.services.context_targeting import get_applicable_documents
@@ -111,24 +113,52 @@ def _compute_dominant_malice(indicators: list[EnrichedIndicator]) -> str:
 
 
 def _build_metadata(
-    alert: object, indicator_count: int, context_docs_count: int = 0
+    alert: object,
+    indicators: list[EnrichedIndicator],
+    context_docs_count: int = 0,
 ) -> AlertMetadata:
     from app.db.models.alert import Alert
 
     assert isinstance(alert, Alert)
+
+    # Collect succeeded/failed provider names from indicator enrichment results
+    succeeded: set[str] = set()
+    failed: set[str] = set()
+    for ind in indicators:
+        if not ind.enrichment_results:
+            continue
+        for provider, data in ind.enrichment_results.items():
+            if not isinstance(data, dict):
+                continue
+            if data.get("success") is True:
+                succeeded.add(provider)
+            elif data.get("success") is False:
+                failed.add(provider)
+
     enrichment: dict[str, object] = {
-        "succeeded": [],
-        "failed": [],
+        "succeeded": sorted(succeeded),
+        "failed": sorted(failed),
         "enriched_at": alert.enriched_at.isoformat() if alert.enriched_at else None,
     }
     return AlertMetadata(
         generated_at=datetime.now(UTC),
         alert_source=alert.source_name,
-        indicator_count=indicator_count,
+        indicator_count=len(indicators),
         enrichment=enrichment,
         detection_rule_matched=alert.detection_rule_id is not None,
         context_documents_applied=context_docs_count,
     )
+
+
+def _alert_response_from_orm(alert: object) -> AlertResponse:
+    """Build AlertResponse without triggering SQLAlchemy relationship lazy-loads."""
+    from app.db.models.alert import Alert
+
+    assert isinstance(alert, Alert)
+    # Use __dict__ to avoid hitting relationship descriptors
+    attrs = {k: v for k, v in alert.__dict__.items() if not k.startswith("_")}
+    attrs.pop("detection_rule", None)
+    return AlertResponse.model_validate(attrs)
 
 
 _ALLOWED_SORT_BY = {"title", "status", "severity", "source_name", "occurred_at", "created_at"}
@@ -220,13 +250,29 @@ async def get_alert(
     indicators = await indicator_repo.list_for_alert(alert.id)
     enriched_indicators = [_build_indicator(i) for i in indicators]
 
-    # Count applicable context documents
+    # Load applicable context documents
     context_docs = await get_applicable_documents(alert, db)
 
-    metadata = _build_metadata(alert, len(enriched_indicators), len(context_docs))
+    # Load detection rule if linked
+    detection_rule_resp = None
+    if alert.detection_rule_id is not None:
+        from app.db.models.detection_rule import DetectionRule
 
-    response = AlertResponse.model_validate(alert)
+        dr_result = await db.execute(
+            select(DetectionRule).where(DetectionRule.id == alert.detection_rule_id)
+        )
+        dr = dr_result.scalar_one_or_none()
+        if dr is not None:
+            detection_rule_resp = DetectionRuleResponse.model_validate(dr)
+
+    metadata = _build_metadata(alert, enriched_indicators, len(context_docs))
+
+    response = _alert_response_from_orm(alert)
     response.indicators = enriched_indicators
+    response.detection_rule = detection_rule_resp
+    response.context_documents = [
+        ContextDocumentResponse.model_validate(d) for d in context_docs
+    ]
     # Compute effective malice: override > worst-of-indicators > "Pending"
     response.malice = (
         alert.malice_override
@@ -345,9 +391,9 @@ async def patch_alert(
 
     indicators = await indicator_repo.list_for_alert(updated.id)
     enriched_indicators = [_build_indicator(i) for i in indicators]
-    metadata = _build_metadata(updated, len(enriched_indicators))
+    metadata = _build_metadata(updated, enriched_indicators)
 
-    response = AlertResponse.model_validate(updated)
+    response = _alert_response_from_orm(updated)
     response.indicators = enriched_indicators
     response.malice = (
         updated.malice_override
@@ -739,7 +785,11 @@ def _build_enrichment_summary(enrichment_results: dict | None) -> dict[str, str]
             continue
         extracted = data.get("extracted", {})
         if isinstance(extracted, dict):
-            verdict = extracted.get("verdict") or extracted.get("malice") or extracted.get("risk_score")
+            verdict = (
+                extracted.get("verdict")
+                or extracted.get("malice")
+                or extracted.get("risk_score")
+            )
             if verdict is not None:
                 summary[provider] = str(verdict)
                 continue

@@ -1,6 +1,6 @@
 ---
 name: new-alert-source
-description: Scaffold a new alert source integration plugin for Calseta AI. Use when adding a new SIEM or security tool as an alert source.
+description: Scaffold a new alert source integration plugin for Calseta. Use when adding a new SIEM or security tool as an alert source.
 argument-hint: "<source-name> (e.g. crowdstrike, palo-alto)"
 allowed-tools: Read, Write, Glob, WebFetch
 ---

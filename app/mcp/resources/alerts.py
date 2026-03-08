@@ -84,7 +84,7 @@ async def get_alert(uuid: str) -> str:
     try:
         alert_uuid = _uuid.UUID(uuid)
     except ValueError:
-        raise ValueError(f"Invalid UUID: {uuid}")
+        raise ValueError(f"Invalid UUID: {uuid}") from None
 
     async with AsyncSessionLocal() as session:
         alert_repo = AlertRepository(session)
@@ -177,7 +177,7 @@ async def get_alert_context(uuid: str) -> str:
     try:
         alert_uuid = _uuid.UUID(uuid)
     except ValueError:
-        raise ValueError(f"Invalid UUID: {uuid}")
+        raise ValueError(f"Invalid UUID: {uuid}") from None
 
     async with AsyncSessionLocal() as session:
         alert_repo = AlertRepository(session)
@@ -208,7 +208,7 @@ async def get_alert_activity(uuid: str) -> str:
     try:
         alert_uuid = _uuid.UUID(uuid)
     except ValueError:
-        raise ValueError(f"Invalid UUID: {uuid}")
+        raise ValueError(f"Invalid UUID: {uuid}") from None
 
     async with AsyncSessionLocal() as session:
         alert_repo = AlertRepository(session)

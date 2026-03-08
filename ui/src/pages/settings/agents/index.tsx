@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 
 const AGENT_COLUMNS: ColumnDef[] = [
   { key: "agent", initialWidth: 180, minWidth: 120 },
-  { key: "uuid", initialWidth: 140, minWidth: 100 },
+  { key: "uuid", initialWidth: 280, minWidth: 200 },
   { key: "endpoint", initialWidth: 220, minWidth: 120 },
   { key: "status", initialWidth: 80, minWidth: 70 },
   { key: "triggers", initialWidth: 150, minWidth: 80 },

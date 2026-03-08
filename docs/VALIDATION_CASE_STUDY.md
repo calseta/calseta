@@ -1,11 +1,11 @@
-# Calseta AI — Validation Case Study
+# Calseta — Validation Case Study
 
 ## Purpose
 
 This document presents the methodology, results, and analysis of a controlled comparison between two approaches to AI-powered security alert investigation:
 
 - **Approach A (Naive Agent):** An AI agent receives raw alert JSON from the source SIEM, extracts indicators via tool calls, calls enrichment APIs directly, parses raw API responses, and synthesizes findings with no pre-loaded context.
-- **Approach B (Calseta Agent):** The same alert is ingested by Calseta AI, processed through the full normalization and enrichment pipeline, and delivered to the agent as a structured payload with pre-computed enrichment, detection rule documentation, and applicable runbooks.
+- **Approach B (Calseta Agent):** The same alert is ingested by Calseta, processed through the full normalization and enrichment pipeline, and delivered to the agent as a structured payload with pre-computed enrichment, detection rule documentation, and applicable runbooks.
 
 The hypothesis: Approach B produces at least 50% fewer input tokens than Approach A across all five scenarios, with equal or better finding quality.
 
@@ -17,13 +17,14 @@ The hypothesis: Approach B produces at least 50% fewer input tokens than Approac
 
 | Variable | Value |
 |---|---|
-| LLM | Claude Sonnet (latest version) |
+| LLMs | Claude Sonnet (latest), GPT-4o |
 | Temperature | 0 |
 | Max tokens | 4096 |
 | Enrichment providers | VirusTotal, AbuseIPDB |
 | Alert payloads | 5 synthetic fixtures (identical for both approaches) |
-| Runs per scenario per approach | 3 |
-| Total runs | 30 |
+| Runs per scenario per approach per model | 3 |
+| Total runs (single model) | 30 |
+| Total runs (all models) | 60 |
 
 ### Approach A — Naive Agent
 
@@ -40,7 +41,7 @@ The naive agent has access to 5 tools: `lookup_ip_virustotal`, `lookup_hash_viru
 
 ### Approach B — Calseta Agent
 
-The same alert is ingested by Calseta AI and processed through the full pipeline:
+The same alert is ingested by Calseta and processed through the full pipeline:
 
 1. Agent receives an alert UUID and fetches structured data from Calseta's REST API
 2. Alert data includes: normalized fields, enriched indicators (structured, not raw), detection rule documentation, applicable context documents
@@ -177,13 +178,31 @@ The Calseta agent is expected to produce equal or better quality findings becaus
 - **Detection rule documentation:** The Calseta agent receives the detection rule's documentation field, providing context the naive agent lacks entirely.
 - **Applicable runbooks:** Context documents matched by targeting rules give the Calseta agent specific operational guidance.
 
+### Cross-Provider Validation
+
+The study runs on both Claude Sonnet and GPT-4o to confirm that Calseta's token reduction is not model-specific. Both models use the same:
+- Alert fixtures and enrichment data
+- System prompts and tool definitions
+- Temperature (0) and max tokens (4096)
+
+Token accounting differs slightly between providers (Anthropic reports `input_tokens`/`output_tokens`; OpenAI reports `prompt_tokens`/`completion_tokens`), but both count BPE tokens similarly.
+
+### Cost Projections
+
+Run `python cost_projections.py` after the study to generate:
+- Per-alert cost comparison by model and approach
+- Monthly cost projections at 1/10/100/1000 alerts per day
+- Year 1 TCO including engineering time estimates
+
+Results are written to `results/cost_projections.md`.
+
 ### Limitations
 
 1. **Synthetic fixtures.** The alert payloads are realistic but synthetic. Production payloads may vary in size and complexity.
 
 2. **Enrichment provider availability.** If enrichment APIs are unavailable during the study, the naive agent's tool calls will fail, biasing results. The Calseta agent uses pre-computed enrichment, so provider availability affects ingestion but not the agent's investigation.
 
-3. **Single model.** Results are specific to the Claude Sonnet model and may differ with other models.
+3. **Two models tested.** Results cover Claude Sonnet and GPT-4o. Other models may show different token usage patterns.
 
 4. **Three runs per scenario.** While sufficient to account for basic non-determinism, a larger sample would provide tighter confidence intervals.
 
@@ -193,9 +212,9 @@ The Calseta agent is expected to produce equal or better quality findings becaus
 
 ### Prerequisites
 
-- A running Calseta AI instance: `docker compose up`
-- Python 3.12+ with `anthropic` and `httpx` packages
-- API keys: `ANTHROPIC_API_KEY`, `VIRUSTOTAL_API_KEY`, `ABUSEIPDB_API_KEY`, `CALSETA_API_KEY`
+- A running Calseta instance: `docker compose up`
+- Python 3.12+ with `anthropic`, `openai`, and `httpx` packages
+- API keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `VIRUSTOTAL_API_KEY`, `ABUSEIPDB_API_KEY`, `CALSETA_API_KEY`
 
 ### Steps
 
@@ -206,6 +225,7 @@ cd examples/case_study
 # 2. Create a .env file with your API keys
 cat > .env << 'EOF'
 ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
 VIRUSTOTAL_API_KEY=...
 ABUSEIPDB_API_KEY=...
 CALSETA_BASE_URL=http://localhost:8000
@@ -213,20 +233,29 @@ CALSETA_API_KEY=cai_...
 EOF
 
 # 3. Install dependencies
-pip install anthropic httpx
+pip install anthropic openai httpx
 
 # 4. Ingest fixtures and run the study
 python run_study.py --ingest --run
 
-# 5. Evaluate finding quality
+# 5. Run with both models (Claude + GPT-4o)
+python run_study.py --run --models all
+
+# 6. Evaluate finding quality
 python evaluate_findings.py
 
-# 6. Results are in results/
+# 7. Generate cost projections
+python cost_projections.py
+
+# 8. Results are in results/
 #    - raw_metrics.csv       — token counts, costs, timing
 #    - quality_scores.csv    — blind judge quality scores
+#    - cost_projections.md   — cost analysis and projections
 #    - findings/             — raw finding text from each run
 #    - alert_uuids.json      — UUIDs of ingested fixtures
 ```
+
+The `--models` flag accepts `claude` (default), `openai`, or `all`.
 
 ---
 
@@ -235,11 +264,14 @@ python evaluate_findings.py
 | File | Description |
 |---|---|
 | `examples/case_study/fixtures/` | 5 synthetic alert payloads in source-native format |
-| `examples/case_study/naive_agent.py` | Approach A implementation |
-| `examples/case_study/calseta_agent.py` | Approach B implementation |
-| `examples/case_study/run_study.py` | Study runner (ingestion + benchmark) |
+| `examples/case_study/naive_agent.py` | Approach A — Anthropic Claude agent |
+| `examples/case_study/calseta_agent.py` | Approach B — Anthropic Claude agent |
+| `examples/case_study/openai_agent.py` | Cross-provider validation — OpenAI GPT-4o agents |
+| `examples/case_study/run_study.py` | Study runner (ingestion + benchmark, multi-model) |
 | `examples/case_study/evaluate_findings.py` | Blind LLM judge evaluator |
+| `examples/case_study/cost_projections.py` | Cost projection calculator |
 | `examples/case_study/results/raw_metrics.csv` | Token usage, costs, timing per run |
 | `examples/case_study/results/quality_scores.csv` | Quality scores per finding |
+| `examples/case_study/results/cost_projections.md` | Cost analysis and scale projections |
 | `examples/case_study/results/findings/` | Raw finding text from each agent run |
 | `docs/VALIDATION_CASE_STUDY.md` | This document |

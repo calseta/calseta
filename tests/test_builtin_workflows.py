@@ -6,19 +6,25 @@ All tests are unit-level — no DB required.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.seed.builtin_workflows import _WORKFLOWS, seed_builtin_workflows
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_settings(*, okta_domain="", okta_token="", entra_tid="", entra_cid="", entra_cs=""):
+def _make_settings(
+    *,
+    okta_domain: str = "",
+    okta_token: str = "",
+    entra_tid: str = "",
+    entra_cid: str = "",
+    entra_cs: str = "",
+) -> MagicMock:
     cfg = MagicMock()
     cfg.OKTA_DOMAIN = okta_domain
     cfg.OKTA_API_TOKEN = okta_token
@@ -33,26 +39,26 @@ def _make_settings(*, okta_domain="", okta_token="", entra_tid="", entra_cid="",
 # ---------------------------------------------------------------------------
 
 
-def test_workflow_catalog_has_nine_entries():
+def test_workflow_catalog_has_nine_entries() -> None:
     assert len(_WORKFLOWS) == 9
 
 
-def test_five_okta_workflows():
+def test_five_okta_workflows() -> None:
     okta = [w for w in _WORKFLOWS if w.requires_okta]
     assert len(okta) == 5
 
 
-def test_four_entra_workflows():
+def test_four_entra_workflows() -> None:
     entra = [w for w in _WORKFLOWS if w.requires_entra]
     assert len(entra) == 4
 
 
-def test_all_names_unique():
+def test_all_names_unique() -> None:
     names = [w.name for w in _WORKFLOWS]
     assert len(names) == len(set(names))
 
 
-def test_all_workflow_codes_pass_ast_validation():
+def test_all_workflow_codes_pass_ast_validation() -> None:
     from app.services.workflow_ast import validate_workflow_code
 
     for spec in _WORKFLOWS:
@@ -60,7 +66,7 @@ def test_all_workflow_codes_pass_ast_validation():
         assert errors == [], f"{spec.name} code failed validation: {errors}"
 
 
-def test_all_docs_have_required_sections():
+def test_all_docs_have_required_sections() -> None:
     required_headings = [
         "## Description",
         "## When to Use",
@@ -81,7 +87,7 @@ def test_all_docs_have_required_sections():
 
 
 @pytest.mark.asyncio
-async def test_seed_okta_active_when_credentials_set():
+async def test_seed_okta_active_when_credentials_set() -> None:
     """Okta workflows seeded with is_active=True when creds present."""
     cfg = _make_settings(okta_domain="company.okta.com", okta_token="token123")
 
@@ -101,7 +107,7 @@ async def test_seed_okta_active_when_credentials_set():
 
 
 @pytest.mark.asyncio
-async def test_seed_okta_inactive_when_missing_domain():
+async def test_seed_okta_inactive_when_missing_domain() -> None:
     """Okta workflows seeded with is_active=False when OKTA_DOMAIN is missing."""
     cfg = _make_settings(okta_token="token123")  # domain missing
 
@@ -120,7 +126,7 @@ async def test_seed_okta_inactive_when_missing_domain():
 
 
 @pytest.mark.asyncio
-async def test_seed_okta_inactive_when_missing_token():
+async def test_seed_okta_inactive_when_missing_token() -> None:
     """Okta workflows seeded with is_active=False when OKTA_API_TOKEN is missing."""
     cfg = _make_settings(okta_domain="company.okta.com")  # token missing
 
@@ -144,7 +150,7 @@ async def test_seed_okta_inactive_when_missing_token():
 
 
 @pytest.mark.asyncio
-async def test_seed_entra_active_when_credentials_set():
+async def test_seed_entra_active_when_credentials_set() -> None:
     """Entra workflows seeded with is_active=True when all creds present."""
     cfg = _make_settings(entra_tid="tid", entra_cid="cid", entra_cs="secret")
 
@@ -164,7 +170,7 @@ async def test_seed_entra_active_when_credentials_set():
 
 
 @pytest.mark.asyncio
-async def test_seed_entra_inactive_when_partial_credentials():
+async def test_seed_entra_inactive_when_partial_credentials() -> None:
     """Entra workflows seeded with is_active=False when any cred is missing."""
     cfg = _make_settings(entra_tid="tid", entra_cid="cid")  # client_secret missing
 
@@ -188,7 +194,7 @@ async def test_seed_entra_inactive_when_partial_credentials():
 
 
 @pytest.mark.asyncio
-async def test_seed_calls_upsert_nine_times():
+async def test_seed_calls_upsert_nine_times() -> None:
     """Seeder calls upsert_system_workflow exactly 9 times."""
     cfg = _make_settings()
     repo_mock = AsyncMock()
@@ -202,7 +208,7 @@ async def test_seed_calls_upsert_nine_times():
 
 
 @pytest.mark.asyncio
-async def test_seed_all_have_indicator_type_account():
+async def test_seed_all_have_indicator_type_account() -> None:
     """All seeded workflows have workflow_type='indicator' and indicator_types=['account']."""
     cfg = _make_settings()
     repo_mock = AsyncMock()

@@ -9,12 +9,12 @@ References:
 
 ## Authentication
 
-### Webhook ingest (Calseta AI receiving alerts from Splunk)
+### Webhook ingest (Calseta receiving alerts from Splunk)
 
 Splunk sends webhooks via HTTP POST. Authentication options:
 
 **Custom header token (recommended):**
-Configure in the alert action. Splunk lets you add arbitrary HTTP headers to the webhook — use a shared secret in a custom header (`X-Splunk-Webhook-Secret: {secret}`). Calseta AI verifies this via `verify_webhook_signature()`.
+Configure in the alert action. Splunk lets you add arbitrary HTTP headers to the webhook — use a shared secret in a custom header (`X-Splunk-Webhook-Secret: {secret}`). Calseta verifies this via `verify_webhook_signature()`.
 
 **No built-in HMAC signing**: Unlike Sentinel or Elastic, native Splunk webhook action does not generate HMAC signatures. The recommended approach is:
 1. Use a secret token in a custom header
@@ -33,9 +33,9 @@ Alternatively, Basic Auth: `Authorization: Basic {base64(username:password)}`
 
 ---
 
-## Key Endpoints Used by Calseta AI
+## Key Endpoints Used by Calseta
 
-### Receive webhook (Splunk pushes to Calseta AI)
+### Receive webhook (Splunk pushes to Calseta)
 Splunk calls `POST {calseta_url}/v1/alerts/ingest/splunk` with the payload below.
 
 ### Search for recent alerts (Splunk REST API — optional polling)
@@ -133,7 +133,7 @@ When using Splunk Enterprise Security, notable events (correlation search result
 
 **Non-ES (standard saved search webhook) result fields**
 
-When using a standard Splunk saved search (not ES), `result` contains whatever columns the SPL search returns. Field names are exactly the column names from the SPL query. There is no standard schema — they are arbitrary. Calseta AI extracts what it can via the indicator_field_mappings Pass 3 configuration.
+When using a standard Splunk saved search (not ES), `result` contains whatever columns the SPL search returns. Field names are exactly the column names from the SPL query. There is no standard schema — they are arbitrary. Calseta extracts what it can via the indicator_field_mappings Pass 3 configuration.
 
 Common standard field names: `src_ip`, `dest_ip`, `user`, `action`, `bytes`, `url`, `file_path`, `hash`, `process_name`.
 
@@ -188,10 +188,10 @@ Splunk does not publish specific REST API rate limits. Practical limits:
 ## Known Quirks / Edge Cases
 
 - **`_time` is a Unix timestamp string**: Convert `float(result["_time"])` to datetime before storing as `occurred_at`. Not ISO 8601.
-- **Non-ES result field names are arbitrary**: Standard saved search webhooks return SPL column names. Calseta AI must handle arbitrary field names via Pass 3 indicator_field_mappings, not hardcoded logic.
+- **Non-ES result field names are arbitrary**: Standard saved search webhooks return SPL column names. Calseta must handle arbitrary field names via Pass 3 indicator_field_mappings, not hardcoded logic.
 - **`result` can contain nested fields as JSON strings**: Some Splunk sourcetypes JSON-encode sub-objects into a single string field. Parse defensively.
 - **`search_name` vs `rule_name`**: In ES, `result.rule_name` is the correlation rule. For standard searches, only `search_name` (envelope level) is available. Always check both.
 - **Notable event ID format**: `event_id` in ES notable events is `{_time}.{random_suffix}`. Do NOT use `sid` (the search job ID) as a dedup key — a single `sid` can produce many notable events.
 - **Splunk ES vs standard Splunk**: The `app` field tells you. `SplunkEnterpriseSecuritySuite` = ES. `search` = standard.
-- **No batch delivery**: Each alert fires one webhook call. High-volume environments may generate many simultaneous POST requests to Calseta AI — the ingest endpoint must handle concurrent writes.
-- **Webhook retry**: Splunk retries failed webhook deliveries up to 3 times with exponential backoff. Calseta AI must be idempotent on ingest — dedup by `event_id`.
+- **No batch delivery**: Each alert fires one webhook call. High-volume environments may generate many simultaneous POST requests to Calseta — the ingest endpoint must handle concurrent writes.
+- **Webhook retry**: Splunk retries failed webhook deliveries up to 3 times with exponential backoff. Calseta must be idempotent on ingest — dedup by `event_id`.

@@ -1,6 +1,6 @@
 # How to Add an Enrichment Provider
 
-This guide walks through adding a new enrichment provider to Calseta AI. By the end, your provider will be queried automatically during the alert enrichment pipeline and available for on-demand enrichment via `POST /v1/enrichments`.
+This guide walks through adding a new enrichment provider to Calseta. By the end, your provider will be queried automatically during the alert enrichment pipeline and available for on-demand enrichment via `POST /v1/enrichments`.
 
 Enrichment providers are **database-driven** — each provider is a row in the `enrichment_providers` table with templated HTTP configs, malice threshold rules, and field extraction mappings. There are three ways to add a provider, depending on your use case:
 

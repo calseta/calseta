@@ -22,6 +22,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import AsyncSessionLocal
 from app.integrations.sources.elastic import ElasticSource
@@ -695,7 +696,7 @@ async def _seed_context_documents(session) -> int:  # type: ignore[no-untyped-de
 
 
 async def _seed_alerts(
-    session, queue: TaskQueueBase  # type: ignore[no-untyped-def]
+    session: AsyncSession, queue: TaskQueueBase
 ) -> int:
     """Ingest sample alerts through the standard pipeline. Returns count."""
     ingest_service = AlertIngestionService(session, queue)

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Calseta AI — Sample SOC Investigation Agent (REST API + Claude)
+Calseta — Sample SOC Investigation Agent (REST API + Claude)
 
 A working sample agent that demonstrates how to build an AI-powered SOC
-investigation agent using the Calseta AI REST API. This agent:
+investigation agent using the Calseta REST API. This agent:
 
-  1. Receives alert webhooks from Calseta AI (via a registered agent)
+  1. Receives alert webhooks from Calseta (via a registered agent)
   2. Fetches full alert context from the REST API
   3. Builds a token-efficient investigation prompt
   4. Calls the Claude API for analysis
@@ -85,7 +85,7 @@ logger = logging.getLogger(AGENT_NAME)
 
 class CalsetaClient:
     """
-    Async HTTP client for the Calseta AI REST API.
+    Async HTTP client for the Calseta REST API.
 
     All Calseta API responses follow the envelope format:
       Single object:  {"data": {...}, "meta": {...}}
@@ -186,7 +186,7 @@ class CalsetaClient:
 SYSTEM_PROMPT = """\
 You are a SOC analyst AI agent. You receive security alert data that has already \
 been normalized, enriched with threat intelligence, and annotated with applicable \
-playbooks by Calseta AI.
+playbooks by Calseta.
 
 Your job: analyze the alert, assess the threat, and produce a structured investigation finding.
 
@@ -541,7 +541,7 @@ def _extract_section(text: str, heading: str) -> str | None:
 
 async def webhook_handler(request: Request) -> JSONResponse:
     """
-    Webhook endpoint that receives alert notifications from Calseta AI.
+    Webhook endpoint that receives alert notifications from Calseta.
 
     Calseta's agent dispatch service sends a POST with this payload shape:
     {

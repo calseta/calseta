@@ -50,7 +50,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _load(name: str) -> dict[str, Any]:
-    return json.loads((FIXTURES / name).read_text())
+    return json.loads((FIXTURES / name).read_text())  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------
@@ -1042,7 +1042,7 @@ class TestExceptionIsolation:
             )
 
             assert count == 0
-            MockIndRepo.return_value.upsert.assert_not_awaited()
+            MockIndRepo.return_value.upsert.assert_not_called()
 
     async def test_individual_persist_failure_does_not_block_others(self) -> None:
         """If persisting one indicator fails, others should still be persisted."""
@@ -1316,7 +1316,7 @@ class TestSeedSystemMappings:
 class TestIndicatorMappingCache:
     def test_get_normalized_mappings_filters_by_source(self) -> None:
         """get_normalized_mappings should return global + source-specific mappings."""
-        from app.services.indicator_mapping_cache import _lock, _mappings, get_normalized_mappings
+        from app.services.indicator_mapping_cache import _lock, get_normalized_mappings
 
         test_mappings = [
             CachedMapping(field_path="src_ip", indicator_type="ip", source_name=None),
@@ -1353,9 +1353,8 @@ class TestIndicatorMappingCache:
     def test_get_normalized_mappings_returns_all_global_when_no_source_specific(
         self,
     ) -> None:
-        from app.services.indicator_mapping_cache import _lock, get_normalized_mappings
-
         import app.services.indicator_mapping_cache as cache_mod
+        from app.services.indicator_mapping_cache import _lock, get_normalized_mappings
 
         test_mappings = [
             CachedMapping(field_path="src_ip", indicator_type="ip", source_name=None),

@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { InlineTagEditor } from "@/components/inline-tag-editor";
 import { JsonViewer } from "@/components/json-viewer";
 import {
   DetailPageHeader,
@@ -56,7 +57,6 @@ import {
 } from "@/components/ui/table";
 import {
   Shield,
-  Tag,
   AlertTriangle,
   CheckCircle,
   Globe,
@@ -403,21 +403,18 @@ export function AlertDetailPage() {
                   <DetailPageField label="Closed At" value={formatDate(alert.closed_at)} />
                 )}
               </SidebarSection>
-              {alert.tags.length > 0 && (
-                <SidebarSection title="Tags">
-                  <div className="flex flex-wrap gap-1.5">
-                    {alert.tags.map((t) => (
-                      <span
-                        key={t}
-                        className="flex items-center gap-1 text-[11px] text-dim bg-surface-hover px-2 py-0.5 rounded"
-                      >
-                        <Tag className="h-2.5 w-2.5" />
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </SidebarSection>
-              )}
+              <SidebarSection title="Tags">
+                <InlineTagEditor
+                  tags={alert.tags}
+                  disabled={patchAlert.isPending}
+                  onSave={(newTags) =>
+                    patchAlert.mutate(
+                      { uuid, body: { tags: newTags } },
+                      { onSuccess: () => toast.success("Tags updated") },
+                    )
+                  }
+                />
+              </SidebarSection>
             </DetailPageSidebar>
           }
         >
@@ -438,6 +435,10 @@ export function AlertDetailPage() {
               <TabsTrigger value="graph" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
                 <GitFork className="h-3.5 w-3.5 mr-1" />
                 Graph
+              </TabsTrigger>
+              <TabsTrigger value="agent-payload" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Zap className="h-3.5 w-3.5 mr-1" />
+                Agent Payload
               </TabsTrigger>
               <TabsTrigger value="raw" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
                 <Code className="h-3.5 w-3.5 mr-1" />
@@ -682,6 +683,19 @@ export function AlertDetailPage() {
             {/* Relationship Graph */}
             <TabsContent value="graph" className="mt-4">
               <AlertGraph alertUuid={uuid} />
+            </TabsContent>
+
+            {/* Agent Payload */}
+            <TabsContent value="agent-payload" className="mt-4">
+              <div className="space-y-3">
+                <p className="text-xs text-dim">
+                  This is the exact JSON payload an agent receives via{" "}
+                  <code className="text-teal">GET /v1/alerts/{uuid}</code>{" "}
+                  or MCP resource{" "}
+                  <code className="text-teal">calseta://alerts/{uuid}</code>.
+                </p>
+                <JsonViewer data={alertResp} defaultExpanded={Infinity} />
+              </div>
             </TabsContent>
 
             {/* Raw Data */}

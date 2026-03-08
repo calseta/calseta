@@ -11,7 +11,7 @@ from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.alert import Alert
-from app.schemas.alert import AlertSeverity, AlertStatus, EnrichmentStatus, CalsetaAlert
+from app.schemas.alert import AlertSeverity, AlertStatus, CalsetaAlert, EnrichmentStatus
 
 # Whitelist of columns that can be used for sorting
 _SORT_COLUMNS: dict[str, Any] = {

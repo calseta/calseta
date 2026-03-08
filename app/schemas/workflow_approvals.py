@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -17,10 +17,10 @@ class WorkflowApprovalRequestResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    uuid: uuid.UUID
+    uuid: UUID
     workflow_id: int
     workflow_name: str | None = None
-    workflow_uuid: uuid.UUID | None = None
+    workflow_uuid: UUID | None = None
     trigger_type: str
     trigger_context: dict[str, Any] | None
     reason: str
@@ -46,7 +46,7 @@ class WorkflowExecuteAgentRequest(BaseModel):
 
     indicator_type: str
     indicator_value: str
-    alert_uuid: uuid.UUID | None = None
+    alert_uuid: UUID | None = None
     trigger_source: str = "human"
     reason: str | None = None
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
@@ -93,7 +93,7 @@ class WorkflowRejectRequest(BaseModel):
 class WorkflowPendingApprovalResponse(BaseModel):
     """Response when execute is gated behind an approval request."""
 
-    run_uuid: uuid.UUID | None = None
-    approval_request_uuid: uuid.UUID
+    run_uuid: UUID | None = None
+    approval_request_uuid: UUID
     status: str  # "pending_approval"
     expires_at: datetime

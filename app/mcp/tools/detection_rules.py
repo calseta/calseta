@@ -13,9 +13,12 @@ from datetime import datetime
 
 import structlog
 from mcp.server.fastmcp import Context
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, func, literal, or_, select
 
 from app.db.models.detection_rule import DetectionRule
+from app.db.session import AsyncSessionLocal
+from app.mcp.scope import check_scope
+from app.mcp.server import mcp_server
 
 # CASE expression for severity ordering in MCP queries
 _MCP_SEVERITY_ORDER = case(
@@ -33,9 +36,6 @@ _MCP_SORT_COLUMNS: dict[str, str] = {
     "source_name": "source_name",
     "created_at": "created_at",
 }
-from app.db.session import AsyncSessionLocal
-from app.mcp.scope import check_scope
-from app.mcp.server import mcp_server
 
 logger = structlog.get_logger(__name__)
 
@@ -95,14 +95,14 @@ async def search_detection_rules(
             count_stmt = count_stmt.where(name_filter)
 
         if mitre_tactic:
-            tactic_filter = DetectionRule.mitre_tactics.any(mitre_tactic)
+            tactic_filter = DetectionRule.mitre_tactics.any(literal(mitre_tactic))
             stmt = stmt.where(tactic_filter)
             count_stmt = count_stmt.where(tactic_filter)
 
         if mitre_technique:
             technique_filter = or_(
-                DetectionRule.mitre_techniques.any(mitre_technique),
-                DetectionRule.mitre_subtechniques.any(mitre_technique),
+                DetectionRule.mitre_techniques.any(literal(mitre_technique)),
+                DetectionRule.mitre_subtechniques.any(literal(mitre_technique)),
             )
             stmt = stmt.where(technique_filter)
             count_stmt = count_stmt.where(technique_filter)

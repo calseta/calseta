@@ -82,7 +82,7 @@ async def _create_custom_mapping(
         headers=auth_header(api_key),
     )
     assert resp.status_code == 201, resp.text
-    return resp.json()["data"]
+    return resp.json()["data"]  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------
@@ -416,7 +416,7 @@ class TestSystemMappingProtection:
         data = resp.json()["data"]
         if not data:
             return None
-        return data[0]["uuid"]
+        return data[0]["uuid"]  # type: ignore[no-any-return]
 
     async def test_system_mapping_cannot_be_deleted(
         self, test_client: AsyncClient, api_key: str

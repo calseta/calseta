@@ -1,6 +1,6 @@
-# Calseta AI -- Deployment Guide
+# Calseta -- Deployment Guide
 
-Complete guide for deploying Calseta AI, covering local development, production hardening, SIEM integration, and troubleshooting.
+Complete guide for deploying Calseta, covering local development, production hardening, SIEM integration, and troubleshooting.
 
 ---
 
@@ -20,7 +20,7 @@ Complete guide for deploying Calseta AI, covering local development, production 
 
 ## 1. Architecture Overview
 
-Calseta AI runs as four Docker Compose services:
+Calseta runs as four Docker Compose services:
 
 ```
 FastAPI Server (port 8000)     MCP Server (port 8001)

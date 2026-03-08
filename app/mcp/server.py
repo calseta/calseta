@@ -30,9 +30,9 @@ _auth_settings = AuthSettings(
 )
 
 mcp_server = FastMCP(
-    name="Calseta AI",
+    name="Calseta",
     instructions=(
-        "Calseta AI is a SOC data platform. Use resources to read security "
+        "Calseta is a SOC data platform. Use resources to read security "
         "alerts, detection rules, context documents, workflows, and metrics. "
         "Use tools to post findings, update alert status, execute workflows, "
         "and enrich indicators."

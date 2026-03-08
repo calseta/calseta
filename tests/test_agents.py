@@ -436,7 +436,7 @@ class TestWebhookPayloadStructure:
             "test": True,
             "alert": {
                 "uuid": "00000000-0000-0000-0000-000000000000",
-                "title": "Calseta AI — Test Webhook",
+                "title": "Calseta — Test Webhook",
                 "severity": "Low",
                 "status": "Open",
                 "source_name": agent.name,
@@ -463,16 +463,16 @@ class TestWebhookPayloadStructure:
         # Verify structure
         assert payload["test"] is True
         assert "alert" in payload
-        assert "uuid" in payload["alert"]
-        assert "title" in payload["alert"]
-        assert "severity" in payload["alert"]
+        assert "uuid" in payload["alert"]  # type: ignore[operator]
+        assert "title" in payload["alert"]  # type: ignore[operator]
+        assert "severity" in payload["alert"]  # type: ignore[operator]
         assert payload["indicators"] == []
         assert payload["detection_rule"] is None
         assert "calseta_api_base_url" in payload
         assert "_metadata" in payload
-        assert "generated_at" in payload["_metadata"]
-        assert "indicator_count" in payload["_metadata"]
-        assert "enrichment" in payload["_metadata"]
+        assert "generated_at" in payload["_metadata"]  # type: ignore[operator]
+        assert "indicator_count" in payload["_metadata"]  # type: ignore[operator]
+        assert "enrichment" in payload["_metadata"]  # type: ignore[operator]
 
 
 class TestWebhookAuthHeader:

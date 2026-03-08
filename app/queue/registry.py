@@ -534,8 +534,9 @@ async def dispatch_single_agent_webhook_task(alert_id: int, agent_id: int) -> No
 
     async with AsyncSessionLocal() as session:
         try:
-            from app.db.models.agent_registration import AgentRegistration
             from sqlalchemy import select
+
+            from app.db.models.agent_registration import AgentRegistration
 
             agent_result = await session.execute(
                 select(AgentRegistration).where(AgentRegistration.id == agent_id)

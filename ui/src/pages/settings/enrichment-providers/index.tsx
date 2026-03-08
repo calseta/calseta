@@ -55,7 +55,7 @@ const EP_COLUMNS: ColumnDef[] = [
   { key: "type", initialWidth: 90, minWidth: 70 },
   { key: "status", initialWidth: 80, minWidth: 70 },
   { key: "configured", initialWidth: 90, minWidth: 70 },
-  { key: "indicator_types", initialWidth: 200, minWidth: 100 },
+  { key: "indicator_types", initialWidth: 280, minWidth: 160 },
   { key: "created", initialWidth: 160, minWidth: 120 },
   { key: "actions", initialWidth: 44, minWidth: 44, maxWidth: 44 },
 ];
@@ -405,8 +405,20 @@ export function EnrichmentProvidersPage() {
                           {provider.is_configured ? "yes" : "no"}
                         </span>
                       </TableCell>
-                      <TableCell className="text-xs text-dim">
-                        {provider.supported_indicator_types.join(", ") || "—"}
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {provider.supported_indicator_types.length > 0
+                            ? provider.supported_indicator_types.map((t) => (
+                                <span
+                                  key={t}
+                                  className="inline-block px-1.5 py-0.5 text-[10px] font-mono text-dim bg-surface-hover rounded border border-border"
+                                >
+                                  {t}
+                                </span>
+                              ))
+                            : <span className="text-xs text-dim">—</span>
+                          }
+                        </div>
                       </TableCell>
                       <TableCell className="text-xs text-dim whitespace-nowrap">{formatDate(provider.created_at)}</TableCell>
                       <TableCell>

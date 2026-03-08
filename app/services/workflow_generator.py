@@ -26,7 +26,7 @@ from app.services.workflow_ast import validate_workflow_code
 
 _SYSTEM_PROMPT = """\
 You are an expert security automation engineer. You write workflow functions
-for the Calseta AI SOC platform. Every workflow must follow these rules exactly.
+for the Calseta SOC platform. Every workflow must follow these rules exactly.
 
 ## Workflow Interface
 

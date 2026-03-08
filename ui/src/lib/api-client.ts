@@ -60,6 +60,13 @@ async function request<T>(
   });
 
   if (!res.ok) {
+    // Stale or invalid API key — clear it so the login page shows
+    if (res.status === 401 || res.status === 403) {
+      clearApiKey();
+      window.location.reload();
+      throw new ApiError(res.status, "UNAUTHORIZED", "API key is invalid or expired");
+    }
+
     let code = "UNKNOWN";
     let message = `HTTP ${res.status}`;
     let details: Record<string, unknown> = {};

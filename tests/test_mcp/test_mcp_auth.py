@@ -13,11 +13,9 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import bcrypt
-import pytest
 
 from app.mcp.auth import CalsetaTokenVerifier
 from app.mcp.scope import check_scope
-
 
 # ---------------------------------------------------------------------------
 # Helpers

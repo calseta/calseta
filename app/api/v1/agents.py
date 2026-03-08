@@ -234,7 +234,7 @@ async def test_agent_webhook(
         "test": True,
         "alert": {
             "uuid": "00000000-0000-0000-0000-000000000000",
-            "title": "Calseta AI — Test Webhook",
+            "title": "Calseta — Test Webhook",
             "severity": "Low",
             "status": "Open",
             "source_name": agent.name,

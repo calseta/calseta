@@ -138,9 +138,12 @@ class IndicatorRepository:
             extracted = data.get("extracted", {})
             if isinstance(extracted, dict):
                 verdict = extracted.get("verdict") or extracted.get("malice")
-                if isinstance(verdict, str) and verdict in malice_order:
-                    if malice_order[verdict] > malice_order[worst]:
-                        worst = verdict
+                if (
+                    isinstance(verdict, str)
+                    and verdict in malice_order
+                    and malice_order[verdict] > malice_order[worst]
+                ):
+                    worst = verdict
         return worst
 
     async def count_for_alert(self, alert_id: int) -> int:

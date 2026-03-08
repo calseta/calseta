@@ -113,9 +113,9 @@ async def patch_indicator(
     )
 
     # Write activity event (find an associated alert for the FK)
-    from app.db.models.alert_indicator import AlertIndicator
-
     from sqlalchemy import select
+
+    from app.db.models.alert_indicator import AlertIndicator
 
     alert_link = await db.execute(
         select(AlertIndicator.alert_id)

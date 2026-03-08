@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
 from app.workflows.context import WorkflowContext, WorkflowLogger, WorkflowResult
@@ -16,16 +14,15 @@ from app.workflows.sandbox import run_workflow_code
 
 def _make_ctx() -> WorkflowContext:
     """Create a minimal WorkflowContext for testing."""
+    from datetime import UTC, datetime
     from unittest.mock import MagicMock
+    from uuid import uuid4
 
     from app.workflows.context import (
-        AlertContext,
         IndicatorContext,
         IntegrationClients,
         SecretsAccessor,
     )
-    from datetime import datetime, UTC
-    from uuid import uuid4
 
     indicator = IndicatorContext(
         uuid=uuid4(),

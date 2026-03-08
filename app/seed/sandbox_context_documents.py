@@ -47,8 +47,8 @@ _SANDBOX_DOCS: list[dict[str, object]] = [
         ),
         "targeting_rules": {
             "match_any": [
-                {"field": "source_name", "operator": "eq", "value": "sentinel"},
-                {"field": "tags", "operator": "contains", "value": "IdentityThreat"},
+                {"field": "source_name", "op": "eq", "value": "sentinel"},
+                {"field": "tags", "op": "contains", "value": "IdentityThreat"},
             ]
         },
         "tags": ["identity", "brute-force", "impossible-travel"],
@@ -86,8 +86,8 @@ _SANDBOX_DOCS: list[dict[str, object]] = [
         ),
         "targeting_rules": {
             "match_any": [
-                {"field": "source_name", "operator": "eq", "value": "elastic"},
-                {"field": "severity", "operator": "in", "value": ["Critical", "High"]},
+                {"field": "source_name", "op": "eq", "value": "elastic"},
+                {"field": "severity", "op": "in", "value": ["Critical", "High"]},
             ]
         },
         "tags": ["malware", "containment", "powershell"],
@@ -124,8 +124,8 @@ _SANDBOX_DOCS: list[dict[str, object]] = [
         ),
         "targeting_rules": {
             "match_any": [
-                {"field": "source_name", "operator": "eq", "value": "splunk"},
-                {"field": "tags", "operator": "contains", "value": "Exfiltration"},
+                {"field": "source_name", "op": "eq", "value": "splunk"},
+                {"field": "tags", "op": "contains", "value": "Exfiltration"},
             ]
         },
         "tags": ["exfiltration", "data-transfer", "dlp"],

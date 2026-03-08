@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Calseta AI - Sample MCP Agent
+Calseta - Sample MCP Agent
 ==============================
 
 A working sample agent that demonstrates end-to-end autonomous alert
@@ -384,7 +384,7 @@ async def analyze_with_claude(
             )
 
     # ---- Build the prompt ----
-    prompt = f"""You are a SOC analyst AI agent investigating a security alert from Calseta AI.
+    prompt = f"""You are a SOC analyst AI agent investigating a security alert from Calseta.
 
 ## Alert Data
 {alert_section}
@@ -605,7 +605,7 @@ async def investigate() -> None:
         sys.exit(1)
 
     print("=" * 72)
-    print("  Calseta AI - MCP Agent Investigation")
+    print("  Calseta - MCP Agent Investigation")
     print("=" * 72)
     print(f"  MCP Server:  {MCP_URL}")
     print(f"  Agent Name:  {AGENT_NAME}")

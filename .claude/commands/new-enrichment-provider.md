@@ -1,6 +1,6 @@
 ---
 name: new-enrichment-provider
-description: Scaffold a new enrichment provider plugin for Calseta AI. Use when adding a new threat intelligence or identity source for IOC enrichment.
+description: Scaffold a new enrichment provider plugin for Calseta. Use when adding a new threat intelligence or identity source for IOC enrichment.
 argument-hint: "<provider-name> (e.g. shodan, greynoise)"
 allowed-tools: Read, Write, Glob, WebFetch, WebSearch
 ---

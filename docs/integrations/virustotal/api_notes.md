@@ -18,7 +18,7 @@ Free tier keys work but have severe rate limits. Standard/Premium keys required 
 
 ---
 
-## Key Endpoints Used by Calseta AI
+## Key Endpoints Used by Calseta
 
 ### IP address report
 ```
@@ -144,7 +144,7 @@ All enrichment data lives inside `data.attributes`.
 
 ### Enrichment field extraction paths (Calseta `enrichment_field_extractions` seeding)
 
-These are the dot-notation paths in `data.attributes` that Calseta AI extracts by default:
+These are the dot-notation paths in `data.attributes` that Calseta extracts by default:
 
 | `target_key` | `source_path` | Applies to |
 |---|---|---|
@@ -176,14 +176,14 @@ POST https://www.virustotal.com/api/v3/urls
 { "url": "https://example.com/malware.exe" }
 ```
 
-### Submit file for scanning (not typical for Calseta AI)
+### Submit file for scanning (not typical for Calseta)
 ```
 POST https://www.virustotal.com/api/v3/files
 Content-Type: multipart/form-data
 file={binary}
 ```
 
-For Calseta AI v1, VirusTotal is read-only enrichment only. No write workflow actions needed.
+For Calseta v1, VirusTotal is read-only enrichment only. No write workflow actions needed.
 
 ---
 
@@ -200,7 +200,7 @@ Headers on 429: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset
 
 **Important**: The free tier is completely insufficient for production. Require `VIRUSTOTAL_API_KEY` with at least Standard tier.
 
-Calseta AI respects rate limits via:
+Calseta respects rate limits via:
 1. Cache TTL on `EnrichmentProviderBase` — default 3600 seconds for VT
 2. Respect `Retry-After` or `X-RateLimit-Reset` header on 429
 

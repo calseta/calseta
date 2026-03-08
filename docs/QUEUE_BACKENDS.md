@@ -1,6 +1,6 @@
 # Queue Backends
 
-Calseta AI uses an abstract task queue interface (`TaskQueueBase`) backed by
+Calseta uses an abstract task queue interface (`TaskQueueBase`) backed by
 procrastinate + PostgreSQL by default.
 
 ## Switching Backends

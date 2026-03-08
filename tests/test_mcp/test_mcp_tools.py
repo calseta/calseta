@@ -11,9 +11,8 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -33,15 +32,29 @@ def _mock_alert(
     *,
     alert_uuid: uuid.UUID | None = None,
     title: str = "Suspicious login",
+    severity: str = "High",
     status: str = "Open",
+    enrichment_status: str = "Pending",
+    source_name: str = "sentinel",
+    occurred_at: datetime | None = None,
+    is_enriched: bool = False,
+    tags: list[str] | None = None,
     id: int = 1,
     agent_findings: list | None = None,
 ) -> MagicMock:
+    _now = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
     alert = MagicMock()
     alert.id = id
     alert.uuid = alert_uuid or uuid.uuid4()
     alert.title = title
+    alert.severity = severity
     alert.status = status
+    alert.enrichment_status = enrichment_status
+    alert.source_name = source_name
+    alert.occurred_at = occurred_at or _now
+    alert.is_enriched = is_enriched
+    alert.tags = tags or []
+    alert.created_at = _now
     alert.agent_findings = agent_findings
     return alert
 
@@ -93,16 +106,16 @@ def _mock_approval_request(
     return req
 
 
-def _patch_session():
+def _patch_session() -> tuple[type, AsyncMock]:
     """Return a session context class and mock session for patching AsyncSessionLocal."""
     mock_session = AsyncMock()
     mock_session.commit = AsyncMock()
     mock_session.flush = AsyncMock()
 
     class _FakeCtx:
-        async def __aenter__(self):
+        async def __aenter__(self) -> AsyncMock:
             return mock_session
-        async def __aexit__(self, *args):
+        async def __aexit__(self, *args: Any) -> None:
             pass
 
     return _FakeCtx, mock_session
@@ -233,7 +246,10 @@ class TestSearchAlerts:
 
         with (
             patch("app.mcp.tools.alerts.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.tools.alerts.check_scope", _scope_fail("Insufficient scope. Required: alerts:read")),
+            patch(
+                "app.mcp.tools.alerts.check_scope",
+                _scope_fail("Insufficient scope. Required: alerts:read"),
+            ),
         ):
             from app.mcp.tools.alerts import search_alerts
             result = await search_alerts(ctx=_mock_ctx())
@@ -906,7 +922,7 @@ class TestExecuteWorkflow:
     async def test_execute_inactive_workflow_rejected(self) -> None:
         """Inactive workflows cannot be executed."""
         wf_uuid = uuid.uuid4()
-        wf = _mock_workflow(wf_uuid=wf_uuid, is_active=False)
+        wf = _mock_workflow(wf_uuid=wf_uuid, is_active=False, state="inactive")
 
         session_ctx, mock_session = _patch_session()
         mock_wf_repo = MagicMock()
@@ -1024,8 +1040,14 @@ class TestExecuteWorkflow:
             patch("app.mcp.tools.workflows.AsyncSessionLocal", session_ctx),
             patch("app.mcp.tools.workflows.check_scope", _scope_pass()),
             patch("app.mcp.tools.workflows.WorkflowRepository", return_value=mock_wf_repo),
-            patch("app.workflows.approval.create_approval_request", new_callable=AsyncMock, return_value=approval_req),
-            patch("app.workflows.notifiers.factory.get_approval_notifier", return_value=mock_notifier),
+            patch(
+                "app.workflows.approval.create_approval_request",
+                new_callable=AsyncMock, return_value=approval_req,
+            ),
+            patch(
+                "app.workflows.notifiers.factory.get_approval_notifier",
+                return_value=mock_notifier,
+            ),
             patch("app.queue.factory.get_queue_backend", return_value=mock_queue),
             patch("app.config.settings"),
         ):
@@ -1089,7 +1111,10 @@ class TestExecuteWorkflow:
             patch("app.mcp.tools.workflows.check_scope", _scope_pass()),
             patch("app.mcp.tools.workflows.WorkflowRepository", return_value=mock_wf_repo),
             patch("app.mcp.tools.workflows.WorkflowRunRepository", return_value=mock_run_repo),
-            patch("app.repositories.alert_repository.AlertRepository", return_value=mock_alert_repo),
+            patch(
+                "app.repositories.alert_repository.AlertRepository",
+                return_value=mock_alert_repo,
+            ),
             patch("app.queue.factory.get_queue_backend", return_value=mock_queue),
         ):
             from app.mcp.tools.workflows import execute_workflow
@@ -1121,7 +1146,10 @@ class TestExecuteWorkflow:
             patch("app.mcp.tools.workflows.AsyncSessionLocal", session_ctx),
             patch("app.mcp.tools.workflows.check_scope", _scope_pass()),
             patch("app.mcp.tools.workflows.WorkflowRepository", return_value=mock_wf_repo),
-            patch("app.repositories.alert_repository.AlertRepository", return_value=mock_alert_repo),
+            patch(
+                "app.repositories.alert_repository.AlertRepository",
+                return_value=mock_alert_repo,
+            ),
         ):
             from app.mcp.tools.workflows import execute_workflow
             result = await execute_workflow(

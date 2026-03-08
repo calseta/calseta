@@ -26,14 +26,14 @@ grant_type=client_credentials
 ```
 Then use: `Authorization: Bearer {access_token}`
 
-For Calseta AI v1, SSWS API token is the default (`OKTA_API_TOKEN` env var). OAuth 2.0 is supported via the same auth abstraction.
+For Calseta v1, SSWS API token is the default (`OKTA_API_TOKEN` env var). OAuth 2.0 is supported via the same auth abstraction.
 
 Base URL format: `https://{OKTA_DOMAIN}/api/v1/...`
 `OKTA_DOMAIN` is the Okta organization domain, e.g. `company.okta.com` or `company.okta-emea.com`.
 
 ---
 
-## Key Endpoints Used by Calseta AI
+## Key Endpoints Used by Calseta
 
 ### Get user by ID or login
 ```
@@ -123,7 +123,7 @@ GET /api/v1/users/{userId}/sessions
 }
 ```
 
-### Key user fields for Calseta AI
+### Key user fields for Calseta
 
 | Field | Type | Notes |
 |---|---|---|

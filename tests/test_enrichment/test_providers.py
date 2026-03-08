@@ -13,13 +13,14 @@ httpx.AsyncClient is patched at call-site so no real HTTP calls are made.
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
 from app.integrations.enrichment.abuseipdb import AbuseIPDBProvider, _abuse_score_to_malice
-from app.integrations.enrichment.base import DEFAULT_TTL_BY_TYPE, EnrichmentProviderBase
+from app.integrations.enrichment.base import EnrichmentProviderBase
 from app.integrations.enrichment.entra import EntraProvider
 from app.integrations.enrichment.okta import OktaProvider
 from app.integrations.enrichment.virustotal import (
@@ -28,9 +29,8 @@ from app.integrations.enrichment.virustotal import (
     _endpoint,
     _extract_malice,
 )
-from app.schemas.enrichment import EnrichmentResult, EnrichmentStatus
+from app.schemas.enrichment import EnrichmentStatus
 from app.schemas.indicators import IndicatorType
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -426,7 +426,7 @@ class TestVirusTotalProviderEnrich:
         self, provider: VirusTotalProvider
     ) -> None:
         """Missing attributes in response still returns successfully with defaults."""
-        body = {"data": {"attributes": {}}}
+        body: dict[str, Any] = {"data": {"attributes": {}}}
         with patch("httpx.AsyncClient", _mock_async_client(_mock_response(200, body))):
             result = await provider.enrich("1.2.3.4", IndicatorType.IP)
 
@@ -1355,7 +1355,7 @@ class TestProviderContracts:
     def test_all_providers_have_required_class_attrs(self) -> None:
         """Every provider must define provider_name, display_name, supported_types."""
         for cls in [VirusTotalProvider, AbuseIPDBProvider, OktaProvider, EntraProvider]:
-            inst = cls()
+            inst = cls()  # type: ignore[abstract]
             assert isinstance(inst.provider_name, str)
             assert len(inst.provider_name) > 0
             assert isinstance(inst.display_name, str)
@@ -1365,14 +1365,14 @@ class TestProviderContracts:
             assert all(isinstance(t, IndicatorType) for t in inst.supported_types)
 
     def test_all_providers_have_unique_names(self) -> None:
-        names = [cls().provider_name for cls in [
+        names = [cls().provider_name for cls in [  # type: ignore[abstract]
             VirusTotalProvider, AbuseIPDBProvider, OktaProvider, EntraProvider
         ]]
         assert len(names) == len(set(names))
 
     def test_get_cache_ttl_returns_int(self) -> None:
         for cls in [VirusTotalProvider, AbuseIPDBProvider, OktaProvider, EntraProvider]:
-            inst = cls()
+            inst = cls()  # type: ignore[abstract]
             for itype in inst.supported_types:
                 ttl = inst.get_cache_ttl(itype)
                 assert isinstance(ttl, int)

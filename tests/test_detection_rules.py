@@ -91,7 +91,7 @@ class TestDetectionRuleCreateSchema:
         assert len(rule.data_sources) == 2
 
     def test_empty_name_rejected(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             DetectionRuleCreate(name="")
 
     def test_name_max_length(self) -> None:
@@ -100,7 +100,7 @@ class TestDetectionRuleCreateSchema:
         assert len(rule.name) == 500
 
     def test_name_too_long_rejected(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             DetectionRuleCreate(name="a" * 501)
 
 
@@ -143,7 +143,7 @@ class TestDetectionRulePatchSchema:
         assert patch.documentation == "New docs"
 
     def test_empty_name_rejected(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             DetectionRulePatch(name="")
 
     def test_name_max_length(self) -> None:
@@ -366,7 +366,7 @@ class TestDetectionRuleRefAllSources:
 
     def test_all_return_none_when_missing(self) -> None:
         for source_cls in [SentinelSource, ElasticSource, SplunkSource, GenericSource]:
-            source = source_cls()
+            source = source_cls()  # type: ignore[abstract]
             ref = source.extract_detection_rule_ref({})
             assert ref is None, f"{source_cls.__name__} should return None for empty payload"
 
@@ -473,7 +473,7 @@ class TestIngestionDetectionRuleAssociation:
             "app.services.alert_ingestion.DetectionRuleService"
         ) as MockRuleSvc, patch(
             "app.services.alert_ingestion.ActivityEventService"
-        ), patch(
+        ) as MockActivitySvc, patch(
             "app.services.alert_ingestion.get_normalized_mappings",
             return_value=[],
         ), patch(
@@ -486,9 +486,10 @@ class TestIngestionDetectionRuleAssociation:
             MockAlertRepo.return_value.find_duplicate = AsyncMock(return_value=None)
             MockAlertRepo.return_value.create = AsyncMock(return_value=mock_alert)
             MockRuleSvc.return_value.associate_detection_rule = AsyncMock()
+            MockActivitySvc.return_value.write = AsyncMock()
 
             svc = AlertIngestionService(mock_db, mock_queue)
-            result = await svc.ingest(mock_source, {"test": "payload"})
+            await svc.ingest(mock_source, {"test": "payload"})
 
             MockRuleSvc.return_value.associate_detection_rule.assert_called_once_with(
                 mock_alert,
@@ -528,7 +529,7 @@ class TestIngestionDetectionRuleAssociation:
             "app.services.alert_ingestion.DetectionRuleService"
         ) as MockRuleSvc, patch(
             "app.services.alert_ingestion.ActivityEventService"
-        ), patch(
+        ) as MockActivitySvc, patch(
             "app.services.alert_ingestion.get_normalized_mappings",
             return_value=[],
         ), patch(
@@ -541,6 +542,7 @@ class TestIngestionDetectionRuleAssociation:
             MockAlertRepo.return_value.find_duplicate = AsyncMock(return_value=None)
             MockAlertRepo.return_value.create = AsyncMock(return_value=mock_alert)
             MockRuleSvc.return_value.associate_detection_rule = AsyncMock()
+            MockActivitySvc.return_value.write = AsyncMock()
 
             svc = AlertIngestionService(mock_db, mock_queue)
             await svc.ingest(mock_source, {"test": "payload"})
@@ -578,7 +580,7 @@ class TestIngestionDetectionRuleAssociation:
             "app.services.alert_ingestion.DetectionRuleService"
         ) as MockRuleSvc, patch(
             "app.services.alert_ingestion.ActivityEventService"
-        ), patch(
+        ) as MockActivitySvc, patch(
             "app.services.alert_ingestion.get_normalized_mappings",
             return_value=[],
         ), patch(
@@ -594,6 +596,7 @@ class TestIngestionDetectionRuleAssociation:
             MockRuleSvc.return_value.associate_detection_rule = AsyncMock(
                 side_effect=RuntimeError("DB error")
             )
+            MockActivitySvc.return_value.write = AsyncMock()
 
             svc = AlertIngestionService(mock_db, mock_queue)
             # Should NOT raise — error is caught and logged
@@ -826,7 +829,7 @@ class TestIngestionDeduplication:
             "app.services.alert_ingestion.DetectionRuleService"
         ) as MockRuleSvc, patch(
             "app.services.alert_ingestion.ActivityEventService"
-        ), patch(
+        ) as MockActivitySvc, patch(
             "app.services.alert_ingestion.get_normalized_mappings",
             return_value=[],
         ), patch(
@@ -843,6 +846,7 @@ class TestIngestionDeduplication:
                 return_value=existing_alert
             )
             MockAlertRepo.return_value.create = AsyncMock()
+            MockActivitySvc.return_value.write = AsyncMock()
 
             svc = AlertIngestionService(mock_db, mock_queue)
             result = await svc.ingest(mock_source, {"title": "Dup Alert"})

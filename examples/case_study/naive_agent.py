@@ -1,7 +1,7 @@
 """
 Naive AI Agent — Approach A (Baseline).
 
-Investigates a raw security alert WITHOUT Calseta AI. Represents the current
+Investigates a raw security alert WITHOUT Calseta. Represents the current
 state-of-the-art for teams building security AI agents without purpose-built
 infrastructure.
 

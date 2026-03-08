@@ -16,7 +16,7 @@ No OAuth or token exchange. Keys are obtained from the AbuseIPDB web dashboard a
 
 ---
 
-## Key Endpoints Used by Calseta AI
+## Key Endpoints Used by Calseta
 
 ### Check IP address (primary enrichment endpoint)
 ```
@@ -31,7 +31,7 @@ Query parameters:
 | Parameter | Required | Notes |
 |---|---|---|
 | `ipAddress` | Yes | IPv4 or IPv6 address |
-| `maxAgeInDays` | No | Report lookback window, 1–365, default 30. Calseta AI uses 90. |
+| `maxAgeInDays` | No | Report lookback window, 1–365, default 30. Calseta uses 90. |
 | `verbose` | No | Flag (no value). Include `reports` array in response when present. Do not use in production — increases payload size significantly. |
 
 Returns `200 OK` with JSON body, or `422 Unprocessable Entity` for invalid IP, or `429` for rate limit exceeded.
@@ -119,7 +119,7 @@ Returns `200 OK` with JSON body, or `422 Unprocessable Entity` for invalid IP, o
 
 ### Malice determination
 
-Calseta AI maps `abuseConfidenceScore` to `malice` enum:
+Calseta maps `abuseConfidenceScore` to `malice` enum:
 | Score | `malice` |
 |---|---|
 | 0 | `Benign` |
@@ -157,7 +157,7 @@ Categories (relevant subset):
 | 22 | SSH |
 | 23 | IoT Targeted |
 
-This is the pre-built workflow action for Calseta AI: when an agent confirms a malicious IP, it can report it back to AbuseIPDB.
+This is the pre-built workflow action for Calseta: when an agent confirms a malicious IP, it can report it back to AbuseIPDB.
 
 ---
 
@@ -173,7 +173,7 @@ This is the pre-built workflow action for Calseta AI: when an agent confirms a m
 Rate limit response: `429 Too Many Requests`
 Response body: `{ "errors": [{ "detail": "...", "status": 429 }] }`
 
-Calseta AI uses cache TTL (default: 3600 seconds) to avoid re-fetching recently enriched IPs.
+Calseta uses cache TTL (default: 3600 seconds) to avoid re-fetching recently enriched IPs.
 
 ---
 

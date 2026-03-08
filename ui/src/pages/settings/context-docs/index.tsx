@@ -51,8 +51,8 @@ import { TargetingRuleBuilder } from "@/components/targeting-rules/targeting-rul
 import { type TargetingRules, serializeTargetingRules } from "@/components/targeting-rules/types";
 
 const CD_COLUMNS: ColumnDef[] = [
-  { key: "title", initialWidth: 240, minWidth: 140 },
-  { key: "uuid", initialWidth: 140, minWidth: 100 },
+  { key: "title", initialWidth: 380, minWidth: 200 },
+  { key: "uuid", initialWidth: 280, minWidth: 200 },
   { key: "type", initialWidth: 100, minWidth: 70 },
   { key: "scope", initialWidth: 80, minWidth: 70 },
   { key: "tags", initialWidth: 180, minWidth: 80 },

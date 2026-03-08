@@ -598,7 +598,10 @@ async def test_workflow(
     if workflow.state != "active":
         raise CalsetaException(
             code="WORKFLOW_NOT_EXECUTABLE",
-            message=f"Workflow is in '{workflow.state}' state — set state to 'active' before testing",
+            message=(
+                f"Workflow is in '{workflow.state}' state"
+                " — set state to 'active' before testing"
+            ),
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 

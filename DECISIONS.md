@@ -1,4 +1,4 @@
-# Calseta AI — Autonomous Decision Log
+# Calseta — Autonomous Decision Log
 
 Decisions made during autonomous execution. Reviewed by Jorge on return.
 

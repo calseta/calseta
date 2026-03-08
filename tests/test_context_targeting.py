@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from app.services.context_targeting import evaluate_targeting_rules
 
 # ---------------------------------------------------------------------------
@@ -65,10 +63,11 @@ def test_eq_severity_matches() -> None:
     assert evaluate_targeting_rules(alert, rules) is True
 
 
-def test_eq_severity_id_matches() -> None:
+def test_eq_severity_id_unsupported_field() -> None:
+    """severity_id is not a supported targeting field — evaluates to False."""
     alert = _make_alert(severity_id=5)
     rules = {"match_all": [{"field": "severity_id", "op": "eq", "value": "5"}]}
-    assert evaluate_targeting_rules(alert, rules) is True
+    assert evaluate_targeting_rules(alert, rules) is False
 
 
 # ---------------------------------------------------------------------------
@@ -128,10 +127,11 @@ def test_contains_operator_on_non_list_field_returns_false() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_gte_operator_matches() -> None:
+def test_gte_operator_unsupported_field() -> None:
+    """severity_id is not a supported targeting field — gte evaluates to False."""
     alert = _make_alert(severity_id=4)
     rules = {"match_all": [{"field": "severity_id", "op": "gte", "value": 3}]}
-    assert evaluate_targeting_rules(alert, rules) is True
+    assert evaluate_targeting_rules(alert, rules) is False
 
 
 def test_gte_operator_no_match() -> None:
@@ -140,10 +140,11 @@ def test_gte_operator_no_match() -> None:
     assert evaluate_targeting_rules(alert, rules) is False
 
 
-def test_lte_operator_matches() -> None:
+def test_lte_operator_unsupported_field() -> None:
+    """severity_id is not a supported targeting field — lte evaluates to False."""
     alert = _make_alert(severity_id=2)
     rules = {"match_all": [{"field": "severity_id", "op": "lte", "value": 3}]}
-    assert evaluate_targeting_rules(alert, rules) is True
+    assert evaluate_targeting_rules(alert, rules) is False
 
 
 def test_lte_operator_no_match() -> None:

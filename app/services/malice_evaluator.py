@@ -61,9 +61,9 @@ def _evaluate_condition(actual: Any, operator: str, expected: Any) -> bool:
     # Numeric / equality comparisons
     try:
         if operator == "==":
-            return actual == expected
+            return actual == expected  # type: ignore[no-any-return]
         if operator == "!=":
-            return actual != expected
+            return actual != expected  # type: ignore[no-any-return]
 
         # Coerce to float for numeric comparisons
         actual_num = float(actual)
@@ -126,6 +126,6 @@ class MaliceRuleEvaluator:
 
             actual = _resolve_dot_path(response_data, field)
             if _evaluate_condition(actual, operator, expected):
-                return verdict
+                return verdict  # type: ignore[no-any-return]
 
         return self._default_verdict

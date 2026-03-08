@@ -1,6 +1,6 @@
-# Calseta AI -- Version Upgrade Guide
+# Calseta -- Version Upgrade Guide
 
-Complete procedure for upgrading a Calseta AI deployment to a new version, including pre-upgrade preparation, step-by-step execution, rollback, zero-downtime guidance, and post-upgrade verification.
+Complete procedure for upgrading a Calseta deployment to a new version, including pre-upgrade preparation, step-by-step execution, rollback, zero-downtime guidance, and post-upgrade verification.
 
 ---
 

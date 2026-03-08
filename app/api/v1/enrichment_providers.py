@@ -72,9 +72,19 @@ def _has_credentials(provider: object) -> bool:
 
 
 def _is_provider_configured(provider: object) -> bool:
-    """Check if the provider is both active and has credentials."""
+    """Check if the provider is both active and has credentials (or mock mode)."""
     is_active = getattr(provider, "is_active", False)
-    return is_active and _has_credentials(provider)
+    if not is_active:
+        return False
+
+    # Mock mode: configured if mock_responses exist
+    from app.config import settings
+
+    mock_responses = getattr(provider, "mock_responses", None)
+    if settings.ENRICHMENT_MOCK_MODE and mock_responses:
+        return True
+
+    return _has_credentials(provider)
 
 
 def _to_response(provider: object) -> EnrichmentProviderResponse:

@@ -48,7 +48,7 @@ In Azure Entra ID (formerly Azure AD): App registrations > New registration > Ce
 
 ---
 
-## Key Endpoints Used by Calseta AI
+## Key Endpoints Used by Calseta
 
 ### Get user by ID or UPN
 ```
@@ -274,7 +274,7 @@ Microsoft Graph applies service-level throttling. Limits vary by service:
 Throttling response: `429 Too Many Requests`
 Headers: `Retry-After` (seconds to wait), `x-ms-throttle-reason`
 
-Graph also applies **global throttling** per tenant across all apps: if the tenant is generating too many API calls overall, Calseta AI may be throttled even below per-app limits.
+Graph also applies **global throttling** per tenant across all apps: if the tenant is generating too many API calls overall, Calseta may be throttled even below per-app limits.
 
 ---
 
@@ -289,4 +289,4 @@ Graph also applies **global throttling** per tenant across all apps: if the tena
 - **MFA method array interpretation**: A user with only `passwordAuthenticationMethod` in the array has NO MFA enrolled — the password method is always present and does not indicate MFA. Count non-password methods to assess MFA enrollment.
 - **`ConsistencyLevel: eventual` header**: Required for advanced `$filter` and `$search` queries on large directories. Without it, complex filters return `400 Bad Request`.
 - **Token caching**: Access tokens are valid for ~1 hour. Cache and reuse them. Acquiring a new token per request will exhaust the token endpoint's own rate limits and add 200–500ms latency per call.
-- **Application vs delegated permissions**: Calseta AI uses Application permissions (no user context). Some operations (like reading MFA methods for other users) require specific roles assigned to the service principal in Entra: Global Reader (for reading), Privileged Authentication Administrator (for modifying MFA methods).
+- **Application vs delegated permissions**: Calseta uses Application permissions (no user context). Some operations (like reading MFA methods for other users) require specific roles assigned to the service principal in Entra: Global Reader (for reading), Privileged Authentication Administrator (for modifying MFA methods).

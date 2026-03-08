@@ -14,7 +14,6 @@ from pydantic import ValidationError
 
 from app.schemas.activity_events import ActivityEventType
 from app.schemas.alert import (
-    SEVERITY_ID_MAP,
     AlertCloseClassification,
     AlertSeverity,
     AlertStatus,
@@ -49,7 +48,7 @@ def test_calseta_alert_happy_path() -> None:
     assert alert.severity == AlertSeverity.HIGH
     assert alert.source_name == "sentinel"
     assert alert.src_ip == "185.220.101.45"
-    assert alert.get_severity_id() == 4
+    assert alert.severity == AlertSeverity.HIGH
 
 
 def test_calseta_alert_missing_required_fields() -> None:
@@ -64,27 +63,28 @@ def test_calseta_alert_missing_required_fields() -> None:
     assert "occurred_at" in str(exc_info.value)
 
 
-def test_calseta_alert_severity_id_derived() -> None:
-    """severity_id is derived from severity when not explicitly provided."""
+def test_calseta_alert_severity_value() -> None:
+    """severity stores the correct AlertSeverity enum value."""
     alert = CalsetaAlert(
         title="Test",
         severity=AlertSeverity.CRITICAL,
         occurred_at=datetime(2026, 1, 1, tzinfo=UTC),
         source_name="splunk",
     )
-    assert alert.get_severity_id() == 5
+    assert alert.severity == AlertSeverity.CRITICAL
+    assert alert.severity.value == "Critical"
 
 
-def test_calseta_alert_severity_id_explicit_override() -> None:
-    """Explicit severity_id takes precedence over derived value."""
-    alert = CalsetaAlert(
-        title="Test",
-        severity=AlertSeverity.MEDIUM,
-        occurred_at=datetime(2026, 1, 1, tzinfo=UTC),
-        source_name="splunk",
-        severity_id=99,  # unusual but explicit
-    )
-    assert alert.get_severity_id() == 99
+def test_calseta_alert_severity_accepts_all_values() -> None:
+    """All AlertSeverity enum values are accepted by CalsetaAlert."""
+    for sev in AlertSeverity:
+        alert = CalsetaAlert(
+            title="Test",
+            severity=sev,
+            occurred_at=datetime(2026, 1, 1, tzinfo=UTC),
+            source_name="splunk",
+        )
+        assert alert.severity == sev
 
 
 # ---------------------------------------------------------------------------
@@ -112,12 +112,11 @@ def test_enrichment_status_all_three_values() -> None:
 # AlertSeverity enum
 # ---------------------------------------------------------------------------
 
-def test_alert_severity_all_six_values_and_ids() -> None:
-    """AlertSeverity has 6 values; SEVERITY_ID_MAP covers all of them."""
+def test_alert_severity_all_six_values() -> None:
+    """AlertSeverity has exactly 6 values."""
     assert len(AlertSeverity) == 6
-    assert SEVERITY_ID_MAP[AlertSeverity.PENDING] == 0
-    assert SEVERITY_ID_MAP[AlertSeverity.CRITICAL] == 5
-    assert len(SEVERITY_ID_MAP) == 6
+    values = {s.value for s in AlertSeverity}
+    assert values == {"Pending", "Informational", "Low", "Medium", "High", "Critical"}
 
 
 # ---------------------------------------------------------------------------
@@ -195,8 +194,8 @@ def test_error_response_serializes_correctly() -> None:
 # ---------------------------------------------------------------------------
 
 def test_activity_event_type_all_twelve_values() -> None:
-    """ActivityEventType has exactly 12 values from PRD Section 8."""
-    assert len(ActivityEventType) == 12
+    """ActivityEventType has exactly 17 values (12 original + 5 added)."""
+    assert len(ActivityEventType) == 17
     # Spot-check key values
     assert ActivityEventType.ALERT_INGESTED.value == "alert_ingested"
     assert ActivityEventType.WORKFLOW_APPROVAL_REQUESTED.value == "workflow_approval_requested"

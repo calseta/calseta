@@ -20,7 +20,6 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -30,7 +29,6 @@ from app.services.context_targeting import (
     _get_alert_field,
     evaluate_targeting_rules,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures — mock_queue for integration tests that need a task queue
@@ -112,11 +110,13 @@ class TestGetAlertField:
 class TestEvaluateRuleEq:
     def test_eq_matches_string(self) -> None:
         alert = _make_alert(source_name="elastic")
-        assert _evaluate_rule(alert, {"field": "source_name", "op": "eq", "value": "elastic"}) is True
+        rule = {"field": "source_name", "op": "eq", "value": "elastic"}
+        assert _evaluate_rule(alert, rule) is True
 
     def test_eq_no_match(self) -> None:
         alert = _make_alert(source_name="splunk")
-        assert _evaluate_rule(alert, {"field": "source_name", "op": "eq", "value": "sentinel"}) is False
+        rule = {"field": "source_name", "op": "eq", "value": "sentinel"}
+        assert _evaluate_rule(alert, rule) is False
 
     def test_eq_compares_as_strings(self) -> None:
         """Numeric rule values are cast to string for comparison."""
@@ -565,7 +565,7 @@ class TestContextDocumentSchemaValidation:
     def test_create_invalid_targeting_rules_raises(self) -> None:
         from app.schemas.context_documents import ContextDocumentCreate
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             ContextDocumentCreate(
                 title="Test",
                 document_type="runbook",

@@ -1,4 +1,4 @@
-# Calseta AI — Local Development Guide
+# Calseta — Local Development Guide
 
 ## Prerequisites
 

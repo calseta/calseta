@@ -151,9 +151,9 @@ def _rate_limit_exceeded_handler(
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application instance."""
     application = FastAPI(
-        title="Calseta AI",
+        title="Calseta",
         version=settings.APP_VERSION,
-        description="SOC data platform for AI agent consumption",
+        description="SOC data platform for security agent consumption",
         docs_url=None,
         redoc_url="/redoc",
         lifespan=lifespan,

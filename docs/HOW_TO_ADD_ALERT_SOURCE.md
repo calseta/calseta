@@ -1,6 +1,6 @@
 # How to Add an Alert Source Plugin
 
-This guide walks through adding a new alert source integration to Calseta AI. By the end, your source will accept webhook payloads, normalize them to the Calseta agent-native schema, extract indicators, and flow through the full enrichment pipeline.
+This guide walks through adding a new alert source integration to Calseta. By the end, your source will accept webhook payloads, normalize them to the Calseta agent-native schema, extract indicators, and flow through the full enrichment pipeline.
 
 ---
 

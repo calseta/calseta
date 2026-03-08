@@ -23,7 +23,6 @@ integration level (via the FastAPI test client with a real DB session).
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -36,7 +35,6 @@ import pytest_asyncio
 from app.services.workflow_ast import validate_workflow_code
 from app.workflows.context import WorkflowContext, WorkflowLogger, WorkflowResult
 from app.workflows.sandbox import run_workflow_code
-
 
 # ---------------------------------------------------------------------------
 # Fixtures — mock_queue for integration tests that need a task queue
@@ -1609,7 +1607,7 @@ class TestApprovalDecisionEndpointsIntegration:
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
-        return resp.json()["data"]["approval_request_uuid"]
+        return resp.json()["data"]["approval_request_uuid"]  # type: ignore[no-any-return]
 
     @pytest.mark.asyncio
     async def test_approve_returns_200(
@@ -1884,7 +1882,7 @@ class TestWorkflowExecuteAgentRequestSchema:
     def test_invalid_trigger_source_raises(self) -> None:
         from app.schemas.workflow_approvals import WorkflowExecuteAgentRequest
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             WorkflowExecuteAgentRequest(
                 indicator_type="ip",
                 indicator_value="1.2.3.4",
@@ -1894,7 +1892,7 @@ class TestWorkflowExecuteAgentRequestSchema:
     def test_invalid_indicator_type_raises(self) -> None:
         from app.schemas.workflow_approvals import WorkflowExecuteAgentRequest
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             WorkflowExecuteAgentRequest(
                 indicator_type="invalid_type",
                 indicator_value="1.2.3.4",

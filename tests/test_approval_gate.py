@@ -17,22 +17,25 @@ import hmac
 import json
 import time
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
+if TYPE_CHECKING:
+    from app.workflows.notifiers.base import ApprovalRequest
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_approval_request(**overrides):  # type: ignore[return]
+def _make_approval_request(**overrides: Any) -> ApprovalRequest:
     """Build an ApprovalRequest dataclass with sensible defaults."""
     from app.workflows.notifiers.base import ApprovalRequest
 
-    defaults = dict(
+    defaults: dict[str, Any] = dict(
         approval_uuid=uuid4(),
         workflow_name="Test Workflow",
         workflow_risk_level="high",
@@ -395,15 +398,17 @@ async def test_slack_callback_missing_payload_returns_400() -> None:
 
     app = create_app()
     client = TestClient(app)
-    resp = client.post(
-        "/v1/approvals/callback/slack",
-        data={},  # no payload field
-        headers={
-            "Authorization": "Bearer cai_test",
-            "X-Slack-Request-Timestamp": str(int(time.time())),
-            "X-Slack-Signature": "v0=invalid",
-        },
-    )
+    with patch("app.api.v1.approvals.settings") as mock_settings:
+        mock_settings.SLACK_SIGNING_SECRET = ""
+        resp = client.post(
+            "/v1/approvals/callback/slack",
+            data={},  # no payload field
+            headers={
+                "Authorization": "Bearer cai_test",
+                "X-Slack-Request-Timestamp": str(int(time.time())),
+                "X-Slack-Signature": "v0=invalid",
+            },
+        )
     assert resp.status_code == 400
 
 
@@ -466,10 +471,12 @@ async def test_slack_callback_no_actions_returns_ok() -> None:
     client = TestClient(app)
 
     payload = json.dumps({"actions": []})
-    resp = client.post(
-        "/v1/approvals/callback/slack",
-        data={"payload": payload},
-    )
+    with patch("app.api.v1.approvals.settings") as mock_settings:
+        mock_settings.SLACK_SIGNING_SECRET = ""
+        resp = client.post(
+            "/v1/approvals/callback/slack",
+            data={"payload": payload},
+        )
     assert resp.status_code == 200
     assert resp.text == "ok"
 
@@ -487,10 +494,12 @@ async def test_slack_callback_invalid_action_id_format_returns_ok() -> None:
         "actions": [{"action_id": "no-colon-here", "value": "x"}],
         "user": {"id": "U123"},
     })
-    resp = client.post(
-        "/v1/approvals/callback/slack",
-        data={"payload": payload},
-    )
+    with patch("app.api.v1.approvals.settings") as mock_settings:
+        mock_settings.SLACK_SIGNING_SECRET = ""
+        resp = client.post(
+            "/v1/approvals/callback/slack",
+            data={"payload": payload},
+        )
     assert resp.status_code == 200
     assert resp.text == "ok"
 
@@ -508,10 +517,12 @@ async def test_slack_callback_invalid_uuid_returns_ok() -> None:
         "actions": [{"action_id": "approve:not-a-uuid", "value": "x"}],
         "user": {"id": "U123"},
     })
-    resp = client.post(
-        "/v1/approvals/callback/slack",
-        data={"payload": payload},
-    )
+    with patch("app.api.v1.approvals.settings") as mock_settings:
+        mock_settings.SLACK_SIGNING_SECRET = ""
+        resp = client.post(
+            "/v1/approvals/callback/slack",
+            data={"payload": payload},
+        )
     assert resp.status_code == 200
     assert resp.text == "ok"
 
@@ -539,8 +550,10 @@ async def test_slack_callback_routes_approve_decision() -> None:
     app = create_app()
     client = TestClient(app)
 
-    with patch("app.db.session.AsyncSessionLocal", return_value=mock_session), \
+    with patch("app.api.v1.approvals.settings") as mock_settings, \
+         patch("app.db.session.AsyncSessionLocal", return_value=mock_session), \
          patch("app.workflows.approval.process_approval_decision", mock_decide):
+        mock_settings.SLACK_SIGNING_SECRET = ""
         resp = client.post(
             "/v1/approvals/callback/slack",
             data={"payload": payload},
@@ -577,8 +590,10 @@ async def test_slack_callback_routes_reject_decision() -> None:
     app = create_app()
     client = TestClient(app)
 
-    with patch("app.db.session.AsyncSessionLocal", return_value=mock_session), \
+    with patch("app.api.v1.approvals.settings") as mock_settings, \
+         patch("app.db.session.AsyncSessionLocal", return_value=mock_session), \
          patch("app.workflows.approval.process_approval_decision", mock_decide):
+        mock_settings.SLACK_SIGNING_SECRET = ""
         resp = client.post(
             "/v1/approvals/callback/slack",
             data={"payload": payload},

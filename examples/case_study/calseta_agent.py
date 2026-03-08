@@ -1,7 +1,7 @@
 """
-Calseta AI Agent — Approach B.
+Calseta Agent — Approach B.
 
-Investigates a security alert WITH Calseta AI. Demonstrates the platform's
+Investigates a security alert WITH Calseta. Demonstrates the platform's
 value proposition: structured data, pre-computed enrichment, context documents,
 and detection rule documentation — all delivered before the agent sees the alert.
 
@@ -164,7 +164,7 @@ class CalsetaAgent:
     def _build_system_prompt(self) -> str:
         return (
             "You are a SOC analyst AI agent investigating a security alert. "
-            "You have been given a pre-structured alert payload from Calseta AI "
+            "You have been given a pre-structured alert payload from Calseta "
             "that includes:\n"
             "- The normalized alert with clean field names\n"
             "- All indicators of compromise, already extracted and enriched\n"
@@ -268,7 +268,7 @@ class CalsetaAgent:
     async def investigate(self, alert_uuid: str) -> AgentMetrics:
         """
         Run a full investigation on an alert that has already been processed
-        by Calseta AI.
+        by Calseta.
 
         Returns AgentMetrics with token counts, timing, and the finding text.
         """

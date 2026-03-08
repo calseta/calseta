@@ -31,8 +31,8 @@ import { SortableColumnHeader } from "@/components/sortable-column-header";
 import { ColumnFilterPopover } from "@/components/column-filter-popover";
 
 const COLUMNS: ColumnDef[] = [
-  { key: "title", initialWidth: 300, minWidth: 160 },
-  { key: "uuid", initialWidth: 140, minWidth: 100 },
+  { key: "title", initialWidth: 420, minWidth: 200 },
+  { key: "uuid", initialWidth: 280, minWidth: 200 },
   { key: "status", initialWidth: 100, minWidth: 80 },
   { key: "enrichment", initialWidth: 100, minWidth: 80 },
   { key: "severity", initialWidth: 100, minWidth: 80 },

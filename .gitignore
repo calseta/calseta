@@ -45,6 +45,7 @@ postgres_data/
 # Claude Code local overrides
 .claude/settings.local.json
 .mcp.local.json
+.mcp.json
 
 # Admin UI build output
 ui/dist/

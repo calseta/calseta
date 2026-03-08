@@ -1,19 +1,19 @@
-# Calseta AI -- Example Agents
+# Calseta -- Example Agents
 
-This directory contains working sample agents that demonstrate how to build AI-powered SOC investigation agents using Calseta AI as the data platform.
+This directory contains working sample agents that demonstrate how to build AI-powered SOC investigation agents using Calseta as the data platform.
 
-Calseta AI is **not** an AI SOC product -- it is the data infrastructure layer. These examples show how **your** agents consume the structured, enriched data that Calseta provides.
+Calseta is **not** an AI SOC product -- it is the data infrastructure layer. These examples show how **your** agents consume the structured, enriched data that Calseta provides.
 
 ---
 
 ## Prerequisites
 
-### Calseta AI Running
+### Calseta Running
 
-All examples assume a running Calseta AI instance:
+All examples assume a running Calseta instance:
 
 ```bash
-# Start Calseta AI (API, worker, database)
+# Start Calseta (API, worker, database)
 docker compose up -d
 
 # Create your first API key
@@ -41,7 +41,7 @@ All examples use Python 3.12+ features (type hints, StrEnum, etc.).
 
 This agent demonstrates the most common integration pattern:
 
-1. Register as an agent with Calseta AI
+1. Register as an agent with Calseta
 2. Receive alert webhooks when new enriched alerts arrive
 3. Fetch full alert context from the REST API
 4. Build a token-efficient prompt and call Claude
@@ -239,7 +239,7 @@ Calseta MCP Server                         Sample MCP Agent
 
 ## Design Philosophy
 
-Both sample agents follow the same principles that Calseta AI is built on:
+Both sample agents follow the same principles that Calseta is built on:
 
 ### Calseta Does the Data Work, Your Agent Does the Reasoning
 

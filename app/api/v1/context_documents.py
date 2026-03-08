@@ -191,7 +191,11 @@ async def list_context_documents(
         )
 
     # Parse comma-separated multi-value filter
-    type_list = [s.strip() for s in document_type.split(",") if s.strip()] if document_type else None
+    type_list = (
+        [s.strip() for s in document_type.split(",") if s.strip()]
+        if document_type
+        else None
+    )
 
     repo = ContextDocumentRepository(db)
     docs, total = await repo.list_documents(

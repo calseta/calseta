@@ -127,7 +127,10 @@ _BUILTIN_PROVIDERS: list[dict] = [
     {
         "provider_name": "okta",
         "display_name": "Okta",
-        "description": "Okta Management API v1 — user account and group membership lookups.",
+        "description": (
+            "Okta Management API v1 — user account, "
+            "group membership, and manager lookups."
+        ),
         "supported_indicator_types": ["account"],
         "auth_type": "api_token",
         "env_var_mapping": {"domain": "OKTA_DOMAIN", "api_token": "OKTA_API_TOKEN"},
@@ -159,6 +162,18 @@ _BUILTIN_PROVIDERS: list[dict] = [
                     "expected_status": [200],
                     "optional": True,
                 },
+                {
+                    "name": "user_manager",
+                    "method": "GET",
+                    "url": "https://{{auth.domain}}/api/v1/users/{{steps.user_lookup.response.id}}/linkedObjects/manager",
+                    "headers": {
+                        "Authorization": "SSWS {{auth.api_token}}",
+                        "Accept": "application/json",
+                    },
+                    "timeout_seconds": 30,
+                    "expected_status": [200],
+                    "optional": True,
+                },
             ],
         },
         "malice_rules": {
@@ -172,7 +187,7 @@ _BUILTIN_PROVIDERS: list[dict] = [
         "display_name": "Microsoft Entra ID",
         "description": (
             "Microsoft Graph API v1.0 — Azure AD user "
-            "account and group membership lookups."
+            "account, group membership, and manager lookups."
         ),
         "supported_indicator_types": ["account"],
         "auth_type": "oauth2_client_credentials",
@@ -233,6 +248,143 @@ _BUILTIN_PROVIDERS: list[dict] = [
                     "timeout_seconds": 30,
                     "expected_status": [200],
                     "optional": True,
+                },
+                {
+                    "name": "user_manager",
+                    "method": "GET",
+                    "url": (
+                        "https://graph.microsoft.com/v1.0/"
+                        "users/"
+                        "{{steps.user_lookup.response.id}}"
+                        "/manager?$select=displayName,"
+                        "mail,jobTitle"
+                    ),
+                    "headers": {
+                        "Authorization": "Bearer {{steps.token.response.access_token}}",
+                    },
+                    "timeout_seconds": 30,
+                    "expected_status": [200],
+                    "not_found_status": [404],
+                    "optional": True,
+                },
+            ],
+        },
+        "malice_rules": {
+            "rules": [],
+            "default_verdict": "Pending",
+            "not_found_verdict": "Pending",
+        },
+    },
+    # -----------------------------------------------------------------
+    # Internal IP Intelligence — classify IPs as VPN, cloud, datacenter,
+    # or corporate. Surface cloud account details for cloud IPs.
+    # -----------------------------------------------------------------
+    {
+        "provider_name": "internal_ip_intel",
+        "display_name": "Internal IP Intelligence",
+        "description": (
+            "Internal CMDB / IPAM lookup — classifies IPs as VPN, cloud, "
+            "datacenter, or corporate. For cloud IPs, surfaces the cloud "
+            "account name, owner, region, and provider."
+        ),
+        "supported_indicator_types": ["ip"],
+        "auth_type": "api_key",
+        "env_var_mapping": {"api_key": "INTERNAL_IP_INTEL_API_KEY"},
+        "default_cache_ttl_seconds": 1800,
+        "cache_ttl_by_type": {"ip": 1800},
+        "http_config": {
+            "steps": [
+                {
+                    "name": "lookup",
+                    "method": "GET",
+                    "url": "{{auth.base_url}}/api/v1/ip/{{indicator.value}}",
+                    "headers": {
+                        "Authorization": "Bearer {{auth.api_key}}",
+                        "Accept": "application/json",
+                    },
+                    "timeout_seconds": 15,
+                    "expected_status": [200],
+                    "not_found_status": [404],
+                },
+            ],
+        },
+        "malice_rules": {
+            "rules": [],
+            "default_verdict": "Pending",
+            "not_found_verdict": "Pending",
+        },
+    },
+    # -----------------------------------------------------------------
+    # HR / Insider Risk — insider threat group membership, manager chain,
+    # employment status, risk flags.
+    # -----------------------------------------------------------------
+    {
+        "provider_name": "hr_insider_risk",
+        "display_name": "HR / Insider Risk",
+        "description": (
+            "HR system integration — surfaces insider threat group "
+            "membership (leavers, new hires, executives/VIPs, security "
+            "team, contractors, PIP), manager chain, hire date, and "
+            "employment risk flags."
+        ),
+        "supported_indicator_types": ["account"],
+        "auth_type": "api_key",
+        "env_var_mapping": {"api_key": "HR_INSIDER_RISK_API_KEY"},
+        "default_cache_ttl_seconds": 900,
+        "cache_ttl_by_type": {"account": 900},
+        "http_config": {
+            "steps": [
+                {
+                    "name": "employee_lookup",
+                    "method": "GET",
+                    "url": "{{auth.base_url}}/api/v1/employees/{{indicator.value | urlencode}}",
+                    "headers": {
+                        "Authorization": "Bearer {{auth.api_key}}",
+                        "Accept": "application/json",
+                    },
+                    "timeout_seconds": 15,
+                    "expected_status": [200],
+                    "not_found_status": [404],
+                },
+            ],
+        },
+        "malice_rules": {
+            "rules": [],
+            "default_verdict": "Pending",
+            "not_found_verdict": "Pending",
+        },
+    },
+    # -----------------------------------------------------------------
+    # Asset Management — devices assigned to a user from Intune / Jamf /
+    # CMDB, with EDR agent status and last check-in.
+    # -----------------------------------------------------------------
+    {
+        "provider_name": "asset_management",
+        "display_name": "Asset Management",
+        "description": (
+            "Unified asset management lookup (Intune, Jamf, CMDB) — "
+            "returns devices assigned to a user with OS version, "
+            "compliance status, EDR agent state, last user login, "
+            "and network connection details."
+        ),
+        "supported_indicator_types": ["account"],
+        "auth_type": "api_key",
+        "env_var_mapping": {"api_key": "ASSET_MGMT_API_KEY"},
+        "default_cache_ttl_seconds": 600,
+        "cache_ttl_by_type": {"account": 600},
+        "http_config": {
+            "steps": [
+                {
+                    "name": "device_lookup",
+                    "method": "GET",
+                    "url": "{{auth.base_url}}/api/v1/users/{{indicator.value | urlencode}}/devices",
+                    "headers": {
+                        "Authorization": "Bearer {{auth.api_key}}",
+                        "Accept": "application/json",
+                    },
+                    "timeout_seconds": 15,
+                    "expected_status": [200],
+                    "not_found_status": [404],
                 },
             ],
         },
@@ -383,6 +535,12 @@ def _build_extractions() -> list[_E]:
          "user_lookup.profile.lastName", "last_name",
          "string", "Last name"),
         ("okta", "account",
+         "user_lookup.profile.department", "department",
+         "string", "Department"),
+        ("okta", "account",
+         "user_lookup.profile.title", "title",
+         "string", "Job title"),
+        ("okta", "account",
          "user_lookup.status", "status",
          "string", "User status"),
         ("okta", "account",
@@ -426,10 +584,554 @@ def _build_extractions() -> list[_E]:
          "last_password_change", "string",
          "Last password change"),
     ])
+    # Internal IP Intelligence
+    result.extend([
+        ("internal_ip_intel", "ip",
+         "classification", "classification",
+         "string", "IP classification (external_unknown, corporate, cloud)"),
+        ("internal_ip_intel", "ip",
+         "network_zone", "network_zone",
+         "string", "Network zone"),
+        ("internal_ip_intel", "ip",
+         "is_vpn", "is_vpn",
+         "bool", "Is VPN IP"),
+        ("internal_ip_intel", "ip",
+         "is_cloud", "is_cloud",
+         "bool", "Is cloud IP"),
+        ("internal_ip_intel", "ip",
+         "is_datacenter", "is_datacenter",
+         "bool", "Is datacenter IP"),
+        ("internal_ip_intel", "ip",
+         "is_internal", "is_internal",
+         "bool", "Is internal/recognized IP"),
+        ("internal_ip_intel", "ip",
+         "known_asset", "known_asset",
+         "bool", "IP belongs to a known managed asset"),
+        ("internal_ip_intel", "ip",
+         "previous_sightings", "previous_sightings",
+         "number", "Number of previous sightings in environment"),
+    ])
+    # HR / Insider Risk
+    result.extend([
+        ("hr_insider_risk", "account",
+         "employee_id", "employee_id",
+         "string", "HR employee ID"),
+        ("hr_insider_risk", "account",
+         "employment_status", "employment_status",
+         "string", "Employment status"),
+        ("hr_insider_risk", "account",
+         "employment_type", "employment_type",
+         "string", "Employment type (full_time, contractor)"),
+        ("hr_insider_risk", "account",
+         "hire_date", "hire_date",
+         "string", "Hire date"),
+        ("hr_insider_risk", "account",
+         "manager.name", "manager_name",
+         "string", "Manager name"),
+        ("hr_insider_risk", "account",
+         "manager.email", "manager_email",
+         "string", "Manager email"),
+        ("hr_insider_risk", "account",
+         "insider_threat_groups",
+         "insider_threat_groups", "list",
+         "Insider threat group memberships"),
+        ("hr_insider_risk", "account",
+         "risk_flags", "risk_flags",
+         "list", "Active risk flags"),
+        ("hr_insider_risk", "account",
+         "notice_period_active",
+         "notice_period_active", "bool",
+         "Is notice period active (leaver)"),
+    ])
+    # Asset Management
+    result.extend([
+        ("asset_management", "account",
+         "total_devices", "total_devices",
+         "int", "Total assigned devices"),
+        ("asset_management", "account",
+         "devices.0.device_name",
+         "primary_device_name", "string",
+         "Primary device name"),
+        ("asset_management", "account",
+         "devices.0.os", "primary_device_os",
+         "string", "Primary device OS"),
+        ("asset_management", "account",
+         "devices.0.compliance_status",
+         "primary_device_compliance", "string",
+         "Primary device compliance status"),
+        ("asset_management", "account",
+         "devices.0.edr.agent",
+         "primary_edr_agent", "string",
+         "Primary device EDR agent"),
+        ("asset_management", "account",
+         "devices.0.edr.status",
+         "primary_edr_status", "string",
+         "Primary device EDR status"),
+        ("asset_management", "account",
+         "devices.0.managed_by",
+         "primary_device_managed_by", "string",
+         "Primary device management platform"),
+        ("asset_management", "account",
+         "devices.0.network.last_ip",
+         "primary_device_last_ip", "string",
+         "Primary device last IP"),
+    ])
     return result
 
 
 _BUILTIN_FIELD_EXTRACTIONS = _build_extractions()
+
+
+# ---------------------------------------------------------------------------
+# Mock responses — returned when ENRICHMENT_MOCK_MODE=true
+# Keyed by indicator type; each has "raw", "extracted", and "malice"
+# ---------------------------------------------------------------------------
+
+_MOCK_RESPONSES: dict[str, dict[str, object]] = {
+    "virustotal": {
+        "ip": {
+            "raw": {
+                "data": {
+                    "id": "185.220.101.34",
+                    "type": "ip_address",
+                    "attributes": {
+                        "country": "DE",
+                        "as_owner": "Zwiebelfreunde e.V.",
+                        "asn": 205100,
+                        "network": "185.220.101.0/24",
+                        "reputation": -42,
+                        "tags": ["tor", "proxy"],
+                        "categories": {"Forcepoint ThreatSeeker": "proxy"},
+                        "last_analysis_stats": {
+                            "malicious": 14,
+                            "suspicious": 2,
+                            "harmless": 52,
+                            "undetected": 12,
+                        },
+                    },
+                },
+            },
+            "extracted": {
+                "malicious_count": 14,
+                "suspicious_count": 2,
+                "reputation": -42,
+                "tags": ["tor", "proxy"],
+                "country": "DE",
+                "as_owner": "Zwiebelfreunde e.V.",
+                "asn": 205100,
+                "network": "185.220.101.0/24",
+                "categories": {"Forcepoint ThreatSeeker": "proxy"},
+            },
+            "malice": "Malicious",
+        },
+        "domain": {
+            "raw": {
+                "data": {
+                    "id": "evil-c2.example.com",
+                    "type": "domain",
+                    "attributes": {
+                        "registrar": "Namecheap Inc.",
+                        "creation_date": 1701388800,
+                        "reputation": -15,
+                        "tags": ["c2", "malware"],
+                        "categories": {},
+                        "last_analysis_stats": {
+                            "malicious": 8,
+                            "suspicious": 1,
+                            "harmless": 60,
+                            "undetected": 11,
+                        },
+                    },
+                },
+            },
+            "extracted": {
+                "malicious_count": 8,
+                "suspicious_count": 1,
+                "reputation": -15,
+                "tags": ["c2", "malware"],
+                "registrar": "Namecheap Inc.",
+                "creation_date": 1701388800,
+                "categories": {},
+            },
+            "malice": "Malicious",
+        },
+        "hash_sha256": {
+            "raw": {
+                "data": {
+                    "id": "a1b2c3d4e5f6...",
+                    "type": "file",
+                    "attributes": {
+                        "meaningful_name": "svchost_update.exe",
+                        "type_description": "Win32 EXE",
+                        "size": 245760,
+                        "reputation": -50,
+                        "tags": ["emotet", "trojan"],
+                        "last_analysis_stats": {
+                            "malicious": 48,
+                            "suspicious": 3,
+                            "harmless": 5,
+                            "undetected": 14,
+                        },
+                    },
+                },
+            },
+            "extracted": {
+                "malicious_count": 48,
+                "suspicious_count": 3,
+                "reputation": -50,
+                "tags": ["emotet", "trojan"],
+                "meaningful_name": "svchost_update.exe",
+                "type_description": "Win32 EXE",
+                "size": 245760,
+            },
+            "malice": "Malicious",
+        },
+    },
+    "abuseipdb": {
+        "ip": {
+            "raw": {
+                "data": {
+                    "ipAddress": "185.220.101.34",
+                    "isPublic": True,
+                    "abuseConfidenceScore": 100,
+                    "countryCode": "DE",
+                    "isp": "Zwiebelfreunde e.V.",
+                    "usageType": "Reserved",
+                    "isTor": True,
+                    "isWhitelisted": False,
+                    "totalReports": 2847,
+                    "numDistinctUsers": 312,
+                    "lastReportedAt": "2026-03-06T12:34:56Z",
+                },
+            },
+            "extracted": {
+                "abuse_confidence_score": 100,
+                "total_reports": 2847,
+                "country_code": "DE",
+                "isp": "Zwiebelfreunde e.V.",
+                "usage_type": "Reserved",
+                "is_whitelisted": False,
+                "is_tor": True,
+                "is_public": True,
+                "num_distinct_users": 312,
+                "last_reported_at": "2026-03-06T12:34:56Z",
+            },
+            "malice": "Malicious",
+        },
+    },
+    "okta": {
+        "account": {
+            "raw": {
+                "user_lookup": {
+                    "id": "00u1a2b3c4d5e6f7g8",
+                    "status": "ACTIVE",
+                    "created": "2024-06-15T09:00:00.000Z",
+                    "lastLogin": "2026-03-06T14:22:00.000Z",
+                    "passwordChanged": "2026-01-10T08:00:00.000Z",
+                    "profile": {
+                        "login": "j.martinez@contoso.com",
+                        "email": "j.martinez@contoso.com",
+                        "firstName": "Jorge",
+                        "lastName": "Martinez",
+                        "department": "Engineering",
+                        "title": "Senior Engineer",
+                    },
+                },
+                "user_groups": [
+                    {"id": "00g1", "profile": {"name": "Engineering"}},
+                    {"id": "00g2", "profile": {"name": "VPN-Users"}},
+                    {"id": "00g3", "profile": {"name": "AWS-ReadOnly"}},
+                ],
+                "user_manager": [
+                    {
+                        "id": "00u9z8y7x6w5v4u3t2",
+                        "status": "ACTIVE",
+                        "profile": {
+                            "login": "s.patel@contoso.com",
+                            "email": "s.patel@contoso.com",
+                            "firstName": "Sunita",
+                            "lastName": "Patel",
+                            "title": "VP of Engineering",
+                        },
+                    },
+                ],
+            },
+            "extracted": {
+                "user_id": "00u1a2b3c4d5e6f7g8",
+                "login": "j.martinez@contoso.com",
+                "email": "j.martinez@contoso.com",
+                "first_name": "Jorge",
+                "last_name": "Martinez",
+                "status": "ACTIVE",
+                "department": "Engineering",
+                "title": "Senior Engineer",
+                "created": "2024-06-15T09:00:00.000Z",
+                "last_login": "2026-03-06T14:22:00.000Z",
+                "password_changed": "2026-01-10T08:00:00.000Z",
+                "groups": ["Engineering", "VPN-Users", "AWS-ReadOnly"],
+                "manager_name": "Sunita Patel",
+                "manager_email": "s.patel@contoso.com",
+                "manager_title": "VP of Engineering",
+            },
+            "malice": "Pending",
+        },
+    },
+    "entra": {
+        "account": {
+            "raw": {
+                "user_lookup": {
+                    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                    "userPrincipalName": "j.martinez@contoso.com",
+                    "displayName": "Jorge Martinez",
+                    "mail": "j.martinez@contoso.com",
+                    "accountEnabled": True,
+                    "department": "Engineering",
+                    "jobTitle": "Senior Engineer",
+                    "lastPasswordChangeDateTime": "2026-01-10T08:00:00Z",
+                },
+                "user_groups": {
+                    "value": [
+                        {"displayName": "Engineering"},
+                        {"displayName": "GlobalAdmins"},
+                        {"displayName": "Azure-Contributors"},
+                    ],
+                },
+                "user_manager": {
+                    "displayName": "Sunita Patel",
+                    "mail": "s.patel@contoso.com",
+                    "jobTitle": "VP of Engineering",
+                },
+            },
+            "extracted": {
+                "object_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "user_principal_name": "j.martinez@contoso.com",
+                "display_name": "Jorge Martinez",
+                "mail": "j.martinez@contoso.com",
+                "account_enabled": True,
+                "department": "Engineering",
+                "job_title": "Senior Engineer",
+                "last_password_change": "2026-01-10T08:00:00Z",
+                "groups": [
+                    "Engineering",
+                    "GlobalAdmins",
+                    "Azure-Contributors",
+                ],
+                "manager_name": "Sunita Patel",
+                "manager_email": "s.patel@contoso.com",
+                "manager_title": "VP of Engineering",
+            },
+            "malice": "Pending",
+        },
+    },
+    "internal_ip_intel": {
+        "ip": {
+            "raw": {
+                "classification": "external_unknown",
+                "network_zone": "external",
+                "is_vpn": False,
+                "is_cloud": False,
+                "is_datacenter": False,
+                "is_internal": False,
+                "known_asset": False,
+                "previous_sightings": 0,
+                "first_seen_in_environment": None,
+                "notes": "IP not recognized in any internal network, "
+                "VPN pool, or managed cloud account.",
+            },
+            "extracted": {
+                "classification": "external_unknown",
+                "network_zone": "external",
+                "is_vpn": False,
+                "is_cloud": False,
+                "is_datacenter": False,
+                "is_internal": False,
+                "known_asset": False,
+                "previous_sightings": 0,
+            },
+            "malice": "Suspicious",
+        },
+        "default": {
+            "raw": {
+                "classification": "external_unknown",
+                "network_zone": "external",
+                "is_vpn": False,
+                "is_cloud": False,
+                "is_datacenter": False,
+                "is_internal": False,
+                "known_asset": False,
+                "previous_sightings": 0,
+                "notes": "IP not recognized in any internal network, "
+                "VPN pool, or managed cloud account.",
+            },
+            "extracted": {
+                "classification": "external_unknown",
+                "network_zone": "external",
+                "is_vpn": False,
+                "is_cloud": False,
+                "is_datacenter": False,
+                "is_internal": False,
+                "known_asset": False,
+                "previous_sightings": 0,
+            },
+            "malice": "Suspicious",
+        },
+    },
+    "hr_insider_risk": {
+        "account": {
+            "raw": {
+                "employee_id": "EMP-10042",
+                "email": "j.martinez@contoso.com",
+                "full_name": "Jorge Martinez",
+                "employment_status": "active",
+                "employment_type": "full_time",
+                "hire_date": "2024-06-15",
+                "department": "Engineering",
+                "title": "Senior Engineer",
+                "location": "New York, NY",
+                "manager": {
+                    "name": "Sunita Patel",
+                    "email": "s.patel@contoso.com",
+                    "title": "VP of Engineering",
+                },
+                "insider_threat_groups": [
+                    "new_hire_watchlist",
+                    "privileged_access",
+                ],
+                "risk_flags": [],
+                "last_review_date": "2026-02-01",
+                "notice_period_active": False,
+                "all_groups_available": [
+                    "executives_vip",
+                    "leavers",
+                    "new_hire_watchlist",
+                    "contractors",
+                    "privileged_access",
+                    "pip_active",
+                    "security_team",
+                    "finance_team",
+                    "board_members",
+                ],
+            },
+            "extracted": {
+                "employee_id": "EMP-10042",
+                "employment_status": "active",
+                "employment_type": "full_time",
+                "hire_date": "2024-06-15",
+                "location": "New York, NY",
+                "manager_name": "Sunita Patel",
+                "manager_email": "s.patel@contoso.com",
+                "insider_threat_groups": [
+                    "new_hire_watchlist",
+                    "privileged_access",
+                ],
+                "risk_flags": [],
+                "notice_period_active": False,
+                "last_review_date": "2026-02-01",
+            },
+            "malice": "Pending",
+        },
+    },
+    "asset_management": {
+        "account": {
+            "raw": {
+                "user_email": "j.martinez@contoso.com",
+                "total_devices": 2,
+                "devices": [
+                    {
+                        "device_id": "DEV-A1B2C3",
+                        "device_name": "JMartinez-MBP",
+                        "device_type": "laptop",
+                        "manufacturer": "Apple",
+                        "model": "MacBook Pro 16-inch (M3 Max)",
+                        "os": "macOS",
+                        "os_version": "15.3.1",
+                        "serial_number": "C02ZX1ABCDEF",
+                        "managed_by": "Jamf",
+                        "compliance_status": "compliant",
+                        "encryption_enabled": True,
+                        "firewall_enabled": True,
+                        "last_check_in": "2026-03-06T14:15:00Z",
+                        "edr": {
+                            "agent": "CrowdStrike Falcon",
+                            "agent_version": "7.14.17409",
+                            "status": "online",
+                            "last_seen": "2026-03-06T14:22:00Z",
+                            "prevention_policy": "Workstation-High",
+                            "sensor_mode": "kernel",
+                        },
+                        "last_user_login": "2026-03-06T08:30:00Z",
+                        "network": {
+                            "last_ip": "10.0.15.201",
+                            "connection_type": "corporate_vpn",
+                            "wifi_ssid": "Contoso-Corp",
+                        },
+                    },
+                    {
+                        "device_id": "DEV-D4E5F6",
+                        "device_name": "JMartinez-iPhone",
+                        "device_type": "mobile",
+                        "manufacturer": "Apple",
+                        "model": "iPhone 16 Pro",
+                        "os": "iOS",
+                        "os_version": "19.3",
+                        "serial_number": "F17ZN4ABCDEF",
+                        "managed_by": "Intune",
+                        "compliance_status": "compliant",
+                        "encryption_enabled": True,
+                        "last_check_in": "2026-03-06T13:45:00Z",
+                        "edr": None,
+                        "last_user_login": "2026-03-06T07:00:00Z",
+                        "network": {
+                            "last_ip": "192.168.1.42",
+                            "connection_type": "cellular",
+                            "wifi_ssid": None,
+                        },
+                    },
+                ],
+            },
+            "extracted": {
+                "total_devices": 2,
+                "device_names": ["JMartinez-MBP", "JMartinez-iPhone"],
+                "device_summary": [
+                    {
+                        "name": "JMartinez-MBP",
+                        "type": "laptop",
+                        "os": "macOS 15.3.1",
+                        "managed_by": "Jamf",
+                        "compliance": "compliant",
+                        "edr_agent": "CrowdStrike Falcon",
+                        "edr_status": "online",
+                        "last_ip": "10.0.15.201",
+                        "last_login": "2026-03-06T08:30:00Z",
+                    },
+                    {
+                        "name": "JMartinez-iPhone",
+                        "type": "mobile",
+                        "os": "iOS 19.3",
+                        "managed_by": "Intune",
+                        "compliance": "compliant",
+                        "edr_agent": None,
+                        "edr_status": None,
+                        "last_ip": "192.168.1.42",
+                        "last_login": "2026-03-06T07:00:00Z",
+                    },
+                ],
+                "all_compliant": True,
+                "edr_coverage": "partial",
+                "encryption_all_enabled": True,
+            },
+            "malice": "Pending",
+        },
+    },
+}
+
+# Also provide hash_md5 and hash_sha1 as aliases for the sha256 mock
+_MOCK_RESPONSES["virustotal"]["hash_md5"] = (
+    _MOCK_RESPONSES["virustotal"]["hash_sha256"]
+)
+_MOCK_RESPONSES["virustotal"]["hash_sha1"] = (
+    _MOCK_RESPONSES["virustotal"]["hash_sha256"]
+)
 
 
 async def seed_builtin_providers(db: AsyncSession) -> None:
@@ -445,10 +1147,18 @@ async def seed_builtin_providers(db: AsyncSession) -> None:
         )
         existing = result.scalar_one_or_none()
 
+        mock = _MOCK_RESPONSES.get(defn["provider_name"])
+
         if existing is not None:
-            # Update http_config on existing builtins if it has changed
+            # Update http_config and mock_responses on existing builtins
+            changed = False
             if existing.http_config != defn["http_config"]:
                 existing.http_config = defn["http_config"]
+                changed = True
+            if existing.mock_responses != mock:
+                existing.mock_responses = mock
+                changed = True
+            if changed:
                 updated += 1
             continue
 
@@ -467,7 +1177,7 @@ async def seed_builtin_providers(db: AsyncSession) -> None:
                 default_cache_ttl_seconds=defn.get("default_cache_ttl_seconds", 3600),
                 cache_ttl_by_type=defn.get("cache_ttl_by_type"),
                 malice_rules=defn.get("malice_rules"),
-                mock_responses=None,
+                mock_responses=mock,
             )
         )
         inserted += 1

@@ -36,7 +36,7 @@ def _decrypt_auth_config(auth_config: dict[str, Any] | None) -> dict[str, Any]:
 
         try:
             decrypted_json = decrypt_value(encrypted)
-            return json.loads(decrypted_json)
+            return json.loads(decrypted_json)  # type: ignore[no-any-return]
         except Exception:
             logger.warning("auth_config_decryption_failed")
             return {}
@@ -76,6 +76,7 @@ class DatabaseDrivenProvider(EnrichmentProviderBase):
         malice_rules: dict[str, Any] | None,
         field_extractions: list[dict[str, Any]],
         is_active: bool = True,
+        mock_responses: dict[str, Any] | None = None,
     ) -> None:
         self.provider_name = provider_name
         self.display_name = display_name
@@ -89,6 +90,7 @@ class DatabaseDrivenProvider(EnrichmentProviderBase):
         self._malice_rules = malice_rules
         self._field_extractions = field_extractions
         self._is_active = is_active
+        self._mock_responses = mock_responses
 
         # Build _TTL_BY_TYPE for the base class get_cache_ttl()
         self._TTL_BY_TYPE = {
@@ -109,16 +111,62 @@ class DatabaseDrivenProvider(EnrichmentProviderBase):
         # Fall back to env vars (for builtins using existing .env config)
         return _resolve_env_vars(self._env_var_mapping)
 
+    def _is_mock_mode(self) -> bool:
+        """Check if enrichment mock mode is enabled."""
+        from app.config import settings
+
+        return settings.ENRICHMENT_MOCK_MODE and bool(self._mock_responses)
+
     def is_configured(self) -> bool:
         """Provider is configured if active and has credentials (or needs none)."""
         if not self._is_active:
             return False
+
+        # Mock mode: always configured if mock responses exist
+        if self._is_mock_mode():
+            return True
 
         if self._auth_type == "no_auth":
             return True
 
         auth = self._resolve_auth()
         return bool(auth)
+
+    def _get_mock_result(
+        self, value: str, indicator_type: IndicatorType
+    ) -> EnrichmentResult:
+        """Return a mock enrichment result from seeded mock_responses."""
+        assert self._mock_responses is not None
+        from datetime import UTC, datetime
+
+        # Look up by indicator type, fall back to "default"
+        type_key = str(indicator_type)
+        mock_data = self._mock_responses.get(
+            type_key, self._mock_responses.get("default", {})
+        )
+        if not mock_data:
+            return EnrichmentResult.skipped_result(
+                self.provider_name,
+                f"No mock response for type '{indicator_type}'",
+            )
+
+        raw = mock_data.get("raw", {})
+        extracted = mock_data.get("extracted", {})
+        malice = mock_data.get("malice", "Pending")
+        extracted["malice"] = malice
+
+        logger.debug(
+            "enrichment_mock_result",
+            provider=self.provider_name,
+            indicator_type=type_key,
+            value=value[:64],
+        )
+        return EnrichmentResult.success_result(
+            provider_name=self.provider_name,
+            extracted=extracted,
+            raw=raw,
+            enriched_at=datetime.now(UTC),
+        )
 
     async def enrich(
         self, value: str, indicator_type: IndicatorType
@@ -135,6 +183,10 @@ class DatabaseDrivenProvider(EnrichmentProviderBase):
                     self.provider_name,
                     f"{self.display_name} does not support '{indicator_type}'",
                 )
+
+            # Mock mode: return seeded mock data instead of real HTTP calls
+            if self._is_mock_mode():
+                return self._get_mock_result(value, indicator_type)
 
             auth = self._resolve_auth()
             engine = GenericHttpEnrichmentEngine(
@@ -183,4 +235,5 @@ class DatabaseDrivenProvider(EnrichmentProviderBase):
             malice_rules=row.malice_rules,
             field_extractions=field_extractions,
             is_active=row.is_active,
+            mock_responses=row.mock_responses,
         )

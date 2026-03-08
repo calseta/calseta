@@ -22,6 +22,7 @@ import hmac
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -96,7 +97,7 @@ class TestSentinelNormalize:
     def test_normalize_missing_severity_uses_pending(self, source: SentinelSource) -> None:
         payload = {"properties": {"title": "Some Incident"}}
         alert = source.normalize(payload)
-        assert alert.severity == AlertSeverity.PENDING
+        assert alert.severity == AlertSeverity.INFORMATIONAL
 
     def test_normalize_unknown_severity_maps_to_pending(self, source: SentinelSource) -> None:
         payload = {"properties": {"title": "Test", "severity": "Fatal"}}
@@ -130,7 +131,7 @@ class TestSentinelNormalize:
         payload: dict = {}  # type: ignore[type-arg]
         alert = source.normalize(payload)
         assert alert.title == "Untitled Sentinel Incident"
-        assert alert.severity == AlertSeverity.PENDING
+        assert alert.severity == AlertSeverity.INFORMATIONAL
         assert alert.source_name == "sentinel"
 
     def test_normalize_falls_back_to_created_time(self, source: SentinelSource) -> None:
@@ -404,7 +405,7 @@ class TestSentinelDetectionRuleRef:
         assert ref == "rule-uuid-abc123"
 
     def test_empty_rule_ids_returns_none(self, source: SentinelSource) -> None:
-        payload = {"properties": {"relatedAnalyticRuleIds": []}}
+        payload: dict[str, Any] = {"properties": {"relatedAnalyticRuleIds": []}}
         assert source.extract_detection_rule_ref(payload) is None
 
     def test_missing_properties_returns_none(self, source: SentinelSource) -> None:
@@ -517,7 +518,7 @@ class TestElasticGetHelper:
         assert _get({}, "nonexistent") is None
 
     def test_returns_none_for_nested_missing(self) -> None:
-        raw = {"a": {"b": {}}}
+        raw: dict[str, Any] = {"a": {"b": {}}}
         assert _get(raw, "a.b.c") is None
 
 

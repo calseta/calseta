@@ -221,14 +221,30 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
     # Build evaluation pairs (randomized for blind judging)
     eval_items: list[dict[str, Any]] = []
     for fpath in finding_files:
-        fname = fpath.stem  # e.g., "01_sentinel_brute_force_tor_naive_run1"
-        parts = fname.rsplit("_", 2)  # ["01_sentinel_brute_force_tor", "naive", "run1"]
-        if len(parts) < 3:
-            continue
+        fname = fpath.stem
+        # Support both old format: "01_..._naive_run1"
+        # and new format:          "01_..._naive_claude_run1"
+        parts = fname.rsplit("_", 3)
 
-        fixture_key = parts[0]
-        approach = parts[1]
-        run_label = parts[2]
+        fixture_key = ""
+        approach = ""
+        run_label = ""
+        model = "unknown"
+
+        if len(parts) >= 4 and parts[-1].startswith("run"):
+            # New format: fixture_approach_model_runN
+            fixture_key = parts[0]
+            approach = parts[1]
+            model = parts[2]
+            run_label = parts[3]
+        elif len(parts) >= 3 and parts[-1].startswith("run"):
+            # Fallback: try 2-part split (old format)
+            old_parts = fname.rsplit("_", 2)
+            fixture_key = old_parts[0]
+            approach = old_parts[1]
+            run_label = old_parts[2]
+        else:
+            continue
 
         # Find matching scenario
         scenario = None
@@ -249,6 +265,7 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
             "file": fpath.name,
             "fixture": fixture_key,
             "approach": approach,
+            "model": model,
             "run": run_label,
             "scenario": scenario,
             "finding": finding_text,
@@ -289,6 +306,7 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
                 "file": item["file"],
                 "scenario": item["scenario"]["label"],
                 "approach": item["approach"],
+                "model": item.get("model", "unknown"),
                 "run": item["run"],
                 "completeness": score_data.get("completeness", 0),
                 "accuracy": score_data.get("accuracy", 0),
@@ -315,6 +333,7 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
         "file",
         "scenario",
         "approach",
+        "model",
         "run",
         "completeness",
         "accuracy",
@@ -336,58 +355,68 @@ def evaluate_findings(results_dir: Path, env: dict[str, str]) -> None:
 
 
 def _print_quality_summary(scores: list[dict[str, Any]]) -> None:
-    """Print quality score summary by approach."""
+    """Print quality score summary by model and approach."""
     from collections import defaultdict
 
-    by_approach: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for s in scores:
-        by_approach[s["approach"]].append(s)
-
-    print("\n=== Quality Score Summary (averages) ===\n")
-    print(
-        f"{'Approach':<12} {'Completeness':>14} {'Accuracy':>10} "
-        f"{'Actionability':>15} {'Overall':>10}"
-    )
-    print("-" * 65)
-
-    for approach in ["naive", "calseta"]:
-        items = by_approach.get(approach, [])
-        if not items:
-            continue
-        n = len(items)
-        avg_c = sum(s["completeness"] for s in items) / n
-        avg_a = sum(s["accuracy"] for s in items) / n
-        avg_r = sum(s["actionability"] for s in items) / n
-        avg_overall = (avg_c + avg_a + avg_r) / 3
-
-        print(
-            f"{approach:<12} {avg_c:>14.1f} {avg_a:>10.1f} "
-            f"{avg_r:>15.1f} {avg_overall:>10.1f}"
-        )
-
-    # Per-scenario breakdown
-    by_scenario: dict[str, dict[str, list[dict[str, Any]]]] = defaultdict(
+    # Group by model and approach
+    by_model_approach: dict[str, dict[str, list[dict[str, Any]]]] = defaultdict(
         lambda: defaultdict(list)
     )
     for s in scores:
-        by_scenario[s["scenario"]][s["approach"]].append(s)
+        model = s.get("model", "unknown")
+        by_model_approach[model][s["approach"]].append(s)
 
-    print("\n=== Per-Scenario Breakdown ===\n")
-    for scenario_label in dict.fromkeys(s["scenario"] for s in scores):
-        print(f"  {scenario_label}:")
+    print("\n=== Quality Score Summary (averages) ===\n")
+    print(
+        f"{'Model':<15} {'Approach':<12} {'Completeness':>14} {'Accuracy':>10} "
+        f"{'Actionability':>15} {'Overall':>10}"
+    )
+    print("-" * 80)
+
+    for model in sorted(by_model_approach.keys()):
         for approach in ["naive", "calseta"]:
-            items = by_scenario[scenario_label].get(approach, [])
+            items = by_model_approach[model].get(approach, [])
             if not items:
                 continue
             n = len(items)
             avg_c = sum(s["completeness"] for s in items) / n
             avg_a = sum(s["accuracy"] for s in items) / n
             avg_r = sum(s["actionability"] for s in items) / n
+            avg_overall = (avg_c + avg_a + avg_r) / 3
+
             print(
-                f"    {approach:<10} — Completeness: {avg_c:.1f}, "
-                f"Accuracy: {avg_a:.1f}, Actionability: {avg_r:.1f}"
+                f"{model:<15} {approach:<12} {avg_c:>14.1f} {avg_a:>10.1f} "
+                f"{avg_r:>15.1f} {avg_overall:>10.1f}"
             )
-        print()
+
+    # Per-scenario breakdown grouped by model
+    by_model_scenario: dict[str, dict[str, dict[str, list[dict[str, Any]]]]] = (
+        defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    )
+    for s in scores:
+        model = s.get("model", "unknown")
+        by_model_scenario[model][s["scenario"]][s["approach"]].append(s)
+
+    print("\n=== Per-Scenario Breakdown ===\n")
+    for model in sorted(by_model_scenario.keys()):
+        print(f"  [{model}]")
+        for scenario_label in dict.fromkeys(
+            s["scenario"] for s in scores if s.get("model") == model
+        ):
+            print(f"    {scenario_label}:")
+            for approach in ["naive", "calseta"]:
+                items = by_model_scenario[model][scenario_label].get(approach, [])
+                if not items:
+                    continue
+                n = len(items)
+                avg_c = sum(s["completeness"] for s in items) / n
+                avg_a = sum(s["accuracy"] for s in items) / n
+                avg_r = sum(s["actionability"] for s in items) / n
+                print(
+                    f"      {approach:<10} — Completeness: {avg_c:.1f}, "
+                    f"Accuracy: {avg_a:.1f}, Actionability: {avg_r:.1f}"
+                )
+            print()
 
 
 # ---------------------------------------------------------------------------

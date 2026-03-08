@@ -48,8 +48,8 @@ import { Plus, Trash2, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-re
 import { cn } from "@/lib/utils";
 
 const DR_COLUMNS: ColumnDef[] = [
-  { key: "name", initialWidth: 260, minWidth: 140 },
-  { key: "uuid", initialWidth: 140, minWidth: 100 },
+  { key: "name", initialWidth: 380, minWidth: 200 },
+  { key: "uuid", initialWidth: 280, minWidth: 200 },
   { key: "source", initialWidth: 110, minWidth: 80 },
   { key: "severity", initialWidth: 90, minWidth: 70 },
   { key: "mitre", initialWidth: 200, minWidth: 100 },
@@ -320,7 +320,8 @@ export function DetectionRulesPage() {
                         <Link
                           to="/settings/detection-rules/$uuid"
                           params={{ uuid: rule.uuid }}
-                          className="text-sm text-foreground hover:text-teal-light transition-colors"
+                          className="text-sm text-foreground hover:text-teal-light transition-colors block truncate"
+                          title={rule.name}
                         >
                           {rule.name}
                         </Link>

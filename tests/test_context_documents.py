@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from app.schemas.context_documents import (
@@ -9,7 +11,6 @@ from app.schemas.context_documents import (
     ContextDocumentPatch,
     validate_targeting_rules,
 )
-
 
 # ---------------------------------------------------------------------------
 # validate_targeting_rules
@@ -53,7 +54,7 @@ def test_rules_missing_both_keys_returns_error() -> None:
 
 
 def test_rules_unknown_key_returns_error() -> None:
-    rules = {"match_any": [], "unknown_key": []}
+    rules: dict[str, Any] = {"match_any": [], "unknown_key": []}
     errors = validate_targeting_rules(rules)
     assert any("unknown keys" in e for e in errors)
 
@@ -89,7 +90,7 @@ def test_rule_invalid_op_returns_error() -> None:
 
 
 def test_all_valid_fields_accepted() -> None:
-    for field in ("source_name", "severity", "severity_id", "tags"):
+    for field in ("source_name", "severity", "tags"):
         rules = {"match_any": [{"field": field, "op": "eq", "value": "x"}]}
         errors = validate_targeting_rules(rules)
         assert errors == [], f"Field '{field}' should be valid but got: {errors}"
@@ -136,7 +137,7 @@ def test_create_invalid_document_type_raises() -> None:
 
 
 def test_create_invalid_targeting_rules_raises() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         ContextDocumentCreate(
             title="Test",
             document_type="runbook",

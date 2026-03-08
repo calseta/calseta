@@ -26,11 +26,11 @@ POST /_security/api_key
 Authorization: Basic {base64(username:password)}
 ```
 
-Webhook signature: Elastic Kibana connector actions support a `secret` header value that Calseta AI verifies.
+Webhook signature: Elastic Kibana connector actions support a `secret` header value that Calseta verifies.
 
 ---
 
-## Key Endpoints Used by Calseta AI
+## Key Endpoints Used by Calseta
 
 ### Find alerts (paginated POST)
 ```
@@ -206,7 +206,7 @@ POST {kibana_url}/api/cases/{case_id}/comments
 ### Isolate endpoint (requires Elastic Defend)
 ```
 POST {kibana_url}/api/endpoint/action/isolate
-{ "endpoint_ids": ["{agent.id}"], "comment": "Isolated by Calseta AI agent" }
+{ "endpoint_ids": ["{agent.id}"], "comment": "Isolated by Calseta agent" }
 ```
 
 ---

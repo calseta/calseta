@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -30,6 +31,7 @@ def _mock_alert(
     title: str = "Suspicious login",
     severity: str = "High",
     status: str = "Open",
+    enrichment_status: str = "Pending",
     source_name: str = "sentinel",
     occurred_at: datetime = _NOW,
     ingested_at: datetime = _NOW,
@@ -50,6 +52,7 @@ def _mock_alert(
     alert.title = title
     alert.severity = severity
     alert.status = status
+    alert.enrichment_status = enrichment_status
     alert.source_name = source_name
     alert.occurred_at = occurred_at
     alert.ingested_at = ingested_at
@@ -218,7 +221,7 @@ def _mock_activity_event(
 # Helper: mock AsyncSessionLocal context manager
 # ---------------------------------------------------------------------------
 
-def _patch_session() -> tuple:
+def _patch_session() -> tuple[type, AsyncMock]:
     """
     Return (patch_obj, mock_session) for patching AsyncSessionLocal.
 
@@ -230,9 +233,9 @@ def _patch_session() -> tuple:
     mock_session.commit = AsyncMock()
 
     class _FakeCtx:
-        async def __aenter__(self):
+        async def __aenter__(self) -> AsyncMock:
             return mock_session
-        async def __aexit__(self, *args):
+        async def __aexit__(self, *args: Any) -> None:
             pass
 
     return _FakeCtx, mock_session
@@ -330,7 +333,10 @@ class TestGetAlert:
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
             patch("app.mcp.resources.alerts.IndicatorRepository", return_value=mock_indicator_repo),
-            patch("app.mcp.resources.alerts.get_applicable_documents", new_callable=AsyncMock, return_value=[]),
+            patch(
+                "app.mcp.resources.alerts.get_applicable_documents",
+                new_callable=AsyncMock, return_value=[],
+            ),
         ):
             from app.mcp.resources.alerts import get_alert
             result = await get_alert(str(alert_uuid))
@@ -359,7 +365,10 @@ class TestGetAlert:
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
             patch("app.mcp.resources.alerts.IndicatorRepository", return_value=mock_indicator_repo),
-            patch("app.mcp.resources.alerts.get_applicable_documents", new_callable=AsyncMock, return_value=[doc]),
+            patch(
+                "app.mcp.resources.alerts.get_applicable_documents",
+                new_callable=AsyncMock, return_value=[doc],
+            ),
         ):
             from app.mcp.resources.alerts import get_alert
             result = await get_alert(str(alert_uuid))
@@ -413,7 +422,10 @@ class TestGetAlert:
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
             patch("app.mcp.resources.alerts.IndicatorRepository", return_value=mock_indicator_repo),
-            patch("app.mcp.resources.alerts.get_applicable_documents", new_callable=AsyncMock, return_value=[]),
+            patch(
+                "app.mcp.resources.alerts.get_applicable_documents",
+                new_callable=AsyncMock, return_value=[],
+            ),
         ):
             from app.mcp.resources.alerts import get_alert
             result = await get_alert(str(alert_uuid))
@@ -438,7 +450,10 @@ class TestGetAlert:
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
             patch("app.mcp.resources.alerts.IndicatorRepository", return_value=mock_indicator_repo),
-            patch("app.mcp.resources.alerts.get_applicable_documents", new_callable=AsyncMock, return_value=[]),
+            patch(
+                "app.mcp.resources.alerts.get_applicable_documents",
+                new_callable=AsyncMock, return_value=[],
+            ),
         ):
             from app.mcp.resources.alerts import get_alert
             result = await get_alert(str(alert_uuid))
@@ -473,7 +488,10 @@ class TestGetAlertContext:
         with (
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
-            patch("app.mcp.resources.alerts.get_applicable_documents", new_callable=AsyncMock, return_value=[doc]),
+            patch(
+                "app.mcp.resources.alerts.get_applicable_documents",
+                new_callable=AsyncMock, return_value=[doc],
+            ),
         ):
             from app.mcp.resources.alerts import get_alert_context
             result = await get_alert_context(str(alert_uuid))
@@ -496,7 +514,10 @@ class TestGetAlertContext:
         with (
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
-            patch("app.mcp.resources.alerts.get_applicable_documents", new_callable=AsyncMock, return_value=[doc]),
+            patch(
+                "app.mcp.resources.alerts.get_applicable_documents",
+                new_callable=AsyncMock, return_value=[doc],
+            ),
         ):
             from app.mcp.resources.alerts import get_alert_context
             result = await get_alert_context(str(alert_uuid))
@@ -549,7 +570,10 @@ class TestGetAlertActivity:
         with (
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
-            patch("app.mcp.resources.alerts.ActivityEventRepository", return_value=mock_activity_repo),
+            patch(
+                "app.mcp.resources.alerts.ActivityEventRepository",
+                return_value=mock_activity_repo,
+            ),
         ):
             from app.mcp.resources.alerts import get_alert_activity
             result = await get_alert_activity(str(alert_uuid))
@@ -576,7 +600,10 @@ class TestGetAlertActivity:
         with (
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
-            patch("app.mcp.resources.alerts.ActivityEventRepository", return_value=mock_activity_repo),
+            patch(
+                "app.mcp.resources.alerts.ActivityEventRepository",
+                return_value=mock_activity_repo,
+            ),
         ):
             from app.mcp.resources.alerts import get_alert_activity
             result = await get_alert_activity(str(alert_uuid))
@@ -615,7 +642,10 @@ class TestListDetectionRules:
 
         with (
             patch("app.mcp.resources.detection_rules.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.detection_rules.DetectionRuleRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.detection_rules.DetectionRuleRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.detection_rules import list_detection_rules
             result = await list_detection_rules()
@@ -635,7 +665,10 @@ class TestListDetectionRules:
 
         with (
             patch("app.mcp.resources.detection_rules.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.detection_rules.DetectionRuleRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.detection_rules.DetectionRuleRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.detection_rules import list_detection_rules
             result = await list_detection_rules()
@@ -656,7 +689,10 @@ class TestListDetectionRules:
 
         with (
             patch("app.mcp.resources.detection_rules.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.detection_rules.DetectionRuleRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.detection_rules.DetectionRuleRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.detection_rules import list_detection_rules
             result = await list_detection_rules()
@@ -681,7 +717,10 @@ class TestGetDetectionRule:
 
         with (
             patch("app.mcp.resources.detection_rules.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.detection_rules.DetectionRuleRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.detection_rules.DetectionRuleRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.detection_rules import get_detection_rule
             result = await get_detection_rule(str(rule_uuid))
@@ -702,7 +741,10 @@ class TestGetDetectionRule:
 
         with (
             patch("app.mcp.resources.detection_rules.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.detection_rules.DetectionRuleRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.detection_rules.DetectionRuleRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.detection_rules import get_detection_rule
             result = await get_detection_rule(str(rule_uuid))
@@ -724,7 +766,10 @@ class TestGetDetectionRule:
 
         with (
             patch("app.mcp.resources.detection_rules.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.detection_rules.DetectionRuleRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.detection_rules.DetectionRuleRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.detection_rules import get_detection_rule
             with pytest.raises(ValueError, match="Detection rule not found"):
@@ -746,7 +791,10 @@ class TestListContextDocuments:
 
         with (
             patch("app.mcp.resources.context_documents.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.context_documents.ContextDocumentRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.context_documents.ContextDocumentRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.context_documents import list_context_documents
             result = await list_context_documents()
@@ -767,7 +815,10 @@ class TestListContextDocuments:
 
         with (
             patch("app.mcp.resources.context_documents.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.context_documents.ContextDocumentRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.context_documents.ContextDocumentRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.context_documents import list_context_documents
             result = await list_context_documents()
@@ -797,7 +848,10 @@ class TestGetContextDocument:
 
         with (
             patch("app.mcp.resources.context_documents.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.context_documents.ContextDocumentRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.context_documents.ContextDocumentRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.context_documents import get_context_document
             result = await get_context_document(str(doc_uuid))
@@ -817,7 +871,10 @@ class TestGetContextDocument:
 
         with (
             patch("app.mcp.resources.context_documents.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.context_documents.ContextDocumentRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.context_documents.ContextDocumentRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.context_documents import get_context_document
             result = await get_context_document(str(doc_uuid))
@@ -838,7 +895,10 @@ class TestGetContextDocument:
 
         with (
             patch("app.mcp.resources.context_documents.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.context_documents.ContextDocumentRepository", return_value=mock_repo),
+            patch(
+                "app.mcp.resources.context_documents.ContextDocumentRepository",
+                return_value=mock_repo,
+            ),
         ):
             from app.mcp.resources.context_documents import get_context_document
             with pytest.raises(ValueError, match="Context document not found"):
@@ -1005,7 +1065,10 @@ class TestGetMetricsSummary:
 
         with (
             patch("app.mcp.resources.metrics.AsyncSessionLocal", session_ctx),
-            patch("app.mcp.resources.metrics.compute_metrics_summary", new_callable=AsyncMock, return_value=summary),
+            patch(
+                "app.mcp.resources.metrics.compute_metrics_summary",
+                new_callable=AsyncMock, return_value=summary,
+            ),
         ):
             from app.mcp.resources.metrics import get_metrics_summary
             result = await get_metrics_summary()

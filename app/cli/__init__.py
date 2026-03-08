@@ -1,5 +1,5 @@
 """
-Calseta AI — CLI commands.
+Calseta — CLI commands.
 
 Management commands that operate directly against the database.
 Run from inside the Docker container or any environment with DATABASE_URL set.
