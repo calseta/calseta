@@ -122,6 +122,44 @@ async def slack_callback(
     except ValueError as exc:
         log.warning("slack_callback_decision_failed", error=str(exc))
 
+    # Fire-and-forget: update the original Slack message to replace buttons
+    # with the decision text (prevents double-clicks and shows outcome inline)
+    channel_id = data.get("channel", {}).get("id", "")
+    message_ts = data.get("message", {}).get("ts", "")
+    original_blocks = data.get("message", {}).get("blocks", [])
+    bot_token = settings.SLACK_BOT_TOKEN
+
+    if bot_token and channel_id and message_ts:
+        try:
+            import httpx
+
+            outcome_icon = "\u2705" if approved else "\u274c"
+            by_text = f" by <@{slack_user_id}>" if slack_user_id else ""
+            decision_text = f"{outcome_icon} *{'Approved' if approved else 'Rejected'}*{by_text}"
+
+            # Keep original blocks (header, fields, reason) but replace the actions block
+            updated_blocks = [b for b in original_blocks if b.get("type") != "actions"]
+            updated_blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": decision_text},
+            })
+
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(
+                    "https://slack.com/api/chat.update",
+                    headers={
+                        "Authorization": f"Bearer {bot_token}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "channel": channel_id,
+                        "ts": message_ts,
+                        "blocks": updated_blocks,
+                    },
+                )
+        except Exception as exc:
+            log.warning("slack_message_update_failed", error=str(exc))
+
     return Response(content="ok")
 
 

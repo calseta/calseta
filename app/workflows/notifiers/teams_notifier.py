@@ -1,12 +1,12 @@
 """
-TeamsApprovalNotifier — sends Adaptive Card approval messages via Teams incoming webhook.
+TeamsApprovalNotifier — sends informational Adaptive Card notifications via Teams incoming webhook.
 
-Teams incoming webhooks do NOT support interactive button callbacks via webhooks.
-Approval decisions must be made via the Calseta REST API:
+Teams incoming webhooks do NOT support interactive button callbacks (that requires
+Azure Bot Framework, which is out of v1 scope). The card is notification-only and
+includes REST API endpoint instructions so approvers can respond via their HTTP
+client of choice:
   POST /v1/workflow-approvals/{uuid}/approve
   POST /v1/workflow-approvals/{uuid}/reject
-
-The card includes direct links to these endpoints for approvers.
 """
 
 from __future__ import annotations
@@ -20,13 +20,17 @@ logger = structlog.get_logger(__name__)
 
 class TeamsApprovalNotifier(ApprovalNotifierBase):
     """
-    Sends Teams Adaptive Card approval messages via incoming webhook.
+    Sends informational Teams Adaptive Card notifications via incoming webhook.
+
+    The card displays approval request details and REST API endpoints for
+    approvers to respond. No interactive buttons — Teams incoming webhooks
+    cannot handle POST callbacks.
 
     Required config:
     - TEAMS_WEBHOOK_URL: incoming webhook URL for the target channel
 
     Optional:
-    - CALSETA_BASE_URL: base URL for constructing approve/reject links
+    - CALSETA_BASE_URL: base URL for REST API endpoint instructions
       (default: http://localhost:8000)
     """
 
@@ -90,23 +94,13 @@ class TeamsApprovalNotifier(ApprovalNotifierBase):
                             },
                             {
                                 "type": "TextBlock",
-                                "text": "Use the buttons below (REST API) to approve or reject:",
+                                "text": (
+                                    f"**To respond to this request:**\n\n"
+                                    f"`POST {approve_url}`\n\n"
+                                    f"`POST {reject_url}`"
+                                ),
                                 "wrap": True,
                                 "isSubtle": True,
-                            },
-                        ],
-                        "actions": [
-                            {
-                                "type": "Action.OpenUrl",
-                                "title": "Approve",
-                                "url": approve_url,
-                                "style": "positive",
-                            },
-                            {
-                                "type": "Action.OpenUrl",
-                                "title": "Reject",
-                                "url": reject_url,
-                                "style": "destructive",
                             },
                         ],
                     },

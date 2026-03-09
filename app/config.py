@@ -234,20 +234,17 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
 
     # ------------------------------------------------------------------
-    # Deployment base URL (used for approval callback links, Teams notifier)
+    # Base URLs
     # ------------------------------------------------------------------
-    CALSETA_BASE_URL: str = "http://localhost:8000"
-
-    # ------------------------------------------------------------------
-    # API base URL included in agent webhook payloads so agents can call back
-    # ------------------------------------------------------------------
-    CALSETA_API_BASE_URL: str = "http://localhost:8000"
+    CALSETA_BASE_URL: str = "http://localhost:8000"  # Public URL (Teams card links, approval callbacks)
+    CALSETA_API_BASE_URL: str = "http://localhost:8000"  # Included in agent webhook payloads
 
     # ------------------------------------------------------------------
     # Approval Notifications
     # ------------------------------------------------------------------
     APPROVAL_NOTIFIER: str = "none"  # "none" | "slack" | "teams"
     APPROVAL_DEFAULT_TIMEOUT_SECONDS: int = 3600
+    APPROVAL_DEFAULT_CHANNEL: str = ""  # Slack channel ID (e.g. "C0123456789") — use ID, not name
     SLACK_BOT_TOKEN: str = ""
     SLACK_SIGNING_SECRET: str = ""
     TEAMS_WEBHOOK_URL: str = ""
