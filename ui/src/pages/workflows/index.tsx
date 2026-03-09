@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -75,22 +74,20 @@ const SORT_KEY_MAP: Record<string, string> = {
   updated: "updated_at",
 };
 
-const WORKFLOW_TEMPLATE = `async def run(ctx):
-    """
-    Workflow entry point.
+const WORKFLOW_TYPE_OPTIONS = ["indicator", "enrichment", "response", "notification", "containment"];
+const INDICATOR_TYPE_OPTIONS = ["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"];
 
-    ctx provides: indicator, alert, http, log, secrets, integrations
-    Returns: WorkflowResult.success(...) or WorkflowResult.fail(...)
-    """
-    ctx.log.info("Starting workflow")
-
-    # Your workflow logic here
-
-    return ctx.result.success(
-        message="Workflow completed",
-        data={}
-    )
-`;
+const INITIAL_CREATE_STATE: Record<string, unknown> = {
+  name: "",
+  workflow_type: "indicator",
+  risk_level: "low",
+  approval_mode: "always",
+  approval_channel: "",
+  approval_timeout_seconds: 3600,
+  indicator_types: [] as string[],
+  timeout_seconds: 30,
+  retry_count: 0,
+};
 
 export function WorkflowsListPage() {
   const {
@@ -114,8 +111,11 @@ export function WorkflowsListPage() {
   const meta = data?.meta;
 
   const [open, setOpen] = useState(false);
-  const [riskLevel, setRiskLevel] = useState("low");
-  const [approvalMode, setApprovalMode] = useState("always");
+  const [draft, setDraft] = useState<Record<string, unknown>>({ ...INITIAL_CREATE_STATE });
+
+  function updateDraft(key: string, value: unknown) {
+    setDraft((prev) => ({ ...prev, [key]: value }));
+  }
 
   // Sort handler maps UI column keys to API sort_by values
   function handleSort(uiKey: string) {
@@ -133,21 +133,16 @@ export function WorkflowsListPage() {
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
     createWorkflow.mutate(
       {
-        name: fd.get("name") as string,
-        workflow_type: (fd.get("workflow_type") as string) || null,
-        risk_level: riskLevel,
-        approval_mode: approvalMode,
-        code: fd.get("code") as string,
-        documentation: (fd.get("documentation") as string) || undefined,
+        ...draft,
+        // Send a minimal default code so the API doesn't reject it
+        code: "async def run(ctx):\n    return ctx.result.success(message=\"Workflow created\", data={})\n",
       },
       {
         onSuccess: () => {
           setOpen(false);
-          setRiskLevel("low");
-          setApprovalMode("always");
+          setDraft({ ...INITIAL_CREATE_STATE });
           toast.success("Workflow created");
         },
         onError: () => toast.error("Failed to create workflow"),
@@ -196,26 +191,48 @@ export function WorkflowsListPage() {
                 Create Workflow
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogContent className="bg-card border-border max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create Workflow</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Name</Label>
-                    <Input name="name" required className="mt-1 bg-surface border-border text-sm" placeholder="e.g. block-malicious-ip" />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Type</Label>
-                    <Input name="workflow_type" className="mt-1 bg-surface border-border text-sm" placeholder="e.g. enrichment, containment, response" />
-                  </div>
+              <form onSubmit={handleCreate} className="space-y-4 py-2">
+                {/* Name */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm text-muted-foreground">Name</Label>
+                  <Input
+                    value={(draft.name as string) ?? ""}
+                    onChange={(e) => updateDraft("name", e.target.value)}
+                    required
+                    className="bg-surface border-border text-sm"
+                    placeholder="e.g. Revoke User Sessions"
+                  />
                 </div>
+
+                {/* Type + Risk Level */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Risk Level</Label>
-                    <Select value={riskLevel} onValueChange={setRiskLevel}>
-                      <SelectTrigger className="mt-1 bg-surface border-border text-sm">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Type</Label>
+                    <Select
+                      value={(draft.workflow_type as string) ?? "indicator"}
+                      onValueChange={(v) => updateDraft("workflow_type", v)}
+                    >
+                      <SelectTrigger className="bg-surface border-border text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {WORKFLOW_TYPE_OPTIONS.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Risk Level</Label>
+                    <Select
+                      value={(draft.risk_level as string) ?? "low"}
+                      onValueChange={(v) => updateDraft("risk_level", v)}
+                    >
+                      <SelectTrigger className="bg-surface border-border text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-border">
@@ -226,10 +243,72 @@ export function WorkflowsListPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Approval Mode</Label>
-                    <Select value={approvalMode} onValueChange={setApprovalMode}>
-                      <SelectTrigger className="mt-1 bg-surface border-border text-sm">
+                </div>
+
+                {/* Indicator Types */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm text-muted-foreground">Indicator Types</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {INDICATOR_TYPE_OPTIONS.map((t) => {
+                      const types = (draft.indicator_types as string[]) ?? [];
+                      const selected = types.includes(t);
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => {
+                            const next = selected
+                              ? types.filter((x) => x !== t)
+                              : [...types, t];
+                            updateDraft("indicator_types", next);
+                          }}
+                          className={cn(
+                            "px-2.5 py-1 rounded-md text-xs border transition-colors",
+                            selected
+                              ? "bg-teal/15 border-teal/40 text-teal-light"
+                              : "bg-surface border-border text-dim hover:border-teal/30",
+                          )}
+                        >
+                          {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Timeout + Retry */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Timeout (seconds)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={draft.timeout_seconds as number}
+                      onChange={(e) => updateDraft("timeout_seconds", parseInt(e.target.value) || 1)}
+                      className="bg-surface border-border text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Retry Count</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={draft.retry_count as number}
+                      onChange={(e) => updateDraft("retry_count", parseInt(e.target.value) || 0)}
+                      className="bg-surface border-border text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Approval Gate */}
+                <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Approval Mode</Label>
+                    <Select
+                      value={(draft.approval_mode as string) ?? "always"}
+                      onValueChange={(v) => updateDraft("approval_mode", v)}
+                    >
+                      <SelectTrigger className="bg-card border-border text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-border">
@@ -239,22 +318,39 @@ export function WorkflowsListPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {(draft.approval_mode as string) !== "never" && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm text-muted-foreground">Approval Channel</Label>
+                        <Input
+                          value={(draft.approval_channel as string) ?? ""}
+                          onChange={(e) => updateDraft("approval_channel", e.target.value)}
+                          placeholder="C0123456789"
+                          className="bg-card border-border text-sm font-mono"
+                        />
+                        <p className="text-[10px] text-dim">
+                          Slack channel ID or Teams webhook URL
+                        </p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm text-muted-foreground">Approval Timeout (seconds)</Label>
+                        <Input
+                          type="number"
+                          min={60}
+                          value={draft.approval_timeout_seconds as number}
+                          onChange={(e) => updateDraft("approval_timeout_seconds", parseInt(e.target.value) || 300)}
+                          className="bg-card border-border text-sm"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Documentation</Label>
-                  <Textarea name="documentation" className="mt-1 bg-surface border-border text-sm" rows={2} placeholder="What does this workflow do?" />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Code</Label>
-                  <Textarea
-                    name="code"
-                    required
-                    rows={14}
-                    className="mt-1 bg-surface border-border text-sm font-mono"
-                    defaultValue={WORKFLOW_TEMPLATE}
-                  />
-                </div>
-                <Button type="submit" disabled={createWorkflow.isPending} className="w-full bg-teal text-white hover:bg-teal-dim">
+
+                <Button
+                  type="submit"
+                  disabled={createWorkflow.isPending || !(draft.name as string)?.trim()}
+                  className="w-full bg-teal text-white hover:bg-teal-dim"
+                >
                   Create
                 </Button>
               </form>
