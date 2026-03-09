@@ -202,6 +202,43 @@ class TestEnrichIndicator:
         assert results["abuseipdb"].success is False
         assert results["abuseipdb"].status == EnrichmentStatus.FAILED
 
+    async def test_skips_private_ip(
+        self, db: AsyncMock, cache: InMemoryCache
+    ) -> None:
+        """Private IPs should be skipped without calling any providers."""
+        vt = _make_provider("virustotal", [IndicatorType.IP], _success("virustotal"))
+
+        with patch(
+            "app.services.enrichment.enrichment_registry.list_for_type",
+            return_value=[vt],
+        ):
+            service = EnrichmentService(db, cache)
+            results = await service.enrich_indicator(IndicatorType.IP, "10.0.8.55")
+
+        # Provider should NOT have been called
+        vt.enrich.assert_not_awaited()
+        assert "_validation" in results
+        assert results["_validation"].success is False
+        assert results["_validation"].status == EnrichmentStatus.SKIPPED
+        assert "non-routable" in (results["_validation"].error_message or "")
+
+    async def test_allows_public_ip(
+        self, db: AsyncMock, cache: InMemoryCache
+    ) -> None:
+        """Public IPs should proceed to provider enrichment normally."""
+        vt = _make_provider("virustotal", [IndicatorType.IP], _success("virustotal"))
+
+        with patch(
+            "app.services.enrichment.enrichment_registry.list_for_type",
+            return_value=[vt],
+        ):
+            service = EnrichmentService(db, cache)
+            results = await service.enrich_indicator(IndicatorType.IP, "8.8.8.8")
+
+        vt.enrich.assert_awaited_once()
+        assert "virustotal" in results
+        assert "_validation" not in results
+
     async def test_provider_exception_is_caught(
         self, db: AsyncMock, cache: InMemoryCache
     ) -> None:

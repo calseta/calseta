@@ -40,6 +40,7 @@ from app.repositories.indicator_repository import IndicatorRepository
 from app.schemas.activity_events import ActivityEventType
 from app.schemas.enrichment import EnrichmentResult
 from app.schemas.indicators import IndicatorType
+from app.services.indicator_validation import is_enrichable
 
 logger = structlog.get_logger(__name__)
 
@@ -77,6 +78,21 @@ class EnrichmentService:
         Returns dict of provider_name → EnrichmentResult.
         Never raises — provider failures are captured in results.
         """
+        enrichable, skip_reason = is_enrichable(indicator_type, value)
+        if not enrichable:
+            logger.info(
+                "enrichment_skipped_not_enrichable",
+                indicator_type=str(indicator_type),
+                value=value[:64],
+                reason=skip_reason,
+            )
+            return {
+                "_validation": EnrichmentResult.skipped_result(
+                    provider_name="_validation",
+                    reason=f"Enrichment skipped: {skip_reason}",
+                )
+            }
+
         providers = enrichment_registry.list_for_type(indicator_type)
         if not providers:
             return {}
