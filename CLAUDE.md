@@ -171,11 +171,12 @@ class TaskQueueBase(ABC):
 Default backend: procrastinate + PostgreSQL. Configured via `QUEUE_BACKEND` env var.
 
 ### Workflow Interface
-Every workflow is an `async def run(ctx: WorkflowContext) -> WorkflowResult` function.
+Every workflow is an HTTP automation script: an `async def run(ctx: WorkflowContext) -> WorkflowResult` function. Python is the glue layer for constructing HTTP requests, calling external endpoints via `ctx.http`, and parsing responses.
 - `WorkflowContext` provides: `indicator`, `alert`, `http` (httpx.AsyncClient), `log`, `secrets`, `integrations`
 - `WorkflowResult` has `success: bool`, `message: str`, `data: dict`
 - Must never raise; all errors returned as `WorkflowResult.fail(...)`
 - Allowed imports validated via AST at save time (standard lib + `calseta.workflows` only)
+- See `docs/HOW_TO_WRITE_WORKFLOWS.md` for patterns and copy-paste examples
 
 ---
 

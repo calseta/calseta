@@ -2,7 +2,11 @@
 
 ## What This Component Does
 
-The workflow engine executes user-defined and system-built Python automation functions in a restricted sandbox. Workflows are `async def run(ctx: WorkflowContext) -> WorkflowResult` functions stored as code strings in the database. The engine compiles code at runtime, injects a context object with indicator data, alert data, HTTP client, logging, secrets, and integration clients (Okta, Entra), enforces execution timeouts, and captures all results for audit logging. An approval gate intercepts agent-triggered executions of high-risk workflows, requiring human approval before execution proceeds.
+The workflow engine executes HTTP automation scripts written in Python in a restricted sandbox. Workflows are `async def run(ctx: WorkflowContext) -> WorkflowResult` functions stored as code strings in the database — Python is the glue layer for constructing HTTP requests, calling external API endpoints via `ctx.http`, and parsing responses. The engine compiles code at runtime, injects a context object with indicator data, alert data, HTTP client, logging, secrets, and integration clients (Okta, Entra), enforces execution timeouts, and captures all results for audit logging. An approval gate intercepts agent-triggered executions of high-risk workflows, requiring human approval before execution proceeds.
+
+### HTTP Automation Pattern
+
+The primary use case for workflows is calling external HTTP endpoints: REST APIs (ServiceNow, Jira, PagerDuty), webhooks (Slack, SOAR platforms), serverless functions (AWS Lambda Function URLs, Azure Logic App triggers), or any service with an HTTP interface. The builtin Okta/Entra workflows are the "batteries included" version of this pattern — they use the same `ctx.http` under the hood, wrapped in typed integration clients for convenience. Custom workflows follow the same pattern with raw HTTP calls.
 
 ## Interfaces
 
