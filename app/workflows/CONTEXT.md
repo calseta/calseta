@@ -86,7 +86,7 @@ async def create_approval_request(...) -> WorkflowApprovalRequest
 async def process_approval_decision(approval_uuid, approved, responder_id, db) -> WorkflowApprovalRequest
 ```
 
-Gate fires when `trigger_source="agent"` AND `workflow.requires_approval=True`. Human-triggered executions always bypass the gate.
+Gate fires based on `workflow.approval_mode`: `"always"` gates all triggers, `"agent_only"` gates only agent triggers (`trigger_source="agent"`), and `"never"` bypasses the gate entirely.
 
 ### Workflow Executor (`app/services/workflow_executor.py`)
 
@@ -106,7 +106,7 @@ Orchestrates: load indicator from DB, build `WorkflowContext`, call `run_workflo
 
 4. **Integration clients are separate from enrichment providers.** `OktaClient` and `EntraClient` in `context.py` are action-oriented (suspend user, revoke sessions) while the Okta and Entra enrichment providers (database-driven, configured in the `enrichment_providers` table) are read-oriented (look up user data). They share API credentials but serve fundamentally different purposes.
 
-5. **Approval gate is in the service layer, not middleware.** The gate check happens in the workflow execute route handler and MCP tool, not as middleware. This allows the gate to access the workflow's `requires_approval` flag and the request's `trigger_source` without additional DB lookups.
+5. **Approval gate is in the service layer, not middleware.** The gate check happens in the workflow execute route handler and MCP tool, not as middleware. This allows the gate to access the workflow's `approval_mode` field (`always`/`agent_only`/`never`) and the request's `trigger_source` without additional DB lookups.
 
 ### Notifier System (`notifiers/`)
 
@@ -169,7 +169,7 @@ All notifier methods must never raise. `send_approval_request()` returns an exte
 | "import of 'os' is not allowed" | AST validation rejected the code at save time | Only imports in `_ALLOWED_IMPORTS` whitelist are permitted |
 | Indicator not found at execution time | Indicator `(type, value)` not in DB | Enrichment pipeline may not have run yet; check `indicator` table |
 | `ctx.integrations.okta` is None | `OKTA_DOMAIN` or `OKTA_API_TOKEN` not set | Check env vars; the client is only instantiated when both are present |
-| Approval gate not firing | `workflow.requires_approval` is False, or `trigger_source` is not "agent" | Human-triggered executes always bypass; check workflow configuration |
+| Approval gate not firing | `workflow.approval_mode` is `"never"`, or mode is `"agent_only"` and `trigger_source` is not `"agent"` | Check `approval_mode` value; `"always"` gates all triggers, `"agent_only"` gates only agent triggers |
 | Slack notification not sent | `SLACK_BOT_TOKEN` not set or channel misconfigured | Check `slack_approval_send_failed` in logs; verify bot has `chat:write` scope |
 
 ## Test Coverage

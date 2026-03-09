@@ -121,7 +121,7 @@ async def run(ctx: WorkflowContext) -> WorkflowResult:
    - `workflow_type` — `indicator` (most common)
    - `indicator_types` — which indicator types this applies to (e.g. `["ip"]`, `["account"]`, `["ip", "domain"]`)
    - `risk_level` — `low`, `medium`, or `high`
-   - `requires_approval` — `true` for destructive actions (block, disable, delete), `false` for read-only or notification workflows
+   - `approval_mode` — `"always"` for destructive actions (block, disable, delete), `"agent_only"` for agent-triggered approval only, `"never"` for read-only or notification workflows
    - `documentation` — markdown with sections: Description, When to Use, Required Secrets, Expected Outcome, Error Cases
 
 5. **Provide the API call** to register the workflow:
@@ -136,7 +136,7 @@ async def run(ctx: WorkflowContext) -> WorkflowResult:
        "indicator_types": ["ip"],
        "state": "draft",
        "risk_level": "medium",
-       "requires_approval": true,
+       "approval_mode": "always",
        "timeout_seconds": 30,
        "documentation": "..."
      }'

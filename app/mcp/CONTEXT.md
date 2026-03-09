@@ -47,7 +47,7 @@ Resources do NOT enforce per-request scopes (authentication is at connection tim
 | `post_alert_finding` | `tools/alerts.py` | `alerts:write` | Post an agent analysis finding |
 | `update_alert_status` | `tools/alerts.py` | `alerts:write` | Update alert status (with close_classification for Closed) |
 | `search_alerts` | `tools/alerts.py` | `alerts:read` | Search alerts by filter criteria |
-| `execute_workflow` | `tools/workflows.py` | `workflows:execute` | Execute a workflow (with approval gate for requires_approval workflows) |
+| `execute_workflow` | `tools/workflows.py` | `workflows:execute` | Execute a workflow (with approval gate based on `approval_mode`: `always`, `agent_only`, or `never`) |
 | `enrich_indicator` | `tools/enrichment.py` | `enrichments:read` | Synchronous on-demand enrichment |
 | `search_detection_rules` | `tools/detection_rules.py` | `alerts:read` | Search rules by name, MITRE mapping, or source |
 
@@ -90,7 +90,7 @@ Returns `None` if the check passes, or a JSON error string if it fails. Tools ca
 
 5. **Scope enforcement at tool level, not resource level.** Resources are read-only and available to all authenticated connections. Tools enforce per-call scope checks because they perform writes or trigger executions. This mirrors the REST API pattern where GET endpoints need `*:read` and mutation endpoints need `*:write`.
 
-6. **MCP workflow execution is always agent-triggered.** The `execute_workflow` tool always sets `trigger_type="agent"`, which means `requires_approval` workflows will always enter the approval gate. There is no way to bypass approval via MCP.
+6. **MCP workflow execution is always agent-triggered.** The `execute_workflow` tool always sets `trigger_type="agent"`, which means workflows with `approval_mode="always"` or `approval_mode="agent_only"` will always enter the approval gate. Only `approval_mode="never"` bypasses the gate via MCP.
 
 ## Extension Pattern: Adding a New Resource
 

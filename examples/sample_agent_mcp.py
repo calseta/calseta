@@ -299,7 +299,7 @@ async def discover_workflows(session: ClientSession) -> list[dict]:
     account suspension, enrichment runs, etc. Each workflow lists:
       - indicator_types it supports (ip, domain, hash, email, account)
       - risk_level (low, medium, high)
-      - requires_approval (whether a human must approve before execution)
+      - approval_mode ("always", "agent_only", or "never")
       - documentation (what it does and when to use it)
     """
     print("\n[Step 5] Discovering workflows from calseta://workflows ...")
@@ -311,7 +311,7 @@ async def discover_workflows(session: ClientSession) -> list[dict]:
     print(f"  Found {len(workflows)} workflows")
     for wf in workflows:
         status = "active" if wf.get("is_active") else "inactive"
-        approval = "requires approval" if wf.get("requires_approval") else "auto-execute"
+        approval = f"approval: {wf.get('approval_mode', 'never')}"
         print(
             f"  - {wf['name']} ({status}, {approval})"
             f" | types: {wf.get('indicator_types', [])}"
@@ -379,7 +379,7 @@ async def analyze_with_claude(
                 f"\n- {wf['name']} (uuid: {wf['uuid']})"
                 f"\n  Types: {wf.get('indicator_types', [])}"
                 f"\n  Risk: {wf.get('risk_level', 'unknown')}"
-                f"\n  Approval required: {wf.get('requires_approval', False)}"
+                f"\n  Approval mode: {wf.get('approval_mode', 'never')}"
                 f"\n  Doc: {wf.get('documentation', 'N/A')}\n"
             )
 

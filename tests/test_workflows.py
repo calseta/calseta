@@ -9,7 +9,7 @@ Covers:
   - Workflow execute endpoint: enqueues task, validates state
   - Workflow test endpoint: sandboxed execution
   - Workflow approval gate:
-    - Agent-triggered with requires_approval=True creates approval request
+    - Agent-triggered with approval_mode="always" creates approval request
     - Human-triggered bypasses approval gate
     - Approve -> workflow executes (enqueues task)
     - Reject -> workflow does NOT execute
@@ -890,7 +890,7 @@ class TestWorkflowCRUDIntegration:
                 "retry_count": 1,
                 "is_active": True,
                 "tags": ["test"],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -919,7 +919,7 @@ class TestWorkflowCRUDIntegration:
                 "retry_count": 1,
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -941,7 +941,7 @@ class TestWorkflowCRUDIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -968,7 +968,7 @@ class TestWorkflowCRUDIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1013,7 +1013,7 @@ class TestWorkflowVersionHistory:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1048,7 +1048,7 @@ class TestWorkflowVersionHistory:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1087,7 +1087,7 @@ class TestWorkflowVersionHistory:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1116,7 +1116,7 @@ class TestWorkflowVersionHistory:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1150,7 +1150,7 @@ class TestWorkflowTestEndpointIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1200,7 +1200,7 @@ class TestWorkflowTestEndpointIntegration:
                 "state": "active",
                 "is_active": False,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1238,7 +1238,7 @@ class TestWorkflowExecuteEndpointIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1269,7 +1269,7 @@ class TestWorkflowExecuteEndpointIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1300,7 +1300,7 @@ class TestWorkflowExecuteEndpointIntegration:
                 "state": "draft",
                 "is_active": False,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1353,7 +1353,7 @@ class TestWorkflowRunAuditIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1413,11 +1413,11 @@ class TestWorkflowApprovalGateIntegration:
     """
 
     @pytest.mark.asyncio
-    async def test_agent_trigger_with_requires_approval_creates_request(
+    async def test_agent_trigger_with_approval_mode_always_creates_request(
         self, test_client: Any, api_key: str, mock_queue: Any
     ) -> None:
         """
-        When trigger_source=agent AND requires_approval=True,
+        When trigger_source=agent AND approval_mode="always",
         the execute endpoint should create an approval request.
         """
         create_resp = await test_client.post(
@@ -1428,7 +1428,7 @@ class TestWorkflowApprovalGateIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": True,
+                "approval_mode": "always",
                 "approval_timeout_seconds": 3600,
                 "risk_level": "high",
             },
@@ -1459,7 +1459,7 @@ class TestWorkflowApprovalGateIntegration:
         self, test_client: Any, api_key: str, mock_queue: Any
     ) -> None:
         """
-        When trigger_source=human, even if requires_approval=True,
+        When trigger_source=human, even if approval_mode="always",
         the workflow should be immediately queued (not gated).
         """
         create_resp = await test_client.post(
@@ -1470,7 +1470,7 @@ class TestWorkflowApprovalGateIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": True,
+                "approval_mode": "always",
                 "approval_timeout_seconds": 3600,
                 "risk_level": "high",
             },
@@ -1498,7 +1498,7 @@ class TestWorkflowApprovalGateIntegration:
         self, test_client: Any, api_key: str, mock_queue: Any
     ) -> None:
         """
-        When trigger_source=agent but requires_approval=False,
+        When trigger_source=agent but approval_mode="never",
         the workflow should be immediately queued.
         """
         create_resp = await test_client.post(
@@ -1509,7 +1509,7 @@ class TestWorkflowApprovalGateIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1545,7 +1545,7 @@ class TestWorkflowApprovalGateIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": True,
+                "approval_mode": "always",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },
@@ -1588,7 +1588,7 @@ class TestApprovalDecisionEndpointsIntegration:
                 "state": "active",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": True,
+                "approval_mode": "always",
                 "approval_timeout_seconds": 3600,
                 "risk_level": "high",
             },
@@ -1807,7 +1807,7 @@ class TestWorkflowDeleteIntegration:
                 "state": "draft",
                 "is_active": True,
                 "tags": [],
-                "requires_approval": False,
+                "approval_mode": "never",
                 "approval_timeout_seconds": 300,
                 "risk_level": "low",
             },

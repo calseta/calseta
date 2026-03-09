@@ -1,10 +1,11 @@
-"""Initial schema — all 15 core tables.
+"""Initial schema — all 17 tables (squashed from 9 migrations).
 
 Revision ID: 0001
 Revises:
 Create Date: 2026-02-28
 
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -77,6 +78,12 @@ def upgrade() -> None:
         sa.Column("run_frequency", sa.Text(), nullable=True),
         sa.Column("created_by", sa.Text(), nullable=True),
         sa.Column("documentation", sa.Text(), nullable=True),
+        sa.Column(
+            "is_system",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("uuid"),
     )
@@ -152,6 +159,12 @@ def upgrade() -> None:
             server_default=sa.text("ARRAY[]::text[]"),
         ),
         sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
+        sa.Column(
+            "is_system",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("uuid"),
     )
@@ -202,7 +215,7 @@ def upgrade() -> None:
             server_default=sa.text("ARRAY[]::text[]"),
         ),
         sa.Column("time_saved_minutes", sa.Integer(), nullable=True),
-        sa.Column("requires_approval", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column("approval_mode", sa.String(20), nullable=False, server_default="always"),
         sa.Column("approval_channel", sa.Text(), nullable=True),
         sa.Column(
             "approval_timeout_seconds", sa.Integer(), nullable=False, server_default="3600"
@@ -300,6 +313,12 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("allowed_sources", postgresql.ARRAY(sa.Text()), nullable=True),
+        sa.Column(
+            "is_system",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("uuid"),
         sa.UniqueConstraint("key_prefix"),
@@ -341,6 +360,79 @@ def upgrade() -> None:
     )
 
     # ----------------------------------------------------------------
+    # enrichment_providers
+    # ----------------------------------------------------------------
+    op.create_table(
+        "enrichment_providers",
+        sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column(
+            "uuid",
+            postgresql.UUID(as_uuid=True),
+            server_default=sa.text("gen_random_uuid()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("provider_name", sa.Text(), nullable=False),
+        sa.Column("display_name", sa.Text(), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column(
+            "is_builtin",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
+        sa.Column(
+            "is_active",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("true"),
+        ),
+        sa.Column(
+            "supported_indicator_types",
+            postgresql.ARRAY(sa.Text()),
+            nullable=False,
+            server_default="{}",
+        ),
+        sa.Column("http_config", postgresql.JSONB(), nullable=False),
+        sa.Column(
+            "auth_type",
+            sa.Text(),
+            nullable=False,
+            server_default=sa.text("'no_auth'"),
+        ),
+        sa.Column("auth_config", postgresql.JSONB(), nullable=True),
+        sa.Column("env_var_mapping", postgresql.JSONB(), nullable=True),
+        sa.Column(
+            "default_cache_ttl_seconds",
+            sa.Integer(),
+            nullable=False,
+            server_default=sa.text("3600"),
+        ),
+        sa.Column("cache_ttl_by_type", postgresql.JSONB(), nullable=True),
+        sa.Column("malice_rules", postgresql.JSONB(), nullable=True),
+        sa.Column("mock_responses", postgresql.JSONB(), nullable=True),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("uuid"),
+        sa.UniqueConstraint("provider_name", name="uq_enrichment_provider_name"),
+    )
+    op.create_index(
+        "ix_enrichment_providers_is_active",
+        "enrichment_providers",
+        ["is_active"],
+    )
+
+    # ----------------------------------------------------------------
     # alerts (depends on detection_rules)
     # ----------------------------------------------------------------
     op.create_table(
@@ -365,6 +457,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("title", sa.Text(), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
         sa.Column("severity", sa.Text(), nullable=False, server_default="'Pending'"),
         sa.Column("source_name", sa.Text(), nullable=False),
         sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
@@ -379,12 +472,21 @@ def upgrade() -> None:
         sa.Column("is_enriched", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("fingerprint", sa.Text(), nullable=True),
         sa.Column(
-            "status", sa.Text(), nullable=False, server_default="'pending_enrichment'"
+            "duplicate_count",
+            sa.Integer(),
+            nullable=False,
+            server_default=sa.text("0"),
         ),
+        sa.Column("last_seen_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("status", sa.Text(), nullable=False, server_default="Open"),
+        sa.Column("enrichment_status", sa.Text(), nullable=False, server_default="Pending"),
         sa.Column("close_classification", sa.Text(), nullable=True),
         sa.Column("acknowledged_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("triaged_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("closed_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("malice_override", sa.Text(), nullable=True),
+        sa.Column("malice_override_source", sa.Text(), nullable=True),
+        sa.Column("malice_override_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "raw_payload",
             postgresql.JSONB(astext_type=sa.Text()),
@@ -402,6 +504,12 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("ARRAY[]::text[]"),
         ),
+        sa.Column(
+            "is_system",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
         sa.Column("detection_rule_id", sa.BigInteger(), nullable=True),
         sa.ForeignKeyConstraint(
             ["detection_rule_id"],
@@ -410,6 +518,11 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("uuid"),
+    )
+    op.create_index(
+        "ix_alerts_fingerprint_created_at",
+        "alerts",
+        ["fingerprint", sa.text("created_at DESC")],
     )
 
     # ----------------------------------------------------------------
@@ -442,6 +555,13 @@ def upgrade() -> None:
         sa.Column("last_seen", sa.DateTime(timezone=True), nullable=False),
         sa.Column("is_enriched", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("malice", sa.Text(), nullable=False, server_default="'Pending'"),
+        sa.Column(
+            "malice_source",
+            sa.Text(),
+            nullable=False,
+            server_default=sa.text("'enrichment'"),
+        ),
+        sa.Column("malice_overridden_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "enrichment_results",
             postgresql.JSONB(astext_type=sa.Text()),
@@ -656,6 +776,34 @@ def upgrade() -> None:
     )
 
     # ----------------------------------------------------------------
+    # workflow_code_versions (depends on workflows)
+    # ----------------------------------------------------------------
+    op.create_table(
+        "workflow_code_versions",
+        sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column("workflow_id", sa.BigInteger(), nullable=False),
+        sa.Column("version", sa.Integer(), nullable=False),
+        sa.Column("code", sa.Text(), nullable=False),
+        sa.Column(
+            "saved_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["workflow_id"],
+            ["workflows.id"],
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_workflow_code_versions_workflow_id",
+        "workflow_code_versions",
+        ["workflow_id"],
+    )
+
+    # ----------------------------------------------------------------
     # agent_runs (depends on agent_registrations, alerts)
     # ----------------------------------------------------------------
     op.create_table(
@@ -705,6 +853,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("agent_runs")
+    op.drop_table("workflow_code_versions")
     op.drop_table("workflow_approval_requests")
     op.drop_table("workflow_runs")
     op.drop_table("activity_events")
@@ -712,6 +861,7 @@ def downgrade() -> None:
     op.drop_table("alert_indicators")
     op.drop_table("indicators")
     op.drop_table("alerts")
+    op.drop_table("enrichment_providers")
     op.drop_table("indicator_field_mappings")
     op.drop_table("api_keys")
     op.drop_table("agent_registrations")

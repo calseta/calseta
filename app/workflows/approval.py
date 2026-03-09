@@ -1,12 +1,16 @@
 """
 Workflow approval gate — creates approval requests and processes decisions.
 
-Gate logic (applied in the execute endpoint):
-  - If trigger_source="agent" AND workflow.requires_approval=True:
+Gate logic (applied in the execute endpoint, based on workflow.approval_mode):
+  - If approval_mode="always": all triggers go through approval gate.
+  - If approval_mode="agent_only": only agent triggers (trigger_source="agent") require approval.
+  - If approval_mode="never": no approval required, immediate execution.
+
+  When the gate fires:
       → Create WorkflowApprovalRequest(status="pending")
       → Enqueue send_approval_notification_task
       → Return 202 {"status": "pending_approval", "approval_request_uuid": "..."}
-  - Otherwise (human trigger OR requires_approval=False):
+  Otherwise:
       → Existing execute-immediately behavior (4.8)
 
 Decision processing:
@@ -136,6 +140,29 @@ async def process_approval_decision(
             delay_seconds=0,
             priority=0,
         )
+
+    # Activity event: workflow_approval_responded
+    try:
+        from app.schemas.activity_events import ActivityEventType
+        from app.services.activity_event import ActivityEventService
+
+        tc = request.trigger_context or {}
+        activity_svc = ActivityEventService(db)
+        await activity_svc.write(
+            ActivityEventType.WORKFLOW_APPROVAL_RESPONDED,
+            actor_type="api",
+            workflow_id=request.workflow_id,
+            alert_id=tc.get("alert_id"),
+            references={
+                "approval_uuid": str(approval_uuid),
+                "decision": "approved" if approved else "rejected",
+                "responder_id": responder_id,
+                "indicator_type": tc.get("indicator_type"),
+                "indicator_value": tc.get("indicator_value"),
+            },
+        )
+    except Exception:
+        pass  # Never break the approval flow for audit events
 
     logger.info(
         "approval_decision_processed",

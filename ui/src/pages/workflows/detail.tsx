@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -114,7 +113,7 @@ export function WorkflowDetailPage() {
       indicator_types: [...wf.indicator_types],
       timeout_seconds: wf.timeout_seconds,
       retry_count: wf.retry_count,
-      requires_approval: wf.requires_approval,
+      approval_mode: wf.approval_mode ?? "always",
       approval_channel: wf.approval_channel ?? "",
       approval_timeout_seconds: wf.approval_timeout_seconds,
       time_saved_minutes: wf.time_saved_minutes ?? 0,
@@ -226,11 +225,19 @@ export function WorkflowDetailPage() {
               <Badge variant="outline" className={cn("text-xs", riskColor(wf.risk_level))}>
                 {wf.risk_level} risk
               </Badge>
-              {wf.requires_approval && (
-                <Badge variant="outline" className="text-xs text-amber bg-amber/10 border-amber/30">
-                  Approval required
-                </Badge>
-              )}
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs",
+                  wf.approval_mode === "always"
+                    ? "text-amber bg-amber/10 border-amber/30"
+                    : wf.approval_mode === "agent_only"
+                      ? "text-teal bg-teal/10 border-teal/30"
+                      : "text-dim bg-dim/10 border-dim/30",
+                )}
+              >
+                {wf.approval_mode === "agent_only" ? "agent only" : wf.approval_mode} approval
+              </Badge>
             </>
           }
           actions={
@@ -317,7 +324,21 @@ export function WorkflowDetailPage() {
             {
               label: "Approval",
               icon: ShieldCheck,
-              value: wf.requires_approval ? "Required" : "Not required",
+              value: (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-xs",
+                    wf.approval_mode === "always"
+                      ? "text-amber bg-amber/10 border-amber/30"
+                      : wf.approval_mode === "agent_only"
+                        ? "text-teal bg-teal/10 border-teal/30"
+                        : "text-dim bg-dim/10 border-dim/30",
+                  )}
+                >
+                  {wf.approval_mode === "agent_only" ? "agent only" : wf.approval_mode}
+                </Badge>
+              ),
             },
           ]}
         />
@@ -354,9 +375,9 @@ export function WorkflowDetailPage() {
                 )}
                 <DetailPageField label="System" value={wf.is_system ? "Yes" : "No"} />
               </SidebarSection>
-              {wf.requires_approval && (
+              {wf.approval_mode !== "never" && (
                 <SidebarSection title="Approval">
-                  <DetailPageField label="Required" value="Yes" />
+                  <DetailPageField label="Mode" value={wf.approval_mode === "agent_only" ? "Agent Only" : "Always"} />
                   <DetailPageField label="Channel" value={wf.approval_channel ?? "—"} />
                   <DetailPageField label="Timeout" value={`${wf.approval_timeout_seconds}s`} />
                 </SidebarSection>
@@ -651,14 +672,23 @@ export function WorkflowDetailPage() {
 
             {/* Approval Gate */}
             <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm text-muted-foreground">Requires Approval</Label>
-                <Switch
-                  checked={editDraft.requires_approval as boolean}
-                  onCheckedChange={(v) => updateDraft("requires_approval", v)}
-                />
+              <div className="space-y-1.5">
+                <Label className="text-sm text-muted-foreground">Approval Mode</Label>
+                <Select
+                  value={editDraft.approval_mode as string}
+                  onValueChange={(v) => updateDraft("approval_mode", v)}
+                >
+                  <SelectTrigger className="bg-card border-border text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="always">Always</SelectItem>
+                    <SelectItem value="agent_only">Agent Only</SelectItem>
+                    <SelectItem value="never">Never</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              {(editDraft.requires_approval as boolean) && (
+              {(editDraft.approval_mode as string) !== "never" && (
                 <>
                   <div className="space-y-1.5">
                     <Label className="text-sm text-muted-foreground">Notifier</Label>

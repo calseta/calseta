@@ -109,8 +109,8 @@ const indicatorIcons: Record<string, React.ComponentType<{ className?: string }>
 export function AlertDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
   const { data: alertResp, isLoading, refetch, isFetching } = useAlert(uuid);
-  const { data: activityResp } = useAlertActivity(uuid);
-  const { data: contextResp } = useAlertContext(uuid);
+  const { data: activityResp, refetch: refetchActivity } = useAlertActivity(uuid);
+  const { data: contextResp, refetch: refetchContext } = useAlertContext(uuid);
   const patchAlert = usePatchAlert();
   const enrichAlert = useEnrichAlert();
 
@@ -228,7 +228,7 @@ export function AlertDetailPage() {
           backTo="/alerts"
           title={alert.title}
           subtitle={alert.description ? <p className="text-sm text-dim leading-relaxed">{alert.description}</p> : undefined}
-          onRefresh={() => refetch()}
+          onRefresh={() => { refetch(); refetchActivity(); refetchContext(); }}
           isRefreshing={isFetching}
           actions={<RunAgentButton alertUuid={uuid} />}
           badges={

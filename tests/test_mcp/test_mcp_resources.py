@@ -171,7 +171,7 @@ def _mock_workflow(
     is_system: bool = False,
     tags: list[str] | None = None,
     time_saved_minutes: int | None = 15,
-    requires_approval: bool = True,
+    approval_mode: str = "always",
     approval_channel: str | None = "#soc-approvals",
     approval_timeout_seconds: int = 3600,
     risk_level: str = "medium",
@@ -191,7 +191,7 @@ def _mock_workflow(
     wf.is_system = is_system
     wf.tags = tags or []
     wf.time_saved_minutes = time_saved_minutes
-    wf.requires_approval = requires_approval
+    wf.approval_mode = approval_mode
     wf.approval_channel = approval_channel
     wf.approval_timeout_seconds = approval_timeout_seconds
     wf.risk_level = risk_level
@@ -948,7 +948,7 @@ class TestListWorkflows:
         expected_keys = {
             "uuid", "name", "workflow_type", "indicator_types",
             "state", "code_version", "is_active", "is_system",
-            "tags", "time_saved_minutes", "requires_approval",
+            "tags", "time_saved_minutes", "approval_mode",
             "risk_level", "documentation", "created_at", "updated_at",
         }
         assert expected_keys.issubset(set(item.keys()))
@@ -979,7 +979,7 @@ class TestGetWorkflow:
         assert data["uuid"] == str(wf_uuid)
         assert data["name"] == "Block IP"
         assert data["code"] == "async def run(ctx): pass"
-        assert data["requires_approval"] is True
+        assert data["approval_mode"] == "always"
 
     async def test_full_workflow_fields_present(self) -> None:
         wf_uuid = uuid.uuid4()
@@ -1000,7 +1000,7 @@ class TestGetWorkflow:
             "uuid", "name", "workflow_type", "indicator_types",
             "code", "code_version", "state", "timeout_seconds",
             "retry_count", "is_active", "is_system", "tags",
-            "time_saved_minutes", "requires_approval",
+            "time_saved_minutes", "approval_mode",
             "approval_channel", "approval_timeout_seconds",
             "risk_level", "documentation", "created_at", "updated_at",
         }

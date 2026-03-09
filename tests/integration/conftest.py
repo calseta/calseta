@@ -257,7 +257,7 @@ async def sample_workflow(
             "is_active": True,
             "tags": ["test"],
             "time_saved_minutes": 5,
-            "requires_approval": False,
+            "approval_mode": "never",
             "approval_channel": None,
             "approval_timeout_seconds": 300,
             "risk_level": "low",

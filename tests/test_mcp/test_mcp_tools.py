@@ -65,7 +65,7 @@ def _mock_workflow(
     name: str = "Block IP",
     is_active: bool = True,
     state: str = "active",
-    requires_approval: bool = False,
+    approval_mode: str = "never",
     code_version: int = 1,
     approval_timeout_seconds: int = 3600,
 ) -> MagicMock:
@@ -75,7 +75,7 @@ def _mock_workflow(
     wf.name = name
     wf.is_active = is_active
     wf.state = state
-    wf.requires_approval = requires_approval
+    wf.approval_mode = approval_mode
     wf.code_version = code_version
     wf.approval_timeout_seconds = approval_timeout_seconds
     wf.approval_channel = "#soc-approvals"
@@ -830,7 +830,7 @@ class TestExecuteWorkflow:
     async def test_execute_immediate_success(self) -> None:
         """Workflow without approval gate returns queued status with run_uuid."""
         wf_uuid = uuid.uuid4()
-        wf = _mock_workflow(wf_uuid=wf_uuid, requires_approval=False)
+        wf = _mock_workflow(wf_uuid=wf_uuid, approval_mode="never")
         run = _mock_workflow_run()
 
         session_ctx, mock_session = _patch_session()
@@ -972,7 +972,7 @@ class TestExecuteWorkflow:
     async def test_execute_approval_gate_without_reason(self) -> None:
         """Workflow requiring approval without reason returns error."""
         wf_uuid = uuid.uuid4()
-        wf = _mock_workflow(wf_uuid=wf_uuid, requires_approval=True)
+        wf = _mock_workflow(wf_uuid=wf_uuid, approval_mode="always")
 
         session_ctx, mock_session = _patch_session()
         mock_wf_repo = MagicMock()
@@ -997,7 +997,7 @@ class TestExecuteWorkflow:
     async def test_execute_approval_gate_without_confidence(self) -> None:
         """Workflow requiring approval without confidence returns error."""
         wf_uuid = uuid.uuid4()
-        wf = _mock_workflow(wf_uuid=wf_uuid, requires_approval=True)
+        wf = _mock_workflow(wf_uuid=wf_uuid, approval_mode="always")
 
         session_ctx, mock_session = _patch_session()
         mock_wf_repo = MagicMock()
@@ -1023,7 +1023,7 @@ class TestExecuteWorkflow:
     async def test_execute_approval_gate_success(self) -> None:
         """Workflow with approval gate returns pending_approval status."""
         wf_uuid = uuid.uuid4()
-        wf = _mock_workflow(wf_uuid=wf_uuid, requires_approval=True)
+        wf = _mock_workflow(wf_uuid=wf_uuid, approval_mode="always")
         approval_req = _mock_approval_request()
 
         session_ctx, mock_session = _patch_session()
@@ -1090,7 +1090,7 @@ class TestExecuteWorkflow:
         """execute_workflow resolves alert_uuid to alert_id in trigger_context."""
         wf_uuid = uuid.uuid4()
         alert_uuid = uuid.uuid4()
-        wf = _mock_workflow(wf_uuid=wf_uuid, requires_approval=False)
+        wf = _mock_workflow(wf_uuid=wf_uuid, approval_mode="never")
         alert = _mock_alert(alert_uuid=alert_uuid)
         run = _mock_workflow_run()
 
@@ -1133,7 +1133,7 @@ class TestExecuteWorkflow:
         """Alert UUID that doesn't exist returns error."""
         wf_uuid = uuid.uuid4()
         alert_uuid = uuid.uuid4()
-        wf = _mock_workflow(wf_uuid=wf_uuid, requires_approval=False)
+        wf = _mock_workflow(wf_uuid=wf_uuid, approval_mode="never")
 
         session_ctx, mock_session = _patch_session()
         mock_wf_repo = MagicMock()

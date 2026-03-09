@@ -21,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
   TableBody,
   TableCell,
@@ -41,13 +40,14 @@ import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/copyable-text";
 import { SortableColumnHeader } from "@/components/sortable-column-header";
 import { ColumnFilterPopover } from "@/components/column-filter-popover";
-import { ShieldCheck, Code, Lock, Plus, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ShieldCheck, Code, Plus, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
 
 const WF_COLUMNS: ColumnDef[] = [
   { key: "name", initialWidth: 380, minWidth: 200 },
   { key: "uuid", initialWidth: 280, minWidth: 200 },
   { key: "state", initialWidth: 80, minWidth: 70 },
   { key: "type", initialWidth: 110, minWidth: 80 },
+  { key: "indicators", initialWidth: 180, minWidth: 120 },
   { key: "risk", initialWidth: 80, minWidth: 70 },
   { key: "approval", initialWidth: 80, minWidth: 60 },
   { key: "version", initialWidth: 70, minWidth: 60 },
@@ -115,7 +115,7 @@ export function WorkflowsListPage() {
 
   const [open, setOpen] = useState(false);
   const [riskLevel, setRiskLevel] = useState("low");
-  const [requiresApproval, setRequiresApproval] = useState(false);
+  const [approvalMode, setApprovalMode] = useState("always");
 
   // Sort handler maps UI column keys to API sort_by values
   function handleSort(uiKey: string) {
@@ -139,7 +139,7 @@ export function WorkflowsListPage() {
         name: fd.get("name") as string,
         workflow_type: (fd.get("workflow_type") as string) || null,
         risk_level: riskLevel,
-        requires_approval: requiresApproval,
+        approval_mode: approvalMode,
         code: fd.get("code") as string,
         documentation: (fd.get("documentation") as string) || undefined,
       },
@@ -147,7 +147,7 @@ export function WorkflowsListPage() {
         onSuccess: () => {
           setOpen(false);
           setRiskLevel("low");
-          setRequiresApproval(false);
+          setApprovalMode("always");
           toast.success("Workflow created");
         },
         onError: () => toast.error("Failed to create workflow"),
@@ -226,11 +226,18 @@ export function WorkflowsListPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-end pb-1">
-                    <div className="flex items-center gap-2">
-                      <Switch checked={requiresApproval} onCheckedChange={setRequiresApproval} />
-                      <Label className="text-xs text-muted-foreground">Requires Approval</Label>
-                    </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Approval Mode</Label>
+                    <Select value={approvalMode} onValueChange={setApprovalMode}>
+                      <SelectTrigger className="mt-1 bg-surface border-border text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        <SelectItem value="always">Always</SelectItem>
+                        <SelectItem value="agent_only">Agent Only</SelectItem>
+                        <SelectItem value="never">Never</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div>
@@ -285,6 +292,7 @@ export function WorkflowsListPage() {
                   />
                 </ResizableTableHead>
                 <ResizableTableHead columnKey="type" className="text-dim text-xs">Type</ResizableTableHead>
+                <ResizableTableHead columnKey="indicators" className="text-dim text-xs">Indicators</ResizableTableHead>
                 <ResizableTableHead columnKey="risk" className="text-dim text-xs">
                   <SortableColumnHeader
                     label="Risk"
@@ -317,7 +325,7 @@ export function WorkflowsListPage() {
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <TableRow key={i} className="border-border">
-                      {Array.from({ length: 8 }).map((_, j) => (
+                      {Array.from({ length: 9 }).map((_, j) => (
                         <TableCell key={j}>
                           <Skeleton className="h-5 w-20" />
                         </TableCell>
@@ -345,8 +353,8 @@ export function WorkflowsListPage() {
                           </div>
                         </Link>
                       </TableCell>
-                      <TableCell>
-                        <CopyableText text={wf.uuid} mono className="text-[11px] text-dim" />
+                      <TableCell className="overflow-hidden">
+                        <CopyableText text={wf.uuid} mono className="text-[11px] text-dim truncate block" />
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -367,6 +375,23 @@ export function WorkflowsListPage() {
                         {wf.workflow_type ?? "—"}
                       </TableCell>
                       <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {wf.indicator_types?.length ? (
+                            wf.indicator_types.map((t: string) => (
+                              <Badge
+                                key={t}
+                                variant="outline"
+                                className="text-[10px] font-mono text-purple-400 bg-purple-400/10 border-purple-400/30"
+                              >
+                                {t}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-dim">—</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <Badge
                           variant="outline"
                           className={cn("text-[11px]", riskColor(wf.risk_level))}
@@ -375,11 +400,19 @@ export function WorkflowsListPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {wf.requires_approval ? (
-                          <Lock className="h-3.5 w-3.5 text-amber" />
-                        ) : (
-                          <span className="text-xs text-dim">—</span>
-                        )}
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[11px]",
+                            wf.approval_mode === "always"
+                              ? "text-amber bg-amber/10 border-amber/30"
+                              : wf.approval_mode === "agent_only"
+                                ? "text-teal bg-teal/10 border-teal/30"
+                                : "text-dim bg-dim/10 border-dim/30",
+                          )}
+                        >
+                          {wf.approval_mode === "agent_only" ? "agent only" : wf.approval_mode}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-dim font-mono">
                         v{wf.code_version}
@@ -391,7 +424,7 @@ export function WorkflowsListPage() {
                   ))}
               {!isLoading && workflows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-sm text-dim py-12">
+                  <TableCell colSpan={9} className="text-center text-sm text-dim py-12">
                     No workflows configured
                   </TableCell>
                 </TableRow>

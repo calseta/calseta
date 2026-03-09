@@ -231,7 +231,7 @@ Calseta ships with 9 pre-built workflows for Okta and Microsoft Entra identity l
 | Entra — Enable Account | Re-enables a disabled account | Medium |
 | Entra — Force MFA Re-registration | Deletes all registered auth methods | High |
 
-All builtin workflows require approval when triggered by an AI agent (`requires_approval=True`).
+All builtin workflows have `approval_mode="agent_only"` — they require human approval when triggered by an AI agent, but execute immediately when triggered by a human.
 
 ## Code Generation
 
@@ -276,15 +276,19 @@ The response includes the `WorkflowResult`, execution duration, and the full log
 
 ## Approval Gate
 
-Workflows can require human approval before execution when triggered by an AI agent.
+Workflows can require human approval before execution via the `approval_mode` field.
 
-Set `requires_approval: true` on the workflow. When an agent calls `POST /v1/workflows/{uuid}/execute` with `trigger_source: "agent"`, the execution is paused and an approval request is created. A human must approve or reject via:
+Three modes are available:
+
+- `"always"` — approval is required for every execution, regardless of trigger source
+- `"agent_only"` — approval is required only when triggered by an AI agent (`trigger_source: "agent"`); human-triggered executions bypass the gate
+- `"never"` (default) — no approval required; executes immediately
+
+When the approval gate fires, the execution is paused and an approval request is created. A human must approve or reject via:
 
 - `POST /v1/workflow-approvals/{uuid}/approve`
 - `POST /v1/workflow-approvals/{uuid}/reject`
 
 If a Slack or Teams notifier is configured (`APPROVAL_NOTIFIER=slack` or `teams`), the approver receives a notification with action buttons (Slack) or REST API links (Teams).
-
-Human-triggered executions (`trigger_source: "human"`) always bypass the approval gate.
 
 Agent-triggered execute requests must include `reason` and `confidence` fields explaining why the workflow should run.

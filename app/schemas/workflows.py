@@ -13,6 +13,7 @@ from app.schemas.indicators import IndicatorType
 WORKFLOW_TYPES = frozenset({"indicator", "alert"})
 WORKFLOW_STATES = frozenset({"draft", "active", "inactive"})
 RISK_LEVELS = frozenset({"low", "medium", "high", "critical"})
+APPROVAL_MODES = frozenset({"always", "agent_only", "never"})
 
 
 class WorkflowCreate(BaseModel):
@@ -28,7 +29,7 @@ class WorkflowCreate(BaseModel):
     is_active: bool = True
     tags: list[str] = []
     time_saved_minutes: int | None = None
-    requires_approval: bool = True
+    approval_mode: str = "always"
     approval_channel: str | None = None
     approval_timeout_seconds: int = 3600
     risk_level: str = "medium"
@@ -67,6 +68,13 @@ class WorkflowCreate(BaseModel):
             raise ValueError(f"risk_level must be one of: {sorted(RISK_LEVELS)}")
         return v
 
+    @field_validator("approval_mode")
+    @classmethod
+    def _validate_approval_mode(cls, v: str) -> str:
+        if v not in APPROVAL_MODES:
+            raise ValueError(f"approval_mode must be one of: {sorted(APPROVAL_MODES)}")
+        return v
+
 
 class WorkflowPatch(BaseModel):
     """Request body for PATCH /v1/workflows/{uuid}."""
@@ -81,7 +89,7 @@ class WorkflowPatch(BaseModel):
     is_active: bool | None = None
     tags: list[str] | None = None
     time_saved_minutes: int | None = None
-    requires_approval: bool | None = None
+    approval_mode: str | None = None
     approval_channel: str | None = None
     approval_timeout_seconds: int | None = None
     risk_level: str | None = None
@@ -122,6 +130,13 @@ class WorkflowPatch(BaseModel):
             raise ValueError(f"risk_level must be one of: {sorted(RISK_LEVELS)}")
         return v
 
+    @field_validator("approval_mode")
+    @classmethod
+    def _validate_approval_mode(cls, v: str | None) -> str | None:
+        if v is not None and v not in APPROVAL_MODES:
+            raise ValueError(f"approval_mode must be one of: {sorted(APPROVAL_MODES)}")
+        return v
+
 
 class WorkflowSummary(BaseModel):
     """List response — omits code to save tokens."""
@@ -138,7 +153,7 @@ class WorkflowSummary(BaseModel):
     is_system: bool
     tags: list[str]
     time_saved_minutes: int | None
-    requires_approval: bool
+    approval_mode: str
     risk_level: str
     documentation: str | None
     created_at: datetime

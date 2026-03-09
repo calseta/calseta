@@ -203,7 +203,7 @@ export interface WorkflowSummary {
   is_system: boolean;
   tags: string[];
   time_saved_minutes: number | null;
-  requires_approval: boolean;
+  approval_mode: string;
   risk_level: string;
   documentation: string | null;
   created_at: string;

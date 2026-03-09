@@ -162,7 +162,7 @@ def _build_workflow_summary_dict(workflow: Workflow) -> dict[str, Any]:
         "workflow_type": workflow.workflow_type,
         "documentation": workflow.documentation,
         "risk_level": workflow.risk_level,
-        "requires_approval": workflow.requires_approval,
+        "approval_mode": workflow.approval_mode,
         "indicator_types": list(workflow.indicator_types or []),
         "tags": list(workflow.tags or []),
     }

@@ -520,7 +520,7 @@ async def seed_builtin_workflows(db: AsyncSession, cfg: Settings) -> None:
             state="active",
             is_active=is_active,
             risk_level=spec.risk_level,
-            requires_approval=True,
+            approval_mode="always",
             timeout_seconds=60,
             retry_count=0,
         )

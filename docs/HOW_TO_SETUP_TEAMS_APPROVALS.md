@@ -9,7 +9,7 @@ This guide walks through connecting Calseta to Microsoft Teams so that workflow 
 ```
 Agent triggers workflow (trigger_source=agent)
     │
-    ├─ Approval gate fires (workflow.requires_approval=true)
+    ├─ Approval gate fires (workflow.approval_mode="always" or "agent_only")
     │       │
     │       ├─ Creates WorkflowApprovalRequest (status=pending)
     │       ├─ Enqueues notification task
@@ -99,14 +99,14 @@ Restart the API server and worker.
 ```bash
 # List workflows
 curl -s http://localhost:8000/v1/workflows \
-  -H "Authorization: Bearer <your-api-key>" | jq '.data[] | {uuid, name, state, requires_approval}'
+  -H "Authorization: Bearer <your-api-key>" | jq '.data[] | {uuid, name, state, approval_mode}'
 
-# Enable approval on a workflow
+# Enable approval on a workflow (always requires approval, regardless of trigger source)
 curl -s -X PATCH http://localhost:8000/v1/workflows/<workflow-uuid> \
   -H "Authorization: Bearer <your-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
-    "requires_approval": true,
+    "approval_mode": "always",
     "risk_level": "high",
     "approval_timeout_seconds": 3600
   }' | jq .

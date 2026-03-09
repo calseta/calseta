@@ -49,8 +49,9 @@ async def execute_workflow(
     The workflow is enqueued for asynchronous execution and a run UUID is
     returned immediately. Use the run UUID to check execution status.
 
-    If the workflow requires approval, the execution is gated behind an
-    approval request — the response will indicate "pending_approval" status.
+    If the workflow's approval_mode is "always" or "agent_only", the execution
+    is gated behind an approval request — the response will indicate
+    "pending_approval" status. MCP calls are always agent-triggered.
 
     Args:
         workflow_uuid: UUID of the workflow to execute.
@@ -117,14 +118,14 @@ async def execute_workflow(
         }
 
         # Approval gate (MCP calls are always agent-triggered)
-        if workflow.requires_approval:
+        if workflow.approval_mode in ("always", "agent_only"):
             if not reason:
                 return json.dumps({
-                    "error": "reason is required for workflows that require approval."
+                    "error": "reason is required when the workflow approval gate is active."
                 })
             if confidence is None:
                 return json.dumps({
-                    "error": "confidence is required for workflows that require approval."
+                    "error": "confidence is required when the workflow approval gate is active."
                 })
 
             from app.config import settings

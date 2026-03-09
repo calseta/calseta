@@ -95,13 +95,13 @@ curl -s http://localhost:8000/v1/api-keys \
 
 # 2. List workflows and find one (or create one)
 curl -s http://localhost:8000/v1/workflows \
-  -H "Authorization: Bearer <key>" | jq '.data[] | {uuid, name, state, requires_approval}'
+  -H "Authorization: Bearer <key>" | jq '.data[] | {uuid, name, state, approval_mode}'
 
 # 3. Enable approval gate on a workflow (must be active)
 curl -s -X PATCH http://localhost:8000/v1/workflows/<workflow-uuid> \
   -H "Authorization: Bearer <key>" \
   -H "Content-Type: application/json" \
-  -d '{"requires_approval": true, "risk_level": "high", "approval_timeout_seconds": 3600}' | jq .
+  -d '{"approval_mode": "always", "risk_level": "high", "approval_timeout_seconds": 3600}' | jq .
 ```
 
 **Trigger as agent:**
@@ -149,16 +149,18 @@ curl -s http://localhost:8000/v1/workflows/<workflow-uuid>/runs \
 
 | # | Scenario | Expected |
 |---|---|---|
-| 1 | Agent triggers workflow with `requires_approval=true` | 202 + Slack message with buttons |
+| 1 | Agent triggers workflow with `approval_mode="always"` | 202 + Slack message with buttons |
 | 2 | Click **Approve** button in Slack | Approval processed, workflow executes, thread reply posted |
 | 3 | Click **Reject** button in Slack | Rejection recorded, no execution, thread reply posted |
 | 4 | Click button on already-decided request | 200 OK returned to Slack (error logged, no crash) |
 | 5 | Click button on expired request | 200 OK returned to Slack (error logged, no crash) |
-| 6 | Human triggers same workflow (`trigger_source=human`) | Bypasses gate entirely, executes immediately |
-| 7 | Agent triggers workflow with `requires_approval=false` | No approval, executes immediately |
+| 6 | Human triggers workflow with `approval_mode="agent_only"` | Bypasses gate, executes immediately |
+| 7 | Agent triggers workflow with `approval_mode="never"` | No approval, executes immediately |
 | 8 | Agent triggers without `reason` or `confidence` | 422 validation error |
 | 9 | `SLACK_SIGNING_SECRET` set + tampered request | 403 Forbidden |
 | 10 | `SLACK_SIGNING_SECRET` not set + any request | Signature check skipped (accepted) |
+| 11 | Agent triggers workflow with `approval_mode="agent_only"` | 202 + Slack message with buttons |
+| 12 | Human triggers workflow with `approval_mode="always"` | 202 + Slack message with buttons (approval required for all triggers) |
 
 ---
 

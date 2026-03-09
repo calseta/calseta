@@ -163,7 +163,7 @@ async def create_workflow(
         is_active=body.is_active,
         tags=body.tags,
         time_saved_minutes=body.time_saved_minutes,
-        requires_approval=body.requires_approval,
+        approval_mode=body.approval_mode,
         approval_channel=body.approval_channel,
         approval_timeout_seconds=body.approval_timeout_seconds,
         risk_level=body.risk_level,
@@ -238,7 +238,7 @@ async def patch_workflow(
         is_active=is_active,
         tags=body.tags,
         time_saved_minutes=body.time_saved_minutes,
-        requires_approval=body.requires_approval,
+        approval_mode=body.approval_mode,
         approval_channel=body.approval_channel,
         approval_timeout_seconds=body.approval_timeout_seconds,
         risk_level=body.risk_level,
@@ -293,11 +293,14 @@ async def execute_workflow(
     """
     Enqueue a workflow for execution. Returns 202 Accepted immediately.
 
-    Approval gate:
-    - If trigger_source="agent" AND workflow.requires_approval=True:
-      creates an approval request, enqueues a notification, returns
+    Approval gate (based on workflow.approval_mode):
+    - If approval_mode="always": all triggers go through approval gate.
+    - If approval_mode="agent_only": only agent triggers require approval.
+    - If approval_mode="never": no approval required, immediate execution.
+
+    When the approval gate fires, creates an approval request, enqueues a
+    notification, and returns:
       {"status": "pending_approval", "approval_request_uuid": "...", "expires_at": "..."}
-    - Otherwise: immediately enqueues execution (existing behavior).
 
     When trigger_source="agent", both `reason` and `confidence` are required.
     """
@@ -354,9 +357,9 @@ async def execute_workflow(
     }
 
     # ---------------------------------------------------------------------------
-    # Approval gate: agent trigger + requires_approval
+    # Approval gate: always, agent_only, or never
     # ---------------------------------------------------------------------------
-    if body.trigger_source == "agent" and workflow.requires_approval:
+    if workflow.approval_mode == "always" or (workflow.approval_mode == "agent_only" and body.trigger_source == "agent"):
         from app.workflows.approval import create_approval_request
         from app.workflows.notifiers.factory import get_approval_notifier
 
@@ -371,6 +374,30 @@ async def execute_workflow(
             notifier_type=notifier.notifier_name,
             db=db,
             cfg=settings,
+        )
+
+        # Activity event: workflow_approval_requested
+        from app.schemas.activity_events import ActivityEventType
+        from app.services.activity_event import ActivityEventService
+
+        activity_svc = ActivityEventService(db)
+        await activity_svc.write(
+            ActivityEventType.WORKFLOW_APPROVAL_REQUESTED,
+            actor_type="api",
+            actor_key_prefix=auth.key_prefix,
+            workflow_id=workflow.id,
+            alert_id=alert_id,
+            references={
+                "workflow_uuid": str(workflow.uuid),
+                "workflow_name": workflow.name,
+                "approval_uuid": str(approval_req.uuid),
+                "trigger_source": body.trigger_source,
+                "reason": body.reason,
+                "confidence": body.confidence,
+                "indicator_type": body.indicator_type,
+                "indicator_value": body.indicator_value,
+                "expires_at": approval_req.expires_at.isoformat(),
+            },
         )
 
         # Enqueue notification task
@@ -399,7 +426,7 @@ async def execute_workflow(
         )
 
     # ---------------------------------------------------------------------------
-    # Immediate execution path (human trigger, or requires_approval=False)
+    # Immediate execution path (approval_mode="never", or not matched above)
     # ---------------------------------------------------------------------------
     run_repo = WorkflowRunRepository(db)
     run = await run_repo.create(

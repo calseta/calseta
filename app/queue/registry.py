@@ -215,18 +215,45 @@ async def execute_workflow_run_task(workflow_run_id: int) -> None:
             else:
                 run_status = "failed"
 
+            result_data = {
+                "success": exec_result.result.success,
+                "message": exec_result.result.message,
+                "data": exec_result.result.data,
+            }
             await run_repo.update_after_execution(
                 run,
                 status=run_status,
                 log_output=exec_result.log_output,
-                result_data={
-                    "success": exec_result.result.success,
-                    "message": exec_result.result.message,
-                    "data": exec_result.result.data,
-                },
+                result_data=result_data,
                 duration_ms=exec_result.duration_ms,
                 completed_at=datetime.now(UTC).isoformat(),
             )
+
+            # Activity event: workflow_executed
+            try:
+                from app.schemas.activity_events import ActivityEventType
+                from app.services.activity_event import ActivityEventService
+
+                activity_svc = ActivityEventService(session)
+                await activity_svc.write(
+                    ActivityEventType.WORKFLOW_EXECUTED,
+                    actor_type="system",
+                    workflow_id=workflow.id,
+                    alert_id=tc.get("alert_id"),
+                    references={
+                        "workflow_uuid": str(workflow.uuid),
+                        "workflow_name": workflow.name,
+                        "run_uuid": str(run.uuid),
+                        "trigger_type": run.trigger_type,
+                        "status": run_status,
+                        "duration_ms": exec_result.duration_ms,
+                        "indicator_type": tc.get("indicator_type"),
+                        "indicator_value": tc.get("indicator_value"),
+                    },
+                )
+            except Exception:
+                pass  # ActivityEventService.write already swallows errors
+
             await session.commit()
         except Exception:
             await session.rollback()
@@ -399,6 +426,33 @@ async def execute_approved_workflow_task(approval_request_id: int) -> None:
             )
 
             approval.execution_result = result_data
+
+            # Activity event: workflow_executed (via approval)
+            try:
+                from app.schemas.activity_events import ActivityEventType
+                from app.services.activity_event import ActivityEventService
+
+                activity_svc = ActivityEventService(session)
+                await activity_svc.write(
+                    ActivityEventType.WORKFLOW_EXECUTED,
+                    actor_type="system",
+                    workflow_id=workflow.id,
+                    alert_id=tc.get("alert_id"),
+                    references={
+                        "workflow_uuid": str(workflow.uuid),
+                        "workflow_name": workflow.name,
+                        "run_uuid": str(run.uuid),
+                        "trigger_type": approval.trigger_type,
+                        "status": run_status,
+                        "duration_ms": exec_result.duration_ms,
+                        "approval_uuid": str(approval.uuid),
+                        "indicator_type": tc.get("indicator_type"),
+                        "indicator_value": tc.get("indicator_value"),
+                    },
+                )
+            except Exception:
+                pass
+
             await session.commit()
 
             # Send result notification (best-effort, errors logged by notifier)

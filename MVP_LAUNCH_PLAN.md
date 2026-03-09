@@ -499,7 +499,7 @@ Every table includes: `id` (serial PK), `uuid` (UUID, external-facing), `created
 
 **context_documents** — Runbooks, IR plans, SOPs. `targeting_rules` JSONB, `content` TEXT.
 
-**workflows** — Python automation functions. `code` TEXT, `code_version` INTEGER, `state` TEXT (`draft`/`active`/`inactive`), `documentation` TEXT, `requires_approval` BOOLEAN, `risk_level`.
+**workflows** — Python automation functions. `code` TEXT, `code_version` INTEGER, `state` TEXT (`draft`/`active`/`inactive`), `documentation` TEXT, `approval_mode` TEXT (`always`/`agent_only`/`never`), `risk_level`.
 
 **workflow_runs** — Execution audit log. `log_output` TEXT, `result` JSONB, `code_version_executed` INTEGER.
 
@@ -658,8 +658,8 @@ async def run(ctx: WorkflowContext) -> WorkflowResult
 
 ### Workflow Approval Gate
 
-- Gate fires when `trigger_source=agent` AND `workflow.requires_approval=true`
-- Human-triggered execute always bypasses gate
+- Gate fires when `workflow.approval_mode="always"` (all triggers) or `workflow.approval_mode="agent_only"` AND `trigger_source=agent`
+- `approval_mode="never"` skips approval entirely
 - `reason` + `confidence` required on agent-triggered execute requests
 - `ApprovalNotifierBase` ABC → `NullApprovalNotifier`, `SlackApprovalNotifier`, `TeamsApprovalNotifier`
 - Factory resolves from `APPROVAL_NOTIFIER` env var: `slack`, `teams`, `none` (default)

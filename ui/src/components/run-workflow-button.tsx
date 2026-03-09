@@ -125,7 +125,7 @@ export function RunWorkflowButton({
                           </span>
                         )}
                       </div>
-                      {wf.requires_approval && (
+                      {wf.approval_mode !== "never" && (
                         <span className="text-[9px] text-amber shrink-0">
                           approval
                         </span>

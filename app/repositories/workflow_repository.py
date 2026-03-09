@@ -46,7 +46,7 @@ class WorkflowRepository:
         is_system: bool = False,
         tags: list[str] | None = None,
         time_saved_minutes: int | None = None,
-        requires_approval: bool = True,
+        approval_mode: str = "always",
         approval_channel: str | None = None,
         approval_timeout_seconds: int = 3600,
         risk_level: str = "medium",
@@ -66,7 +66,7 @@ class WorkflowRepository:
             is_system=is_system,
             tags=tags or [],
             time_saved_minutes=time_saved_minutes,
-            requires_approval=requires_approval,
+            approval_mode=approval_mode,
             approval_channel=approval_channel,
             approval_timeout_seconds=approval_timeout_seconds,
             risk_level=risk_level,
@@ -157,7 +157,7 @@ class WorkflowRepository:
         is_active: bool | None = None,
         tags: list[str] | None = None,
         time_saved_minutes: int | None = None,
-        requires_approval: bool | None = None,
+        approval_mode: str | None = None,
         approval_channel: str | None = None,
         approval_timeout_seconds: int | None = None,
         risk_level: str | None = None,
@@ -195,8 +195,8 @@ class WorkflowRepository:
             workflow.tags = tags
         if time_saved_minutes is not None:
             workflow.time_saved_minutes = time_saved_minutes
-        if requires_approval is not None:
-            workflow.requires_approval = requires_approval
+        if approval_mode is not None:
+            workflow.approval_mode = approval_mode
         if approval_channel is not None:
             workflow.approval_channel = approval_channel
         if approval_timeout_seconds is not None:
