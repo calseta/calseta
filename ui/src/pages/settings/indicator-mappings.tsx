@@ -148,7 +148,7 @@ export function IndicatorMappingsPage() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Extraction Target</Label>
+                  <Label className="text-xs text-muted-foreground">Extract From</Label>
                   <Select value={formTarget} onValueChange={setFormTarget} required>
                     <SelectTrigger className="mt-1 bg-surface border-border text-sm">
                       <SelectValue />
@@ -159,6 +159,11 @@ export function IndicatorMappingsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-dim mt-1">
+                    {formTarget === "normalized"
+                      ? "Match against standardized alert fields (applies to all sources)"
+                      : "Match against source-specific raw JSON (use dot-notation paths)"}
+                  </p>
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Field Path</Label>
@@ -207,7 +212,7 @@ export function IndicatorMappingsPage() {
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
                 <ResizableTableHead columnKey="source" className="text-dim text-xs">Source</ResizableTableHead>
-                <ResizableTableHead columnKey="target" className="text-dim text-xs">Target</ResizableTableHead>
+                <ResizableTableHead columnKey="target" className="text-dim text-xs">Extract From</ResizableTableHead>
                 <ResizableTableHead columnKey="field_path" className="text-dim text-xs">Field Path</ResizableTableHead>
                 <ResizableTableHead columnKey="indicator_type" className="text-dim text-xs">Indicator Type</ResizableTableHead>
                 <ResizableTableHead columnKey="system" className="text-dim text-xs">System</ResizableTableHead>
