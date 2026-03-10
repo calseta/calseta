@@ -32,10 +32,11 @@ import {
   type ColumnDef,
 } from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useWorkflows, useCreateWorkflow } from "@/hooks/use-api";
+import { useWorkflows, useCreateWorkflow, useApprovalDefaults } from "@/hooks/use-api";
 import { useTableState } from "@/hooks/use-table-state";
 import { formatDate, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { WORKFLOW_TEMPLATES } from "@/lib/workflow-templates";
 import { CopyableText } from "@/components/copyable-text";
 import { SortableColumnHeader } from "@/components/sortable-column-header";
 import { ColumnFilterPopover } from "@/components/column-filter-popover";
@@ -107,11 +108,30 @@ export function WorkflowsListPage() {
 
   const { data, isLoading, refetch, isFetching } = useWorkflows(params);
   const createWorkflow = useCreateWorkflow();
+  const { data: approvalData } = useApprovalDefaults();
+  const approvalDefaults = approvalData?.data;
   const workflows = data?.data ?? [];
   const meta = data?.meta;
 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Record<string, unknown>>({ ...INITIAL_CREATE_STATE });
+
+  function openCreateDialog() {
+    const defaults = { ...INITIAL_CREATE_STATE };
+    if (approvalDefaults) {
+      if (approvalDefaults.notifier !== "none") {
+        defaults.approval_mode = "always";
+      }
+      if (approvalDefaults.default_channel) {
+        defaults.approval_channel = approvalDefaults.default_channel;
+      }
+      if (approvalDefaults.default_timeout_seconds) {
+        defaults.approval_timeout_seconds = approvalDefaults.default_timeout_seconds;
+      }
+    }
+    setDraft(defaults);
+    setOpen(true);
+  }
 
   function updateDraft(key: string, value: unknown) {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -136,8 +156,7 @@ export function WorkflowsListPage() {
     createWorkflow.mutate(
       {
         ...draft,
-        // Send a minimal default code so the API doesn't reject it
-        code: "async def run(ctx):\n    return ctx.result.success(message=\"Workflow created\", data={})\n",
+        code: WORKFLOW_TEMPLATES[0].code,
       },
       {
         onSuccess: () => {
@@ -184,13 +203,11 @@ export function WorkflowsListPage() {
               </span>
             )}
           </div>
+          <Button size="sm" onClick={openCreateDialog} className="bg-teal text-white hover:bg-teal-dim">
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Create Workflow
+          </Button>
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="bg-teal text-white hover:bg-teal-dim">
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Create Workflow
-              </Button>
-            </DialogTrigger>
             <DialogContent className="bg-card border-border max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create Workflow</DialogTitle>
@@ -302,6 +319,21 @@ export function WorkflowsListPage() {
 
                 {/* Approval Gate */}
                 <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
+                  {approvalDefaults && approvalDefaults.notifier !== "none" && (
+                    <p className="text-[11px] text-teal">
+                      System notifier: <span className="font-medium">{approvalDefaults.notifier}</span>
+                      {approvalDefaults.default_channel && (
+                        <span className="text-dim ml-1">
+                          (default channel: <span className="font-mono">{approvalDefaults.default_channel}</span>)
+                        </span>
+                      )}
+                    </p>
+                  )}
+                  {approvalDefaults && approvalDefaults.notifier === "none" && (
+                    <p className="text-[11px] text-dim">
+                      No approval notifier configured. Set <span className="font-mono">APPROVAL_NOTIFIER</span> env var to enable Slack or Teams notifications.
+                    </p>
+                  )}
                   <div className="space-y-1.5">
                     <Label className="text-sm text-muted-foreground">Approval Mode</Label>
                     <Select
@@ -321,15 +353,23 @@ export function WorkflowsListPage() {
                   {(draft.approval_mode as string) !== "never" && (
                     <>
                       <div className="space-y-1.5">
-                        <Label className="text-sm text-muted-foreground">Approval Channel</Label>
+                        <Label className="text-sm text-muted-foreground">
+                          {approvalDefaults?.notifier === "teams" ? "Teams Webhook URL" : "Approval Channel"}
+                        </Label>
                         <Input
                           value={(draft.approval_channel as string) ?? ""}
                           onChange={(e) => updateDraft("approval_channel", e.target.value)}
-                          placeholder="C0123456789"
+                          placeholder={
+                            approvalDefaults?.notifier === "teams"
+                              ? "https://outlook.office.com/webhook/..."
+                              : "C0123456789"
+                          }
                           className="bg-card border-border text-sm font-mono"
                         />
                         <p className="text-[10px] text-dim">
-                          Slack channel ID or Teams webhook URL
+                          {approvalDefaults?.notifier === "teams"
+                            ? "Paste the incoming webhook URL from your Teams channel connector"
+                            : "Slack channel ID — leave blank to use the system default"}
                         </p>
                       </div>
                       <div className="space-y-1.5">

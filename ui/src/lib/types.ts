@@ -433,6 +433,15 @@ export interface IndicatorFieldMapping {
   updated_at: string;
 }
 
+// Settings
+export interface ApprovalDefaults {
+  notifier: string;
+  default_channel: string | null;
+  default_timeout_seconds: number;
+  slack_configured: boolean;
+  teams_configured: boolean;
+}
+
 // Health
 export interface HealthResponse {
   status: string;

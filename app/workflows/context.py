@@ -91,7 +91,7 @@ class WorkflowLogger:
 
     def render(self) -> str:
         """Render all log entries as newline-separated JSON."""
-        return "\n".join(json.dumps(e) for e in self._entries)
+        return "\n".join(json.dumps(e, default=str) for e in self._entries)
 
 
 # ---------------------------------------------------------------------------

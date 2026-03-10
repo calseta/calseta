@@ -23,7 +23,18 @@ import type {
   EnrichmentProviderTestResult,
   EnrichmentFieldExtraction,
   IndicatorFieldMapping,
+  ApprovalDefaults,
 } from "@/lib/types";
+
+// Settings
+export function useApprovalDefaults() {
+  return useQuery({
+    queryKey: ["settings", "approval-defaults"],
+    queryFn: () => api.get<DataResponse<ApprovalDefaults>>("/settings/approval-defaults"),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
 
 // Health
 export function useHealth() {

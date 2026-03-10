@@ -276,6 +276,7 @@ class WorkflowTestRequest(BaseModel):
     indicator_type: str = "ip"
     indicator_value: str = "1.2.3.4"
     mock_http_responses: dict[str, Any] = {}
+    live_http: bool = False
 
     @field_validator("indicator_type")
     @classmethod

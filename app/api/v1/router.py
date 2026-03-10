@@ -22,6 +22,7 @@ from app.api.v1 import (
     indicators,
     ingest,
     metrics,
+    settings,
     sources,
     workflow_approvals,
     workflows,
@@ -45,3 +46,4 @@ v1_router.include_router(approvals.router)
 v1_router.include_router(agents.router)
 v1_router.include_router(sources.router)
 v1_router.include_router(metrics.router)
+v1_router.include_router(settings.router)

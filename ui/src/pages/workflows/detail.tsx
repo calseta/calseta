@@ -43,6 +43,13 @@ import {
 } from "@/hooks/use-api";
 import { formatDate, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from "@/lib/workflow-templates";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Play,
   FlaskConical,
@@ -57,11 +64,356 @@ import {
   AlertTriangle,
   GitBranch,
   ShieldCheck,
+  FileCode,
+  Copy,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 const INDICATOR_TYPE_OPTIONS = ["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"];
 const RISK_LEVELS = ["low", "medium", "high", "critical"];
 const WORKFLOW_STATES = ["draft", "active", "inactive"];
+
+const WORKFLOW_LLM_INSTRUCTIONS = `You are generating a Calseta workflow — an async Python function that automates a security operation via HTTP calls.
+
+## Interface
+
+\`\`\`python
+from app.workflows.context import WorkflowContext, WorkflowResult
+
+async def run(ctx: WorkflowContext) -> WorkflowResult:
+    ...
+\`\`\`
+
+## Available on \`ctx\`
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| ctx.indicator.type | str | "ip", "domain", "hash_sha256", "url", "email", "account" |
+| ctx.indicator.value | str | The IOC value, e.g. "1.2.3.4", "evil.com" |
+| ctx.indicator.malice | str | "Pending", "Benign", "Suspicious", "Malicious" |
+| ctx.indicator.uuid | str | Unique identifier |
+| ctx.indicator.is_enriched | bool | Whether enrichment has run |
+| ctx.indicator.enrichment_results | dict or None | Enrichment data by provider |
+| ctx.alert | AlertContext or None | None for standalone workflows |
+| ctx.alert.title | str | Alert title |
+| ctx.alert.severity | str | "Informational", "Low", "Medium", "High", "Critical" |
+| ctx.alert.source_name | str | "sentinel", "elastic", "splunk" |
+| ctx.alert.status | str | "Open", "Triaging", "Escalated", "Closed" |
+| ctx.alert.tags | list[str] | Alert tags |
+| ctx.alert.raw_payload | dict | Original source payload |
+| ctx.http | httpx.AsyncClient | Async HTTP client for external calls |
+| ctx.log | WorkflowLogger | Structured logging: .info(), .warning(), .error(), .debug() |
+| ctx.secrets | SecretsAccessor | .get("ENV_VAR_NAME") returns str or None |
+| ctx.integrations.okta | OktaClient or None | Pre-authenticated if OKTA_DOMAIN + OKTA_API_TOKEN set |
+| ctx.integrations.entra | EntraClient or None | Pre-authenticated if Entra env vars set |
+
+## Return values
+
+\`\`\`python
+return WorkflowResult.ok("Success message", data={"key": "value"})
+return WorkflowResult.fail("Error message", data={"status_code": 500})
+\`\`\`
+
+## HTTP response (httpx.Response)
+
+| Attribute | Description |
+|-----------|-------------|
+| resp.status_code | int — HTTP status code |
+| resp.text | str — response body as string |
+| resp.json() | dict — parse response body as JSON |
+| resp.headers | dict-like — response headers |
+| resp.is_success | bool — True if 2xx |
+
+## Rules
+
+1. The function MUST be \`async def run(ctx)\` — this is the entry point
+2. NEVER raise exceptions — always return WorkflowResult.fail()
+3. Always \`await\` HTTP calls: \`resp = await ctx.http.get(url)\`
+4. Use ctx.secrets.get("KEY") for API keys/tokens, never hardcode
+5. Use ctx.log.info("message", key=value) for logging, not print()
+6. Wrap HTTP calls in try/except and return WorkflowResult.fail() on error
+
+## Allowed imports
+
+asyncio, base64, collections, copy, datetime, enum, functools, hashlib, hmac, html, http, inspect, io, ipaddress, itertools, json, logging, math, operator, re, statistics, string, textwrap, time, typing, urllib, uuid
+
+## Blocked (will be rejected)
+
+os, subprocess, sys, socket, open(), exec(), eval(), threading, multiprocessing
+
+## Example pattern
+
+\`\`\`python
+from app.workflows.context import WorkflowContext, WorkflowResult
+
+async def run(ctx: WorkflowContext) -> WorkflowResult:
+    api_url = ctx.secrets.get("API_URL")
+    api_token = ctx.secrets.get("API_TOKEN")
+    if not api_url or not api_token:
+        return WorkflowResult.fail("API_URL and API_TOKEN must be set")
+
+    payload = {
+        "indicator_type": ctx.indicator.type,
+        "indicator_value": ctx.indicator.value,
+    }
+    if ctx.alert:
+        payload["alert_title"] = ctx.alert.title
+        payload["severity"] = ctx.alert.severity
+
+    ctx.log.info("calling_api", url=api_url)
+    try:
+        resp = await ctx.http.post(
+            api_url,
+            json=payload,
+            headers={"Authorization": f"Bearer {api_token}"},
+        )
+    except Exception as exc:
+        ctx.log.error("request_failed", error=str(exc))
+        return WorkflowResult.fail(f"HTTP request failed: {exc}")
+
+    if resp.status_code >= 400:
+        return WorkflowResult.fail(
+            f"API returned {resp.status_code}",
+            data={"status_code": resp.status_code, "response": resp.json()},
+        )
+
+    ctx.log.info("success", status=resp.status_code)
+    return WorkflowResult.ok(
+        f"Completed (HTTP {resp.status_code})",
+        data={"response": resp.json()},
+    )
+\`\`\`
+`;
+
+// ---------------------------------------------------------------------------
+// Structured test result display
+// ---------------------------------------------------------------------------
+
+/** Parse a structured log line (JSON) into a readable row */
+function parseLogLine(line: string): { level: string; message: string; ts: string; extra: Record<string, unknown> } | null {
+  try {
+    const parsed = JSON.parse(line);
+    return {
+      level: parsed.level ?? "info",
+      message: parsed.message ?? "",
+      ts: parsed.ts ?? "",
+      extra: parsed.extra ?? {},
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Extract a human-readable error message + traceback from the raw message string */
+function parseErrorMessage(message: string): { summary: string; traceback: string | null } {
+  // Pattern: "Workflow run() raised an exception: <error>\nTraceback..."
+  const traceIdx = message.indexOf("\nTraceback");
+  if (traceIdx === -1) {
+    return { summary: message, traceback: null };
+  }
+  const summary = message.slice(0, traceIdx).trim();
+  const traceBlock = message.slice(traceIdx + 1).trim();
+
+  // Extract just the last line (the actual error) and the relevant file line
+  const lines = traceBlock.split("\n");
+  const errorLine = lines[lines.length - 1] ?? "";
+  // Find the workflow file reference (line in "<workflow>")
+  const workflowLine = lines.find((l) => l.includes('File "<workflow>"'));
+  const codeLine = workflowLine ? lines[lines.indexOf(workflowLine) + 1]?.trim() : null;
+
+  return {
+    summary: `${summary}\n${errorLine}`,
+    traceback: codeLine
+      ? `${workflowLine?.trim()}\n    ${codeLine}\n${errorLine}`
+      : traceBlock,
+  };
+}
+
+const LOG_LEVEL_STYLES: Record<string, string> = {
+  info: "text-teal",
+  warning: "text-amber",
+  error: "text-red-threat",
+  debug: "text-dim",
+};
+
+function TestResultDisplay({ result }: { result: Record<string, unknown> }) {
+  const data = (result as { data?: Record<string, unknown> }).data ?? result;
+  const success = data.success as boolean | undefined;
+  const message = (data.message as string) ?? "";
+  const logOutput = (data.log_output as string) ?? "";
+  const durationMs = data.duration_ms as number | undefined;
+  const resultData = data.result_data as Record<string, unknown> | undefined;
+
+  // Parse error message
+  const isError = success === false;
+  const hasException = message.includes("raised an exception");
+  const { summary, traceback } = hasException
+    ? parseErrorMessage(message)
+    : { summary: message, traceback: null };
+
+  // Parse log lines
+  const logLines = logOutput
+    .split("\n")
+    .filter((l) => l.trim())
+    .map(parseLogLine)
+    .filter(Boolean) as { level: string; message: string; ts: string; extra: Record<string, unknown> }[];
+
+  // Check if result_data has content
+  const hasResultData = resultData && Object.keys(resultData).length > 0;
+
+  return (
+    <div className="space-y-3">
+      {/* Status header */}
+      <Card className={cn(
+        "border p-3",
+        isError
+          ? "bg-red-threat/5 border-red-threat/30"
+          : "bg-teal/5 border-teal/30",
+      )}>
+          <div className="flex items-start gap-3">
+            {isError ? (
+              <XCircle className="h-5 w-5 text-red-threat shrink-0 mt-0.5" />
+            ) : (
+              <CheckCircle className="h-5 w-5 text-teal shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <span className={cn(
+                  "text-sm font-medium",
+                  isError ? "text-red-threat" : "text-teal",
+                )}>
+                  {isError ? "Test Failed" : "Test Passed"}
+                </span>
+                {durationMs != null && durationMs > 0 && (
+                  <span className="text-[11px] text-dim font-mono">{durationMs}ms</span>
+                )}
+              </div>
+              {hasException ? (
+                <div className="mt-2 space-y-2">
+                  <p className="text-sm text-foreground">
+                    {summary.split("\n").map((line, i) => (
+                      <span key={i}>
+                        {i > 0 && <br />}
+                        {i === summary.split("\n").length - 1 ? (
+                          <span className="font-mono text-red-threat">{line}</span>
+                        ) : (
+                          line
+                        )}
+                      </span>
+                    ))}
+                  </p>
+                  {traceback && (
+                    <details className="group">
+                      <summary className="text-[11px] text-dim cursor-pointer hover:text-foreground select-none">
+                        Show traceback
+                      </summary>
+                      <pre className="mt-1.5 text-[11px] font-mono text-dim whitespace-pre-wrap bg-surface rounded p-3 border border-border overflow-x-auto">
+                        {traceback}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-1">{message}</p>
+              )}
+            </div>
+          </div>
+      </Card>
+
+      {/* Result data — the data dict from WorkflowResult.ok/fail(data={...}) */}
+      {hasResultData && (
+        <Card className="bg-card border-border p-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[11px] text-dim font-medium tracking-wide uppercase">Result Data</p>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(JSON.stringify(resultData, null, 2));
+                toast.success("Copied to clipboard");
+              }}
+              className="text-dim hover:text-foreground transition-colors p-0.5"
+              title="Copy result data"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <pre className="text-[12px] font-mono text-foreground whitespace-pre-wrap break-words bg-surface rounded border border-border p-3 max-h-[400px] overflow-auto">
+            {JSON.stringify(resultData, null, 2)}
+          </pre>
+        </Card>
+      )}
+
+      {/* Log output */}
+      {logLines.length > 0 && (
+        <Card className="bg-card border-border p-3">
+          <p className="text-[11px] text-dim font-medium tracking-wide uppercase mb-1.5">Log Output</p>
+          <div className="rounded bg-surface border border-border divide-y divide-border overflow-hidden">
+            {logLines.map((log, i) => {
+              const extraEntries = Object.entries(log.extra);
+              return (
+                <div key={i} className="px-3 py-2 text-[12px] font-mono overflow-hidden">
+                  <div className="flex items-start gap-3">
+                    <span className={cn("shrink-0 uppercase font-semibold w-12", LOG_LEVEL_STYLES[log.level] ?? "text-dim")}>
+                      {log.level}
+                    </span>
+                    <span className="text-foreground break-all">{log.message}</span>
+                  </div>
+                  {extraEntries.length > 0 && (
+                    <div className="mt-1.5 ml-[60px] rounded border border-border overflow-hidden">
+                      <table className="text-[11px] w-full">
+                        <tbody className="divide-y divide-border">
+                          {extraEntries.map(([k, v]) => {
+                            const val = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+                            const isLong = val.length > 120;
+                            return (
+                              <tr key={k} className="align-top">
+                                <td className="text-muted-foreground px-2 py-1 whitespace-nowrap bg-card/50 border-r border-border align-top">{k}</td>
+                                <td className="text-dim px-2 py-1 max-w-0 w-full group/val">
+                                  <div className="flex items-start gap-1">
+                                    <div className="min-w-0 flex-1">
+                                      {isLong ? (
+                                        <details>
+                                          <summary className="cursor-pointer hover:text-foreground truncate block">
+                                            {val.slice(0, 100)}...
+                                          </summary>
+                                          <pre className="mt-1 text-[11px] text-dim whitespace-pre-wrap break-all bg-card rounded p-2 border border-border">
+                                            {val}
+                                          </pre>
+                                        </details>
+                                      ) : (
+                                        <span className="break-all">{val}</span>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(val);
+                                        toast.success("Copied to clipboard");
+                                      }}
+                                      className="shrink-0 opacity-0 group-hover/val:opacity-100 transition-opacity text-dim hover:text-foreground p-0.5"
+                                      title="Copy value"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
 
 export function WorkflowDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
@@ -75,6 +427,9 @@ export function WorkflowDetailPage() {
   const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
   const [testIndicator, setTestIndicator] = useState("1.2.3.4");
   const [testType, setTestType] = useState("ip");
+  const [mockResponse, setMockResponse] = useState("{}");
+  const [showMock, setShowMock] = useState(false);
+  const [liveHttp, setLiveHttp] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [editDraft, setEditDraft] = useState<Record<string, unknown>>({});
 
@@ -167,20 +522,39 @@ export function WorkflowDetailPage() {
 
   async function handleTest() {
     setTestResult(null);
+
+    // Parse mock response JSON (empty = use default)
+    let parsedMock: Record<string, unknown> | undefined;
+    if (mockResponse.trim() && mockResponse.trim() !== "{}") {
+      try {
+        parsedMock = JSON.parse(mockResponse);
+      } catch {
+        toast.error("Mock response is not valid JSON");
+        return;
+      }
+    }
+
     try {
       const result = await testWorkflow.mutateAsync({
         uuid,
         body: {
           indicator_type: testType,
           indicator_value: testIndicator,
-          mock_http_responses: {},
+          mock_http_responses: parsedMock || {},
+          live_http: liveHttp,
         },
       });
       setTestResult(result);
-      toast.success("Test completed");
+      // Toast reflects the workflow result, not just the API call
+      const data = (result as { data?: Record<string, unknown> }).data;
+      if (data?.success === false) {
+        toast.error("Test completed — workflow returned failure");
+      } else {
+        toast.success("Test completed — workflow returned success");
+      }
     } catch (err) {
       setTestResult({ error: String(err) });
-      toast.error("Test failed");
+      toast.error("Test request failed");
     }
   }
 
@@ -408,6 +782,51 @@ export function WorkflowDetailPage() {
 
             {/* Code Editor */}
             <TabsContent value="code" className="mt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-dim font-mono">v{wf.code_version}</span>
+                </div>
+                {!wf.is_system && (
+                  <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-border text-xs text-dim hover:text-foreground"
+                    onClick={() => {
+                      navigator.clipboard.writeText(WORKFLOW_LLM_INSTRUCTIONS);
+                      toast.success("LLM instructions copied to clipboard");
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5 mr-1.5" />
+                    Copy LLM Instructions
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-border text-xs text-dim hover:text-foreground"
+                      >
+                        <FileCode className="h-3.5 w-3.5 mr-1.5" />
+                        Use Template
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-80 bg-card border-border">
+                      {WORKFLOW_TEMPLATES.map((tpl: WorkflowTemplate) => (
+                        <DropdownMenuItem
+                          key={tpl.id}
+                          onClick={() => setCode(tpl.code)}
+                          className="flex flex-col items-start gap-0.5 py-2.5 cursor-pointer"
+                        >
+                          <span className="text-sm text-foreground font-medium">{tpl.name}</span>
+                          <span className="text-[11px] text-dim leading-tight">{tpl.description}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  </div>
+                )}
+              </div>
               <WorkflowCodeEditor
                 value={code ?? ""}
                 onChange={(val) => setCode(val)}
@@ -434,15 +853,18 @@ export function WorkflowDetailPage() {
 
             {/* Test Sandbox */}
             <TabsContent value="test" className="mt-4 space-y-4">
-              <Card className="bg-card border-border">
-                <CardContent className="p-4 space-y-3">
+              <Card className="bg-card border-border p-3 space-y-2">
                   <div className="flex gap-3">
-                    <Input
-                      placeholder="Indicator type (ip, domain, hash_sha256...)"
-                      value={testType}
-                      onChange={(e) => setTestType(e.target.value)}
-                      className="w-48 bg-surface border-border text-sm"
-                    />
+                    <Select value={testType} onValueChange={setTestType}>
+                      <SelectTrigger className="w-48 bg-surface border-border text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"].map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Input
                       placeholder="Indicator value"
                       value={testIndicator}
@@ -453,7 +875,12 @@ export function WorkflowDetailPage() {
                       size="sm"
                       onClick={handleTest}
                       disabled={testWorkflow.isPending}
-                      className="bg-card border border-border text-foreground hover:border-teal/40"
+                      className={cn(
+                        "border",
+                        liveHttp
+                          ? "bg-teal text-white hover:bg-teal-dim border-teal/30"
+                          : "bg-card border-border text-foreground hover:border-teal/40",
+                      )}
                     >
                       {testWorkflow.isPending ? (
                         <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -462,32 +889,73 @@ export function WorkflowDetailPage() {
                       )}
                       Test
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleExecute}
-                      disabled={executeWorkflow.isPending}
-                      className="bg-teal text-white hover:bg-teal-dim"
-                    >
-                      <Play className="h-3.5 w-3.5 mr-1.5" />
-                      Execute
-                    </Button>
                   </div>
-                </CardContent>
+
+                  {/* Live / Mock toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setLiveHttp(!liveHttp)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors",
+                          liveHttp
+                            ? "bg-teal/15 border-teal/40 text-teal-light"
+                            : "bg-surface border-border text-dim hover:border-teal/30",
+                        )}
+                      >
+                        {liveHttp ? (
+                          <Wifi className="h-3 w-3" />
+                        ) : (
+                          <WifiOff className="h-3 w-3" />
+                        )}
+                        {liveHttp ? "Live HTTP" : "Mock HTTP"}
+                      </button>
+                      <span className="text-[10px] text-dim">
+                        {liveHttp
+                          ? "Real HTTP requests will be made to external endpoints"
+                          : "All HTTP calls return mock responses — no real requests"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Mock response editor (only when mock mode) */}
+                  {!liveHttp && (
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowMock(!showMock)}
+                        className="text-[11px] text-dim hover:text-foreground transition-colors flex items-center gap-1.5 select-none"
+                      >
+                        <span className={cn(
+                          "inline-block transition-transform text-[9px]",
+                          showMock ? "rotate-90" : "",
+                        )}>
+                          &#9654;
+                        </span>
+                        Custom Mock Response
+                        {mockResponse.trim() && mockResponse.trim() !== "{}" && (
+                          <span className="text-teal ml-1">(set)</span>
+                        )}
+                      </button>
+                      {showMock && (
+                        <div className="space-y-1.5">
+                          <textarea
+                            value={mockResponse}
+                            onChange={(e) => setMockResponse(e.target.value)}
+                            placeholder='{"ip": "8.8.8.8", "org": "Google LLC", "city": "Mountain View"}'
+                            rows={5}
+                            className="w-full bg-surface border border-border rounded-md p-3 text-xs font-mono text-foreground resize-y focus:outline-none focus:border-teal/50"
+                          />
+                          <p className="text-[10px] text-dim leading-relaxed">
+                            JSON to return for all HTTP calls. Leave empty for default <span className="font-mono">{"{"}&quot;status&quot;: &quot;ok&quot;{"}"}</span>.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
               </Card>
-              {testResult && (
-                <Card className="bg-card border-border">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-muted-foreground">
-                      Test Result
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <pre className="text-xs font-mono text-foreground whitespace-pre-wrap">
-                      {JSON.stringify(testResult, null, 2)}
-                    </pre>
-                  </CardContent>
-                </Card>
-              )}
+              {testResult && <TestResultDisplay result={testResult} />}
             </TabsContent>
 
             {/* Run History */}

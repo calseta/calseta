@@ -632,13 +632,19 @@ async def test_workflow(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Build mock HTTP transport that returns 200 for all requests
-    mock_transport = httpx.MockTransport(
-        handler=lambda request: httpx.Response(
-            200,
-            json=body.mock_http_responses or {"status": "ok"},
+    # Build HTTP client — live or mock depending on request
+    if body.live_http:
+        http_client = httpx.AsyncClient(
+            timeout=min(workflow.timeout_seconds, 30),
         )
-    )
+    else:
+        mock_transport = httpx.MockTransport(
+            handler=lambda request: httpx.Response(
+                200,
+                json=body.mock_http_responses or {"status": "ok"},
+            )
+        )
+        http_client = httpx.AsyncClient(transport=mock_transport)
 
     # Build mock integration clients (record calls, no real API)
     class _MockOkta(OktaClient):
@@ -694,7 +700,7 @@ async def test_workflow(
             updated_at=_now,
         ),
         alert=None,
-        http=httpx.AsyncClient(transport=mock_transport),
+        http=http_client,
         log=WorkflowLogger(),
         secrets=SecretsAccessor(),
         integrations=IntegrationClients(
