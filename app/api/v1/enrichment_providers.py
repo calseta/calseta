@@ -29,7 +29,11 @@ from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
 from app.db.session import get_db
+from app.integrations.enrichment.database_provider import DatabaseDrivenProvider
 from app.integrations.enrichment.registry import enrichment_registry
+from app.repositories.enrichment_field_extraction_repository import (
+    EnrichmentFieldExtractionRepository,
+)
 from app.repositories.enrichment_provider_repository import (
     EnrichmentProviderRepository,
 )
@@ -301,6 +305,18 @@ async def delete_enrichment_provider(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Cascade delete all field extractions for this provider
+    extraction_repo = EnrichmentFieldExtractionRepository(db)
+    deleted_count = await extraction_repo.delete_by_provider(
+        provider.provider_name
+    )
+    if deleted_count:
+        logger.info(
+            "enrichment_field_extractions_cascade_deleted",
+            provider_name=provider.provider_name,
+            count=deleted_count,
+        )
+
     await repo.delete(provider)
 
     # Reload registry
@@ -351,7 +367,13 @@ async def test_enrichment_provider(
         )
 
     start = time.monotonic()
-    result = await registered.enrich(body.indicator_value, itype)
+
+    # Use debug-enabled enrichment if available (DatabaseDrivenProvider)
+    if isinstance(registered, DatabaseDrivenProvider):
+        result = await registered.enrich_with_debug(body.indicator_value, itype)
+    else:
+        result = await registered.enrich(body.indicator_value, itype)
+
     duration_ms = int((time.monotonic() - start) * 1000)
 
     return DataResponse(
@@ -361,8 +383,10 @@ async def test_enrichment_provider(
             indicator_type=body.indicator_type,
             indicator_value=body.indicator_value,
             extracted=result.extracted,
+            raw_response=result.raw,
             error_message=result.error_message,
             duration_ms=duration_ms,
+            steps=result.debug_steps,
         )
     )
 

@@ -375,14 +375,62 @@ export interface EnrichmentProvider {
   updated_at: string;
 }
 
+export interface HttpStepDebug {
+  step_name: string;
+  step_index: number;
+  indicator_value: string | null;
+  request_method: string;
+  request_url: string;
+  request_headers: Record<string, string>;
+  request_query_params: Record<string, string> | null;
+  request_body: unknown | null;
+  response_status_code: number | null;
+  response_headers: Record<string, string> | null;
+  response_body: unknown | null;
+  duration_ms: number;
+  error: string | null;
+  skipped: boolean;
+}
+
 export interface EnrichmentProviderTestResult {
   success: boolean;
   provider_name: string;
   indicator_type: string;
   indicator_value: string;
   extracted: Record<string, unknown> | null;
+  raw_response: Record<string, unknown> | null;
   error_message: string | null;
   duration_ms: number;
+  steps: HttpStepDebug[] | null;
+}
+
+// Enrichment Field Extractions
+export interface EnrichmentFieldExtraction {
+  uuid: string;
+  provider_name: string;
+  indicator_type: string;
+  source_path: string;
+  target_key: string;
+  value_type: string;
+  is_system: boolean;
+  is_active: boolean;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Indicator Field Mappings
+export interface IndicatorFieldMapping {
+  uuid: string;
+  source_name: string | null;
+  field_path: string;
+  indicator_type: string;
+  extraction_target: string;
+  is_system: boolean;
+  is_active: boolean;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // Health

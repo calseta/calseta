@@ -50,7 +50,9 @@ import {
 } from "@/hooks/use-api";
 import { formatDate } from "@/lib/format";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { FieldExtractionEditor } from "@/components/field-extraction-editor";
 import { useNavigate } from "@tanstack/react-router";
+import type { HttpStepDebug, EnrichmentProviderTestResult } from "@/lib/types";
 import {
   Shield,
   Globe,
@@ -66,6 +68,8 @@ import {
   Scale,
   Trash2,
   Microscope,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 const ALL_INDICATOR_TYPES = ["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"];
@@ -79,6 +83,227 @@ const CACHE_TTL_OPTIONS = [
   { value: "14400", label: "4 hours" },
   { value: "86400", label: "24 hours" },
 ];
+
+// ---------------------------------------------------------------------------
+// Test Result Display (Postman-style step viewer)
+// ---------------------------------------------------------------------------
+
+function StatusCodeBadge({ code }: { code: number }) {
+  const isOk = code >= 200 && code < 300;
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "text-xs font-mono",
+        isOk
+          ? "text-teal border-teal/30 bg-teal/10"
+          : "text-red-threat border-red-threat/30 bg-red-threat/10",
+      )}
+    >
+      {code}
+    </Badge>
+  );
+}
+
+function MethodBadge({ method }: { method: string }) {
+  const colors: Record<string, string> = {
+    GET: "text-blue-400 border-blue-400/30 bg-blue-400/10",
+    POST: "text-teal border-teal/30 bg-teal/10",
+    PUT: "text-amber-400 border-amber-400/30 bg-amber-400/10",
+    PATCH: "text-amber-400 border-amber-400/30 bg-amber-400/10",
+    DELETE: "text-red-threat border-red-threat/30 bg-red-threat/10",
+  };
+  return (
+    <Badge variant="outline" className={cn("text-xs font-mono font-bold", colors[method] || "text-dim border-border")}>
+      {method}
+    </Badge>
+  );
+}
+
+function HeadersGrid({ headers }: { headers: Record<string, string> }) {
+  const entries = Object.entries(headers);
+  if (entries.length === 0) return <span className="text-xs text-dim">No headers</span>;
+  return (
+    <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+      {entries.map(([key, value]) => (
+        <div key={key} className="contents">
+          <span className="text-xs font-mono text-muted-foreground truncate">{key}</span>
+          <span className="text-xs font-mono text-foreground truncate">{value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StepDetail({ step }: { step: HttpStepDebug }) {
+  return (
+    <div className="space-y-4 pt-3 pb-1">
+      {/* Request Headers */}
+      {Object.keys(step.request_headers).length > 0 && (
+        <div>
+          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Request Headers</span>
+          <div className="mt-1.5 p-2.5 rounded-md bg-surface border border-border">
+            <HeadersGrid headers={step.request_headers} />
+          </div>
+        </div>
+      )}
+
+      {/* Request Query Params */}
+      {step.request_query_params && Object.keys(step.request_query_params).length > 0 && (
+        <div>
+          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Query Parameters</span>
+          <div className="mt-1.5 p-2.5 rounded-md bg-surface border border-border">
+            <HeadersGrid headers={step.request_query_params} />
+          </div>
+        </div>
+      )}
+
+      {/* Request Body */}
+      {step.request_body != null && (
+        <div>
+          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Request Body</span>
+          <div className="mt-1.5">
+            <JsonViewer data={step.request_body as Record<string, unknown>} defaultExpanded={2} />
+          </div>
+        </div>
+      )}
+
+      {/* Error */}
+      {step.error && (
+        <div className="rounded-md bg-red-threat/5 border border-red-threat/20 p-3">
+          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium block mb-1">Error</span>
+          <p className="text-xs text-red-threat font-mono">{step.error}</p>
+        </div>
+      )}
+
+      {/* Response Headers */}
+      {step.response_headers && Object.keys(step.response_headers).length > 0 && (
+        <div>
+          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Response Headers</span>
+          <div className="mt-1.5 p-2.5 rounded-md bg-surface border border-border">
+            <HeadersGrid headers={step.response_headers} />
+          </div>
+        </div>
+      )}
+
+      {/* Response Body */}
+      {step.response_body != null && (
+        <div>
+          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Response Body</span>
+          <div className="mt-1.5">
+            <JsonViewer data={step.response_body as Record<string, unknown>} defaultExpanded={2} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TestResultDisplay({
+  result,
+  expandedSteps,
+  onToggleStep,
+}: {
+  result: EnrichmentProviderTestResult;
+  expandedSteps: Set<number>;
+  onToggleStep: (idx: number) => void;
+}) {
+  return (
+    <div className="space-y-3 mt-3">
+      {/* Summary bar */}
+      <div className="flex items-center gap-3">
+        {result.success ? (
+          <Badge variant="outline" className="text-xs text-teal border-teal/30 bg-teal/10">
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Success
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-xs text-red-threat border-red-threat/30 bg-red-threat/10">
+            <XCircle className="h-3 w-3 mr-1" />
+            Failed
+          </Badge>
+        )}
+        <span className="text-xs text-dim">{result.duration_ms}ms</span>
+        {result.steps && result.steps.length > 0 && (
+          <span className="text-xs text-dim">
+            {result.steps.length} step{result.steps.length !== 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+
+      {/* Error message (top-level) */}
+      {result.error_message && !result.steps?.length && (
+        <div className="rounded-md bg-red-threat/5 border border-red-threat/20 p-3">
+          <p className="text-xs text-red-threat font-mono">{result.error_message}</p>
+        </div>
+      )}
+
+      {/* Steps */}
+      {result.steps && result.steps.length > 0 && (
+        <div className="space-y-2">
+          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+            HTTP Steps
+          </span>
+          <div className="space-y-1.5">
+            {result.steps.map((step, idx) => {
+              const isExpanded = expandedSteps.has(idx);
+              return (
+                <div key={idx} className="rounded-md border border-border bg-surface overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => onToggleStep(idx)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-3.5 w-3.5 text-dim shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5 text-dim shrink-0" />
+                    )}
+                    <MethodBadge method={step.request_method} />
+                    <span className="text-xs font-mono text-foreground truncate flex-1">
+                      {step.request_url}
+                    </span>
+                    {step.response_status_code != null && (
+                      <StatusCodeBadge code={step.response_status_code} />
+                    )}
+                    {step.error && !step.response_status_code && (
+                      <Badge variant="outline" className="text-xs text-red-threat border-red-threat/30 bg-red-threat/10">
+                        Error
+                      </Badge>
+                    )}
+                    {step.skipped && (
+                      <Badge variant="outline" className="text-xs text-dim border-border">
+                        Skipped
+                      </Badge>
+                    )}
+                    <span className="text-xs text-dim shrink-0">{step.duration_ms}ms</span>
+                  </button>
+                  {isExpanded && (
+                    <div className="px-3 pb-3 border-t border-border">
+                      <StepDetail step={step} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Extracted Data */}
+      {result.extracted && Object.keys(result.extracted).length > 0 && (
+        <div>
+          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+            Extracted Fields
+          </span>
+          <div className="mt-2">
+            <JsonViewer data={result.extracted} defaultExpanded={3} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function EnrichmentProviderDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
@@ -108,15 +333,8 @@ export function EnrichmentProviderDetailPage() {
   // Test state
   const [testIndicatorType, setTestIndicatorType] = useState("ip");
   const [testIndicatorValue, setTestIndicatorValue] = useState("");
-  const [testResult, setTestResult] = useState<{
-    success: boolean;
-    provider_name: string;
-    indicator_type: string;
-    indicator_value: string;
-    extracted: Record<string, unknown> | null;
-    error_message: string | null;
-    duration_ms: number;
-  } | null>(null);
+  const [testResult, setTestResult] = useState<EnrichmentProviderTestResult | null>(null);
+  const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
 
   // Delete state
   const [showDelete, setShowDelete] = useState(false);
@@ -242,10 +460,20 @@ export function EnrichmentProviderDetailPage() {
       return;
     }
     setTestResult(null);
+    setExpandedSteps(new Set());
     testProvider.mutate(
       { uuid, body: { indicator_type: testIndicatorType, indicator_value: testIndicatorValue.trim() } },
       {
-        onSuccess: (res) => setTestResult(res.data),
+        onSuccess: (res) => {
+          setTestResult(res.data);
+          // Auto-expand all steps for single-step providers, first step for multi-step
+          const steps = res.data.steps;
+          if (steps && steps.length === 1) {
+            setExpandedSteps(new Set([0]));
+          } else if (steps && steps.length > 0) {
+            setExpandedSteps(new Set([0]));
+          }
+        },
         onError: () => toast.error("Failed to test provider"),
       },
     );
@@ -256,7 +484,7 @@ export function EnrichmentProviderDetailPage() {
     deleteProvider.mutate(uuid, {
       onSuccess: () => {
         toast.success("Provider deleted");
-        navigate({ to: "/settings/enrichment-providers" });
+        navigate({ to: "/manage/enrichment-providers" });
       },
       onError: () => toast.error("Failed to delete provider"),
     });
@@ -277,7 +505,7 @@ export function EnrichmentProviderDetailPage() {
     <AppLayout title="Enrichment Provider">
       <div className="space-y-6">
         <DetailPageHeader
-          backTo="/settings/enrichment-providers"
+          backTo="/manage/enrichment-providers"
           title={provider.display_name}
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
@@ -448,6 +676,9 @@ export function EnrichmentProviderDetailPage() {
             <TabsList className="bg-surface border border-border">
               <TabsTrigger value="configuration" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
                 Configuration
+              </TabsTrigger>
+              <TabsTrigger value="extractions" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                Field Extractions
               </TabsTrigger>
               <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
                 Test
@@ -648,6 +879,15 @@ export function EnrichmentProviderDetailPage() {
               </Card>
             </TabsContent>
 
+            {/* Field Extractions Tab */}
+            <TabsContent value="extractions" className="mt-4">
+              <FieldExtractionEditor
+                providerName={provider.provider_name}
+                supportedIndicatorTypes={provider.supported_indicator_types}
+                isBuiltin={provider.is_builtin}
+              />
+            </TabsContent>
+
             {/* Test Tab */}
             <TabsContent value="test" className="mt-4">
               <Card className="bg-card border-border">
@@ -703,39 +943,18 @@ export function EnrichmentProviderDetailPage() {
                   </div>
 
                   {testResult && (
-                    <div className="space-y-3 mt-3">
-                      <div className="flex items-center gap-3">
-                        {testResult.success ? (
-                          <Badge variant="outline" className="text-xs text-teal border-teal/30 bg-teal/10">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Success
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs text-red-threat border-red-threat/30 bg-red-threat/10">
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Failed
-                          </Badge>
-                        )}
-                        <span className="text-xs text-dim">{testResult.duration_ms}ms</span>
-                      </div>
-
-                      {testResult.error_message && (
-                        <div className="rounded-md bg-red-threat/5 border border-red-threat/20 p-3">
-                          <p className="text-xs text-red-threat font-mono">{testResult.error_message}</p>
-                        </div>
-                      )}
-
-                      {testResult.extracted && Object.keys(testResult.extracted).length > 0 && (
-                        <div>
-                          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
-                            Extracted Data
-                          </span>
-                          <div className="mt-2">
-                            <JsonViewer data={testResult.extracted} defaultExpanded={3} />
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <TestResultDisplay
+                      result={testResult}
+                      expandedSteps={expandedSteps}
+                      onToggleStep={(idx) => {
+                        setExpandedSteps((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(idx)) next.delete(idx);
+                          else next.add(idx);
+                          return next;
+                        });
+                      }}
+                    />
                   )}
                 </CardContent>
               </Card>

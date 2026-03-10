@@ -21,6 +21,8 @@ import type {
   HealthResponse,
   EnrichmentProvider,
   EnrichmentProviderTestResult,
+  EnrichmentFieldExtraction,
+  IndicatorFieldMapping,
 } from "@/lib/types";
 
 // Health
@@ -610,5 +612,89 @@ export function useTestEnrichmentProvider() {
   return useMutation({
     mutationFn: ({ uuid, body }: { uuid: string; body: { indicator_type: string; indicator_value: string } }) =>
       api.post<DataResponse<EnrichmentProviderTestResult>>(`/enrichment-providers/${uuid}/test`, body),
+  });
+}
+
+// Enrichment Field Extractions
+export function useFieldExtractions(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["field-extractions", qs],
+    queryFn: () =>
+      api.get<PaginatedResponse<EnrichmentFieldExtraction>>(`/enrichment-field-extractions${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useCreateFieldExtraction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<EnrichmentFieldExtraction>>("/enrichment-field-extractions", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["field-extractions"] }),
+  });
+}
+
+export function useBulkCreateFieldExtractions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<EnrichmentFieldExtraction[]>>("/enrichment-field-extractions/bulk", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["field-extractions"] }),
+  });
+}
+
+export function usePatchFieldExtraction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<EnrichmentFieldExtraction>>(`/enrichment-field-extractions/${uuid}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["field-extractions"] }),
+  });
+}
+
+export function useDeleteFieldExtraction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/enrichment-field-extractions/${uuid}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["field-extractions"] }),
+  });
+}
+
+// Indicator Field Mappings
+export function useIndicatorMappings(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["indicator-mappings", qs],
+    queryFn: () =>
+      api.get<PaginatedResponse<IndicatorFieldMapping>>(`/indicator-mappings${qs ? `?${qs}` : ""}`)
+  });
+}
+
+export function useCreateIndicatorMapping() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<IndicatorFieldMapping>>("/indicator-mappings", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["indicator-mappings"] }),
+  });
+}
+
+export function useDeleteIndicatorMapping() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/indicator-mappings/${uuid}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["indicator-mappings"] }),
   });
 }
