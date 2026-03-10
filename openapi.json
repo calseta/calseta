@@ -2357,6 +2357,338 @@
         }
       }
     },
+    "/v1/enrichment-field-extractions": {
+      "get": {
+        "tags": [
+          "enrichment-field-extractions"
+        ],
+        "summary": "List Enrichment Field Extractions",
+        "operationId": "list_enrichment_field_extractions_v1_enrichment_field_extractions_get",
+        "parameters": [
+          {
+            "name": "provider_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider Name"
+            }
+          },
+          {
+            "name": "indicator_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Indicator Type"
+            }
+          },
+          {
+            "name": "is_system",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is System"
+            }
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Active"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-indexed)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-indexed)"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Items per page (max 500)",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Items per page (max 500)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_EnrichmentFieldExtractionResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "enrichment-field-extractions"
+        ],
+        "summary": "Create Enrichment Field Extraction",
+        "operationId": "create_enrichment_field_extraction_v1_enrichment_field_extractions_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrichmentFieldExtractionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_EnrichmentFieldExtractionResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/enrichment-field-extractions/bulk": {
+      "post": {
+        "tags": [
+          "enrichment-field-extractions"
+        ],
+        "summary": "Bulk Create Enrichment Field Extractions",
+        "operationId": "bulk_create_enrichment_field_extractions_v1_enrichment_field_extractions_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrichmentFieldExtractionBulkCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_list_EnrichmentFieldExtractionResponse__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/enrichment-field-extractions/{extraction_uuid}": {
+      "get": {
+        "tags": [
+          "enrichment-field-extractions"
+        ],
+        "summary": "Get Enrichment Field Extraction",
+        "operationId": "get_enrichment_field_extraction_v1_enrichment_field_extractions__extraction_uuid__get",
+        "parameters": [
+          {
+            "name": "extraction_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Extraction Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_EnrichmentFieldExtractionResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "enrichment-field-extractions"
+        ],
+        "summary": "Patch Enrichment Field Extraction",
+        "operationId": "patch_enrichment_field_extraction_v1_enrichment_field_extractions__extraction_uuid__patch",
+        "parameters": [
+          {
+            "name": "extraction_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Extraction Uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrichmentFieldExtractionPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_EnrichmentFieldExtractionResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "enrichment-field-extractions"
+        ],
+        "summary": "Delete Enrichment Field Extraction",
+        "operationId": "delete_enrichment_field_extraction_v1_enrichment_field_extractions__extraction_uuid__delete",
+        "parameters": [
+          {
+            "name": "extraction_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Extraction Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/context-documents": {
       "get": {
         "tags": [
@@ -2958,7 +3290,7 @@
           "workflows"
         ],
         "summary": "Execute Workflow",
-        "description": "Enqueue a workflow for execution. Returns 202 Accepted immediately.\n\nApproval gate:\n- If trigger_source=\"agent\" AND workflow.requires_approval=True:\n  creates an approval request, enqueues a notification, returns\n  {\"status\": \"pending_approval\", \"approval_request_uuid\": \"...\", \"expires_at\": \"...\"}\n- Otherwise: immediately enqueues execution (existing behavior).\n\nWhen trigger_source=\"agent\", both `reason` and `confidence` are required.",
+        "description": "Enqueue a workflow for execution. Returns 202 Accepted immediately.\n\nApproval gate (based on workflow.approval_mode):\n- If approval_mode=\"always\": all triggers go through approval gate.\n- If approval_mode=\"agent_only\": only agent triggers require approval.\n- If approval_mode=\"never\": no approval required, immediate execution.\n\nWhen the approval gate fires, creates an approval request, enqueues a\nnotification, and returns:\n  {\"status\": \"pending_approval\", \"approval_request_uuid\": \"...\", \"expires_at\": \"...\"}\n\nWhen trigger_source=\"agent\", both `reason` and `confidence` are required.",
         "operationId": "execute_workflow_v1_workflows__workflow_uuid__execute_post",
         "parameters": [
           {
@@ -3569,6 +3901,107 @@
         }
       }
     },
+    "/v1/approvals/{approval_uuid}/decide": {
+      "get": {
+        "tags": [
+          "approvals"
+        ],
+        "summary": "Get Approval Decide Page",
+        "description": "Render a browser-based approval page for the given approval request.\n\nAuth: the `token` query parameter is the decide_token generated at approval\ncreation time. No API key required.",
+        "operationId": "get_approval_decide_page_v1_approvals__approval_uuid__decide_get",
+        "parameters": [
+          {
+            "name": "approval_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Approval Uuid"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "approvals"
+        ],
+        "summary": "Post Approval Decide",
+        "description": "Process an approval decision submitted from the browser approval page.\n\nAuth: the `token` form field is the decide_token. No API key required.",
+        "operationId": "post_approval_decide_v1_approvals__approval_uuid__decide_post",
+        "parameters": [
+          {
+            "name": "approval_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Approval Uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_post_approval_decide_v1_approvals__approval_uuid__decide_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/approvals/callback/slack": {
       "post": {
         "tags": [
@@ -3639,7 +4072,7 @@
           "approvals"
         ],
         "summary": "Teams Callback",
-        "description": "Teams interactive callback stub.\n\nTeams incoming webhooks do not support interactive button callbacks\n(that requires Azure Bot Framework, which is out of scope for v1).\n\nApprovers should use the REST API endpoints:\n  POST /v1/workflow-approvals/{uuid}/approve\n  POST /v1/workflow-approvals/{uuid}/reject",
+        "description": "Teams interactive callback stub.\n\nTeams incoming webhooks do not support interactive button callbacks\n(that requires Azure Bot Framework, which is out of scope for v1).\n\nApprovers should use the REST API endpoints or the browser approval page:\n  POST /v1/workflow-approvals/{uuid}/approve or /reject\n  GET  /v1/approvals/{uuid}/decide?token=...",
         "operationId": "teams_callback_v1_approvals_callback_teams_post",
         "responses": {
           "200": {
@@ -4303,6 +4736,30 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/settings/approval-defaults": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Approval Defaults",
+        "description": "Return the system-level approval notifier defaults from env config.",
+        "operationId": "get_approval_defaults_v1_settings_approval_defaults_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Approval Defaults V1 Settings Approval Defaults Get"
                 }
               }
             }
@@ -5365,6 +5822,17 @@
             "type": "string",
             "title": "Title"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "severity": {
             "$ref": "#/components/schemas/AlertSeverity"
           },
@@ -5663,6 +6131,17 @@
             "type": "string",
             "title": "Title"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "severity": {
             "$ref": "#/components/schemas/AlertSeverity"
           },
@@ -5724,6 +6203,24 @@
         ],
         "title": "AlertSummary",
         "description": "Compact alert for list views \u2014 GET /v1/alerts."
+      },
+      "Body_post_approval_decide_v1_approvals__approval_uuid__decide_post": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "decision": {
+            "type": "string",
+            "title": "Decision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "decision"
+        ],
+        "title": "Body_post_approval_decide_v1_approvals__approval_uuid__decide_post"
       },
       "ContextDocumentPatch": {
         "properties": {
@@ -6118,6 +6615,23 @@
         ],
         "title": "DataResponse[DetectionRuleResponse]"
       },
+      "DataResponse_EnrichmentFieldExtractionResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EnrichmentFieldExtractionResponse"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "DataResponse[EnrichmentFieldExtractionResponse]"
+      },
       "DataResponse_EnrichmentProviderResponse_": {
         "properties": {
           "data": {
@@ -6429,6 +6943,27 @@
           "data"
         ],
         "title": "DataResponse[list[ContextDocumentResponse]]"
+      },
+      "DataResponse_list_EnrichmentFieldExtractionResponse__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/EnrichmentFieldExtractionResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "DataResponse[list[EnrichmentFieldExtractionResponse]]"
       },
       "DataResponse_list_EnrichmentProviderInfo__": {
         "properties": {
@@ -6968,6 +7503,216 @@
         "title": "EnrichedIndicator",
         "description": "Full indicator as returned to API callers and MCP clients.\nIncludes enrichment results and alert association metadata."
       },
+      "EnrichmentFieldExtractionBulkCreate": {
+        "properties": {
+          "extractions": {
+            "items": {
+              "$ref": "#/components/schemas/EnrichmentFieldExtractionCreate"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Extractions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "extractions"
+        ],
+        "title": "EnrichmentFieldExtractionBulkCreate",
+        "description": "Request body for bulk-creating enrichment field extractions."
+      },
+      "EnrichmentFieldExtractionCreate": {
+        "properties": {
+          "provider_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Provider Name",
+            "description": "Provider this extraction belongs to"
+          },
+          "indicator_type": {
+            "type": "string",
+            "title": "Indicator Type",
+            "description": "Indicator type: ip, domain, hash_md5, hash_sha1, hash_sha256, url, email, account"
+          },
+          "source_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Path",
+            "description": "Dot-notation path into the raw enrichment response"
+          },
+          "target_key": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Target Key",
+            "description": "Key in the extracted dict surfaced to agents"
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type",
+            "description": "One of: string, int, float, bool, list, dict, any",
+            "default": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider_name",
+          "indicator_type",
+          "source_path",
+          "target_key"
+        ],
+        "title": "EnrichmentFieldExtractionCreate",
+        "description": "Request body for creating an enrichment field extraction."
+      },
+      "EnrichmentFieldExtractionPatch": {
+        "properties": {
+          "source_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Path"
+          },
+          "target_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Key"
+          },
+          "value_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Type"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "title": "EnrichmentFieldExtractionPatch",
+        "description": "Request body for PATCH /v1/enrichment-field-extractions/{uuid}."
+      },
+      "EnrichmentFieldExtractionResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Uuid"
+          },
+          "provider_name": {
+            "type": "string",
+            "title": "Provider Name"
+          },
+          "indicator_type": {
+            "type": "string",
+            "title": "Indicator Type"
+          },
+          "source_path": {
+            "type": "string",
+            "title": "Source Path"
+          },
+          "target_key": {
+            "type": "string",
+            "title": "Target Key"
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type"
+          },
+          "is_system": {
+            "type": "boolean",
+            "title": "Is System"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "provider_name",
+          "indicator_type",
+          "source_path",
+          "target_key",
+          "value_type",
+          "is_system",
+          "is_active",
+          "description",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "EnrichmentFieldExtractionResponse",
+        "description": "Response schema for enrichment field extraction endpoints."
+      },
       "EnrichmentProviderCreate": {
         "properties": {
           "provider_name": {
@@ -7416,6 +8161,18 @@
             ],
             "title": "Extracted"
           },
+          "raw_response": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Response"
+          },
           "error_message": {
             "anyOf": [
               {
@@ -7431,6 +8188,20 @@
             "type": "integer",
             "title": "Duration Ms",
             "default": 0
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/HttpStepDebug"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps"
           }
         },
         "type": "object",
@@ -7720,6 +8491,132 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HttpStepDebug": {
+        "properties": {
+          "step_name": {
+            "type": "string",
+            "title": "Step Name"
+          },
+          "step_index": {
+            "type": "integer",
+            "title": "Step Index"
+          },
+          "indicator_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indicator Value"
+          },
+          "request_method": {
+            "type": "string",
+            "title": "Request Method"
+          },
+          "request_url": {
+            "type": "string",
+            "title": "Request Url"
+          },
+          "request_headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Request Headers"
+          },
+          "request_query_params": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Query Params"
+          },
+          "request_body": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Body"
+          },
+          "response_status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Status Code"
+          },
+          "response_headers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Headers"
+          },
+          "response_body": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Body"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms",
+            "default": 0
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "skipped": {
+            "type": "boolean",
+            "title": "Skipped",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "step_name",
+          "step_index",
+          "request_method",
+          "request_url",
+          "request_headers"
+        ],
+        "title": "HttpStepDebug",
+        "description": "Per-step HTTP request/response debug info for test results."
       },
       "IndicatorAddItem": {
         "properties": {
@@ -8625,6 +9522,26 @@
         ],
         "title": "PaginatedResponse[DetectionRuleResponse]"
       },
+      "PaginatedResponse_EnrichmentFieldExtractionResponse_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/EnrichmentFieldExtractionResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "PaginatedResponse[EnrichmentFieldExtractionResponse]"
+      },
       "PaginatedResponse_EnrichmentProviderResponse_": {
         "properties": {
           "data": {
@@ -9234,10 +10151,10 @@
             ],
             "title": "Time Saved Minutes"
           },
-          "requires_approval": {
-            "type": "boolean",
-            "title": "Requires Approval",
-            "default": true
+          "approval_mode": {
+            "type": "string",
+            "title": "Approval Mode",
+            "default": "always"
           },
           "approval_channel": {
             "anyOf": [
@@ -9609,16 +10526,16 @@
             ],
             "title": "Time Saved Minutes"
           },
-          "requires_approval": {
+          "approval_mode": {
             "anyOf": [
               {
-                "type": "boolean"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Requires Approval"
+            "title": "Approval Mode"
           },
           "approval_channel": {
             "anyOf": [
@@ -9761,9 +10678,9 @@
             ],
             "title": "Time Saved Minutes"
           },
-          "requires_approval": {
-            "type": "boolean",
-            "title": "Requires Approval"
+          "approval_mode": {
+            "type": "string",
+            "title": "Approval Mode"
           },
           "risk_level": {
             "type": "string",
@@ -9830,7 +10747,7 @@
           "is_system",
           "tags",
           "time_saved_minutes",
-          "requires_approval",
+          "approval_mode",
           "risk_level",
           "documentation",
           "created_at",
@@ -10033,9 +10950,9 @@
             ],
             "title": "Time Saved Minutes"
           },
-          "requires_approval": {
-            "type": "boolean",
-            "title": "Requires Approval"
+          "approval_mode": {
+            "type": "string",
+            "title": "Approval Mode"
           },
           "risk_level": {
             "type": "string",
@@ -10075,7 +10992,7 @@
           "is_system",
           "tags",
           "time_saved_minutes",
-          "requires_approval",
+          "approval_mode",
           "risk_level",
           "documentation",
           "created_at",
