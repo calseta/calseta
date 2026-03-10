@@ -72,6 +72,28 @@ class EnrichmentProviderTestRequest(BaseModel):
     indicator_value: str
 
 
+class HttpStepDebug(BaseModel):
+    """Per-step HTTP request/response debug info for test results."""
+
+    step_name: str
+    step_index: int
+    indicator_value: str | None = None
+    # Request
+    request_method: str
+    request_url: str
+    request_headers: dict[str, str]
+    request_query_params: dict[str, str] | None = None
+    request_body: Any | None = None
+    # Response
+    response_status_code: int | None = None
+    response_headers: dict[str, str] | None = None
+    response_body: Any | None = None
+    # Meta
+    duration_ms: int = 0
+    error: str | None = None
+    skipped: bool = False
+
+
 class EnrichmentProviderTestResponse(BaseModel):
     """Response body for the test endpoint."""
 
@@ -80,5 +102,7 @@ class EnrichmentProviderTestResponse(BaseModel):
     indicator_type: str
     indicator_value: str
     extracted: dict[str, Any] | None = None
+    raw_response: dict[str, Any] | None = None
     error_message: str | None = None
     duration_ms: int = 0
+    steps: list[HttpStepDebug] | None = None

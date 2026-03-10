@@ -22,6 +22,8 @@ Multi-step flow (Okta, Entra):
 
 from __future__ import annotations
 
+import re
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -29,11 +31,64 @@ import httpx
 import structlog
 
 from app.schemas.enrichment import EnrichmentResult
+from app.schemas.enrichment_providers import HttpStepDebug
 from app.services.enrichment_template import TemplateResolver
 from app.services.field_extractor import FieldExtractor
 from app.services.malice_evaluator import MaliceRuleEvaluator
 
 logger = structlog.get_logger(__name__)
+
+_SENSITIVE_HEADER_RE = re.compile(
+    r"(authorization|api[_-]?key|apikey|token|secret|password|x-api-key)",
+    re.IGNORECASE,
+)
+_MAX_DEBUG_BODY_SIZE = 50_000  # 50KB cap for response bodies in debug output
+
+
+def _mask_value(value: str) -> str:
+    """Mask a sensitive string: show first 4 + **** + last 4, or just **** if short."""
+    if len(value) <= 8:
+        return "****"
+    return value[:4] + "****" + value[-4:]
+
+
+def mask_sensitive_headers(
+    headers: dict[str, str],
+    auth_values: list[str],
+) -> dict[str, str]:
+    """Mask sensitive header values for debug output."""
+    masked: dict[str, str] = {}
+    for name, value in headers.items():
+        if _SENSITIVE_HEADER_RE.search(name):
+            masked[name] = _mask_value(value)
+        elif any(av and av in value for av in auth_values):
+            masked[name] = _mask_value(value)
+        else:
+            masked[name] = value
+    return masked
+
+
+def mask_auth_values_in_url(url: str, auth_values: list[str]) -> str:
+    """Mask auth values that appear in URL query params."""
+    result = url
+    for av in auth_values:
+        if av and av in result:
+            result = result.replace(av, _mask_value(av))
+    return result
+
+
+def _truncate_body(body: Any) -> Any:
+    """Truncate response body if serialized form exceeds size cap."""
+    import json as _json
+
+    try:
+        serialized = _json.dumps(body)
+    except (TypeError, ValueError):
+        return body
+    if len(serialized) <= _MAX_DEBUG_BODY_SIZE:
+        return body
+    # Return truncated string representation with marker
+    return {"_truncated": True, "_preview": serialized[:_MAX_DEBUG_BODY_SIZE]}
 
 
 class GenericHttpEnrichmentEngine:
@@ -56,11 +111,12 @@ class GenericHttpEnrichmentEngine:
         indicator_value: str,
         indicator_type: str,
         auth_config: dict[str, Any],
+        capture_debug: bool = False,
     ) -> EnrichmentResult:
         """Execute the enrichment pipeline. Never raises — returns failure_result."""
         try:
             return await self._execute_inner(
-                indicator_value, indicator_type, auth_config
+                indicator_value, indicator_type, auth_config, capture_debug
             )
         except Exception as exc:
             logger.exception(
@@ -76,6 +132,7 @@ class GenericHttpEnrichmentEngine:
         indicator_value: str,
         indicator_type: str,
         auth_config: dict[str, Any],
+        capture_debug: bool = False,
     ) -> EnrichmentResult:
         steps = self._http_config.get("steps", [])
         if not steps:
@@ -95,6 +152,10 @@ class GenericHttpEnrichmentEngine:
 
         step_responses: dict[str, dict[str, Any]] = {}
         not_found = False
+        debug_steps: list[HttpStepDebug] = []
+
+        # Collect auth values for masking (flat list of all resolved credential values)
+        auth_values = [str(v) for v in auth_config.values() if v] if capture_debug else []
 
         async with httpx.AsyncClient() as client:
             for i, step in enumerate(steps):
@@ -124,18 +185,52 @@ class GenericHttpEnrichmentEngine:
                 }
 
                 # Handle query parameters
+                resolved_params = None
                 if "query_params" in step:
-                    request_kwargs["params"] = resolver.resolve_value(step["query_params"])
+                    resolved_params = resolver.resolve_value(step["query_params"])
+                    request_kwargs["params"] = resolved_params
 
                 # Handle body
+                resolved_body = None
                 if "json_body" in step:
-                    request_kwargs["json"] = resolver.resolve_value(step["json_body"])
+                    resolved_body = resolver.resolve_value(step["json_body"])
+                    request_kwargs["json"] = resolved_body
                 elif "form_body" in step:
-                    request_kwargs["data"] = resolver.resolve_value(step["form_body"])
+                    resolved_body = resolver.resolve_value(step["form_body"])
+                    request_kwargs["data"] = resolved_body
 
+                # Build debug step (before request)
+                step_debug: HttpStepDebug | None = None
+                if capture_debug:
+                    masked_headers = mask_sensitive_headers(
+                        {k: str(v) for k, v in headers.items()}, auth_values
+                    )
+                    masked_url = mask_auth_values_in_url(url, auth_values)
+                    masked_params = None
+                    if resolved_params:
+                        masked_params = {
+                            k: (_mask_value(str(v)) if any(av and av in str(v) for av in auth_values) else str(v))
+                            for k, v in resolved_params.items()
+                        }
+                    step_debug = HttpStepDebug(
+                        step_name=step_name,
+                        step_index=i,
+                        indicator_value=indicator_value,
+                        request_method=method,
+                        request_url=masked_url,
+                        request_headers=masked_headers,
+                        request_query_params=masked_params,
+                        request_body=resolved_body,
+                    )
+
+                step_start = time.monotonic()
                 try:
                     response = await client.request(**request_kwargs)
                 except Exception as exc:
+                    if capture_debug and step_debug:
+                        step_debug.duration_ms = int((time.monotonic() - step_start) * 1000)
+                        step_debug.error = str(exc)
+                        debug_steps.append(step_debug)
                     if is_optional:
                         logger.warning(
                             "enrichment_step_optional_failed",
@@ -144,10 +239,28 @@ class GenericHttpEnrichmentEngine:
                             error=str(exc),
                         )
                         continue
-                    return EnrichmentResult.failure_result(
+                    result = EnrichmentResult.failure_result(
                         self._provider_name,
                         f"Step '{step_name}' failed: {exc}",
                     )
+                    if capture_debug:
+                        result.debug_steps = debug_steps
+                    return result
+
+                step_duration = int((time.monotonic() - step_start) * 1000)
+
+                # Fill debug response info
+                if capture_debug and step_debug:
+                    step_debug.duration_ms = step_duration
+                    step_debug.response_status_code = response.status_code
+                    resp_headers = dict(response.headers)
+                    step_debug.response_headers = mask_sensitive_headers(resp_headers, auth_values)
+                    try:
+                        resp_body = response.json()
+                        step_debug.response_body = _truncate_body(resp_body)
+                    except Exception:
+                        step_debug.response_body = {"_raw_text": response.text[:2000]}
+                    debug_steps.append(step_debug)
 
                 # Check not-found status
                 not_found_statuses = step.get("not_found_status", [])
@@ -166,11 +279,16 @@ class GenericHttpEnrichmentEngine:
                             step=step_name,
                             status_code=response.status_code,
                         )
+                        if capture_debug and step_debug:
+                            step_debug.skipped = True
                         continue
-                    return EnrichmentResult.failure_result(
+                    result = EnrichmentResult.failure_result(
                         self._provider_name,
                         f"Step '{step_name}' returned HTTP {response.status_code}",
                     )
+                    if capture_debug:
+                        result.debug_steps = debug_steps
+                    return result
 
                 # Parse response
                 try:
@@ -192,12 +310,15 @@ class GenericHttpEnrichmentEngine:
         if not_found:
             evaluator = MaliceRuleEvaluator(self._malice_rules)
             verdict = evaluator.evaluate(raw_response, not_found=True)
-            return EnrichmentResult.success_result(
+            result = EnrichmentResult.success_result(
                 provider_name=self._provider_name,
                 extracted={"found": False, "malice": verdict},
                 raw=raw_response,
                 enriched_at=datetime.now(UTC),
             )
+            if capture_debug:
+                result.debug_steps = debug_steps
+            return result
 
         # Extract fields
         extractor = FieldExtractor(self._field_extractions)
@@ -208,9 +329,12 @@ class GenericHttpEnrichmentEngine:
         verdict = evaluator.evaluate(raw_response)
         extracted["malice"] = verdict
 
-        return EnrichmentResult.success_result(
+        result = EnrichmentResult.success_result(
             provider_name=self._provider_name,
             extracted=extracted,
             raw=raw_response,
             enriched_at=datetime.now(UTC),
         )
+        if capture_debug:
+            result.debug_steps = debug_steps
+        return result

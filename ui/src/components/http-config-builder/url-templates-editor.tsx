@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -10,6 +9,7 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 import type { UrlTemplateRow } from "./types";
 import { INDICATOR_TYPES, createEmptyUrlTemplate } from "./types";
+import { TemplateInput } from "./template-input";
 
 interface UrlTemplatesEditorProps {
   templates: UrlTemplateRow[];
@@ -54,12 +54,14 @@ export function UrlTemplatesEditor({ templates, onChange }: UrlTemplatesEditorPr
               </SelectContent>
             </Select>
           </div>
-          <Input
-            value={row.urlTemplate}
-            onChange={(e) => updateTemplate(row.id, "urlTemplate", e.target.value)}
-            placeholder="https://api.example.com/v3/{{value}}"
-            className="bg-surface border-border text-xs h-7 font-mono flex-1"
-          />
+          <div className="flex-1">
+            <TemplateInput
+              value={row.urlTemplate}
+              onChange={(val) => updateTemplate(row.id, "urlTemplate", val)}
+              placeholder="https://api.example.com/v3/{{indicator.value}}"
+              className="bg-surface border-border text-xs h-7"
+            />
+          </div>
           <Button
             variant="ghost"
             size="sm"

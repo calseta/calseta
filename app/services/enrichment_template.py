@@ -75,6 +75,10 @@ class TemplateResolver:
                 if filter_name == "urlencode":
                     apply_urlencode = True
 
+            # Support shorthand: {{value}} → {{indicator.value}}, {{type}} → {{indicator.type}}
+            if raw_path in ("value", "type"):
+                raw_path = f"indicator.{raw_path}"
+
             # Validate namespace
             segments = raw_path.split(".", 1)
             namespace = segments[0]

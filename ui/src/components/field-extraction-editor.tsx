@@ -33,6 +33,7 @@ import {
   Loader2,
   Layers,
   Save,
+  Pencil,
 } from "lucide-react";
 
 const VALUE_TYPES = ["string", "int", "float", "bool", "list", "dict", "any"];
@@ -48,6 +49,13 @@ interface FieldExtractionEditorProps {
 
 interface NewRow {
   indicator_type: string;
+  source_path: string;
+  target_key: string;
+  value_type: string;
+  description: string;
+}
+
+interface EditingRow {
   source_path: string;
   target_key: string;
   value_type: string;
@@ -81,6 +89,10 @@ export function FieldExtractionEditor({
     uuid: string;
     label: string;
   } | null>(null);
+
+  // Inline editing state for existing rows
+  const [editingUuid, setEditingUuid] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState<EditingRow | null>(null);
 
   const extractions = data?.data ?? [];
 
@@ -199,6 +211,57 @@ export function FieldExtractionEditor({
     );
   }
 
+  // --- Inline editing ---
+  function startEditing(ext: EnrichmentFieldExtraction) {
+    setEditingUuid(ext.uuid);
+    setEditingDraft({
+      source_path: ext.source_path,
+      target_key: ext.target_key,
+      value_type: ext.value_type,
+      description: ext.description ?? "",
+    });
+  }
+
+  function cancelEditing() {
+    setEditingUuid(null);
+    setEditingDraft(null);
+  }
+
+  function saveEditing(ext: EnrichmentFieldExtraction) {
+    if (!editingDraft) return;
+    if (!editingDraft.source_path.trim() || !editingDraft.target_key.trim()) {
+      toast.error("Source path and target key are required");
+      return;
+    }
+
+    // Only send changed fields
+    const updates: Record<string, unknown> = {};
+    if (editingDraft.source_path.trim() !== ext.source_path)
+      updates.source_path = editingDraft.source_path.trim();
+    if (editingDraft.target_key.trim() !== ext.target_key)
+      updates.target_key = editingDraft.target_key.trim();
+    if (editingDraft.value_type !== ext.value_type)
+      updates.value_type = editingDraft.value_type;
+    if ((editingDraft.description.trim() || null) !== (ext.description ?? null))
+      updates.description = editingDraft.description.trim() || null;
+
+    if (Object.keys(updates).length === 0) {
+      cancelEditing();
+      return;
+    }
+
+    patchExtraction.mutate(
+      { uuid: ext.uuid, body: updates },
+      {
+        onSuccess: () => {
+          toast.success("Extraction updated");
+          cancelEditing();
+        },
+        onError: () => toast.error("Failed to update extraction"),
+      },
+    );
+  }
+
   function handleDelete() {
     if (!deleteTarget) return;
     deleteExtraction.mutate(deleteTarget.uuid, {
@@ -273,10 +336,21 @@ export function FieldExtractionEditor({
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-xs text-dim mb-3">
+          <p className="text-xs text-dim mb-1">
             Map fields from raw enrichment API responses to structured keys
             surfaced to agents. System extractions are locked but can be toggled
             on/off.
+          </p>
+          <p className="text-[11px] text-dim mb-3">
+            <strong>Source path</strong> uses dot-notation into the raw API response body.
+            For example, if the response is{" "}
+            <code className="text-[11px] bg-surface px-1 py-0.5 rounded border border-border">
+              {`{"data": {"attributes": {"reputation": 0}}}`}
+            </code>
+            , the source path is{" "}
+            <code className="text-[11px] bg-surface px-1 py-0.5 rounded border border-border text-teal-light">
+              data.attributes.reputation
+            </code>.
           </p>
 
           {/* Table */}
@@ -321,97 +395,230 @@ export function FieldExtractionEditor({
                 </div>
 
                 {/* Rows */}
-                {items.map((ext) => (
-                  <div
-                    key={ext.uuid}
-                    className={cn(
-                      "group border-b border-border last:border-b-0 hover:bg-surface/30 transition-colors",
-                      !ext.is_active && "opacity-40",
-                      ext.is_system && "bg-muted/5",
-                    )}
-                  >
+                {items.map((ext) => {
+                  const isEditing = editingUuid === ext.uuid;
+
+                  if (isEditing && editingDraft) {
+                    return (
+                      <div
+                        key={ext.uuid}
+                        className="border-b border-teal/20 bg-teal/5 last:border-b-0"
+                      >
+                        <div
+                          className={cn(
+                            "grid gap-2 items-center px-3 py-1.5",
+                            GRID_COLS,
+                          )}
+                        >
+                          {/* Type (not editable) */}
+                          <span className="text-xs font-mono text-dim truncate">
+                            {ext.indicator_type}
+                          </span>
+
+                          {/* Source Path */}
+                          <Input
+                            value={editingDraft.source_path}
+                            onChange={(e) =>
+                              setEditingDraft({ ...editingDraft, source_path: e.target.value })
+                            }
+                            className="h-7 bg-surface border-border text-xs font-mono"
+                          />
+
+                          {/* Arrow */}
+                          <div className="flex justify-center">
+                            <ArrowRight className="h-3 w-3 text-dim flex-shrink-0" />
+                          </div>
+
+                          {/* Target Key */}
+                          <Input
+                            value={editingDraft.target_key}
+                            onChange={(e) =>
+                              setEditingDraft({ ...editingDraft, target_key: e.target.value })
+                            }
+                            className="h-7 bg-surface border-border text-xs font-mono"
+                          />
+
+                          {/* Value Type */}
+                          <Select
+                            value={editingDraft.value_type}
+                            onValueChange={(v) =>
+                              setEditingDraft({ ...editingDraft, value_type: v })
+                            }
+                          >
+                            <SelectTrigger className="h-7 bg-surface border-border text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border">
+                              {VALUE_TYPES.map((type) => (
+                                <SelectItem key={type} value={type} className="text-xs">
+                                  {type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          {/* Save */}
+                          <div className="flex justify-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => saveEditing(ext)}
+                              disabled={patchExtraction.isPending}
+                              className="h-6 w-6 p-0 text-teal hover:text-teal-light"
+                              title="Save changes"
+                            >
+                              {patchExtraction.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* Cancel */}
+                          <div className="flex justify-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={cancelEditing}
+                              className="h-6 w-6 p-0 text-dim hover:text-red-threat"
+                              title="Cancel editing"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Description input row */}
+                        <div
+                          className={cn(
+                            "grid gap-2 items-center px-3 pb-2 pt-0",
+                            GRID_COLS,
+                          )}
+                        >
+                          <div />
+                          <div className="col-span-3">
+                            <Input
+                              value={editingDraft.description}
+                              onChange={(e) =>
+                                setEditingDraft({ ...editingDraft, description: e.target.value })
+                              }
+                              placeholder="Description (optional)"
+                              className="h-6 bg-surface border-border text-[11px] text-dim"
+                            />
+                          </div>
+                          <div />
+                          <div />
+                          <div />
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
                     <div
+                      key={ext.uuid}
                       className={cn(
-                        "grid gap-2 items-center px-3 py-1.5",
-                        GRID_COLS,
+                        "group border-b border-border last:border-b-0 hover:bg-surface/30 transition-colors",
+                        !ext.is_active && "opacity-40",
+                        ext.is_system && "bg-muted/5",
                       )}
                     >
-                      {/* Type */}
-                      <div className="flex items-center gap-1 min-w-0">
-                        {ext.is_system && (
-                          <Lock className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0" />
+                      <div
+                        className={cn(
+                          "grid gap-2 items-center px-3 py-1.5",
+                          GRID_COLS,
                         )}
-                        <span className="text-xs font-mono text-dim truncate">
-                          {ext.indicator_type}
-                        </span>
-                      </div>
-
-                      {/* Source Path */}
-                      <code className="text-xs font-mono text-foreground truncate">
-                        {ext.source_path}
-                      </code>
-
-                      {/* Arrow */}
-                      <div className="flex justify-center">
-                        <ArrowRight className="h-3 w-3 text-dim flex-shrink-0" />
-                      </div>
-
-                      {/* Target Key */}
-                      <code className="text-xs font-mono text-teal-light truncate">
-                        {ext.target_key}
-                      </code>
-
-                      {/* Value Type */}
-                      <span className="text-[11px] text-dim truncate">
-                        {ext.value_type}
-                      </span>
-
-                      {/* Active toggle */}
-                      <div className="flex justify-center">
-                        <Switch
-                          checked={ext.is_active}
-                          onCheckedChange={() => handleToggleActive(ext)}
-                          className={cn(
-                            "scale-75",
-                            ext.is_active
-                              ? "data-[state=checked]:bg-teal"
-                              : "",
+                      >
+                        {/* Type */}
+                        <div className="flex items-center gap-1 min-w-0">
+                          {ext.is_system && (
+                            <Lock className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0" />
                           )}
-                        />
+                          <span className="text-xs font-mono text-dim truncate">
+                            {ext.indicator_type}
+                          </span>
+                        </div>
+
+                        {/* Source Path */}
+                        <code className="text-xs font-mono text-foreground truncate">
+                          {ext.source_path}
+                        </code>
+
+                        {/* Arrow */}
+                        <div className="flex justify-center">
+                          <ArrowRight className="h-3 w-3 text-dim flex-shrink-0" />
+                        </div>
+
+                        {/* Target Key */}
+                        <code className="text-xs font-mono text-teal-light truncate">
+                          {ext.target_key}
+                        </code>
+
+                        {/* Value Type */}
+                        <span className="text-[11px] text-dim truncate">
+                          {ext.value_type}
+                        </span>
+
+                        {/* Active toggle */}
+                        <div className="flex justify-center">
+                          <Switch
+                            checked={ext.is_active}
+                            onCheckedChange={() => handleToggleActive(ext)}
+                            className={cn(
+                              "scale-75",
+                              ext.is_active
+                                ? "data-[state=checked]:bg-teal"
+                                : "",
+                            )}
+                          />
+                        </div>
+
+                        {/* Edit / Delete */}
+                        <div className="flex justify-center">
+                          {!ext.is_system ? (
+                            <div className="flex gap-0.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => startEditing(ext)}
+                                className="h-6 w-6 p-0 text-dim hover:text-teal opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Edit"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setDeleteTarget({
+                                    uuid: ext.uuid,
+                                    label: `${ext.source_path} → ${ext.target_key}`,
+                                  })
+                                }
+                                className="h-6 w-6 p-0 text-dim hover:text-red-threat opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="h-6 w-6" />
+                          )}
+                        </div>
                       </div>
 
-                      {/* Delete */}
-                      <div className="flex justify-center">
-                        {!ext.is_system ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setDeleteTarget({
-                                uuid: ext.uuid,
-                                label: `${ext.source_path} → ${ext.target_key}`,
-                              })
-                            }
-                            className="h-6 w-6 p-0 text-dim hover:text-red-threat opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        ) : (
-                          <div className="h-6 w-6" />
-                        )}
-                      </div>
+                      {/* Description subtitle (if present) */}
+                      {ext.description && (
+                        <div className="px-3 pb-1.5 -mt-0.5">
+                          <p className="text-[11px] text-dim pl-[90px] ml-2">
+                            {ext.description}
+                          </p>
+                        </div>
+                      )}
                     </div>
-
-                    {/* Description subtitle (if present) */}
-                    {ext.description && (
-                      <div className="px-3 pb-1.5 -mt-0.5">
-                        <p className="text-[11px] text-dim pl-[90px] ml-2">
-                          {ext.description}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ))}
 
@@ -537,7 +744,7 @@ export function FieldExtractionEditor({
                   </div>
                 </div>
 
-                {/* Description input below — aligned to source_path column using same grid */}
+                {/* Description input below — spans from source_path through value_type (col-span-3) */}
                 <div
                   className={cn(
                     "grid gap-2 items-center px-3 pb-2 pt-0",
@@ -545,7 +752,7 @@ export function FieldExtractionEditor({
                   )}
                 >
                   <div />
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <Input
                       value={row.description}
                       onChange={(e) =>
@@ -557,19 +764,20 @@ export function FieldExtractionEditor({
                   </div>
                   <div />
                   <div />
+                  <div />
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Hint text */}
+          {/* Hint text
           {newRows.length === 0 && extractions.length > 0 && (
             <p className="text-[11px] text-dim mt-2">
               Click <strong>Add Row</strong> to add a new extraction. Each row
               maps a dot-notation path in the raw API response to a named key in
               the <code className="text-[11px]">extracted</code> object.
             </p>
-          )}
+          )} */}
         </CardContent>
       </Card>
 

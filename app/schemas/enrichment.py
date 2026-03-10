@@ -37,6 +37,9 @@ class EnrichmentResult(BaseModel):
     # Populated on failure
     error_message: str | None = None
 
+    # Debug info (only populated during test/debug calls)
+    debug_steps: list[Any] | None = None
+
     @classmethod
     def success_result(
         cls,

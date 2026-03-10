@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { TEMPLATE_VARIABLES } from "./types";
 
@@ -16,6 +15,115 @@ interface TemplateInputProps {
   variables?: TemplateVariable[];
 }
 
+// Split text into literal and {{...}} token segments
+function splitTemplate(text: string): { type: "text" | "token"; value: string }[] {
+  const parts: { type: "text" | "token"; value: string }[] = [];
+  const regex = /(\{\{[^}]+\}\})/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: "text", value: text.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: "token", value: match[1] });
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push({ type: "text", value: text.slice(lastIndex) });
+  }
+  return parts;
+}
+
+/** Whether the string contains any {{...}} template tokens. */
+function hasTemplateTokens(text: string): boolean {
+  return /\{\{[^}]+\}\}/.test(text);
+}
+
+/**
+ * Save and restore caret position in a contentEditable element.
+ * Returns the character offset from the start of the element's text.
+ */
+function getCaretOffset(el: HTMLElement): number {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return 0;
+  const range = sel.getRangeAt(0).cloneRange();
+  range.selectNodeContents(el);
+  range.setEnd(sel.getRangeAt(0).startContainer, sel.getRangeAt(0).startOffset);
+  return range.toString().length;
+}
+
+function setCaretOffset(el: HTMLElement, offset: number) {
+  const sel = window.getSelection();
+  if (!sel) return;
+
+  let remaining = offset;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+  let node: Node | null;
+
+  while ((node = walker.nextNode())) {
+    const textNode = node as Text;
+    if (remaining <= textNode.length) {
+      const range = document.createRange();
+      range.setStart(textNode, remaining);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return;
+    }
+    remaining -= textNode.length;
+  }
+
+  // If offset exceeds text length, place at end
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+/**
+ * Extract raw text from a contentEditable element.
+ * Pill spans have a data-token attribute containing the raw {{...}} text.
+ */
+function extractRawText(el: HTMLElement): string {
+  let result = "";
+  for (const child of Array.from(el.childNodes)) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      result += child.textContent ?? "";
+    } else if (child instanceof HTMLElement) {
+      const token = child.getAttribute("data-token");
+      if (token) {
+        result += token;
+      } else {
+        result += child.textContent ?? "";
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Build HTML with pill spans for {{...}} tokens.
+ */
+function buildInnerHTML(text: string): string {
+  if (!text) return "";
+  const parts = splitTemplate(text);
+  return parts
+    .map((p) => {
+      if (p.type === "token") {
+        const inner = p.value.replace(/^\{\{|\}\}$/g, "");
+        // Use zero-width spaces around the pill so the cursor can be positioned next to it
+        return `\u200B<span data-token="${escapeHtml(p.value)}" contenteditable="false" class="inline-flex items-center px-1 py-0 mx-0.5 rounded bg-teal/15 text-teal border border-teal/25 text-[10px] font-semibold whitespace-nowrap align-baseline leading-[18px] select-none pointer-events-none">${escapeHtml(inner)}</span>\u200B`;
+      }
+      return escapeHtml(p.value);
+    })
+    .join("");
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 export function TemplateInput({
   value,
   onChange,
@@ -23,14 +131,16 @@ export function TemplateInput({
   className,
   variables = TEMPLATE_VARIABLES,
 }: TemplateInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const editableRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [filterText, setFilterText] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [triggerStart, setTriggerStart] = useState(-1);
+  // Track whether we're programmatically updating innerHTML to avoid re-render loops
+  const suppressInputRef = useRef(false);
 
-  // Strip {{ }} wrapper from variable names for matching
   const variableEntries = variables.map((v) => ({
     name: v.variable.replace(/^\{\{|\}\}$/g, ""),
     label: v.variable,
@@ -43,10 +153,25 @@ export function TemplateInput({
       v.description.toLowerCase().includes(filterText.toLowerCase()),
   );
 
-  // Reset selection when filter changes
   useEffect(() => {
     setSelectedIndex(0);
   }, [filterText]);
+
+  // Sync value → innerHTML when value changes externally
+  useEffect(() => {
+    const el = editableRef.current;
+    if (!el) return;
+    const currentRaw = extractRawText(el);
+    if (currentRaw !== value) {
+      suppressInputRef.current = true;
+      const caretPos = focused ? getCaretOffset(el) : 0;
+      el.innerHTML = buildInnerHTML(value);
+      if (focused) {
+        requestAnimationFrame(() => setCaretOffset(el, caretPos));
+      }
+      suppressInputRef.current = false;
+    }
+  }, [value, focused]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -54,8 +179,8 @@ export function TemplateInput({
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(e.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target as Node)
+        editableRef.current &&
+        !editableRef.current.contains(e.target as Node)
       ) {
         setOpen(false);
       }
@@ -66,42 +191,65 @@ export function TemplateInput({
 
   const insertVariable = useCallback(
     (varName: string) => {
-      const input = inputRef.current;
-      if (!input || triggerStart < 0) return;
+      const el = editableRef.current;
+      if (!el || triggerStart < 0) return;
 
-      const cursorPos = input.selectionStart ?? value.length;
-      const before = value.slice(0, triggerStart);
-      const after = value.slice(cursorPos);
+      const rawText = extractRawText(el);
+      const caretPos = getCaretOffset(el);
+      const before = rawText.slice(0, triggerStart);
+      const after = rawText.slice(caretPos);
       const insertion = `{{${varName}}}`;
       const newValue = before + insertion + after;
-      onChange(newValue);
 
+      onChange(newValue);
       setOpen(false);
       setTriggerStart(-1);
 
-      // Restore cursor after the inserted variable
+      // Place cursor after the inserted variable
       requestAnimationFrame(() => {
-        const newPos = before.length + insertion.length;
-        input.setSelectionRange(newPos, newPos);
-        input.focus();
+        if (!el) return;
+        el.innerHTML = buildInnerHTML(newValue);
+        setCaretOffset(el, before.length + insertion.length);
+        el.focus();
       });
     },
-    [value, onChange, triggerStart],
+    [onChange, triggerStart],
   );
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const newValue = e.target.value;
-    const cursorPos = e.target.selectionStart ?? 0;
-    onChange(newValue);
+  function handleInput() {
+    if (suppressInputRef.current) return;
+    const el = editableRef.current;
+    if (!el) return;
 
-    // Look backwards from cursor for an open {{ without a closing }}
-    const before = newValue.slice(0, cursorPos);
-    const lastOpen = before.lastIndexOf("{{");
-    const lastClose = before.lastIndexOf("}}");
+    const rawText = extractRawText(el);
+    const caretPos = getCaretOffset(el);
+
+    // Check if we need to re-render pills (a token was completed)
+    const hadTokens = hasTemplateTokens(value);
+    const hasTokensNow = hasTemplateTokens(rawText);
+
+    if (rawText !== value) {
+      onChange(rawText);
+    }
+
+    // Re-render pills if token structure changed
+    if (hadTokens !== hasTokensNow || (hasTokensNow && rawText !== value)) {
+      suppressInputRef.current = true;
+      requestAnimationFrame(() => {
+        if (!el) return;
+        el.innerHTML = buildInnerHTML(rawText);
+        setCaretOffset(el, caretPos);
+        suppressInputRef.current = false;
+      });
+    }
+
+    // Check for autocomplete trigger
+    const textBefore = rawText.slice(0, caretPos);
+    const lastOpen = textBefore.lastIndexOf("{{");
+    const lastClose = textBefore.lastIndexOf("}}");
 
     if (lastOpen >= 0 && lastOpen > lastClose) {
-      // We're inside an open {{ — extract filter text
-      const partial = before.slice(lastOpen + 2);
+      const partial = textBefore.slice(lastOpen + 2);
       setFilterText(partial);
       setTriggerStart(lastOpen);
       setOpen(true);
@@ -111,7 +259,13 @@ export function TemplateInput({
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    // Prevent Enter from inserting newlines (single-line input)
+    if (e.key === "Enter" && !open) {
+      e.preventDefault();
+      return;
+    }
+
     if (!open || filtered.length === 0) return;
 
     if (e.key === "ArrowDown") {
@@ -128,15 +282,37 @@ export function TemplateInput({
     }
   }
 
+  // Handle paste — strip HTML formatting, keep plain text
+  function handlePaste(e: React.ClipboardEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    document.execCommand("insertText", false, text);
+  }
+
   return (
     <div className="relative">
-      <Input
-        ref={inputRef}
-        value={value}
-        onChange={handleChange}
+      <div
+        ref={editableRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        className={cn("font-mono", className)}
+        onPaste={handlePaste}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          setTimeout(() => setOpen(false), 150);
+        }}
+        data-placeholder={placeholder}
+        className={cn(
+          "flex items-center overflow-hidden whitespace-nowrap",
+          "rounded-md border px-3 font-mono text-xs",
+          "outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          "min-h-[28px] leading-[26px]",
+          // Show placeholder via CSS when empty
+          "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none",
+          className,
+        )}
       />
       {open && filtered.length > 0 && (
         <div
@@ -175,23 +351,22 @@ export function TemplateInput({
  * Used in display/read-only contexts.
  */
 export function TemplatePills({ text }: { text: string }) {
-  const parts = text.split(/(\{\{[^}]+\}\})/g);
-
+  const parts = splitTemplate(text);
   return (
     <span className="font-mono text-[11px] break-all">
-      {parts.map((part, i) => {
-        const match = part.match(/^\{\{([^}]+)\}\}$/);
-        if (match) {
+      {parts.map((p, i) => {
+        if (p.type === "token") {
+          const inner = p.value.replace(/^\{\{|\}\}$/g, "");
           return (
             <span
               key={i}
-              className="inline-flex items-center px-1.5 py-0 mx-0.5 rounded bg-teal/15 text-teal border border-teal/25 text-[10px] font-semibold whitespace-nowrap align-baseline"
+              className="inline-flex items-center px-1 py-0 mx-0.5 rounded bg-teal/15 text-teal border border-teal/25 text-[10px] font-semibold whitespace-nowrap align-baseline leading-[18px]"
             >
-              {match[1]}
+              {inner}
             </span>
           );
         }
-        return <span key={i}>{part}</span>;
+        return <span key={i}>{p.value}</span>;
       })}
     </span>
   );

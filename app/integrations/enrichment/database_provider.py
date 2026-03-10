@@ -206,6 +206,44 @@ class DatabaseDrivenProvider(EnrichmentProviderBase):
             )
             return EnrichmentResult.failure_result(self.provider_name, str(exc))
 
+    async def enrich_with_debug(
+        self, value: str, indicator_type: IndicatorType
+    ) -> EnrichmentResult:
+        """Execute enrichment with per-step debug info captured. For test endpoint only."""
+        try:
+            if not self.is_configured():
+                return EnrichmentResult.skipped_result(
+                    self.provider_name,
+                    f"{self.display_name} is not configured",
+                )
+            if indicator_type not in self.supported_types:
+                return EnrichmentResult.skipped_result(
+                    self.provider_name,
+                    f"{self.display_name} does not support '{indicator_type}'",
+                )
+
+            # Mock mode: return mock data without debug steps
+            if self._is_mock_mode():
+                return self._get_mock_result(value, indicator_type)
+
+            auth = self._resolve_auth()
+            engine = GenericHttpEnrichmentEngine(
+                provider_name=self.provider_name,
+                http_config=self._http_config,
+                malice_rules=self._malice_rules,
+                field_extractions=self._field_extractions,
+            )
+            return await engine.execute(value, str(indicator_type), auth, capture_debug=True)
+
+        except Exception as exc:
+            logger.exception(
+                "database_provider_enrich_debug_error",
+                provider=self.provider_name,
+                indicator_type=str(indicator_type),
+                value=value[:64],
+            )
+            return EnrichmentResult.failure_result(self.provider_name, str(exc))
+
     @classmethod
     def from_db_row(
         cls,

@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
 import type { KeyValueRow } from "./types";
 import { createEmptyKvRow } from "./types";
+import { TemplateInput } from "./template-input";
 
 interface KeyValueEditorProps {
   label?: string;
@@ -42,12 +43,14 @@ export function KeyValueEditor({
             placeholder={keyPlaceholder}
             className="bg-surface border-border text-xs h-7 font-mono flex-1"
           />
-          <Input
-            value={row.value}
-            onChange={(e) => updateRow(row.id, "value", e.target.value)}
-            placeholder={valuePlaceholder}
-            className="bg-surface border-border text-xs h-7 font-mono flex-[2]"
-          />
+          <div className="flex-[2]">
+            <TemplateInput
+              value={row.value}
+              onChange={(val) => updateRow(row.id, "value", val)}
+              placeholder={valuePlaceholder}
+              className="bg-surface border-border text-xs h-7"
+            />
+          </div>
           <Button
             variant="ghost"
             size="sm"

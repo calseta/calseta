@@ -158,7 +158,7 @@ export function StepCard({
               <TemplateInput
                 value={step.url}
                 onChange={(url) => update({ url })}
-                placeholder="https://api.example.com/v3/{{value}}"
+                placeholder="https://api.example.com/v3/{{indicator.value}}"
                 className="bg-surface border-border text-xs h-7"
               />
             </div>
@@ -207,7 +207,7 @@ export function StepCard({
                 value={step.jsonBody}
                 onChange={(e) => update({ jsonBody: e.target.value })}
                 rows={4}
-                placeholder='{"key": "{{value}}"}'
+                placeholder='{"key": "{{indicator.value}}"}'
                 className="bg-surface border-border text-xs font-mono mt-1.5"
               />
             )}
