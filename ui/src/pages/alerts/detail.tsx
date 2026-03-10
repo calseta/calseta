@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useParams, useSearch, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
@@ -108,6 +108,8 @@ const indicatorIcons: Record<string, React.ComponentType<{ className?: string }>
 
 export function AlertDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
+  const { tab: activeTab } = useSearch({ from: "/alerts/$uuid" });
+  const navigate = useNavigate();
   const { data: alertResp, isLoading, refetch, isFetching } = useAlert(uuid);
   const { data: activityResp, refetch: refetchActivity } = useAlertActivity(uuid);
   const { data: contextResp, refetch: refetchContext } = useAlertContext(uuid);
@@ -117,7 +119,9 @@ export function AlertDetailPage() {
   const [closingWith, setClosingWith] = useState<string>("");
   const [showCloseFlow, setShowCloseFlow] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("indicators");
+  function setActiveTab(tab: string) {
+    navigate({ search: { tab }, replace: true });
+  }
   const [showAddIndicators, setShowAddIndicators] = useState(false);
   const [selectedIndicator, setSelectedIndicator] = useState<{
     uuid: string;

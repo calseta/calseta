@@ -13,7 +13,7 @@ export function formatDate(iso: string): string {
   const year = d.getUTCFullYear();
   const hh = String(d.getUTCHours()).padStart(2, "0");
   const mm = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${mon} ${day}, ${year} ${hh}:${mm}`;
+  return `${mon} ${day}, ${year} ${hh}:${mm} UTC`;
 }
 
 export function formatSeconds(seconds: number | null): string {

@@ -32,11 +32,13 @@ import {
 } from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CopyableText } from "@/components/copyable-text";
 import { useSources, useCreateSource, useDeleteSource } from "@/hooks/use-api";
 import { formatDate } from "@/lib/format";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 
 const SRC_COLUMNS: ColumnDef[] = [
+  { key: "expand", initialWidth: 32, minWidth: 32, maxWidth: 32 },
   { key: "source", initialWidth: 160, minWidth: 100 },
   { key: "display_name", initialWidth: 200, minWidth: 120 },
   { key: "status", initialWidth: 90, minWidth: 70 },
@@ -51,6 +53,13 @@ const AVAILABLE_SOURCES = [
   { value: "generic", label: "Generic Webhook" },
 ];
 
+const SOURCE_DOC_SLUGS: Record<string, string> = {
+  sentinel: "sentinel",
+  elastic: "elastic",
+  splunk: "splunk",
+  generic: "generic",
+};
+
 export function SourcesPage() {
   const { data, isLoading } = useSources();
   const createSource = useCreateSource();
@@ -58,8 +67,10 @@ export function SourcesPage() {
   const [open, setOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ uuid: string; name: string } | null>(null);
+  const [expandedSource, setExpandedSource] = useState<string | null>(null);
 
   const sources = data?.data ?? [];
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://your-calseta-host";
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -95,8 +106,12 @@ export function SourcesPage() {
     });
   }
 
+  function toggleExpand(uuid: string) {
+    setExpandedSource((prev) => (prev === uuid ? null : uuid));
+  }
+
   return (
-    <AppLayout title="Source Integrations">
+    <AppLayout title="Alert Sources">
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <span className="text-xs text-dim">{sources.length} sources</span>
@@ -109,7 +124,7 @@ export function SourcesPage() {
             </DialogTrigger>
             <DialogContent className="bg-card border-border">
               <DialogHeader>
-                <DialogTitle>Add Source Integration</DialogTitle>
+                <DialogTitle>Add Alert Source</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCreate} className="space-y-3">
                 <div>
@@ -140,13 +155,14 @@ export function SourcesPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card">
-          <ResizableTable storageKey="sources" columns={SRC_COLUMNS}>
+          <ResizableTable storageKey="alert-sources" columns={SRC_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
+                <ResizableTableHead columnKey="expand" className="text-dim text-xs w-8" />
                 <ResizableTableHead columnKey="source" className="text-dim text-xs">Source</ResizableTableHead>
                 <ResizableTableHead columnKey="display_name" className="text-dim text-xs">Display Name</ResizableTableHead>
                 <ResizableTableHead columnKey="status" className="text-dim text-xs">Status</ResizableTableHead>
-                <ResizableTableHead columnKey="created" className="text-dim text-xs">Created (UTC)</ResizableTableHead>
+                <ResizableTableHead columnKey="created" className="text-dim text-xs">Created</ResizableTableHead>
                 <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
               </TableRow>
             </TableHeader>
@@ -154,37 +170,90 @@ export function SourcesPage() {
               {isLoading
                 ? Array.from({ length: 4 }).map((_, i) => (
                     <TableRow key={i} className="border-border">
-                      {Array.from({ length: 5 }).map((_, j) => (
+                      {Array.from({ length: 6 }).map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 : sources.map((src) => (
-                    <TableRow key={src.uuid} className="border-border hover:bg-accent/50">
-                      <TableCell className="text-sm font-mono text-foreground">{src.source_name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{src.display_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={src.is_active ? "text-teal bg-teal/10 border-teal/30 text-[11px]" : "text-dim bg-dim/10 border-dim/30 text-[11px]"}>
-                          {src.is_active ? "active" : "inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-dim whitespace-nowrap">{formatDate(src.created_at)}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteTarget({ uuid: src.uuid, name: src.display_name })}
-                          className="h-8 w-8 p-0 text-dim hover:text-red-threat"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                    <>
+                      <TableRow key={src.uuid} className="border-border hover:bg-accent/50">
+                        <TableCell className="w-8 p-0 pl-2">
+                          <button
+                            onClick={() => toggleExpand(src.uuid)}
+                            className="p-1 text-dim hover:text-foreground"
+                          >
+                            {expandedSource === src.uuid ? (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-sm font-mono text-foreground">{src.source_name}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{src.display_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={src.is_active ? "text-teal bg-teal/10 border-teal/30 text-[11px]" : "text-dim bg-dim/10 border-dim/30 text-[11px]"}>
+                            {src.is_active ? "active" : "inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-dim whitespace-nowrap">{formatDate(src.created_at)}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteTarget({ uuid: src.uuid, name: src.display_name })}
+                            className="h-8 w-8 p-0 text-dim hover:text-red-threat"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      {expandedSource === src.uuid && (
+                        <TableRow key={`${src.uuid}-detail`} className="border-border bg-surface/50">
+                          <TableCell colSpan={6}>
+                            <div className="py-3 px-2 space-y-3">
+                              <div>
+                                <span className="text-[11px] text-dim uppercase tracking-wider font-medium">Webhook URL</span>
+                                <div className="mt-1">
+                                  <CopyableText
+                                    text={`${origin}/v1/alerts/ingest/${src.source_name}`}
+                                    mono
+                                    className="text-xs text-teal"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[11px] text-dim uppercase tracking-wider font-medium">Required Headers</span>
+                                <div className="mt-1 space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <code className="text-xs text-dim bg-surface px-1.5 py-0.5 rounded border border-border">Authorization: Bearer cai_...</code>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <code className="text-xs text-dim bg-surface px-1.5 py-0.5 rounded border border-border">Content-Type: application/json</code>
+                                  </div>
+                                </div>
+                              </div>
+                              {SOURCE_DOC_SLUGS[src.source_name] && (
+                                <a
+                                  href={`https://docs.calseta.com/integrations/alert-sources/${SOURCE_DOC_SLUGS[src.source_name]}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-teal hover:underline"
+                                >
+                                  View full setup guide &rarr;
+                                </a>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
                   ))}
               {!isLoading && sources.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-dim py-12">
-                    No source integrations configured
+                  <TableCell colSpan={6} className="text-center text-sm text-dim py-12">
+                    No alert sources configured
                   </TableCell>
                 </TableRow>
               )}
@@ -196,7 +265,7 @@ export function SourcesPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(v) => !v && setDeleteTarget(null)}
-        title="Delete Source Integration"
+        title="Delete Alert Source"
         description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
         confirmLabel="Delete"
         onConfirm={handleDelete}

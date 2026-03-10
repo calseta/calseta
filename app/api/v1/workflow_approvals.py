@@ -13,6 +13,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import CalsetaException
@@ -20,6 +21,7 @@ from app.api.pagination import PaginationParams
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.db.models.api_key import APIKey as ApiKeyModel
 from app.db.session import get_db
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.workflow_approvals import (
@@ -164,12 +166,22 @@ async def approve_workflow(
     from app.workflows.approval import process_approval_decision
 
     try:
+        # Resolve API key name for audit display
+        key_name: str | None = None
+        key_row = (await db.execute(
+            select(ApiKeyModel.name).where(ApiKeyModel.id == auth.key_id)
+        )).scalar_one_or_none()
+        if key_row:
+            key_name = key_row
+
         responder = (body.responder_id if body else None) or str(auth.key_prefix)
         request = await process_approval_decision(
             approval_uuid=approval_uuid,
             approved=True,
             responder_id=responder,
             db=db,
+            actor_key_prefix=auth.key_prefix,
+            actor_key_name=key_name,
         )
         await db.commit()
         await db.refresh(request)
@@ -220,12 +232,23 @@ async def reject_workflow(
     from app.workflows.approval import process_approval_decision
 
     try:
+        from app.db.models.api_key import APIKey as ApiKeyModel
+
+        key_name: str | None = None
+        key_row = (await db.execute(
+            __import__("sqlalchemy").select(ApiKeyModel.name).where(ApiKeyModel.id == auth.key_id)
+        )).scalar_one_or_none()
+        if key_row:
+            key_name = key_row
+
         responder = (body.responder_id if body else None) or str(auth.key_prefix)
         request = await process_approval_decision(
             approval_uuid=approval_uuid,
             approved=False,
             responder_id=responder,
             db=db,
+            actor_key_prefix=auth.key_prefix,
+            actor_key_name=key_name,
         )
         await db.commit()
         await db.refresh(request)

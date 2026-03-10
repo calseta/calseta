@@ -462,7 +462,12 @@ async def add_finding(
         actor_type="api",
         actor_key_prefix=auth.key_prefix,
         alert_id=alert.id,
-        references={"finding_id": finding_id, "agent_name": body.agent_name},
+        references={
+            "finding_id": finding_id,
+            "agent_name": body.agent_name,
+            "summary": (body.summary[:120] + "...") if len(body.summary) > 120 else body.summary,
+            "confidence": body.confidence.value if body.confidence else None,
+        },
     )
 
     return DataResponse(

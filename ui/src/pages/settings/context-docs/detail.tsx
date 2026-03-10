@@ -93,7 +93,7 @@ export function ContextDocDetailPage() {
     <AppLayout title="Context Document">
       <div className="space-y-6">
         <DetailPageHeader
-          backTo="/settings/context-docs"
+          backTo="/manage/context-docs"
           title={doc.title}
           onRefresh={() => refetch()}
           isRefreshing={isFetching}

@@ -318,7 +318,7 @@ export function DetectionRulesPage() {
                     <TableRow key={rule.uuid} className="border-border hover:bg-accent/50">
                       <TableCell>
                         <Link
-                          to="/settings/detection-rules/$uuid"
+                          to="/manage/detection-rules/$uuid"
                           params={{ uuid: rule.uuid }}
                           className="text-sm text-foreground hover:text-teal-light transition-colors block truncate"
                           title={rule.name}

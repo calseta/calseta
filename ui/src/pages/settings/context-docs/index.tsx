@@ -340,7 +340,7 @@ export function ContextDocsPage() {
                     <TableRow key={doc.uuid} className="border-border hover:bg-accent/50">
                       <TableCell>
                         <Link
-                          to="/settings/context-docs/$uuid"
+                          to="/manage/context-docs/$uuid"
                           params={{ uuid: doc.uuid }}
                           className="flex items-center gap-2 text-sm text-foreground hover:text-teal-light transition-colors"
                         >

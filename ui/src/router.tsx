@@ -21,6 +21,7 @@ import { EnrichmentProvidersPage } from "@/pages/settings/enrichment-providers";
 import { EnrichmentProviderDetailPage } from "@/pages/settings/enrichment-providers/detail";
 import { ApiKeysPage } from "@/pages/settings/api-keys";
 import { ApiKeyDetailPage } from "@/pages/settings/api-keys/detail";
+import { IndicatorMappingsPage } from "@/pages/settings/indicator-mappings";
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -42,6 +43,9 @@ const alertDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/alerts/$uuid",
   component: AlertDetailPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || "indicators",
+  }),
 });
 
 const workflowsRoute = createRoute({
@@ -62,58 +66,60 @@ const approvalsRoute = createRoute({
   component: ApprovalsPage,
 });
 
+// Manage routes
 const detectionRulesRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/settings/detection-rules",
+  path: "/manage/detection-rules",
   component: DetectionRulesPage,
 });
 
 const detectionRuleDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/settings/detection-rules/$uuid",
+  path: "/manage/detection-rules/$uuid",
   component: DetectionRuleDetailPage,
 });
 
 const contextDocsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/settings/context-docs",
+  path: "/manage/context-docs",
   component: ContextDocsPage,
 });
 
 const contextDocDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/settings/context-docs/$uuid",
+  path: "/manage/context-docs/$uuid",
   component: ContextDocDetailPage,
-});
-
-const sourcesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/sources",
-  component: SourcesPage,
 });
 
 const agentsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/settings/agents",
+  path: "/manage/agents",
   component: AgentsPage,
 });
 
 const agentDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/settings/agents/$uuid",
+  path: "/manage/agents/$uuid",
   component: AgentDetailPage,
 });
 
 const enrichmentProvidersRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/settings/enrichment-providers",
+  path: "/manage/enrichment-providers",
   component: EnrichmentProvidersPage,
 });
 
 const enrichmentProviderDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/settings/enrichment-providers/$uuid",
+  path: "/manage/enrichment-providers/$uuid",
   component: EnrichmentProviderDetailPage,
+});
+
+// Settings routes
+const sourcesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/alert-sources",
+  component: SourcesPage,
 });
 
 const apiKeysRoute = createRoute({
@@ -126,6 +132,12 @@ const apiKeyDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/api-keys/$uuid",
   component: ApiKeyDetailPage,
+});
+
+const indicatorMappingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/indicator-mappings",
+  component: IndicatorMappingsPage,
 });
 
 const routeTree = rootRoute.addChildren([
@@ -146,6 +158,7 @@ const routeTree = rootRoute.addChildren([
   agentDetailRoute,
   apiKeysRoute,
   apiKeyDetailRoute,
+  indicatorMappingsRoute,
 ]);
 
 export const router = createRouter({ routeTree });

@@ -286,7 +286,7 @@ export function AgentDetailPage() {
     <AppLayout title="Agent Detail">
       <div className="space-y-6">
         <DetailPageHeader
-          backTo="/settings/agents"
+          backTo="/manage/agents"
           title={agent.name}
           onRefresh={() => refetch()}
           isRefreshing={isFetching}

@@ -11,6 +11,7 @@ import {
   FileCode2,
   Microscope,
   LogOut,
+  MapPin,
 } from "lucide-react";
 
 const LOGO_PATH = "/logo.png";
@@ -25,13 +26,17 @@ const mainNav = [
   { to: "/approvals", icon: CheckCircle2, label: "Approvals" },
 ];
 
+const manageNav = [
+  { to: "/manage/agents", icon: Bot, label: "Agents" },
+  { to: "/manage/enrichment-providers", icon: Microscope, label: "Enrichments" },
+  { to: "/manage/detection-rules", icon: Radar, label: "Detection Rules" },
+  { to: "/manage/context-docs", icon: BookOpen, label: "Context Docs" },
+];
+
 const settingsNav = [
-  { to: "/settings/detection-rules", icon: Radar, label: "Detection Rules" },
-  { to: "/settings/context-docs", icon: BookOpen, label: "Context Docs" },
-  { to: "/settings/sources", icon: FileCode2, label: "Sources" },
-  { to: "/settings/enrichment-providers", icon: Microscope, label: "Enrichments" },
-  { to: "/settings/agents", icon: Bot, label: "Agents" },
   { to: "/settings/api-keys", icon: Key, label: "API Keys" },
+  { to: "/settings/alert-sources", icon: FileCode2, label: "Alert Sources" },
+  { to: "/settings/indicator-mappings", icon: MapPin, label: "Indicator Mappings" },
 ];
 
 export function Sidebar() {
@@ -68,6 +73,30 @@ export function Sidebar() {
             item.to === "/"
               ? pathname === "/"
               : pathname.startsWith(item.to);
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={cn(
+                "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+                active
+                  ? "bg-teal/15 text-teal-light"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          );
+        })}
+
+        <Separator className="my-3 bg-border" />
+
+        <div className="px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-dim">
+          Manage
+        </div>
+        {manageNav.map((item) => {
+          const active = pathname.startsWith(item.to);
           return (
             <Link
               key={item.to}

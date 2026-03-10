@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 import { severityColor, statusColor, maliceColor } from "@/lib/format";
 import { Shield, ArrowRight, Zap } from "lucide-react";
@@ -5,6 +6,32 @@ import { Shield, ArrowRight, Zap } from "lucide-react";
 interface ActivityEventReferencesProps {
   eventType: string;
   references: Record<string, unknown> | null;
+}
+
+function WorkflowLink({ name, uuid }: { name?: string; uuid?: string }) {
+  if (!name) return null;
+  if (uuid) {
+    return (
+      <Link
+        to="/workflows/$uuid"
+        params={{ uuid: String(uuid) }}
+        className="text-xs text-teal hover:underline"
+      >
+        {String(name)}
+      </Link>
+    );
+  }
+  return <span className="text-xs text-foreground">{String(name)}</span>;
+}
+
+function IndicatorBadge({ type, value }: { type?: unknown; value?: unknown }) {
+  if (!type || !value) return null;
+  const v = String(value);
+  return (
+    <Badge variant="outline" className="text-[10px] text-dim font-mono border-border max-w-48 truncate">
+      {String(type)}: {v.length > 30 ? v.slice(0, 30) + "..." : v}
+    </Badge>
+  );
 }
 
 export function ActivityEventReferences({ eventType, references }: ActivityEventReferencesProps) {
@@ -18,9 +45,9 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
         <div className="flex items-center gap-2 flex-wrap">
           <Shield className="h-3 w-3 text-teal shrink-0" />
           {r.source_name && <span className="text-xs text-foreground">{String(r.source_name)}</span>}
-          {r.indicator_count != null && (
-            <Badge variant="outline" className="text-[10px] text-teal bg-teal/10 border-teal/30">
-              {String(r.indicator_count)} indicators
+          {r.severity && (
+            <Badge variant="outline" className={`text-[10px] ${severityColor(String(r.severity))}`}>
+              {String(r.severity)}
             </Badge>
           )}
         </div>
@@ -97,12 +124,22 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
 
     case "alert_finding_added":
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {r.agent_name && (
             <span className="text-xs text-teal">{String(r.agent_name)}</span>
           )}
+          {r.confidence && (
+            <Badge variant="outline" className="text-[10px] text-foreground border-border">
+              {String(r.confidence)} confidence
+            </Badge>
+          )}
           {r.finding_id && (
             <span className="text-[10px] text-dim font-mono">{String(r.finding_id).slice(0, 8)}</span>
+          )}
+          {r.summary && (
+            <span className="text-[11px] text-dim italic truncate max-w-72">
+              {String(r.summary)}
+            </span>
           )}
         </div>
       );
@@ -149,7 +186,8 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
 
     case "workflow_executed":
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <WorkflowLink name={r.workflow_name as string} uuid={r.workflow_uuid as string} />
           <Badge
             variant="outline"
             className={`text-[10px] ${
@@ -160,6 +198,17 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
           >
             {r.status === "success" || r.success === true ? "Success" : "Failed"}
           </Badge>
+          {r.trigger_type && (
+            <Badge variant="outline" className="text-[10px] text-dim border-border">
+              {String(r.trigger_type)}
+            </Badge>
+          )}
+          <IndicatorBadge type={r.indicator_type} value={r.indicator_value} />
+          {r.approval_uuid && (
+            <Badge variant="outline" className="text-[10px] text-amber bg-amber/10 border-amber/30">
+              via approval
+            </Badge>
+          )}
           {r.duration_ms != null && (
             <span className="text-[10px] text-dim">{String(r.duration_ms)}ms</span>
           )}
@@ -172,13 +221,20 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
     case "workflow_approval_requested":
       return (
         <div className="flex items-center gap-2 flex-wrap">
+          <WorkflowLink name={r.workflow_name as string} uuid={r.workflow_uuid as string} />
+          {r.trigger_source && (
+            <Badge variant="outline" className="text-[10px] text-dim border-border">
+              {String(r.trigger_source)}
+            </Badge>
+          )}
+          <IndicatorBadge type={r.indicator_type} value={r.indicator_value} />
           {r.confidence != null && (
             <Badge variant="outline" className="text-[10px] text-foreground border-border">
               {String(r.confidence)} confidence
             </Badge>
           )}
-          {r.run_uuid && (
-            <span className="text-[10px] text-dim font-mono">{String(r.run_uuid).slice(0, 8)}</span>
+          {r.approval_uuid && (
+            <span className="text-[10px] text-dim font-mono">{String(r.approval_uuid).slice(0, 8)}</span>
           )}
           {r.reason && (
             <span className="text-[11px] text-dim italic truncate max-w-64">
@@ -190,7 +246,8 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
 
     case "workflow_approval_responded":
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <WorkflowLink name={r.workflow_name as string} uuid={r.workflow_uuid as string} />
           <Badge
             variant="outline"
             className={`text-[10px] ${
@@ -201,8 +258,61 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
           >
             {r.decision === "approved" ? "Approved" : "Rejected"}
           </Badge>
-          {r.responder_id && (
+          <IndicatorBadge type={r.indicator_type} value={r.indicator_value} />
+          {r.actor_key_prefix && (
+            <span className="text-[10px] text-dim">
+              by{" "}
+              <span className="font-mono">{String(r.actor_key_prefix)}...</span>
+              {r.actor_key_name && (
+                <span className="text-foreground ml-1">({String(r.actor_key_name)})</span>
+              )}
+            </span>
+          )}
+          {!r.actor_key_prefix && r.responder_id && (
             <span className="text-[10px] text-dim font-mono">{String(r.responder_id)}</span>
+          )}
+        </div>
+      );
+
+    case "alert_deduplicated":
+      return (
+        <div className="flex items-center gap-2 flex-wrap">
+          {r.duplicate_count != null && (
+            <Badge variant="outline" className="text-[10px] text-foreground border-border">
+              {String(r.duplicate_count)} duplicates
+            </Badge>
+          )}
+          {r.source_name && (
+            <span className="text-xs text-dim">{String(r.source_name)}</span>
+          )}
+          {r.fingerprint && (
+            <span className="text-[10px] text-dim font-mono">
+              {String(r.fingerprint).length > 16
+                ? String(r.fingerprint).slice(0, 16) + "..."
+                : String(r.fingerprint)}
+            </span>
+          )}
+        </div>
+      );
+
+    case "agent_webhook_dispatched":
+      return (
+        <div className="flex items-center gap-2 flex-wrap">
+          {r.agent_name && (
+            <span className="text-xs text-foreground">{String(r.agent_name)}</span>
+          )}
+          <Badge
+            variant="outline"
+            className={`text-[10px] ${
+              r.delivered === true
+                ? "text-teal bg-teal/10 border-teal/30"
+                : "text-red-threat bg-red-threat/10 border-red-threat/30"
+            }`}
+          >
+            {r.delivered === true ? "Delivered" : "Failed"}
+          </Badge>
+          {r.status_code != null && (
+            <span className="text-[10px] text-dim font-mono">HTTP {String(r.status_code)}</span>
           )}
         </div>
       );

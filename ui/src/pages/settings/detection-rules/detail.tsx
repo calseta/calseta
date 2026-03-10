@@ -182,7 +182,7 @@ export function DetectionRuleDetailPage() {
     <AppLayout title="Detection Rule">
       <div className="space-y-6">
         <DetailPageHeader
-          backTo="/settings/detection-rules"
+          backTo="/manage/detection-rules"
           title={rule.name}
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
