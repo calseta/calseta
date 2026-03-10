@@ -33,3 +33,4 @@ class WorkflowApprovalRequest(TimestampMixin, UUIDMixin, Base):
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     execution_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    decide_token: Mapped[str | None] = mapped_column(Text)

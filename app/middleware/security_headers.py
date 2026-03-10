@@ -62,6 +62,10 @@ _DOCS_CSP = (
 _API_PREFIXES = ("/v1/", "/health")
 _DOCS_PREFIXES = ("/redoc", "/openapi.json")
 
+# Browser-rendered HTML pages served under /v1/ that need the UI CSP
+# (inline styles, Google Fonts) rather than the strict API CSP.
+_BROWSER_PAGE_PATTERN = "/decide"
+
 _HSTS_VALUE = "max-age=63072000; includeSubDomains"
 
 
@@ -76,7 +80,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Use strict CSP for API routes, docs-specific CSP for Swagger/ReDoc,
         # and permissive CSP for the admin UI.
         path = request.url.path
-        if any(path.startswith(p) for p in _API_PREFIXES):
+        if path.endswith(_BROWSER_PAGE_PATTERN):
+            csp = _UI_CSP
+        elif any(path.startswith(p) for p in _API_PREFIXES):
             csp = _API_CSP
         elif any(path.startswith(p) for p in _DOCS_PREFIXES):
             csp = _DOCS_CSP

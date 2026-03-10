@@ -37,6 +37,7 @@ class ApprovalRequest:
     expires_at: datetime
     alert_uuid: UUID | None = None
     approval_channel: str | None = None
+    decide_token: str | None = None
     execution_result: dict[str, Any] | None = field(default=None)
 
 

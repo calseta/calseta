@@ -51,59 +51,107 @@ class TeamsApprovalNotifier(ApprovalNotifierBase):
         approve_url = f"{base_url}/v1/workflow-approvals/{request.approval_uuid}/approve"
         reject_url = f"{base_url}/v1/workflow-approvals/{request.approval_uuid}/reject"
 
+        # Browser-based approval URL (token-authenticated, no API key needed)
+        decide_url = ""
+        if request.decide_token:
+            decide_url = (
+                f"{base_url}/v1/approvals/{request.approval_uuid}"
+                f"/decide?token={request.decide_token}"
+            )
+
+        body: list[dict] = [
+            {
+                "type": "TextBlock",
+                "size": "Large",
+                "weight": "Bolder",
+                "text": (
+                    f"[{request.workflow_risk_level.upper()} RISK] "
+                    f"Workflow Approval Required"
+                ),
+                "wrap": True,
+            },
+            {
+                "type": "TextBlock",
+                "text": request.workflow_name,
+                "weight": "Bolder",
+                "wrap": True,
+            },
+            {
+                "type": "FactSet",
+                "facts": [
+                    {
+                        "title": "Indicator",
+                        "value": (
+                            f"{request.indicator_type}: "
+                            f"{request.indicator_value}"
+                        ),
+                    },
+                    {
+                        "title": "Trigger",
+                        "value": request.trigger_source,
+                    },
+                    {
+                        "title": "Confidence",
+                        "value": confidence_pct,
+                    },
+                    {
+                        "title": "Risk Level",
+                        "value": request.workflow_risk_level,
+                    },
+                    {
+                        "title": "Expires",
+                        "value": request.expires_at.strftime(
+                            "%Y-%m-%d %H:%M UTC"
+                        ),
+                    },
+                ],
+            },
+            {
+                "type": "TextBlock",
+                "text": f"**Agent reason:** {request.reason}",
+                "wrap": True,
+            },
+        ]
+
+        actions: list[dict] = []
+
+        # Primary: browser-based approval (no API key needed)
+        if decide_url:
+            actions.append({
+                "type": "Action.OpenUrl",
+                "title": "Review & Decide",
+                "url": decide_url,
+                "style": "positive",
+            })
+
+        # Fallback: REST API links as secondary actions
+        actions.extend([
+            {
+                "type": "Action.OpenUrl",
+                "title": "Approve via API",
+                "url": approve_url,
+            },
+            {
+                "type": "Action.OpenUrl",
+                "title": "Reject via API",
+                "url": reject_url,
+            },
+        ])
+
+        card_content: dict = {
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "type": "AdaptiveCard",
+            "version": "1.4",
+            "body": body,
+            "actions": actions,
+        }
+
         return {
             "type": "message",
             "attachments": [
                 {
                     "contentType": "application/vnd.microsoft.card.adaptive",
-                    "content": {
-                        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                        "type": "AdaptiveCard",
-                        "version": "1.4",
-                        "body": [
-                            {
-                                "type": "TextBlock",
-                                "size": "Large",
-                                "weight": "Bolder",
-                                "text": (
-                                    f"[{request.workflow_risk_level.upper()} RISK] "
-                                    f"Workflow Approval Required"
-                                ),
-                                "wrap": True,
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": request.workflow_name,
-                                "weight": "Bolder",
-                                "wrap": True,
-                            },
-                            {
-                                "type": "FactSet",
-                                "facts": [
-                                    {"title": "Indicator", "value": f"{request.indicator_type}: {request.indicator_value}"},
-                                    {"title": "Trigger", "value": request.trigger_source},
-                                    {"title": "Confidence", "value": confidence_pct},
-                                    {"title": "Risk Level", "value": request.workflow_risk_level},
-                                    {"title": "Expires", "value": request.expires_at.strftime("%Y-%m-%d %H:%M UTC")},
-                                ],
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": f"**Agent reason:** {request.reason}",
-                                "wrap": True,
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": (
-                                    f"**To respond to this request:**\n\n"
-                                    f"`POST {approve_url}`\n\n"
-                                    f"`POST {reject_url}`"
-                                ),
-                                "wrap": True,
-                                "isSubtle": True,
-                            },
-                        ],
-                    },
+                    "content": card_content,
                 }
             ],
         }

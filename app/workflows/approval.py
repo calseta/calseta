@@ -21,6 +21,7 @@ Decision processing:
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -63,6 +64,8 @@ async def create_approval_request(
     )
     expires_at = datetime.now(UTC) + timedelta(seconds=timeout_seconds)
 
+    decide_token = secrets.token_urlsafe(32)
+
     request = WAR(
         uuid=uuid.uuid4(),
         workflow_id=workflow.id,
@@ -75,6 +78,7 @@ async def create_approval_request(
         notifier_channel=workflow.approval_channel,
         status="pending",
         expires_at=expires_at,
+        decide_token=decide_token,
     )
     db.add(request)
     await db.flush()
@@ -87,6 +91,8 @@ async def process_approval_decision(
     approved: bool,
     responder_id: str | None,
     db: AsyncSession,
+    actor_key_prefix: str | None = None,
+    actor_key_name: str | None = None,
 ) -> WorkflowApprovalRequest:
     """
     Process an approve or reject decision on a pending approval request.
@@ -143,23 +149,36 @@ async def process_approval_decision(
 
     # Activity event: workflow_approval_responded
     try:
+        from app.db.models.workflow import Workflow
         from app.schemas.activity_events import ActivityEventType
         from app.services.activity_event import ActivityEventService
 
         tc = request.trigger_context or {}
+        refs: dict = {
+            "approval_uuid": str(approval_uuid),
+            "decision": "approved" if approved else "rejected",
+            "responder_id": responder_id,
+            "indicator_type": tc.get("indicator_type"),
+            "indicator_value": tc.get("indicator_value"),
+            "actor_key_prefix": actor_key_prefix,
+            "actor_key_name": actor_key_name,
+        }
+        # Load workflow name/uuid for richer activity display
+        wf_result = await db.execute(
+            select(Workflow.uuid, Workflow.name).where(Workflow.id == request.workflow_id)
+        )
+        wf_row = wf_result.one_or_none()
+        if wf_row:
+            refs["workflow_uuid"] = str(wf_row.uuid)
+            refs["workflow_name"] = wf_row.name
+
         activity_svc = ActivityEventService(db)
         await activity_svc.write(
             ActivityEventType.WORKFLOW_APPROVAL_RESPONDED,
             actor_type="api",
             workflow_id=request.workflow_id,
             alert_id=tc.get("alert_id"),
-            references={
-                "approval_uuid": str(approval_uuid),
-                "decision": "approved" if approved else "rejected",
-                "responder_id": responder_id,
-                "indicator_type": tc.get("indicator_type"),
-                "indicator_value": tc.get("indicator_value"),
-            },
+            references=refs,
         )
     except Exception:
         pass  # Never break the approval flow for audit events

@@ -317,6 +317,7 @@ async def send_approval_notification_task(approval_request_id: int) -> None:
                 confidence=approval.confidence,
                 expires_at=approval.expires_at,
                 approval_channel=approval.notifier_channel,
+                decide_token=approval.decide_token,
             )
 
             notifier = get_approval_notifier(settings)

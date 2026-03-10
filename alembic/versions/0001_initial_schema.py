@@ -767,6 +767,7 @@ def upgrade() -> None:
         sa.Column(
             "execution_result", postgresql.JSONB(astext_type=sa.Text()), nullable=True
         ),
+        sa.Column("decide_token", sa.Text(), nullable=True),
         sa.ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
             ["workflow_run_id"], ["workflow_runs.id"], ondelete="SET NULL"

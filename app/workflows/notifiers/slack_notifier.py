@@ -44,12 +44,15 @@ class SlackApprovalNotifier(ApprovalNotifierBase):
             or "#general"
         )
 
+    def _base_url(self) -> str:
+        return getattr(self._cfg, "CALSETA_BASE_URL", "http://localhost:8000").rstrip("/")
+
     def _build_approval_blocks(self, request: ApprovalRequest) -> list[dict]:
         confidence_pct = f"{request.confidence * 100:.0f}%"
         approve_action = f"approve:{request.approval_uuid}"
         reject_action = f"reject:{request.approval_uuid}"
 
-        return [
+        blocks: list[dict] = [
             {
                 "type": "header",
                 "text": {
@@ -94,6 +97,25 @@ class SlackApprovalNotifier(ApprovalNotifierBase):
                 ],
             },
         ]
+
+        # Browser-based approval fallback link
+        if request.decide_token:
+            base_url = self._base_url()
+            decide_url = (
+                f"{base_url}/v1/approvals/{request.approval_uuid}"
+                f"/decide?token={request.decide_token}"
+            )
+            blocks.append({
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"Or <{decide_url}|decide via browser>",
+                    }
+                ],
+            })
+
+        return blocks
 
     async def send_approval_request(self, request: ApprovalRequest) -> str:
         """
