@@ -163,6 +163,34 @@
 .markdown-preview pre { background: #0a0e14; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.75em 1em; overflow-x: auto; margin: 0.75em 0; }
 .markdown-preview pre code { background: none; padding: 0; font-size: 0.8em; }
 
+/* react-grid-layout overrides */
+.dashboard-grid .react-grid-item.react-grid-placeholder {
+  background: rgba(77, 125, 113, 0.15);
+  border: 1px dashed rgba(77, 125, 113, 0.4);
+  border-radius: 0.5rem;
+  opacity: 1;
+}
+.dashboard-grid .react-grid-item > .react-resizable-handle {
+  width: 14px;
+  height: 14px;
+}
+.dashboard-grid .react-grid-item > .react-resizable-handle::after {
+  border-color: #57635F;
+  width: 6px;
+  height: 6px;
+  right: 4px;
+  bottom: 4px;
+}
+.dashboard-grid .react-grid-item:hover > .react-resizable-handle::after {
+  border-color: #4D7D71;
+}
+.dashboard-grid .react-grid-item.react-draggable-dragging {
+  z-index: 50;
+  opacity: 0.9;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border-radius: 0.5rem;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

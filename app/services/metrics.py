@@ -13,8 +13,12 @@ from typing import Any
 from sqlalchemy import extract, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models.agent_registration import AgentRegistration
 from app.db.models.alert import Alert
+from app.db.models.context_document import ContextDocument
 from app.db.models.detection_rule import DetectionRule
+from app.db.models.enrichment_provider import EnrichmentProvider
+from app.db.models.indicator_field_mapping import IndicatorFieldMapping
 from app.db.models.workflow import Workflow
 from app.db.models.workflow_approval_request import WorkflowApprovalRequest
 from app.db.models.workflow_run import WorkflowRun
@@ -22,6 +26,7 @@ from app.schemas.metrics import (
     AlertMetricsResponse,
     MetricsSummaryAlerts,
     MetricsSummaryApprovals,
+    MetricsSummaryPlatform,
     MetricsSummaryResponse,
     MetricsSummaryWorkflows,
     WorkflowMetricsResponse,
@@ -527,6 +532,58 @@ async def compute_metrics_summary(db: AsyncSession) -> MetricsSummaryResponse:
     mttc_seconds: float | None = float(mttc_raw) if mttc_raw is not None else None
 
     # ------------------------------------------------------------------
+    # Alert: by_status
+    # ------------------------------------------------------------------
+    status_result = await db.execute(
+        select(Alert.status, func.count(Alert.id))
+        .where(Alert.created_at >= from_time)
+        .group_by(Alert.status)
+    )
+    by_status: dict[str, int] = {row[0]: row[1] for row in status_result.all()}
+
+    # ------------------------------------------------------------------
+    # Alert: by_source
+    # ------------------------------------------------------------------
+    source_result = await db.execute(
+        select(Alert.source_name, func.count(Alert.id))
+        .where(Alert.created_at >= from_time)
+        .group_by(Alert.source_name)
+    )
+    by_source: dict[str, int] = {row[0]: row[1] for row in source_result.all()}
+
+    # ------------------------------------------------------------------
+    # Alert: enrichment_coverage — enriched / total
+    # ------------------------------------------------------------------
+    if total > 0:
+        enriched_count_result = await db.execute(
+            select(func.count(Alert.id)).where(
+                Alert.created_at >= from_time,
+                Alert.is_enriched.is_(True),
+            )
+        )
+        enriched_count: int = enriched_count_result.scalar_one() or 0
+        enrichment_coverage = enriched_count / total
+    else:
+        enrichment_coverage = 0.0
+
+    # ------------------------------------------------------------------
+    # Alert: mean_time_to_enrich — AVG(enriched_at - ingested_at)
+    # ------------------------------------------------------------------
+    mtte_result = await db.execute(
+        select(
+            func.avg(extract("epoch", Alert.enriched_at - Alert.ingested_at))
+        ).where(
+            Alert.created_at >= from_time,
+            Alert.is_enriched.is_(True),
+            Alert.enriched_at.is_not(None),
+        )
+    )
+    mtte_raw = mtte_result.scalar_one()
+    mean_time_to_enrich_seconds: float | None = (
+        float(mtte_raw) if mtte_raw is not None else None
+    )
+
+    # ------------------------------------------------------------------
     # Workflows: total_configured (active only)
     # ------------------------------------------------------------------
     wf_total_result = await db.execute(
@@ -640,12 +697,84 @@ async def compute_metrics_summary(db: AsyncSession) -> MetricsSummaryResponse:
         float(median_raw) if median_raw is not None else None
     )
 
+    # ------------------------------------------------------------------
+    # Platform: context_documents — count all
+    # ------------------------------------------------------------------
+    ctx_docs_result = await db.execute(
+        select(func.count(ContextDocument.id))
+    )
+    platform_context_documents: int = ctx_docs_result.scalar_one() or 0
+
+    # ------------------------------------------------------------------
+    # Platform: detection_rules — count all
+    # ------------------------------------------------------------------
+    det_rules_result = await db.execute(
+        select(func.count(DetectionRule.id))
+    )
+    platform_detection_rules: int = det_rules_result.scalar_one() or 0
+
+    # ------------------------------------------------------------------
+    # Platform: enrichment_providers — count active
+    # ------------------------------------------------------------------
+    ep_result = await db.execute(
+        select(func.count(EnrichmentProvider.id)).where(
+            EnrichmentProvider.is_active.is_(True)
+        )
+    )
+    platform_enrichment_providers: int = ep_result.scalar_one() or 0
+
+    # ------------------------------------------------------------------
+    # Platform: enrichment_providers_by_indicator_type — unnest active
+    # ------------------------------------------------------------------
+    ep_by_type_result = await db.execute(
+        text("""
+            SELECT t.indicator_type, COUNT(DISTINCT ep.id)
+            FROM enrichment_providers ep,
+                 unnest(ep.supported_indicator_types) AS t(indicator_type)
+            WHERE ep.is_active = true
+            GROUP BY t.indicator_type
+        """)
+    )
+    enrichment_providers_by_indicator_type: dict[str, int] = {
+        row[0]: row[1] for row in ep_by_type_result.all()
+    }
+
+    # ------------------------------------------------------------------
+    # Platform: agents — count active
+    # ------------------------------------------------------------------
+    agents_result = await db.execute(
+        select(func.count(AgentRegistration.id)).where(
+            AgentRegistration.is_active.is_(True)
+        )
+    )
+    platform_agents: int = agents_result.scalar_one() or 0
+
+    # ------------------------------------------------------------------
+    # Platform: workflows — count all (any state)
+    # ------------------------------------------------------------------
+    wf_all_result = await db.execute(
+        select(func.count(Workflow.id))
+    )
+    platform_workflows: int = wf_all_result.scalar_one() or 0
+
+    # ------------------------------------------------------------------
+    # Platform: indicator_mappings — count all
+    # ------------------------------------------------------------------
+    ifm_result = await db.execute(
+        select(func.count(IndicatorFieldMapping.id))
+    )
+    platform_indicator_mappings: int = ifm_result.scalar_one() or 0
+
     return MetricsSummaryResponse(
         period="last_30_days",
         alerts=MetricsSummaryAlerts(
             total=total,
             active=active,
             by_severity=by_severity,
+            by_status=by_status,
+            by_source=by_source,
+            enrichment_coverage=enrichment_coverage,
+            mean_time_to_enrich_seconds=mean_time_to_enrich_seconds,
             false_positive_rate=false_positive_rate,
             mttd_seconds=mttd_seconds,
             mtta_seconds=mtta_seconds,
@@ -663,5 +792,14 @@ async def compute_metrics_summary(db: AsyncSession) -> MetricsSummaryResponse:
             approved_last_30_days=ap_approved,
             approval_rate=approval_rate,
             median_response_time_minutes=median_response_time_minutes,
+        ),
+        platform=MetricsSummaryPlatform(
+            context_documents=platform_context_documents,
+            detection_rules=platform_detection_rules,
+            enrichment_providers=platform_enrichment_providers,
+            enrichment_providers_by_indicator_type=enrichment_providers_by_indicator_type,
+            agents=platform_agents,
+            workflows=platform_workflows,
+            indicator_mappings=platform_indicator_mappings,
         ),
     )

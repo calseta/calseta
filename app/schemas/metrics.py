@@ -12,6 +12,10 @@ class MetricsSummaryAlerts(BaseModel):
     total: int
     active: int
     by_severity: dict[str, int]
+    by_status: dict[str, int]
+    by_source: dict[str, int]
+    enrichment_coverage: float
+    mean_time_to_enrich_seconds: float | None
     false_positive_rate: float
     mttd_seconds: float | None
     mtta_seconds: float | None
@@ -33,11 +37,22 @@ class MetricsSummaryApprovals(BaseModel):
     median_response_time_minutes: float | None
 
 
+class MetricsSummaryPlatform(BaseModel):
+    context_documents: int
+    detection_rules: int
+    enrichment_providers: int
+    enrichment_providers_by_indicator_type: dict[str, int]
+    agents: int
+    workflows: int
+    indicator_mappings: int
+
+
 class MetricsSummaryResponse(BaseModel):
     period: str = "last_30_days"
     alerts: MetricsSummaryAlerts
     workflows: MetricsSummaryWorkflows
     approvals: MetricsSummaryApprovals
+    platform: MetricsSummaryPlatform
 
 
 class WorkflowMetricsResponse(BaseModel):

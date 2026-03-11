@@ -1,7 +1,9 @@
+import { type ReactNode, useMemo } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMetricsSummary, useApprovals } from "@/hooks/use-api";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { formatSeconds, formatPercent } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,6 +17,14 @@ import {
   Timer,
   Target,
   RefreshCw,
+  FileText,
+  Shield,
+  Search,
+  Bot,
+  Link,
+  Hourglass,
+  Activity,
+  RotateCcw,
 } from "lucide-react";
 import {
   BarChart,
@@ -25,6 +35,8 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { Responsive, useContainerWidth } from "react-grid-layout";
+import "react-grid-layout/css/styles.css";
 
 const severityColors: Record<string, string> = {
   Critical: "#EA591B",
@@ -35,22 +47,72 @@ const severityColors: Record<string, string> = {
   Pending: "#1e2a25",
 };
 
+const statusColors: Record<string, string> = {
+  Open: "#EA591B",
+  Triaging: "#FFBB1A",
+  Escalated: "#4D7D71",
+  Closed: "#57635F",
+};
+
+const SEVERITY_ORDER = ["Critical", "High", "Medium", "Low", "Informational", "Pending"];
+const STATUS_ORDER = ["Open", "Triaging", "Escalated", "Closed"];
+
+const tooltipStyle = {
+  backgroundColor: "#0d1117",
+  border: "1px solid #1e2a25",
+  borderRadius: 8,
+  color: "#CCD0CF",
+  fontSize: 12,
+};
+
 export function DashboardPage() {
   const { data: metricsResp, isLoading: metricsLoading, refetch, isFetching } = useMetricsSummary();
   const { data: approvalsResp } = useApprovals("pending");
+  const { layout, handleLayoutChange, resetLayout } = useDashboardLayout();
+  const { width, containerRef, mounted } = useContainerWidth({ initialWidth: 1200 });
 
   const metrics = metricsResp?.data;
   const pendingApprovals = approvalsResp?.data?.length ?? 0;
 
-  const severityData = metrics
-    ? Object.entries(metrics.alerts.by_severity)
-        .map(([name, value]) => ({ name, value }))
-        .sort(
-          (a, b) =>
-            ["Critical", "High", "Medium", "Low", "Informational", "Pending"].indexOf(a.name) -
-            ["Critical", "High", "Medium", "Low", "Informational", "Pending"].indexOf(b.name),
-        )
-    : [];
+  const severityData = useMemo(
+    () =>
+      metrics
+        ? Object.entries(metrics.alerts.by_severity)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => SEVERITY_ORDER.indexOf(a.name) - SEVERITY_ORDER.indexOf(b.name))
+        : [],
+    [metrics],
+  );
+
+  const statusData = useMemo(
+    () =>
+      metrics
+        ? Object.entries(metrics.alerts.by_status ?? {})
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => STATUS_ORDER.indexOf(a.name) - STATUS_ORDER.indexOf(b.name))
+        : [],
+    [metrics],
+  );
+
+  const sourceData = useMemo(
+    () =>
+      metrics
+        ? Object.entries(metrics.alerts.by_source ?? {})
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+        : [],
+    [metrics],
+  );
+
+  const providerByTypeData = useMemo(
+    () =>
+      metrics
+        ? Object.entries(metrics.platform?.enrichment_providers_by_indicator_type ?? {})
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+        : [],
+    [metrics],
+  );
 
   if (metricsLoading) {
     return (
@@ -69,10 +131,210 @@ export function DashboardPage() {
     );
   }
 
+  // Build card map: id → rendered content
+  const cards: Record<string, ReactNode> = {
+    // Platform stats
+    "ctx-docs": (
+      <StatCard icon={FileText} label="Context Docs" value={metrics?.platform?.context_documents ?? 0} />
+    ),
+    "det-rules": (
+      <StatCard icon={Shield} label="Detection Rules" value={metrics?.platform?.detection_rules ?? 0} />
+    ),
+    "enrich-prov": (
+      <StatCard icon={Search} label="Enrichment Providers" value={metrics?.platform?.enrichment_providers ?? 0} />
+    ),
+    agents: <StatCard icon={Bot} label="Agents" value={metrics?.platform?.agents ?? 0} />,
+    "workflows-count": (
+      <StatCard icon={Workflow} label="Workflows" value={metrics?.platform?.workflows ?? 0} />
+    ),
+    "ind-maps": (
+      <StatCard icon={Link} label="Indicator Mappings" value={metrics?.platform?.indicator_mappings ?? 0} />
+    ),
+
+    // Alert KPIs
+    "total-alerts": (
+      <KpiCard
+        icon={ShieldAlert}
+        label="Total Alerts"
+        value={metrics?.alerts.total ?? 0}
+        sub={`${metrics?.alerts.active ?? 0} active`}
+      />
+    ),
+    mttd: (
+      <KpiCard
+        icon={Clock}
+        label="MTTD"
+        value={formatSeconds(metrics?.alerts.mttd_seconds ?? null)}
+        sub="Mean Time to Detect"
+      />
+    ),
+    mtta: (
+      <KpiCard
+        icon={Timer}
+        label="MTTA"
+        value={formatSeconds(metrics?.alerts.mtta_seconds ?? null)}
+        sub="Mean Time to Acknowledge"
+      />
+    ),
+    mttt: (
+      <KpiCard
+        icon={Hourglass}
+        label="MTTT"
+        value={formatSeconds(metrics?.alerts.mttt_seconds ?? null)}
+        sub="Mean Time to Triage"
+      />
+    ),
+    mttc: (
+      <KpiCard
+        icon={Target}
+        label="MTTC"
+        value={formatSeconds(metrics?.alerts.mttc_seconds ?? null)}
+        sub="Mean Time to Conclusion"
+      />
+    ),
+
+    // Ops KPIs
+    "wf-exec": (
+      <KpiCard
+        icon={Workflow}
+        label="Workflow Executions"
+        value={metrics?.workflows.executions ?? 0}
+        sub={`${formatPercent(metrics?.workflows.success_rate ?? 0)} success`}
+      />
+    ),
+    "time-saved": (
+      <KpiCard
+        icon={TrendingUp}
+        label="Time Saved"
+        value={`${(metrics?.workflows.estimated_time_saved_hours ?? 0).toFixed(1)}h`}
+        sub="Estimated via workflows"
+      />
+    ),
+    "fp-rate": (
+      <KpiCard
+        icon={AlertTriangle}
+        label="False Positive Rate"
+        value={formatPercent(metrics?.alerts.false_positive_rate ?? 0)}
+        sub="Last 30 days"
+      />
+    ),
+    "enrich-cov": (
+      <KpiCard
+        icon={Activity}
+        label="Enrichment Coverage"
+        value={formatPercent(metrics?.alerts.enrichment_coverage ?? 0)}
+        sub="Alerts enriched"
+      />
+    ),
+    "pending-approvals": (
+      <KpiCard
+        icon={CheckCircle2}
+        label="Pending Approvals"
+        value={pendingApprovals}
+        sub={`${formatPercent(metrics?.approvals.approval_rate ?? 0)} approval rate`}
+        highlight={pendingApprovals > 0}
+      />
+    ),
+
+    // Charts
+    "sev-chart": (
+      <ChartCard title="Alerts by Severity" empty={severityData.length === 0} emptyText="No alert data yet">
+        <BarChart data={severityData} barSize={32}>
+          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            {severityData.map((entry) => (
+              <Cell key={entry.name} fill={severityColors[entry.name] ?? "#57635F"} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ChartCard>
+    ),
+    "status-chart": (
+      <ChartCard title="Alerts by Status" empty={statusData.length === 0} emptyText="No alert data yet">
+        <BarChart data={statusData} barSize={32}>
+          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            {statusData.map((entry) => (
+              <Cell key={entry.name} fill={statusColors[entry.name] ?? "#57635F"} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ChartCard>
+    ),
+    "source-chart": (
+      <ChartCard title="Alerts by Source" empty={sourceData.length === 0} emptyText="No source data yet">
+        <BarChart data={sourceData} barSize={32}>
+          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#4D7D71" />
+        </BarChart>
+      </ChartCard>
+    ),
+    "provider-type-chart": (
+      <ChartCard
+        title="Enrichment Providers by Indicator Type"
+        empty={providerByTypeData.length === 0}
+        emptyText="No enrichment provider data yet"
+      >
+        <BarChart data={providerByTypeData} barSize={32}>
+          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} allowDecimals={false} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#4D7D71" />
+        </BarChart>
+      </ChartCard>
+    ),
+
+    // Workflow performance
+    "wf-perf": (
+      <Card className="bg-card border-border h-full">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Workflow Performance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            <StatRow label="Total Configured" value={metrics?.workflows.total_configured ?? 0} />
+            <StatRow label="Executions (30d)" value={metrics?.workflows.executions ?? 0} />
+            <StatRow label="Success Rate" value={formatPercent(metrics?.workflows.success_rate ?? 0)} />
+            <StatRow label="Approvals (30d)" value={metrics?.approvals.approved_last_30_days ?? 0} />
+            <StatRow
+              label="Median Approval Time"
+              value={
+                metrics?.approvals.median_response_time_minutes != null
+                  ? `${metrics.approvals.median_response_time_minutes.toFixed(1)} min`
+                  : "--"
+              }
+            />
+            <StatRow
+              label="Mean Time to Enrich"
+              value={formatSeconds(metrics?.alerts.mean_time_to_enrich_seconds ?? null)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+    ),
+  };
+
   return (
     <AppLayout title="Dashboard">
-      <div className="space-y-6">
-        <div className="flex justify-end">
+      <div className="space-y-2">
+        <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetLayout}
+            className="h-8 px-2 text-dim hover:text-teal text-xs gap-1"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset layout
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -84,149 +346,83 @@ export function DashboardPage() {
           </Button>
         </div>
 
-        {/* KPI Cards — Row 1 */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            icon={ShieldAlert}
-            label="Total Alerts"
-            value={metrics?.alerts.total ?? 0}
-            sub={`${metrics?.alerts.active ?? 0} active`}
-          />
-          <KpiCard
-            icon={Clock}
-            label="MTTD"
-            value={formatSeconds(metrics?.alerts.mttd_seconds ?? null)}
-            sub="Mean Time to Detect"
-          />
-          <KpiCard
-            icon={Timer}
-            label="MTTA"
-            value={formatSeconds(metrics?.alerts.mtta_seconds ?? null)}
-            sub="Mean Time to Acknowledge"
-          />
-          <KpiCard
-            icon={Target}
-            label="MTTC"
-            value={formatSeconds(metrics?.alerts.mttc_seconds ?? null)}
-            sub="Mean Time to Conclusion"
-          />
-        </div>
-
-        {/* KPI Cards — Row 2 */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            icon={Workflow}
-            label="Workflow Executions"
-            value={metrics?.workflows.executions ?? 0}
-            sub={`${formatPercent(metrics?.workflows.success_rate ?? 0)} success`}
-          />
-          <KpiCard
-            icon={TrendingUp}
-            label="Time Saved"
-            value={`${(metrics?.workflows.estimated_time_saved_hours ?? 0).toFixed(1)}h`}
-            sub="Estimated via workflows"
-          />
-          <KpiCard
-            icon={AlertTriangle}
-            label="False Positive Rate"
-            value={formatPercent(metrics?.alerts.false_positive_rate ?? 0)}
-            sub="Last 30 days"
-          />
-          <KpiCard
-            icon={CheckCircle2}
-            label="Pending Approvals"
-            value={pendingApprovals}
-            sub={`${formatPercent(metrics?.approvals.approval_rate ?? 0)} approval rate`}
-            highlight={pendingApprovals > 0}
-          />
-        </div>
-
-        {/* Charts */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Alerts by Severity
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {severityData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={severityData} barSize={32}>
-                    <XAxis
-                      dataKey="name"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: "#57635F", fontSize: 11 }}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: "#57635F", fontSize: 11 }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#0d1117",
-                        border: "1px solid #1e2a25",
-                        borderRadius: 8,
-                        color: "#CCD0CF",
-                        fontSize: 12,
-                      }}
-                    />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                      {severityData.map((entry) => (
-                        <Cell
-                          key={entry.name}
-                          fill={severityColors[entry.name] ?? "#57635F"}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-[260px] items-center justify-center text-sm text-dim">
-                  No alert data yet
+        <div ref={containerRef} className="w-full">
+          {mounted && (
+            <Responsive
+              className="dashboard-grid"
+              width={width}
+              layouts={{ lg: layout }}
+              breakpoints={{ lg: 1024, md: 768, sm: 480 }}
+              cols={{ lg: 12, md: 6, sm: 2 }}
+              rowHeight={80}
+              margin={[12, 12]}
+              containerPadding={[0, 0]}
+              isDraggable
+              isResizable
+              draggableHandle=".drag-handle"
+              onLayoutChange={(current) => handleLayoutChange(current)}
+              useCSSTransforms
+            >
+              {layout.map((item) => (
+                <div key={item.i} className="group relative">
+                  <div className="drag-handle absolute top-1 right-1 z-10 flex h-6 w-6 cursor-grab items-center justify-center rounded-md opacity-0 transition-opacity group-hover:opacity-100 hover:bg-teal/10 active:cursor-grabbing">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-dim group-hover:text-teal"
+                    >
+                      <circle cx="9" cy="5" r="1" />
+                      <circle cx="9" cy="12" r="1" />
+                      <circle cx="9" cy="19" r="1" />
+                      <circle cx="15" cy="5" r="1" />
+                      <circle cx="15" cy="12" r="1" />
+                      <circle cx="15" cy="19" r="1" />
+                    </svg>
+                  </div>
+                  {cards[item.i]}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Workflow Performance
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Stat
-                label="Total Configured"
-                value={metrics?.workflows.total_configured ?? 0}
-              />
-              <Stat
-                label="Executions (30d)"
-                value={metrics?.workflows.executions ?? 0}
-              />
-              <Stat
-                label="Success Rate"
-                value={formatPercent(metrics?.workflows.success_rate ?? 0)}
-              />
-              <Stat
-                label="Approvals (30d)"
-                value={metrics?.approvals.approved_last_30_days ?? 0}
-              />
-              <Stat
-                label="Median Approval Time"
-                value={
-                  metrics?.approvals.median_response_time_minutes != null
-                    ? `${metrics.approvals.median_response_time_minutes.toFixed(1)} min`
-                    : "--"
-                }
-              />
-            </CardContent>
-          </Card>
+              ))}
+            </Responsive>
+          )}
         </div>
       </div>
     </AppLayout>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <Card className="bg-card border-border hover:border-teal/20 transition-colors h-full">
+      <CardContent className="flex items-center gap-2.5 p-3 h-full">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-teal/10">
+          <Icon className="h-3.5 w-3.5 text-teal" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[10px] text-muted-foreground truncate leading-tight">{label}</p>
+          <p className="text-base font-heading font-extrabold tracking-tight text-foreground">
+            {value}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -244,34 +440,63 @@ function KpiCard({
   highlight?: boolean;
 }) {
   return (
-    <Card className="bg-card border-border hover:border-teal/30 transition-colors">
-      <CardContent className="p-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal/10">
-            <Icon className="h-4.5 w-4.5 text-teal" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground truncate">{label}</p>
-            <p
-              className={`text-xl font-heading font-extrabold tracking-tight ${
-                highlight ? "text-amber" : "text-foreground"
-              }`}
-            >
-              {value}
-            </p>
-            <p className="text-[11px] text-dim truncate">{sub}</p>
-          </div>
+    <Card className="bg-card border-border hover:border-teal/30 transition-colors h-full">
+      <CardContent className="flex items-center gap-3 p-5 h-full">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal/10">
+          <Icon className="h-4.5 w-4.5 text-teal" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground truncate">{label}</p>
+          <p
+            className={`text-xl font-heading font-extrabold tracking-tight ${
+              highlight ? "text-amber" : "text-foreground"
+            }`}
+          >
+            {value}
+          </p>
+          <p className="text-[11px] text-dim truncate">{sub}</p>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function ChartCard({
+  title,
+  empty,
+  emptyText,
+  children,
+}: {
+  title: string;
+  empty: boolean;
+  emptyText: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium text-foreground">{value}</span>
+    <Card className="bg-card border-border h-full flex flex-col">
+      <CardHeader className="pb-2 shrink-0">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex-1 min-h-0">
+        {!empty ? (
+          <ResponsiveContainer width="100%" height="100%">
+            {children as React.ReactElement}
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex h-full items-center justify-center text-sm text-dim">
+            {emptyText}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatRow({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="text-center">
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      <p className="text-lg font-heading font-extrabold tracking-tight text-foreground">{value}</p>
     </div>
   );
 }
