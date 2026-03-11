@@ -12,10 +12,13 @@ requests to the API. Use CORS_ALLOWED_ORIGINS with specific origins.
 
 from __future__ import annotations
 
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+
+logger = structlog.get_logger(__name__)
 
 
 def setup_cors(app: FastAPI) -> None:
@@ -26,6 +29,14 @@ def setup_cors(app: FastAPI) -> None:
     CORS is added in the correct stack position (outer = before auth).
     """
     if settings.CORS_ALLOW_ALL_ORIGINS:
+        logger.warning(
+            "cors_allow_all_origins_enabled",
+            msg=(
+                "CORS_ALLOW_ALL_ORIGINS is enabled — all origins can make "
+                "cross-origin requests. This is intended for local development "
+                "only. Set CORS_ALLOWED_ORIGINS to specific origins in production."
+            ),
+        )
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],

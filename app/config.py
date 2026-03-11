@@ -259,6 +259,11 @@ class Settings(BaseSettings):
     TEAMS_WEBHOOK_URL: str = ""
 
     # ------------------------------------------------------------------
+    # Workflow Resource Limits
+    # ------------------------------------------------------------------
+    WORKFLOW_MAX_MEMORY_MB: int = 256  # Max virtual memory per workflow execution
+
+    # ------------------------------------------------------------------
     # Sandbox
     # ------------------------------------------------------------------
     ENRICHMENT_MOCK_MODE: bool = False

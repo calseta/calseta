@@ -196,6 +196,7 @@ async def execute_workflow(
             code=workflow.code,
             ctx=ctx,
             timeout=workflow.timeout_seconds,
+            max_memory_mb=settings.WORKFLOW_MAX_MEMORY_MB,
         )
 
     duration_ms = int(time.monotonic() * 1000) - start_ms

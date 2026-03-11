@@ -16,10 +16,16 @@ from __future__ import annotations
 
 import asyncio
 import builtins
+import contextlib
+import resource as _resource
 import traceback
 from typing import Any
 
+import structlog
+
 from app.workflows.context import WorkflowContext, WorkflowResult
+
+logger = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Allowed modules (must match _ALLOWED_IMPORTS in workflow_ast.py)
@@ -123,6 +129,53 @@ _SAFE_BUILTINS["__import__"] = _restricted_import
 
 
 # ---------------------------------------------------------------------------
+# Resource limits — memory ceiling for workflow execution
+# ---------------------------------------------------------------------------
+
+
+def _set_memory_limit(max_bytes: int) -> tuple[int, tuple[int, int]] | None:
+    """Set a virtual memory ceiling and return (rlimit_const, previous_limit), or None.
+
+    On Linux, uses RLIMIT_AS (virtual address space).
+    On macOS, RLIMIT_AS is not available; falls back to RLIMIT_RSS (resident set size)
+    which is advisory but better than nothing.
+    If neither works, returns None and execution proceeds without a memory limit.
+    """
+    for limit_attr in ("RLIMIT_AS", "RLIMIT_RSS"):
+        rlimit = getattr(_resource, limit_attr, None)
+        if rlimit is None:
+            continue
+        try:
+            soft, hard = _resource.getrlimit(rlimit)
+            # Never exceed the hard limit
+            effective = min(max_bytes, hard) if hard != _resource.RLIM_INFINITY else max_bytes
+            _resource.setrlimit(rlimit, (effective, hard))
+            logger.debug(
+                "workflow_memory_limit_set",
+                limit_type=limit_attr,
+                max_mb=max_bytes // (1024 * 1024),
+            )
+            return (rlimit, (soft, hard))
+        except (ValueError, OSError) as exc:
+            logger.debug(
+                "workflow_memory_limit_skip",
+                limit_type=limit_attr,
+                reason=str(exc),
+            )
+            continue
+    return None
+
+
+def _restore_memory_limit(saved: tuple[int, tuple[int, int]] | None) -> None:
+    """Restore the memory limit saved by _set_memory_limit."""
+    if saved is None:
+        return
+    rlimit, prev_limit = saved
+    with contextlib.suppress(ValueError, OSError):
+        _resource.setrlimit(rlimit, prev_limit)
+
+
+# ---------------------------------------------------------------------------
 # run_workflow_code
 # ---------------------------------------------------------------------------
 
@@ -131,14 +184,16 @@ async def run_workflow_code(
     code: str,
     ctx: WorkflowContext,
     timeout: int,
+    max_memory_mb: int = 256,
 ) -> WorkflowResult:
     """
     Execute workflow code in a restricted sandbox.
 
     Args:
-        code:    The full Python source of the workflow module.
-        ctx:     The WorkflowContext to inject as the `ctx` parameter to run().
-        timeout: Maximum execution time in seconds; enforced via asyncio.wait_for.
+        code:           The full Python source of the workflow module.
+        ctx:            The WorkflowContext to inject as the `ctx` parameter to run().
+        timeout:        Maximum execution time in seconds; enforced via asyncio.wait_for.
+        max_memory_mb:  Maximum memory in MB for the workflow execution (default 256).
 
     Returns:
         WorkflowResult. Never raises.
@@ -168,9 +223,20 @@ async def run_workflow_code(
             "Workflow code does not define an async function named 'run'"
         )
 
-    # Step 5: execute with timeout
+    # Step 5: execute with timeout and memory limits
+    max_bytes = max_memory_mb * 1024 * 1024
+    prev_limit = _set_memory_limit(max_bytes)
+    if prev_limit is None:
+        logger.warning(
+            "workflow_memory_limit_unavailable",
+            reason="resource limits not supported on this platform",
+        )
     try:
         result = await asyncio.wait_for(run_fn(ctx), timeout=float(timeout))
+    except MemoryError:
+        return WorkflowResult.fail(
+            f"Workflow exceeded memory limit ({max_memory_mb}MB)"
+        )
     except TimeoutError:
         return WorkflowResult.fail(
             f"Workflow execution timed out after {timeout} seconds"
@@ -179,6 +245,8 @@ async def run_workflow_code(
         return WorkflowResult.fail(
             f"Workflow run() raised an exception: {exc}\n" + traceback.format_exc()
         )
+    finally:
+        _restore_memory_limit(prev_limit)
 
     # Step 6: validate result type
     if not isinstance(result, WorkflowResult):
