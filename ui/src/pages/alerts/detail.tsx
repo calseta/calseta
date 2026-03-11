@@ -632,7 +632,7 @@ export function AlertDetailPage() {
                 <div className="space-y-3">
                   {alert.agent_findings.map((f) => (
                     <Card key={f.id} className="bg-card border-border">
-                      <CardContent className="px-4 pt-2.5 pb-4">
+                      <CardContent className="p-4">
                         <div className="flex items-start justify-between">
                           <div>
                             <Link

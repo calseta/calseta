@@ -324,7 +324,7 @@ function TestResultDisplay({ result }: { result: Record<string, unknown> }) {
 
       {/* Result data — the data dict from WorkflowResult.ok/fail(data={...}) */}
       {hasResultData && (
-        <Card className="bg-card border-border p-3">
+        <Card className="bg-card border-border p-4">
           <div className="flex items-center justify-between mb-1.5">
             <p className="text-[11px] text-dim font-medium tracking-wide uppercase">Result Data</p>
             <button
@@ -347,7 +347,7 @@ function TestResultDisplay({ result }: { result: Record<string, unknown> }) {
 
       {/* Log output */}
       {logLines.length > 0 && (
-        <Card className="bg-card border-border p-3">
+        <Card className="bg-card border-border p-4">
           <p className="text-[11px] text-dim font-medium tracking-wide uppercase mb-1.5">Log Output</p>
           <div className="rounded bg-surface border border-border divide-y divide-border overflow-hidden">
             {logLines.map((log, i) => {
@@ -856,7 +856,7 @@ export function WorkflowDetailPage() {
 
             {/* Test Sandbox */}
             <TabsContent value="test" className="mt-4 space-y-4">
-              <Card className="bg-card border-border p-3 space-y-2">
+              <Card className="bg-card border-border p-4 space-y-2">
                   <div className="flex gap-3">
                     <Select value={testType} onValueChange={setTestType}>
                       <SelectTrigger className="w-48 bg-surface border-border text-sm">
@@ -1028,7 +1028,7 @@ export function WorkflowDetailPage() {
             <DialogTitle className="text-foreground">Edit Workflow</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <div className="space-y-3 py-2">
             {/* Name */}
             <div className="space-y-1.5">
               <Label className="text-sm text-muted-foreground">Name</Label>

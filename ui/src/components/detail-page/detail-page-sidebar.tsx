@@ -8,7 +8,7 @@ interface DetailPageSidebarProps {
 export function DetailPageSidebar({ children }: DetailPageSidebarProps) {
   return (
     <Card className="bg-card border-border py-0">
-      <CardContent className="p-4 space-y-5">{children}</CardContent>
+      <CardContent className="p-4 space-y-3">{children}</CardContent>
     </Card>
   );
 }

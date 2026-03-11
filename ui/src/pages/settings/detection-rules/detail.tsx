@@ -486,7 +486,7 @@ export function DetectionRuleDetailPage() {
             <DialogTitle className="text-foreground">Edit Detection Rule</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <div className="space-y-3 py-2">
             {/* Name */}
             <div className="space-y-1.5">
               <Label className="text-sm text-muted-foreground">Name</Label>

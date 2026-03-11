@@ -117,7 +117,7 @@ export function IndicatorDetailSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="p-4 space-y-5">
+        <div className="p-4 space-y-3">
           {isLoading ? (
             <div className="space-y-3">
               <Skeleton className="h-4 w-48" />

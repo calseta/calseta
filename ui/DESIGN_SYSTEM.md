@@ -474,18 +474,41 @@ const [rawMode, setRawMode] = useState(false);
 
 ## Spacing & Layout
 
+### General
+
 | Context | Pattern |
 |---------|---------|
-| Page content padding | `p-6` |
+| Page content padding | `p-6` (via AppLayout `<main>`) |
 | Stacked page sections | `space-y-4` (list pages), `space-y-6` (detail pages) |
-| Card internal padding | `p-4` or CardHeader/CardContent defaults |
-| Form field spacing | `space-y-3` or `space-y-4` |
-| Field label → input gap | `space-y-1.5` or `mt-1` |
 | Inline elements | `gap-1`, `gap-1.5`, `gap-2` |
 | Badge groups | `flex flex-wrap gap-1` |
 | Button groups | `flex gap-1.5` |
 | Detail page sidebar | `w-full lg:w-80` (responsive) |
 | Status cards grid | `grid-cols-2 md:grid-cols-3` (auto based on item count) |
+
+### Card Spacing Standards
+
+These are the enforced standards. Do not deviate.
+
+| Element | Standard | Notes |
+|---------|----------|-------|
+| **CardContent** (inner/compact cards) | `p-4` | Cards inside tabs, lists, modals |
+| **CardContent** (page-level sections) | base `px-6` | Full-width section cards — use the default, no override |
+| **CardContent** (removed top padding) | `pt-0` | Only when CardHeader is directly above and provides its own spacing |
+| **CardHeader** bottom padding (overridden) | `pb-2` | Never `pb-3` or `pb-6` — `pb-2` is the standard override |
+| **Card list gaps** | `space-y-3` | Between cards in a list (findings, context docs, workflow runs, etc.) |
+| **TabsContent** top margin | `mt-4` | Always `mt-4`, no `space-y-*` mixed into the className |
+| **Dashboard metric cards** | `p-4` | Both small stat cards and KPI cards |
+| **Sidebar CardContent** | `p-4 space-y-3` | DetailPageSidebar wrapper |
+| **Dialog/modal form fields** | `space-y-3 py-2` | Inside edit modals |
+
+### Form Spacing
+
+| Context | Pattern |
+|---------|---------|
+| Form field groups | `space-y-3` |
+| Field label to input gap | `space-y-1.5` |
+| Chip/toggle groups | `flex flex-wrap gap-1.5` or `gap-2` |
 
 ---
 

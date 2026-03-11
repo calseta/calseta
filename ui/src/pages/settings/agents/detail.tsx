@@ -527,7 +527,7 @@ export function AgentDetailPage() {
                     </div>
                   )}
                 </CardHeader>
-                <CardContent className="space-y-5">
+                <CardContent className="space-y-3">
                   {/* Sources */}
                   <div>
                     <div className="flex items-center justify-between mb-2">

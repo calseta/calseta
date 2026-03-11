@@ -458,7 +458,7 @@ function StatCard({
 }) {
   return (
     <Card className="bg-card border-border hover:border-teal/20 transition-colors h-full">
-      <CardContent className="flex items-center gap-2.5 p-3 h-full">
+      <CardContent className="flex items-center gap-2.5 p-4 h-full">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-teal/10">
           <Icon className="h-3.5 w-3.5 text-teal" />
         </div>
@@ -488,7 +488,7 @@ function KpiCard({
 }) {
   return (
     <Card className="bg-card border-border hover:border-teal/30 transition-colors h-full">
-      <CardContent className="flex items-center gap-3 p-5 h-full">
+      <CardContent className="flex items-center gap-3 p-4 h-full">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal/10">
           <Icon className="h-4.5 w-4.5 text-teal" />
         </div>

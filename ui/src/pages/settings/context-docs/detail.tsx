@@ -230,7 +230,7 @@ export function ContextDocDetailPage() {
             {!doc.is_global && (
               <TabsContent value="targeting" className="mt-4">
                 <Card className="bg-card border-border">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm font-medium text-foreground">Targeting Rules</CardTitle>
                       {!editingRules ? (
