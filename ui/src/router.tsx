@@ -110,6 +110,9 @@ const agentDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/manage/agents/$uuid",
   component: AgentDetailPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || "configuration",
+  }),
 });
 
 const enrichmentProvidersRoute = createRoute({

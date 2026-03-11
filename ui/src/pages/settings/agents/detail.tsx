@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useParams, useSearch, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -52,6 +53,8 @@ import {
   CheckCircle2,
   XCircle,
   Check,
+  FileText,
+  Settings,
 } from "lucide-react";
 
 const ALL_SEVERITIES = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
@@ -61,6 +64,8 @@ const RETRY_OPTIONS = [0, 1, 2, 3, 4, 5];
 
 export function AgentDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
+  const { tab: activeTab } = useSearch({ from: "/manage/agents/$uuid" });
+  const navigate = useNavigate();
   const { data, isLoading, refetch, isFetching } = useAgent(uuid);
   const patchAgent = usePatchAgent();
   const testAgent = useTestAgent();
@@ -89,6 +94,10 @@ export function AgentDetailPage() {
   } | null>(null);
 
   const agent = data?.data;
+
+  function setActiveTab(tab: string) {
+    navigate({ search: { tab }, replace: true });
+  }
 
   if (isLoading) {
     return (
@@ -312,7 +321,7 @@ export function AgentDetailPage() {
           }
         />
 
-        {/* Inline-editable status cards (consistent with alerts detail) */}
+        {/* Inline-editable status cards */}
         <DetailPageStatusCards
           items={[
             {
@@ -435,7 +444,7 @@ export function AgentDetailPage() {
                 <DetailPageField
                   label="Auth Header"
                   value={agent.auth_header_name ? (
-                    <span className="font-mono">{agent.auth_header_name}</span>
+                    <span className="font-mono text-xs">{agent.auth_header_name}</span>
                   ) : (
                     <span className="text-dim">Not set</span>
                   )}
@@ -443,322 +452,362 @@ export function AgentDetailPage() {
                 <DetailPageField label="Created" value={formatDate(agent.created_at)} />
                 <DetailPageField label="Updated" value={formatDate(agent.updated_at)} />
               </SidebarSection>
+              <SidebarSection title="Triggers">
+                <DetailPageField
+                  label="Sources"
+                  value={
+                    agent.trigger_on_sources.length > 0
+                      ? agent.trigger_on_sources.join(", ")
+                      : "All"
+                  }
+                />
+                <DetailPageField
+                  label="Severities"
+                  value={
+                    agent.trigger_on_severities.length > 0
+                      ? agent.trigger_on_severities.join(", ")
+                      : "All"
+                  }
+                />
+              </SidebarSection>
             </DetailPageSidebar>
           }
         >
-          <div className="space-y-6">
-            {/* Trigger Configuration (unified card) */}
-            <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-foreground">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-3.5 w-3.5 text-teal" />
-                    Trigger Configuration
-                  </div>
-                </CardTitle>
-                {triggersDirty && (
-                  <div className="flex gap-1.5">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleCancelTriggers}
-                      className="h-7 text-xs text-dim"
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSaveTriggers}
-                      disabled={patchAgent.isPending}
-                      className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                    >
-                      {patchAgent.isPending ? (
-                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      ) : (
-                        <Save className="h-3 w-3 mr-1" />
-                      )}
-                      Save
-                    </Button>
-                  </div>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-5">
-                {/* Sources */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Sources</span>
-                    <span className="text-[11px] text-dim">None selected = all sources</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {ALL_SOURCES.map((source) => {
-                      const effective = sourcesDraft ?? agent.trigger_on_sources;
-                      const selected = effective.includes(source);
-                      return (
-                        <button
-                          key={source}
-                          type="button"
-                          onClick={() => toggleSource(source)}
-                          className={cn(
-                            "px-3 py-1.5 rounded-md text-xs border transition-colors",
-                            selected
-                              ? "bg-teal/15 border-teal/40 text-teal-light"
-                              : "bg-surface border-border text-dim hover:border-teal/30",
-                          )}
-                        >
-                          {source}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="bg-surface border border-border">
+              <TabsTrigger value="configuration" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Settings className="h-3.5 w-3.5 mr-1" />
+                Configuration
+              </TabsTrigger>
+              <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Send className="h-3.5 w-3.5 mr-1" />
+                Test
+              </TabsTrigger>
+              <TabsTrigger value="documentation" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <FileText className="h-3.5 w-3.5 mr-1" />
+                Documentation
+              </TabsTrigger>
+            </TabsList>
 
-                <div className="border-t border-border" />
-
-                {/* Severities */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Severities</span>
-                    <span className="text-[11px] text-dim">None selected = all severities</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {ALL_SEVERITIES.map((sev) => {
-                      const effective = severitiesDraft ?? agent.trigger_on_severities;
-                      const selected = effective.includes(sev);
-                      return (
-                        <button
-                          key={sev}
-                          type="button"
-                          onClick={() => toggleSeverity(sev)}
-                          className={cn(
-                            "px-3 py-1.5 rounded-md text-xs border transition-colors",
-                            selected
-                              ? "bg-teal/15 border-teal/40 text-teal-light"
-                              : "bg-surface border-border text-dim hover:border-teal/30",
-                          )}
-                        >
-                          {sev}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="border-t border-border" />
-
-                {/* Advanced Rules (subsection with own edit/save toggle) */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Advanced Rules</span>
-                      <p className="text-[11px] text-dim mt-0.5">
-                        Match_any (OR) and match_all (AND) conditions against alert fields.
-                      </p>
+            {/* Configuration Tab */}
+            <TabsContent value="configuration" className="mt-4 space-y-6">
+              {/* Trigger Configuration */}
+              <Card className="bg-card border-border">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-3.5 w-3.5 text-teal" />
+                      Trigger Configuration
                     </div>
-                    {!editingFilter ? (
+                  </CardTitle>
+                  {triggersDirty && (
+                    <div className="flex gap-1.5">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={startEditingFilter}
-                        className="h-7 text-xs text-dim hover:text-teal"
+                        onClick={handleCancelTriggers}
+                        className="h-7 text-xs text-dim"
                       >
-                        <Pencil className="h-3 w-3 mr-1" />
-                        Edit
+                        <X className="h-3 w-3 mr-1" />
+                        Cancel
                       </Button>
-                    ) : (
-                      <div className="flex gap-1.5">
+                      <Button
+                        size="sm"
+                        onClick={handleSaveTriggers}
+                        disabled={patchAgent.isPending}
+                        className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                      >
+                        {patchAgent.isPending ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Save className="h-3 w-3 mr-1" />
+                        )}
+                        Save
+                      </Button>
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  {/* Sources */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Sources</span>
+                      <span className="text-[11px] text-dim">None selected = all sources</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {ALL_SOURCES.map((source) => {
+                        const effective = sourcesDraft ?? agent.trigger_on_sources;
+                        const selected = effective.includes(source);
+                        return (
+                          <button
+                            key={source}
+                            type="button"
+                            onClick={() => toggleSource(source)}
+                            className={cn(
+                              "px-3 py-1.5 rounded-md text-xs border transition-colors",
+                              selected
+                                ? "bg-teal/15 border-teal/40 text-teal-light"
+                                : "bg-surface border-border text-dim hover:border-teal/30",
+                            )}
+                          >
+                            {source}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border" />
+
+                  {/* Severities */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Severities</span>
+                      <span className="text-[11px] text-dim">None selected = all severities</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {ALL_SEVERITIES.map((sev) => {
+                        const effective = severitiesDraft ?? agent.trigger_on_severities;
+                        const selected = effective.includes(sev);
+                        return (
+                          <button
+                            key={sev}
+                            type="button"
+                            onClick={() => toggleSeverity(sev)}
+                            className={cn(
+                              "px-3 py-1.5 rounded-md text-xs border transition-colors",
+                              selected
+                                ? "bg-teal/15 border-teal/40 text-teal-light"
+                                : "bg-surface border-border text-dim hover:border-teal/30",
+                            )}
+                          >
+                            {sev}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border" />
+
+                  {/* Advanced Rules */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Advanced Rules</span>
+                        <p className="text-[11px] text-dim mt-0.5">
+                          Match_any (OR) and match_all (AND) conditions against alert fields.
+                        </p>
+                      </div>
+                      {!editingFilter ? (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setEditingFilter(false)}
-                          className="h-7 text-xs text-dim"
+                          onClick={startEditingFilter}
+                          className="h-7 text-xs text-dim hover:text-teal"
                         >
-                          <X className="h-3 w-3 mr-1" />
-                          Cancel
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Edit
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSaveFilter}
-                          disabled={patchAgent.isPending}
-                          className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                        >
-                          <Save className="h-3 w-3 mr-1" />
-                          Save
-                        </Button>
-                      </div>
+                      ) : (
+                        <div className="flex gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingFilter(false)}
+                            className="h-7 text-xs text-dim"
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleSaveFilter}
+                            disabled={patchAgent.isPending}
+                            className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                          >
+                            <Save className="h-3 w-3 mr-1" />
+                            Save
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    {editingFilter ? (
+                      <TargetingRuleBuilder value={filterDraft} onChange={setFilterDraft} />
+                    ) : (
+                      <TargetingRuleDisplay rules={agent.trigger_filter} />
                     )}
                   </div>
-                  {editingFilter ? (
-                    <TargetingRuleBuilder value={filterDraft} onChange={setFilterDraft} />
-                  ) : (
-                    <TargetingRuleDisplay rules={agent.trigger_filter} />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            {/* Authentication */}
-            <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-foreground">
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-3.5 w-3.5 text-dim" />
-                    Authentication
-                  </div>
-                </CardTitle>
-                {!editingAuth ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={startEditingAuth}
-                    className="h-7 text-xs text-dim hover:text-teal"
-                  >
-                    <Pencil className="h-3 w-3 mr-1" />
-                    Edit
-                  </Button>
-                ) : (
-                  <div className="flex gap-1.5">
+              {/* Authentication */}
+              <Card className="bg-card border-border">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-2">
+                      <Lock className="h-3.5 w-3.5 text-dim" />
+                      Authentication
+                    </div>
+                  </CardTitle>
+                  {!editingAuth ? (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setEditingAuth(false)}
-                      className="h-7 text-xs text-dim"
+                      onClick={startEditingAuth}
+                      className="h-7 text-xs text-dim hover:text-teal"
                     >
-                      <X className="h-3 w-3 mr-1" />
-                      Cancel
+                      <Pencil className="h-3 w-3 mr-1" />
+                      Edit
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSaveAuth}
-                      disabled={patchAgent.isPending}
-                      className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                    >
-                      <Save className="h-3 w-3 mr-1" />
-                      Save
-                    </Button>
-                  </div>
-                )}
-              </CardHeader>
-              <CardContent>
-                {editingAuth ? (
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Header Name</Label>
-                      <Input
-                        value={authHeaderName}
-                        onChange={(e) => setAuthHeaderName(e.target.value)}
-                        placeholder="e.g. Authorization, X-API-Key"
-                        className="mt-1 bg-surface border-border text-sm font-mono"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Header Value</Label>
-                      <Input
-                        type="password"
-                        value={authHeaderValue}
-                        onChange={(e) => setAuthHeaderValue(e.target.value)}
-                        placeholder="Leave empty to keep current value"
-                        className="mt-1 bg-surface border-border text-sm"
-                      />
-                      <p className="text-[11px] text-dim mt-1">
-                        The value is encrypted at rest. Leave empty to keep the existing value.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Header Name</span>
-                      <span className="text-xs text-foreground font-mono">
-                        {agent.auth_header_name || "Not set"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Header Value</span>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[11px]",
-                          agent.auth_header_name
-                            ? "text-teal border-teal/30"
-                            : "text-dim border-border",
-                        )}
+                  ) : (
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingAuth(false)}
+                        className="h-7 text-xs text-dim"
                       >
-                        {agent.auth_header_name ? "configured" : "not set"}
-                      </Badge>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Test Webhook */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-foreground">
-                  <div className="flex items-center gap-2">
-                    <Send className="h-3.5 w-3.5 text-dim" />
-                    Test Webhook
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-dim mb-3">
-                  Send a test payload to the agent endpoint to verify connectivity and authentication.
-                </p>
-                <div className="flex items-center gap-3">
-                  <Button
-                    size="sm"
-                    onClick={handleTest}
-                    disabled={testAgent.isPending}
-                    className="bg-teal text-white hover:bg-teal-dim text-xs"
-                  >
-                    {testAgent.isPending ? (
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    ) : (
-                      <Send className="h-3 w-3 mr-1" />
-                    )}
-                    Send Test
-                  </Button>
-                  {testResult && (
-                    <div className="flex items-center gap-3">
-                      {testResult.delivered ? (
-                        <Badge variant="outline" className="text-xs text-teal border-teal/30 bg-teal/10">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Delivered
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs text-red-threat border-red-threat/30 bg-red-threat/10">
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Failed
-                        </Badge>
-                      )}
-                      {testResult.status_code !== null && (
-                        <span className="text-xs text-dim font-mono">
-                          HTTP {testResult.status_code}
-                        </span>
-                      )}
-                      <span className="text-xs text-dim">
-                        {testResult.duration_ms}ms
-                      </span>
+                        <X className="h-3 w-3 mr-1" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveAuth}
+                        disabled={patchAgent.isPending}
+                        className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                      >
+                        <Save className="h-3 w-3 mr-1" />
+                        Save
+                      </Button>
                     </div>
                   )}
-                </div>
-                {testResult?.error && (
-                  <div className="mt-3 rounded-md bg-red-threat/5 border border-red-threat/20 p-3">
-                    <p className="text-xs text-red-threat font-mono">{testResult.error}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  {editingAuth ? (
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Header Name</Label>
+                        <Input
+                          value={authHeaderName}
+                          onChange={(e) => setAuthHeaderName(e.target.value)}
+                          placeholder="e.g. Authorization, X-API-Key"
+                          className="mt-1 bg-surface border-border text-sm font-mono"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Header Value</Label>
+                        <Input
+                          type="password"
+                          value={authHeaderValue}
+                          onChange={(e) => setAuthHeaderValue(e.target.value)}
+                          placeholder="Leave empty to keep current value"
+                          className="mt-1 bg-surface border-border text-sm"
+                        />
+                        <p className="text-[11px] text-dim mt-1">
+                          The value is encrypted at rest. Leave empty to keep the existing value.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Header Name</span>
+                        <span className="text-xs text-foreground font-mono">
+                          {agent.auth_header_name || "Not set"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Header Value</span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[11px]",
+                            agent.auth_header_name
+                              ? "text-teal border-teal/30"
+                              : "text-dim border-border",
+                          )}
+                        >
+                          {agent.auth_header_name ? "configured" : "not set"}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-            {/* Documentation */}
-            <DocumentationEditor
-              content={agent.documentation ?? ""}
-              onSave={handleSaveDocumentation}
-              isSaving={patchAgent.isPending}
-            />
-          </div>
+            {/* Test Tab */}
+            <TabsContent value="test" className="mt-4">
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-2">
+                      <Send className="h-3.5 w-3.5 text-dim" />
+                      Test Webhook
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-dim mb-3">
+                    Send a test payload to the agent endpoint to verify connectivity and authentication.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      size="sm"
+                      onClick={handleTest}
+                      disabled={testAgent.isPending}
+                      className="bg-teal text-white hover:bg-teal-dim text-xs"
+                    >
+                      {testAgent.isPending ? (
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                        <Send className="h-3 w-3 mr-1" />
+                      )}
+                      Send Test
+                    </Button>
+                    {testResult && (
+                      <div className="flex items-center gap-3">
+                        {testResult.delivered ? (
+                          <Badge variant="outline" className="text-xs text-teal border-teal/30 bg-teal/10">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Delivered
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-red-threat border-red-threat/30 bg-red-threat/10">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Failed
+                          </Badge>
+                        )}
+                        {testResult.status_code !== null && (
+                          <span className="text-xs text-dim font-mono">
+                            HTTP {testResult.status_code}
+                          </span>
+                        )}
+                        <span className="text-xs text-dim">
+                          {testResult.duration_ms}ms
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {testResult?.error && (
+                    <div className="mt-3 rounded-md bg-red-threat/5 border border-red-threat/20 p-3">
+                      <p className="text-xs text-red-threat font-mono">{testResult.error}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Documentation Tab */}
+            <TabsContent value="documentation" className="mt-4">
+              <DocumentationEditor
+                content={agent.documentation ?? ""}
+                onSave={handleSaveDocumentation}
+                isSaving={patchAgent.isPending}
+              />
+            </TabsContent>
+          </Tabs>
         </DetailPageLayout>
       </div>
     </AppLayout>
