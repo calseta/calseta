@@ -71,6 +71,7 @@ import {
   Microscope,
   ChevronDown,
   ChevronRight,
+  FileText,
 } from "lucide-react";
 
 
@@ -684,6 +685,7 @@ export function EnrichmentProviderDetailPage() {
                 Test
               </TabsTrigger>
               <TabsTrigger value="docs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <FileText className="h-3.5 w-3.5 mr-1" />
                 Documentation
               </TabsTrigger>
             </TabsList>

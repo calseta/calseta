@@ -1,17 +1,24 @@
 import { useState } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useParams, useSearch, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DetailPageHeader,
   DetailPageStatusCards,
+  DetailPageLayout,
+  DetailPageSidebar,
+  SidebarSection,
+  DetailPageField,
   DocumentationEditor,
 } from "@/components/detail-page";
+import { CopyableText } from "@/components/copyable-text";
 import { useContextDocument, usePatchContextDocument } from "@/hooks/use-api";
+import { formatDate } from "@/lib/format";
 import {
   Select,
   SelectContent,
@@ -19,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, FileText, Globe, GitBranch, Pencil, Save, X } from "lucide-react";
+import { BookOpen, FileText, Globe, GitBranch, Pencil, Save, X, Target } from "lucide-react";
 import {
   TargetingRuleBuilder,
   TargetingRuleDisplay,
@@ -32,12 +39,18 @@ import {
 
 export function ContextDocDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
+  const { tab: activeTab } = useSearch({ from: "/manage/context-docs/$uuid" });
+  const navigate = useNavigate();
   const { data, isLoading, refetch, isFetching } = useContextDocument(uuid);
   const patchDoc = usePatchContextDocument();
   const [editingRules, setEditingRules] = useState(false);
   const [draftRules, setDraftRules] = useState<TargetingRules | null>(null);
 
   const doc = data?.data;
+
+  function setActiveTab(tab: string) {
+    navigate({ search: { tab }, replace: true });
+  }
 
   if (isLoading) {
     return (
@@ -111,20 +124,9 @@ export function ContextDocDetailPage() {
             </>
           }
           subtitle={
-            <div className="space-y-2">
-              {doc.description && (
-                <p className="text-sm text-muted-foreground">{doc.description}</p>
-              )}
-              {doc.tags?.length > 0 && (
-                <div className="flex gap-1.5">
-                  {doc.tags.map((t) => (
-                    <Badge key={t} variant="outline" className="text-[11px] text-foreground border-border">
-                      {t}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
+            doc.description ? (
+              <p className="text-sm text-muted-foreground">{doc.description}</p>
+            ) : undefined
           }
         />
 
@@ -163,6 +165,11 @@ export function ContextDocDetailPage() {
               ),
             },
             {
+              label: "Type",
+              icon: TypeIcon,
+              value: doc.document_type,
+            },
+            {
               label: "Version",
               icon: GitBranch,
               value: <span className="font-mono">v{doc.version}</span>,
@@ -170,63 +177,108 @@ export function ContextDocDetailPage() {
           ]}
         />
 
-        {!doc.is_global && (
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-foreground">Targeting Rules</CardTitle>
-                {!editingRules ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={startEditingRules}
-                    className="h-7 text-xs text-dim hover:text-teal"
-                  >
-                    <Pencil className="h-3 w-3 mr-1" />
-                    Edit
-                  </Button>
-                ) : (
-                  <div className="flex gap-1.5">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditingRules(false)}
-                      className="h-7 text-xs text-dim"
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSaveRules}
-                      disabled={patchDoc.isPending}
-                      className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                    >
-                      <Save className="h-3 w-3 mr-1" />
-                      Save
-                    </Button>
+        <DetailPageLayout
+          sidebar={
+            <DetailPageSidebar>
+              <SidebarSection title="Details">
+                <DetailPageField label="UUID" value={<CopyableText text={doc.uuid} mono className="text-xs" />} />
+                <DetailPageField label="Type" value={doc.document_type} />
+                <DetailPageField label="Scope" value={doc.is_global ? "Global" : "Targeted"} />
+                <DetailPageField label="Version" value={`v${doc.version}`} />
+                <DetailPageField label="Created" value={formatDate(doc.created_at)} />
+                <DetailPageField label="Updated" value={formatDate(doc.updated_at)} />
+              </SidebarSection>
+              {doc.tags?.length > 0 && (
+                <SidebarSection title="Tags">
+                  <div className="flex flex-wrap gap-1">
+                    {doc.tags.map((t) => (
+                      <Badge key={t} variant="outline" className="text-[11px] text-foreground border-border">
+                        {t}
+                      </Badge>
+                    ))}
                   </div>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {editingRules ? (
-                <TargetingRuleBuilder value={draftRules} onChange={setDraftRules} />
-              ) : (
-                <TargetingRuleDisplay rules={doc.targeting_rules} />
+                </SidebarSection>
               )}
-            </CardContent>
-          </Card>
-        )}
+            </DetailPageSidebar>
+          }
+        >
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="bg-surface border border-border">
+              <TabsTrigger value="content" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <FileText className="h-3.5 w-3.5 mr-1" />
+                Content
+              </TabsTrigger>
+              {!doc.is_global && (
+                <TabsTrigger value="targeting" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                  <Target className="h-3.5 w-3.5 mr-1" />
+                  Targeting Rules
+                </TabsTrigger>
+              )}
+            </TabsList>
 
-        <DocumentationEditor
-          content={doc.content ?? ""}
-          onSave={handleSave}
-          isSaving={patchDoc.isPending}
-          title="Content"
-          rows={20}
-          placeholder="Write content in markdown..."
-        />
+            <TabsContent value="content" className="mt-4">
+              <DocumentationEditor
+                content={doc.content ?? ""}
+                onSave={handleSave}
+                isSaving={patchDoc.isPending}
+                title="Content"
+                rows={20}
+                placeholder="Write content in markdown..."
+              />
+            </TabsContent>
+
+            {!doc.is_global && (
+              <TabsContent value="targeting" className="mt-4">
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-foreground">Targeting Rules</CardTitle>
+                      {!editingRules ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={startEditingRules}
+                          className="h-7 text-xs text-dim hover:text-teal"
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                      ) : (
+                        <div className="flex gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingRules(false)}
+                            className="h-7 text-xs text-dim"
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleSaveRules}
+                            disabled={patchDoc.isPending}
+                            className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                          >
+                            <Save className="h-3 w-3 mr-1" />
+                            Save
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {editingRules ? (
+                      <TargetingRuleBuilder value={draftRules} onChange={setDraftRules} />
+                    ) : (
+                      <TargetingRuleDisplay rules={doc.targeting_rules} />
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+          </Tabs>
+        </DetailPageLayout>
       </div>
     </AppLayout>
   );

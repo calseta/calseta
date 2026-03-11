@@ -67,6 +67,7 @@ export interface AlertResponse extends AlertSummary {
   triaged_at: string | null;
   closed_at: string | null;
   detection_rule_id: number | null;
+  detection_rule: DetectionRule | null;
   malice: string | null;
   malice_override: string | null;
   malice_override_source: string | null;

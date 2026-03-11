@@ -80,6 +80,9 @@ const detectionRuleDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/manage/detection-rules/$uuid",
   component: DetectionRuleDetailPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || "documentation",
+  }),
 });
 
 const contextDocsRoute = createRoute({
@@ -92,6 +95,9 @@ const contextDocDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/manage/context-docs/$uuid",
   component: ContextDocDetailPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || "content",
+  }),
 });
 
 const agentsRoute = createRoute({

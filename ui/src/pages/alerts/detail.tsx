@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useSearch, useNavigate } from "@tanstack/react-router";
+import { useParams, useSearch, useNavigate, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +46,7 @@ import { ActivityEventReferences } from "@/components/activity/activity-event-re
 import { AddIndicatorsForm } from "@/components/add-indicators-form";
 import { IndicatorDetailSheet } from "@/components/indicator-detail-sheet";
 import { AlertGraph } from "@/components/alert-graph/alert-graph";
+import { MarkdownPreview } from "@/components/markdown-preview";
 import { RunAgentButton } from "@/components/run-agent-button";
 import {
   Table,
@@ -71,6 +72,7 @@ import {
   GitFork,
   Plus,
   RefreshCw,
+  FileText,
 } from "lucide-react";
 
 const SEVERITY_OPTIONS = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
@@ -391,9 +393,7 @@ export function AlertDetailPage() {
                 {alert.fingerprint && (
                   <DetailPageField label="Fingerprint" value={<CopyableText text={alert.fingerprint} mono className="text-xs" />} />
                 )}
-                {alert.detection_rule_id && (
-                  <DetailPageField label="Detection Rule" value={`#${alert.detection_rule_id}`} />
-                )}
+
                 {alert.duplicate_count > 0 && (
                   <DetailPageField label="Duplicates" value={alert.duplicate_count} />
                 )}
@@ -421,6 +421,50 @@ export function AlertDetailPage() {
                   }
                 />
               </SidebarSection>
+              {alert.detection_rule && (
+                <SidebarSection title="Detection Rule">
+                  <DetailPageField
+                    label="Name"
+                    value={
+                      <Link
+                        to="/manage/detection-rules/$uuid"
+                        params={{ uuid: alert.detection_rule.uuid }}
+                        className="text-teal hover:underline text-xs truncate max-w-[160px] inline-block"
+                      >
+                        {alert.detection_rule.name}
+                      </Link>
+                    }
+                  />
+                  <DetailPageField label="Rule ID" value={alert.detection_rule.source_rule_id ? <CopyableText text={alert.detection_rule.source_rule_id} mono className="text-xs" /> : "—"} />
+                  <DetailPageField
+                    label="Status"
+                    value={
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px]",
+                          alert.detection_rule.is_active
+                            ? "text-teal bg-teal/10 border-teal/30"
+                            : "text-dim bg-dim/10 border-dim/30",
+                        )}
+                      >
+                        {alert.detection_rule.is_active ? "active" : "inactive"}
+                      </Badge>
+                    }
+                  />
+                  {alert.detection_rule.severity && (
+                    <DetailPageField
+                      label="Severity"
+                      value={
+                        <Badge variant="outline" className={cn("text-[10px]", severityColor(alert.detection_rule.severity))}>
+                          {alert.detection_rule.severity}
+                        </Badge>
+                      }
+                    />
+                  )}
+                  <DetailPageField label="Source" value={alert.detection_rule.source_name ?? "—"} />
+                </SidebarSection>
+              )}
             </DetailPageSidebar>
           }
         >
@@ -437,6 +481,10 @@ export function AlertDetailPage() {
               </TabsTrigger>
               <TabsTrigger value="activity" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
                 Activity ({activities.length})
+              </TabsTrigger>
+              <TabsTrigger value="ads" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <FileText className="h-3.5 w-3.5 mr-1" />
+                ADS
               </TabsTrigger>
               <TabsTrigger value="graph" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
                 <GitFork className="h-3.5 w-3.5 mr-1" />
@@ -683,6 +731,33 @@ export function AlertDetailPage() {
                 </div>
               ) : (
                 <Empty text="No activity recorded yet" />
+              )}
+            </TabsContent>
+
+            {/* ADS — Detection Rule Documentation */}
+            <TabsContent value="ads" className="mt-4">
+              {alert.detection_rule?.documentation ? (
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-foreground">
+                        Alerting and Detection Strategy
+                      </CardTitle>
+                      <Link
+                        to="/manage/detection-rules/$uuid"
+                        params={{ uuid: alert.detection_rule.uuid }}
+                        className="text-xs text-teal hover:underline"
+                      >
+                        View Rule
+                      </Link>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <MarkdownPreview content={alert.detection_rule.documentation} />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Empty text={alert.detection_rule ? "No ADS documentation for this detection rule" : "No detection rule linked to this alert"} />
               )}
             </TabsContent>
 
