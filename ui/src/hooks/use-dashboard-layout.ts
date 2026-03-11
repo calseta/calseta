@@ -1,7 +1,10 @@
 import { useState, useCallback } from "react";
 import type { Layout } from "react-grid-layout";
 
-const STORAGE_KEY = "calseta:dashboard-grid";
+// Bump version when grid columns or default card set changes.
+// This discards stale layouts from localStorage automatically.
+const LAYOUT_VERSION = 2;
+const STORAGE_KEY = `calseta:dashboard-grid:v${LAYOUT_VERSION}`;
 
 // 12-column grid (industry standard — divisible by 1,2,3,4,6,12).
 // rowHeight=80px. Cards fill every row edge-to-edge.
@@ -26,20 +29,25 @@ const DEFAULT_LAYOUT: Layout[] = [
   { i: "time-saved", x: 6, y: 2, w: 3, h: 1, minW: 2, maxW: 6 },
   { i: "fp-rate",   x: 9, y: 2, w: 3, h: 1, minW: 2, maxW: 6 },
 
-  // Row 3: Remaining Ops KPIs — 2 items × 4 cols + padding = 12
-  { i: "enrich-cov",        x: 0, y: 3, w: 4, h: 1, minW: 2, maxW: 6 },
-  { i: "pending-approvals", x: 4, y: 3, w: 4, h: 1, minW: 2, maxW: 6 },
+  // Row 3: Remaining Ops KPIs — 4 items × 3 cols = 12 (full row)
+  { i: "enrich-cov",        x: 0, y: 3, w: 3, h: 1, minW: 2, maxW: 6 },
+  { i: "pending-approvals", x: 3, y: 3, w: 3, h: 1, minW: 2, maxW: 6 },
+  { i: "queue-pending",     x: 6, y: 3, w: 3, h: 1, minW: 2, maxW: 6 },
+  { i: "queue-oldest",      x: 9, y: 3, w: 3, h: 1, minW: 2, maxW: 6 },
 
   // Row 4–5: Charts — 2 × 6 cols = 12 (full row)
   { i: "sev-chart",    x: 0, y: 4, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
   { i: "status-chart", x: 6, y: 4, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
 
-  // Row 6–7: Charts — 2 × 6 cols = 12 (full row)
-  { i: "source-chart",        x: 0, y: 7, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
-  { i: "provider-type-chart", x: 6, y: 7, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
+  // Row 7–8: Charts — 2 × 6 cols = 12 (full row)
+  { i: "source-chart",  x: 0, y: 7, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
+  { i: "queue-health",  x: 6, y: 7, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
 
-  // Row 8: Workflow performance — full width
-  { i: "wf-perf", x: 0, y: 10, w: 12, h: 2, minW: 6, maxW: 12, minH: 1 },
+  // Row 10–11: Charts — 1 × 6 cols (provider type chart)
+  { i: "provider-type-chart", x: 0, y: 10, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
+
+  // Row 13: Workflow performance — full width
+  { i: "wf-perf", x: 0, y: 13, w: 12, h: 2, minW: 6, maxW: 12, minH: 1 },
 ];
 
 function loadLayout(): Layout[] | null {
@@ -90,6 +98,9 @@ export function useDashboardLayout() {
     setLayout(DEFAULT_LAYOUT);
     try {
       localStorage.removeItem(STORAGE_KEY);
+      // Clean up legacy keys from older versions
+      localStorage.removeItem("calseta:dashboard-grid");
+      localStorage.removeItem("calseta:dashboard-layout");
     } catch {
       // silently ignore
     }

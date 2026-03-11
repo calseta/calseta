@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import {
   ShieldAlert,
   Clock,
+  Clock4,
   Workflow,
   CheckCircle2,
   AlertTriangle,
@@ -25,6 +26,7 @@ import {
   Hourglass,
   Activity,
   RotateCcw,
+  Layers,
 } from "lucide-react";
 import {
   BarChart,
@@ -32,6 +34,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   Cell,
 } from "recharts";
@@ -111,6 +114,17 @@ export function DashboardPage() {
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value)
         : [],
+    [metrics],
+  );
+
+  const queueData = useMemo(
+    () =>
+      metrics?.queue?.queues?.map((q) => ({
+        name: q.queue,
+        Pending: q.pending,
+        "In Progress": q.in_progress,
+        "Failed (30d)": q.failed_30d,
+      })) ?? [],
     [metrics],
   );
 
@@ -236,6 +250,26 @@ export function DashboardPage() {
       />
     ),
 
+    // Queue KPIs
+    "queue-pending": (
+      <KpiCard
+        icon={Layers}
+        label="Queue Pending"
+        value={metrics?.queue?.total_pending ?? 0}
+        sub={`${metrics?.queue?.total_in_progress ?? 0} in progress`}
+        highlight={(metrics?.queue?.total_pending ?? 0) > 10}
+      />
+    ),
+    "queue-oldest": (
+      <KpiCard
+        icon={Clock4}
+        label="Oldest Pending Task"
+        value={formatSeconds(metrics?.queue?.oldest_pending_age_seconds ?? null)}
+        sub="Task queue age"
+        highlight={(metrics?.queue?.oldest_pending_age_seconds ?? 0) > 300}
+      />
+    ),
+
     // Charts
     "sev-chart": (
       <ChartCard title="Alerts by Severity" empty={severityData.length === 0} emptyText="No alert data yet">
@@ -286,6 +320,19 @@ export function DashboardPage() {
           <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} allowDecimals={false} />
           <Tooltip contentStyle={tooltipStyle} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#4D7D71" />
+        </BarChart>
+      </ChartCard>
+    ),
+    "queue-health": (
+      <ChartCard title="Queue Health" empty={queueData.length === 0} emptyText="No queue data available">
+        <BarChart data={queueData} barSize={20}>
+          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} allowDecimals={false} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Legend wrapperStyle={{ fontSize: 11, color: "#57635F" }} />
+          <Bar dataKey="Pending" fill="#FFBB1A" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="In Progress" fill="#4D7D71" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="Failed (30d)" fill="#EA591B" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ChartCard>
     ),

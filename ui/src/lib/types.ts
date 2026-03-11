@@ -161,6 +161,26 @@ export interface ContextDocument {
   updated_at: string;
 }
 
+// Queue metrics
+export interface QueueEntry {
+  queue: string;
+  pending: number;
+  in_progress: number;
+  succeeded_30d: number;
+  failed_30d: number;
+  avg_duration_seconds: number | null;
+  oldest_pending_age_seconds: number | null;
+}
+
+export interface QueueMetrics {
+  queues: QueueEntry[];
+  total_pending: number;
+  total_in_progress: number;
+  total_failed_30d: number;
+  total_succeeded_30d: number;
+  oldest_pending_age_seconds: number | null;
+}
+
 // Metrics
 export interface MetricsSummary {
   period: string;
@@ -199,6 +219,7 @@ export interface MetricsSummary {
     approval_rate: number;
     median_response_time_minutes: number | null;
   };
+  queue: QueueMetrics | null;
 }
 
 // Workflows

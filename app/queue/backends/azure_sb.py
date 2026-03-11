@@ -6,7 +6,7 @@ Not implemented. See docs/architecture/QUEUE_BACKENDS.md for switching instructi
 
 from __future__ import annotations
 
-from app.queue.base import TaskQueueBase, TaskStatus
+from app.queue.base import QueueMetrics, TaskQueueBase, TaskStatus
 
 
 class AzureServiceBusBackend(TaskQueueBase):
@@ -25,6 +25,12 @@ class AzureServiceBusBackend(TaskQueueBase):
 
     async def get_task_status(self, task_id: str) -> TaskStatus:
         raise NotImplementedError(
+            "Set QUEUE_BACKEND=postgres or see docs/architecture/QUEUE_BACKENDS.md"
+        )
+
+    async def get_queue_metrics(self) -> QueueMetrics:
+        raise NotImplementedError(
+            "Queue metrics not implemented for this backend. "
             "Set QUEUE_BACKEND=postgres or see docs/architecture/QUEUE_BACKENDS.md"
         )
 

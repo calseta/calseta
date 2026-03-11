@@ -47,12 +47,32 @@ class MetricsSummaryPlatform(BaseModel):
     indicator_mappings: int
 
 
+class MetricsSummaryQueueEntry(BaseModel):
+    queue: str
+    pending: int
+    in_progress: int
+    succeeded_30d: int
+    failed_30d: int
+    avg_duration_seconds: float | None
+    oldest_pending_age_seconds: float | None
+
+
+class MetricsSummaryQueue(BaseModel):
+    queues: list[MetricsSummaryQueueEntry]
+    total_pending: int
+    total_in_progress: int
+    total_failed_30d: int
+    total_succeeded_30d: int
+    oldest_pending_age_seconds: float | None
+
+
 class MetricsSummaryResponse(BaseModel):
     period: str = "last_30_days"
     alerts: MetricsSummaryAlerts
     workflows: MetricsSummaryWorkflows
     approvals: MetricsSummaryApprovals
     platform: MetricsSummaryPlatform
+    queue: MetricsSummaryQueue | None = None
 
 
 class WorkflowMetricsResponse(BaseModel):

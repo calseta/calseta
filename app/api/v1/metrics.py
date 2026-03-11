@@ -12,6 +12,8 @@ from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
 from app.db.session import get_db
+from app.queue.base import TaskQueueBase
+from app.queue.dependencies import get_queue
 from app.schemas.common import DataResponse
 from app.schemas.metrics import (
     AlertMetricsResponse,
@@ -52,13 +54,14 @@ async def get_alert_metrics(
 async def get_metrics_summary(
     auth: _AlertsRead,
     db: Annotated[AsyncSession, Depends(get_db)],
+    queue: Annotated[TaskQueueBase, Depends(get_queue)],
 ) -> DataResponse[MetricsSummaryResponse]:
     """
     Compact SOC health snapshot — always last 30 days.
     No time window parameters — window is fixed per PRD.
     Optimized for agent context injection (low token cost).
     """
-    summary = await compute_metrics_summary(db)
+    summary = await compute_metrics_summary(db, queue=queue)
     return DataResponse(data=summary)
 
 

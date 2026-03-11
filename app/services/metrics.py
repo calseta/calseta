@@ -8,7 +8,10 @@ All MTTX values in seconds (float). Return null (None) per PRD spec when data is
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.queue.base import TaskQueueBase
 
 from sqlalchemy import extract, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +30,8 @@ from app.schemas.metrics import (
     MetricsSummaryAlerts,
     MetricsSummaryApprovals,
     MetricsSummaryPlatform,
+    MetricsSummaryQueue,
+    MetricsSummaryQueueEntry,
     MetricsSummaryResponse,
     MetricsSummaryWorkflows,
     WorkflowMetricsResponse,
@@ -409,7 +414,10 @@ async def compute_workflow_metrics(
     )
 
 
-async def compute_metrics_summary(db: AsyncSession) -> MetricsSummaryResponse:
+async def compute_metrics_summary(
+    db: AsyncSession,
+    queue: TaskQueueBase | None = None,
+) -> MetricsSummaryResponse:
     """
     Compact SOC health snapshot — always last 30 days.
     Optimized: 8 targeted queries, no full metric computation.
@@ -765,6 +773,37 @@ async def compute_metrics_summary(db: AsyncSession) -> MetricsSummaryResponse:
     )
     platform_indicator_mappings: int = ifm_result.scalar_one() or 0
 
+    # ------------------------------------------------------------------
+    # Queue metrics (optional — depends on backend support)
+    # ------------------------------------------------------------------
+    queue_summary: MetricsSummaryQueue | None = None
+    if queue is not None:
+        try:
+            qm = await queue.get_queue_metrics()
+            queue_summary = MetricsSummaryQueue(
+                queues=[
+                    MetricsSummaryQueueEntry(
+                        queue=e.queue,
+                        pending=e.pending,
+                        in_progress=e.in_progress,
+                        succeeded_30d=e.succeeded_30d,
+                        failed_30d=e.failed_30d,
+                        avg_duration_seconds=e.avg_duration_seconds,
+                        oldest_pending_age_seconds=e.oldest_pending_age_seconds,
+                    )
+                    for e in qm.queues
+                ],
+                total_pending=qm.total_pending,
+                total_in_progress=qm.total_in_progress,
+                total_failed_30d=qm.total_failed_30d,
+                total_succeeded_30d=qm.total_succeeded_30d,
+                oldest_pending_age_seconds=qm.oldest_pending_age_seconds,
+            )
+        except NotImplementedError:
+            pass  # Backend doesn't support metrics — queue stays None
+        except Exception:
+            pass  # Don't let queue metrics failure break the dashboard
+
     return MetricsSummaryResponse(
         period="last_30_days",
         alerts=MetricsSummaryAlerts(
@@ -802,4 +841,5 @@ async def compute_metrics_summary(db: AsyncSession) -> MetricsSummaryResponse:
             workflows=platform_workflows,
             indicator_mappings=platform_indicator_mappings,
         ),
+        queue=queue_summary,
     )

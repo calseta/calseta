@@ -27,7 +27,7 @@ SIGTERM handling:
 
 from __future__ import annotations
 
-from app.queue.base import TaskQueueBase, TaskStatus
+from app.queue.base import QueueMetrics, QueueMetricsEntry, TaskQueueBase, TaskStatus
 
 # Procrastinate job status → TaskStatus mapping
 _STATUS_MAP: dict[str, TaskStatus] = {
@@ -110,6 +110,81 @@ class ProcrastinateBackend(TaskQueueBase):
 
         raw_status: str = row[0]
         return _STATUS_MAP.get(raw_status, TaskStatus.FAILED)
+
+    async def get_queue_metrics(self) -> QueueMetrics:
+        """Query procrastinate_jobs for per-queue health metrics."""
+        import psycopg
+
+        from datetime import UTC, datetime, timedelta
+
+        now = datetime.now(UTC)
+        thirty_days_ago = now - timedelta(days=30)
+
+        async with (
+            await psycopg.AsyncConnection.connect(self._pg_dsn) as conn,
+            conn.cursor() as cur,
+        ):
+            await cur.execute(
+                """
+                SELECT
+                    queue_name,
+                    COUNT(*) FILTER (WHERE status = 'todo') AS pending,
+                    COUNT(*) FILTER (WHERE status = 'doing') AS in_progress,
+                    COUNT(*) FILTER (
+                        WHERE status = 'succeeded' AND finished_at >= %(since)s
+                    ) AS succeeded_30d,
+                    COUNT(*) FILTER (
+                        WHERE status = 'failed' AND finished_at >= %(since)s
+                    ) AS failed_30d,
+                    AVG(EXTRACT(EPOCH FROM finished_at - started_at))
+                        FILTER (
+                            WHERE status = 'succeeded' AND finished_at >= %(since)s
+                        ) AS avg_duration,
+                    MAX(EXTRACT(EPOCH FROM %(now)s - scheduled_at))
+                        FILTER (WHERE status = 'todo') AS oldest_pending_age
+                FROM procrastinate_jobs
+                GROUP BY queue_name
+                """,
+                {"since": thirty_days_ago, "now": now},
+            )
+            rows = await cur.fetchall()
+
+        entries: list[QueueMetricsEntry] = []
+        total_pending = 0
+        total_in_progress = 0
+        total_failed = 0
+        total_succeeded = 0
+        max_oldest: float | None = None
+
+        for row in rows:
+            entry = QueueMetricsEntry(
+                queue=row[0],
+                pending=row[1] or 0,
+                in_progress=row[2] or 0,
+                succeeded_30d=row[3] or 0,
+                failed_30d=row[4] or 0,
+                avg_duration_seconds=float(row[5]) if row[5] is not None else None,
+                oldest_pending_age_seconds=(
+                    float(row[6]) if row[6] is not None else None
+                ),
+            )
+            entries.append(entry)
+            total_pending += entry.pending
+            total_in_progress += entry.in_progress
+            total_failed += entry.failed_30d
+            total_succeeded += entry.succeeded_30d
+            if entry.oldest_pending_age_seconds is not None:
+                if max_oldest is None or entry.oldest_pending_age_seconds > max_oldest:
+                    max_oldest = entry.oldest_pending_age_seconds
+
+        return QueueMetrics(
+            queues=entries,
+            total_pending=total_pending,
+            total_in_progress=total_in_progress,
+            total_failed_30d=total_failed,
+            total_succeeded_30d=total_succeeded,
+            oldest_pending_age_seconds=max_oldest,
+        )
 
     async def start_worker(self, queues: list[str]) -> None:
         """

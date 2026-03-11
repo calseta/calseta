@@ -13,6 +13,7 @@ All task handlers registered in app/queue/registry.py must be idempotent
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 
@@ -22,6 +23,31 @@ class TaskStatus(StrEnum):
     SUCCESS = "success"
     FAILED = "failed"
     DEAD_LETTER = "dead_letter"
+
+
+@dataclass
+class QueueMetricsEntry:
+    """Metrics for a single named queue."""
+
+    queue: str
+    pending: int = 0
+    in_progress: int = 0
+    succeeded_30d: int = 0
+    failed_30d: int = 0
+    avg_duration_seconds: float | None = None
+    oldest_pending_age_seconds: float | None = None
+
+
+@dataclass
+class QueueMetrics:
+    """Aggregated queue health metrics."""
+
+    queues: list[QueueMetricsEntry] = field(default_factory=list)
+    total_pending: int = 0
+    total_in_progress: int = 0
+    total_failed_30d: int = 0
+    total_succeeded_30d: int = 0
+    oldest_pending_age_seconds: float | None = None
 
 
 class TaskQueueBase(ABC):
@@ -64,6 +90,10 @@ class TaskQueueBase(ABC):
     @abstractmethod
     async def get_task_status(self, task_id: str) -> TaskStatus:
         """Return the current status of a previously enqueued task."""
+
+    @abstractmethod
+    async def get_queue_metrics(self) -> QueueMetrics:
+        """Return health metrics for all known queues."""
 
     @abstractmethod
     async def start_worker(self, queues: list[str]) -> None:
