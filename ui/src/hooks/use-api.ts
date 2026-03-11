@@ -263,13 +263,19 @@ export function useExecuteWorkflow() {
 }
 
 // Approvals
-export function useApprovals(statusFilter?: string) {
-  const qs = statusFilter ? `?status=${statusFilter}` : "";
+export function useApprovals(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
   return useQuery({
-    queryKey: ["approvals", statusFilter],
+    queryKey: ["approvals", qs],
     queryFn: () =>
       api.get<PaginatedResponse<WorkflowApproval>>(
-        `/workflow-approvals${qs}`,
+        `/workflow-approvals${qs ? `?${qs}` : ""}`,
       ),
   });
 }
@@ -403,10 +409,17 @@ export function useDeleteContextDocument() {
 }
 
 // Sources
-export function useSources() {
+export function useSources(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
   return useQuery({
-    queryKey: ["sources"],
-    queryFn: () => api.get<PaginatedResponse<SourceIntegration>>("/sources"),
+    queryKey: ["sources", qs],
+    queryFn: () => api.get<PaginatedResponse<SourceIntegration>>(`/sources${qs ? `?${qs}` : ""}`),
   });
 }
 
@@ -428,11 +441,18 @@ export function useDeleteSource() {
 }
 
 // Agents
-export function useAgents() {
+export function useAgents(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
   return useQuery({
-    queryKey: ["agents"],
+    queryKey: ["agents", qs],
     queryFn: () =>
-      api.get<PaginatedResponse<AgentRegistration>>("/agents"),
+      api.get<PaginatedResponse<AgentRegistration>>(`/agents${qs ? `?${qs}` : ""}`),
   });
 }
 
@@ -494,10 +514,17 @@ export function useDispatchAgent() {
 }
 
 // API Keys
-export function useApiKeys() {
+export function useApiKeys(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
   return useQuery({
-    queryKey: ["api-keys"],
-    queryFn: () => api.get<PaginatedResponse<ApiKeyResponse>>("/api-keys"),
+    queryKey: ["api-keys", qs],
+    queryFn: () => api.get<PaginatedResponse<ApiKeyResponse>>(`/api-keys${qs ? `?${qs}` : ""}`),
   });
 }
 

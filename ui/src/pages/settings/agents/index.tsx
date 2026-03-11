@@ -27,7 +27,9 @@ import {
 } from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { TablePagination } from "@/components/table-pagination";
 import { useAgents, useCreateAgent, useDeleteAgent } from "@/hooks/use-api";
+import { useTableState } from "@/hooks/use-table-state";
 import { formatDate } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
 import { Plus, Trash2, Bot, RefreshCw } from "lucide-react";
@@ -44,13 +46,15 @@ const AGENT_COLUMNS: ColumnDef[] = [
 ];
 
 export function AgentsPage() {
-  const { data, isLoading, refetch, isFetching } = useAgents();
+  const { page, setPage, pageSize, handlePageSizeChange, params } = useTableState({});
+  const { data, isLoading, refetch, isFetching } = useAgents(params);
   const createAgent = useCreateAgent();
   const deleteAgent = useDeleteAgent();
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ uuid: string; name: string } | null>(null);
 
   const agents = data?.data ?? [];
+  const meta = data?.meta;
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -100,7 +104,7 @@ export function AgentsPage() {
             >
               <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
             </Button>
-            <span className="text-xs text-dim">{agents.length} agents</span>
+            <span className="text-xs text-dim">{meta?.total ?? agents.length} agents</span>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -212,6 +216,16 @@ export function AgentsPage() {
             </TableBody>
           </ResizableTable>
         </div>
+
+        {meta && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalPages={meta.total_pages}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        )}
       </div>
 
       <ConfirmDialog

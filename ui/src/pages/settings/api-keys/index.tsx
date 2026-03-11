@@ -26,10 +26,25 @@ import {
 } from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { TablePagination } from "@/components/table-pagination";
 import { useApiKeys, useCreateApiKey, useDeactivateApiKey } from "@/hooks/use-api";
+import { useTableState } from "@/hooks/use-table-state";
 import { formatDate } from "@/lib/format";
-import { Plus, Ban, Copy, Check, Key, RefreshCw } from "lucide-react";
+import { Plus, Ban, Copy, Check, Key, RefreshCw, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const ALL_SCOPES = [
+  "alerts:read",
+  "alerts:write",
+  "enrichments:read",
+  "workflows:read",
+  "workflows:execute",
+  "agents:read",
+  "agents:write",
+  "admin",
+];
+
+const ALL_SOURCES = ["sentinel", "elastic", "splunk", "generic"];
 
 const AK_COLUMNS: ColumnDef[] = [
   { key: "prefix", initialWidth: 140, minWidth: 100 },
@@ -42,7 +57,8 @@ const AK_COLUMNS: ColumnDef[] = [
 ];
 
 export function ApiKeysPage() {
-  const { data, isLoading, refetch, isFetching } = useApiKeys();
+  const { page, setPage, pageSize, handlePageSizeChange, params } = useTableState({});
+  const { data, isLoading, refetch, isFetching } = useApiKeys(params);
   const createKey = useCreateApiKey();
   const deactivateKey = useDeactivateApiKey();
   const [open, setOpen] = useState(false);
@@ -50,24 +66,49 @@ export function ApiKeysPage() {
   const [copied, setCopied] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<{ uuid: string; prefix: string } | null>(null);
 
-  const keys = data?.data ?? [];
+  // Create form state
+  const [createName, setCreateName] = useState("");
+  const [createScopes, setCreateScopes] = useState<string[]>([...ALL_SCOPES]);
+  const [createSources, setCreateSources] = useState<string[]>([]);
+  const [createExpiry, setCreateExpiry] = useState("");
 
-  function handleCreate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    createKey.mutate(
-      {
-        name: fd.get("name") as string,
-        scopes: ["alerts:read", "alerts:write", "enrichments:read", "workflows:read", "workflows:execute", "agents:read", "agents:write", "admin"],
-      },
-      {
-        onSuccess: (resp) => {
-          setNewKey((resp as { data: { key: string } }).data.key);
-          toast.success("API key created");
-        },
-        onError: () => toast.error("Failed to create API key"),
-      },
+  const keys = data?.data ?? [];
+  const meta = data?.meta;
+
+  function resetCreateForm() {
+    setCreateName("");
+    setCreateScopes([...ALL_SCOPES]);
+    setCreateSources([]);
+    setCreateExpiry("");
+  }
+
+  function toggleCreateScope(scope: string) {
+    setCreateScopes((prev) =>
+      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope],
     );
+  }
+
+  function toggleCreateSource(source: string) {
+    setCreateSources((prev) =>
+      prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source],
+    );
+  }
+
+  function handleCreate() {
+    const body: Record<string, unknown> = {
+      name: createName,
+      scopes: createScopes,
+    };
+    if (createSources.length > 0) body.allowed_sources = createSources;
+    if (createExpiry) body.expires_at = new Date(createExpiry).toISOString();
+
+    createKey.mutate(body, {
+      onSuccess: (resp) => {
+        setNewKey((resp as { data: { key: string } }).data.key);
+        toast.success("API key created");
+      },
+      onError: () => toast.error("Failed to create API key"),
+    });
   }
 
   function handleCopy() {
@@ -103,13 +144,13 @@ export function ApiKeysPage() {
             >
               <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
             </Button>
-            <span className="text-xs text-dim">{keys.length} keys</span>
+            <span className="text-xs text-dim">{meta?.total ?? keys.length} keys</span>
           </div>
           <Dialog
             open={open}
             onOpenChange={(v) => {
               setOpen(v);
-              if (!v) setNewKey(null);
+              if (!v) { setNewKey(null); resetCreateForm(); }
             }}
           >
             <DialogTrigger asChild>
@@ -118,7 +159,7 @@ export function ApiKeysPage() {
                 Create Key
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border">
+            <DialogContent className="bg-card border-border max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {newKey ? "Key Created" : "Create API Key"}
@@ -152,6 +193,7 @@ export function ApiKeysPage() {
                     onClick={() => {
                       setOpen(false);
                       setNewKey(null);
+                      resetCreateForm();
                     }}
                     className="w-full bg-teal text-white hover:bg-teal-dim"
                   >
@@ -159,29 +201,98 @@ export function ApiKeysPage() {
                   </Button>
                 </div>
               ) : (
-                <form onSubmit={handleCreate} className="space-y-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">
-                      Name
-                    </Label>
+                <div className="space-y-4">
+                  {/* Name */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Name *</Label>
                     <Input
-                      name="name"
-                      required
+                      value={createName}
+                      onChange={(e) => setCreateName(e.target.value)}
                       placeholder="e.g. my-agent, admin-key"
-                      className="mt-1 bg-surface border-border text-sm"
+                      className="bg-surface border-border text-sm"
                     />
                   </div>
-                  <p className="text-xs text-dim">
-                    All scopes will be granted. Edit scopes on the detail page after creation.
-                  </p>
+
+                  {/* Scopes */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Scopes</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {ALL_SCOPES.map((scope) => {
+                        const selected = createScopes.includes(scope);
+                        return (
+                          <button
+                            key={scope}
+                            type="button"
+                            onClick={() => toggleCreateScope(scope)}
+                            className={cn(
+                              "px-2.5 py-1 rounded-md text-xs border transition-colors",
+                              selected
+                                ? "bg-teal/15 border-teal/40 text-teal-light"
+                                : "bg-surface border-border text-dim hover:border-teal/30",
+                            )}
+                          >
+                            {scope}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Allowed Sources */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Allowed Sources</Label>
+                    <p className="text-[11px] text-dim">
+                      {createSources.length === 0
+                        ? "Unrestricted — key can ingest from any source."
+                        : `Restricted to ${createSources.length} source(s).`}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {ALL_SOURCES.map((source) => {
+                        const selected = createSources.includes(source);
+                        return (
+                          <button
+                            key={source}
+                            type="button"
+                            onClick={() => toggleCreateSource(source)}
+                            className={cn(
+                              "px-2.5 py-1 rounded-md text-xs border transition-colors",
+                              selected
+                                ? "bg-teal/15 border-teal/40 text-teal-light"
+                                : "bg-surface border-border text-dim hover:border-teal/30",
+                            )}
+                          >
+                            {source}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Expiration */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">
+                      <Calendar className="h-3.5 w-3.5 inline mr-1" />
+                      Expiration
+                    </Label>
+                    <Input
+                      type="datetime-local"
+                      value={createExpiry}
+                      onChange={(e) => setCreateExpiry(e.target.value)}
+                      className="bg-surface border-border text-sm"
+                    />
+                    <p className="text-[11px] text-dim">
+                      Leave empty for a non-expiring key.
+                    </p>
+                  </div>
+
                   <Button
-                    type="submit"
-                    disabled={createKey.isPending}
+                    onClick={handleCreate}
+                    disabled={createKey.isPending || !createName.trim() || createScopes.length === 0}
                     className="w-full bg-teal text-white hover:bg-teal-dim"
                   >
                     Create
                   </Button>
-                </form>
+                </div>
               )}
             </DialogContent>
           </Dialog>
@@ -285,6 +396,16 @@ export function ApiKeysPage() {
             </TableBody>
           </ResizableTable>
         </div>
+
+        {meta && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalPages={meta.total_pages}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        )}
       </div>
 
       <ConfirmDialog

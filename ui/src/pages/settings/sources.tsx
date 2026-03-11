@@ -33,7 +33,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CopyableText } from "@/components/copyable-text";
+import { TablePagination } from "@/components/table-pagination";
 import { useSources, useCreateSource, useDeleteSource } from "@/hooks/use-api";
+import { useTableState } from "@/hooks/use-table-state";
 import { formatDate } from "@/lib/format";
 import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 
@@ -61,7 +63,8 @@ const SOURCE_DOC_SLUGS: Record<string, string> = {
 };
 
 export function SourcesPage() {
-  const { data, isLoading } = useSources();
+  const { page, setPage, pageSize, handlePageSizeChange, params } = useTableState({});
+  const { data, isLoading } = useSources(params);
   const createSource = useCreateSource();
   const deleteSource = useDeleteSource();
   const [open, setOpen] = useState(false);
@@ -70,6 +73,7 @@ export function SourcesPage() {
   const [expandedSource, setExpandedSource] = useState<string | null>(null);
 
   const sources = data?.data ?? [];
+  const meta = data?.meta;
   const origin = typeof window !== "undefined" ? window.location.origin : "https://your-calseta-host";
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
@@ -114,7 +118,7 @@ export function SourcesPage() {
     <AppLayout title="Alert Sources">
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <span className="text-xs text-dim">{sources.length} sources</span>
+          <span className="text-xs text-dim">{meta?.total ?? sources.length} sources</span>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="bg-teal text-white hover:bg-teal-dim">
@@ -260,6 +264,16 @@ export function SourcesPage() {
             </TableBody>
           </ResizableTable>
         </div>
+
+        {meta && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalPages={meta.total_pages}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        )}
       </div>
 
       <ConfirmDialog

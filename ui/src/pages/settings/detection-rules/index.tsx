@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -44,7 +45,8 @@ import { formatDate, severityColor } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
 import { SortableColumnHeader } from "@/components/sortable-column-header";
 import { ColumnFilterPopover } from "@/components/column-filter-popover";
-import { Plus, Trash2, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { TablePagination } from "@/components/table-pagination";
+import { Plus, Trash2, RefreshCw, X, Save, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DR_COLUMNS: ColumnDef[] = [
@@ -72,6 +74,8 @@ const SEVERITY_OPTIONS = [
   { value: "Informational", label: "Informational", colorClass: severityColor("Informational") },
   { value: "Pending", label: "Pending", colorClass: severityColor("Pending") },
 ];
+
+const SEVERITY_VALUES = ["Critical", "High", "Medium", "Low", "Informational", "Pending"];
 
 // Map UI column keys to API sort_by values
 const SORT_KEY_MAP: Record<string, string> = {
@@ -103,6 +107,25 @@ export function DetectionRulesPage() {
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ uuid: string; name: string } | null>(null);
 
+  // Create form state
+  const [createDraft, setCreateDraft] = useState({
+    name: "",
+    source_rule_id: "",
+    source_name: "",
+    severity: "",
+    run_frequency: "",
+    created_by: "",
+    documentation: "",
+    mitre_tactics: [] as string[],
+    mitre_techniques: [] as string[],
+    mitre_subtechniques: [] as string[],
+    data_sources: [] as string[],
+  });
+  const [newTactic, setNewTactic] = useState("");
+  const [newTechnique, setNewTechnique] = useState("");
+  const [newSubtechnique, setNewSubtechnique] = useState("");
+  const [newDataSource, setNewDataSource] = useState("");
+
   const rules = data?.data ?? [];
   const meta = data?.meta;
 
@@ -120,32 +143,64 @@ export function DetectionRulesPage() {
     ? { column: reverseSortKeyMap[sort.column] ?? sort.column, order: sort.order }
     : null;
 
-  function handleCreate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+  function resetCreateDraft() {
+    setCreateDraft({
+      name: "",
+      source_rule_id: "",
+      source_name: "",
+      severity: "",
+      run_frequency: "",
+      created_by: "",
+      documentation: "",
+      mitre_tactics: [],
+      mitre_techniques: [],
+      mitre_subtechniques: [],
+      data_sources: [],
+    });
+    setNewTactic("");
+    setNewTechnique("");
+    setNewSubtechnique("");
+    setNewDataSource("");
+  }
 
-    const tacticsRaw = (fd.get("mitre_tactics") as string).trim();
-    const techniquesRaw = (fd.get("mitre_techniques") as string).trim();
-    const subtechniquesRaw = (fd.get("mitre_subtechniques") as string).trim();
-    const dataSourcesRaw = (fd.get("data_sources") as string).trim();
+  function updateDraft(key: string, value: unknown) {
+    setCreateDraft((prev) => ({ ...prev, [key]: value }));
+  }
 
+  function addToList(key: string, value: string, resetFn: (v: string) => void) {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const list = (createDraft[key as keyof typeof createDraft] as string[]) ?? [];
+    if (!list.includes(trimmed)) {
+      updateDraft(key, [...list, trimmed]);
+    }
+    resetFn("");
+  }
+
+  function removeFromList(key: string, value: string) {
+    const list = (createDraft[key as keyof typeof createDraft] as string[]) ?? [];
+    updateDraft(key, list.filter((v) => v !== value));
+  }
+
+  function handleCreate() {
     createRule.mutate(
       {
-        name: fd.get("name") as string,
-        source_rule_id: (fd.get("source_rule_id") as string) || undefined,
-        source_name: (fd.get("source_name") as string) || undefined,
-        severity: (fd.get("severity") as string) || undefined,
-        mitre_tactics: tacticsRaw ? tacticsRaw.split(",").map((s) => s.trim()) : [],
-        mitre_techniques: techniquesRaw ? techniquesRaw.split(",").map((s) => s.trim()) : [],
-        mitre_subtechniques: subtechniquesRaw ? subtechniquesRaw.split(",").map((s) => s.trim()) : [],
-        data_sources: dataSourcesRaw ? dataSourcesRaw.split(",").map((s) => s.trim()) : [],
-        run_frequency: (fd.get("run_frequency") as string) || undefined,
-        created_by: (fd.get("created_by") as string) || undefined,
-        documentation: (fd.get("documentation") as string) || undefined,
+        name: createDraft.name,
+        source_rule_id: createDraft.source_rule_id || undefined,
+        source_name: createDraft.source_name || undefined,
+        severity: createDraft.severity || undefined,
+        mitre_tactics: createDraft.mitre_tactics,
+        mitre_techniques: createDraft.mitre_techniques,
+        mitre_subtechniques: createDraft.mitre_subtechniques,
+        data_sources: createDraft.data_sources,
+        run_frequency: createDraft.run_frequency || undefined,
+        created_by: createDraft.created_by || undefined,
+        documentation: createDraft.documentation || undefined,
       },
       {
         onSuccess: () => {
           setOpen(false);
+          resetCreateDraft();
           toast.success("Detection rule created");
         },
         onError: () => toast.error("Failed to create detection rule"),
@@ -198,7 +253,13 @@ export function DetectionRulesPage() {
               </span>
             )}
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog
+            open={open}
+            onOpenChange={(v) => {
+              setOpen(v);
+              if (!v) resetCreateDraft();
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm" className="bg-teal text-white hover:bg-teal-dim">
                 <Plus className="h-3.5 w-3.5 mr-1" />
@@ -209,41 +270,245 @@ export function DetectionRulesPage() {
               <DialogHeader>
                 <DialogTitle>Create Detection Rule</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-3">
-                <Field label="Name" name="name" required />
+
+              <div className="space-y-4 py-2">
+                {/* Name */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm text-muted-foreground">Name *</Label>
+                  <Input
+                    value={createDraft.name}
+                    onChange={(e) => updateDraft("name", e.target.value)}
+                    className="bg-surface border-border text-sm"
+                  />
+                </div>
+
+                {/* Source Rule ID + Source Name */}
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Source Rule ID" name="source_rule_id" />
-                  <Field label="Source Name" name="source_name" />
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Source Rule ID</Label>
+                    <Input
+                      value={createDraft.source_rule_id}
+                      onChange={(e) => updateDraft("source_rule_id", e.target.value)}
+                      className="bg-surface border-border text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Source Name</Label>
+                    <Input
+                      value={createDraft.source_name}
+                      onChange={(e) => updateDraft("source_name", e.target.value)}
+                      className="bg-surface border-border text-sm"
+                    />
+                  </div>
                 </div>
+
+                {/* Severity + Run Frequency */}
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Severity" name="severity" placeholder="e.g. High, Critical" />
-                  <Field label="Run Frequency" name="run_frequency" placeholder="e.g. 5m, 1h" />
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Severity</Label>
+                    <Select value={createDraft.severity} onValueChange={(v) => updateDraft("severity", v)}>
+                      <SelectTrigger className="bg-surface border-border text-sm">
+                        <SelectValue placeholder="Select severity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SEVERITY_VALUES.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Run Frequency</Label>
+                    <Input
+                      value={createDraft.run_frequency}
+                      onChange={(e) => updateDraft("run_frequency", e.target.value)}
+                      placeholder="e.g. 5m, 1h"
+                      className="bg-surface border-border text-sm"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">MITRE Tactics</Label>
-                  <Input name="mitre_tactics" className="mt-1 bg-surface border-border text-sm" placeholder="Comma-separated: Initial Access, Execution" />
+
+                {/* Created By */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm text-muted-foreground">Created By</Label>
+                  <Input
+                    value={createDraft.created_by}
+                    onChange={(e) => updateDraft("created_by", e.target.value)}
+                    placeholder="Author name or team"
+                    className="bg-surface border-border text-sm"
+                  />
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">MITRE Techniques</Label>
-                  <Input name="mitre_techniques" className="mt-1 bg-surface border-border text-sm" placeholder="Comma-separated: T1566, T1059" />
+
+                {/* MITRE ATT&CK */}
+                <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">MITRE ATT&CK</span>
+
+                  {/* Tactics */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Tactics</Label>
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {createDraft.mitre_tactics.map((t) => (
+                        <Badge key={t} variant="outline" className="text-[11px] text-teal bg-teal/10 border-teal/30 gap-1">
+                          {t}
+                          <button type="button" onClick={() => removeFromList("mitre_tactics", t)} className="hover:text-red-400">
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Input
+                        value={newTactic}
+                        onChange={(e) => setNewTactic(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addToList("mitre_tactics", newTactic, setNewTactic))}
+                        placeholder="e.g. Execution"
+                        className="bg-card border-border text-sm h-7"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => addToList("mitre_tactics", newTactic, setNewTactic)}
+                        className="h-7 px-2 border-border"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Techniques */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Techniques</Label>
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {createDraft.mitre_techniques.map((t) => (
+                        <Badge key={t} variant="outline" className="text-[11px] text-foreground border-border gap-1">
+                          {t}
+                          <button type="button" onClick={() => removeFromList("mitre_techniques", t)} className="hover:text-red-400">
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Input
+                        value={newTechnique}
+                        onChange={(e) => setNewTechnique(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addToList("mitre_techniques", newTechnique, setNewTechnique))}
+                        placeholder="e.g. T1204"
+                        className="bg-card border-border text-sm h-7"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => addToList("mitre_techniques", newTechnique, setNewTechnique)}
+                        className="h-7 px-2 border-border"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Sub-techniques */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Sub-techniques</Label>
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {createDraft.mitre_subtechniques.map((t) => (
+                        <Badge key={t} variant="outline" className="text-[11px] text-foreground border-border gap-1">
+                          {t}
+                          <button type="button" onClick={() => removeFromList("mitre_subtechniques", t)} className="hover:text-red-400">
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Input
+                        value={newSubtechnique}
+                        onChange={(e) => setNewSubtechnique(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addToList("mitre_subtechniques", newSubtechnique, setNewSubtechnique))}
+                        placeholder="e.g. T1204.002"
+                        className="bg-card border-border text-sm h-7"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => addToList("mitre_subtechniques", newSubtechnique, setNewSubtechnique)}
+                        className="h-7 px-2 border-border"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">MITRE Sub-techniques</Label>
-                  <Input name="mitre_subtechniques" className="mt-1 bg-surface border-border text-sm" placeholder="Comma-separated: T1566.001, T1059.001" />
+
+                {/* Data Sources */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm text-muted-foreground">Data Sources</Label>
+                  <div className="flex flex-wrap gap-1 mb-1.5">
+                    {createDraft.data_sources.map((ds) => (
+                      <Badge key={ds} variant="outline" className="text-[11px] text-foreground border-border gap-1">
+                        {ds}
+                        <button type="button" onClick={() => removeFromList("data_sources", ds)} className="hover:text-red-400">
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Input
+                      value={newDataSource}
+                      onChange={(e) => setNewDataSource(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addToList("data_sources", newDataSource, setNewDataSource))}
+                      placeholder="e.g. Endpoint File Creation Events"
+                      className="bg-surface border-border text-sm"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addToList("data_sources", newDataSource, setNewDataSource)}
+                      className="h-8 px-2 border-border"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Data Sources</Label>
-                  <Input name="data_sources" className="mt-1 bg-surface border-border text-sm" placeholder="Comma-separated: Process, Network Traffic" />
+
+                {/* Documentation */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm text-muted-foreground">Documentation</Label>
+                  <Textarea
+                    value={createDraft.documentation}
+                    onChange={(e) => updateDraft("documentation", e.target.value)}
+                    className="bg-surface border-border text-sm"
+                    rows={3}
+                  />
                 </div>
-                <Field label="Created By" name="created_by" placeholder="Author name or team" />
-                <div>
-                  <Label className="text-xs text-muted-foreground">Documentation</Label>
-                  <Textarea name="documentation" className="mt-1 bg-surface border-border text-sm" rows={3} />
-                </div>
-                <Button type="submit" disabled={createRule.isPending} className="w-full bg-teal text-white hover:bg-teal-dim">
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => { setOpen(false); resetCreateDraft(); }}
+                  className="border-border"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreate}
+                  disabled={createRule.isPending || !createDraft.name.trim()}
+                  className="bg-teal text-white hover:bg-teal-dim"
+                >
+                  {createRule.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                  )}
                   Create
                 </Button>
-              </form>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -371,49 +636,14 @@ export function DetectionRulesPage() {
           </ResizableTable>
         </div>
 
-        {/* Pagination */}
         {meta && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-dim">Rows per page</span>
-              <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
-                <SelectTrigger className="h-7 w-[80px] bg-card border-border text-xs text-dim">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                  <SelectItem value="250">250</SelectItem>
-                  <SelectItem value="500">500</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-dim">
-                Page {meta.page} of {meta.total_pages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= meta.total_pages}
-                onClick={() => setPage((p) => p + 1)}
-                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalPages={meta.total_pages}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+          />
         )}
       </div>
 
@@ -426,24 +656,5 @@ export function DetectionRulesPage() {
         onConfirm={handleDelete}
       />
     </AppLayout>
-  );
-}
-
-function Field({
-  label,
-  name,
-  required,
-  placeholder,
-}: {
-  label: string;
-  name: string;
-  required?: boolean;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Input name={name} required={required} placeholder={placeholder} className="mt-1 bg-surface border-border text-sm" />
-    </div>
   );
 }

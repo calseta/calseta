@@ -22,11 +22,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { TablePagination } from "@/components/table-pagination";
 import {
   useApprovals,
   useApproveWorkflow,
   useRejectWorkflow,
 } from "@/hooks/use-api";
+import { useTableState } from "@/hooks/use-table-state";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { WorkflowApproval } from "@/lib/types";
@@ -158,16 +160,19 @@ function TargetCell({ tc }: { tc: Record<string, unknown> }) {
 }
 
 export function ApprovalsPage() {
-  const { data, isLoading, refetch, isFetching } = useApprovals();
+  const { page, setPage, pageSize, handlePageSizeChange, params } = useTableState({});
+  const { data, isLoading, refetch, isFetching } = useApprovals(params);
   const approve = useApproveWorkflow();
   const reject = useRejectWorkflow();
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
 
   const approvals = data?.data ?? [];
+  const meta = data?.meta;
 
   return (
     <AppLayout title="Workflow Approvals">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="space-y-4">
+      <div className="flex items-center gap-2">
         <Button
           variant="ghost"
           size="sm"
@@ -177,6 +182,11 @@ export function ApprovalsPage() {
         >
           <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
         </Button>
+        {meta && (
+          <span className="text-xs text-dim">
+            {meta.total} approval{meta.total !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
       <div className="rounded-lg border border-border bg-card">
         <ResizableTable storageKey="workflow-approvals" columns={APPROVAL_COLUMNS}>
@@ -371,6 +381,17 @@ export function ApprovalsPage() {
             )}
           </TableBody>
         </ResizableTable>
+      </div>
+
+      {meta && (
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalPages={meta.total_pages}
+          onPageChange={setPage}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
       </div>
 
       <ConfirmDialog

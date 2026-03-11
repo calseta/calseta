@@ -32,11 +32,13 @@ import {
 } from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { TablePagination } from "@/components/table-pagination";
 import {
   useIndicatorMappings,
   useCreateIndicatorMapping,
   useDeleteIndicatorMapping,
 } from "@/hooks/use-api";
+import { useTableState } from "@/hooks/use-table-state";
 import { formatDate } from "@/lib/format";
 import { Plus, Trash2, Lock } from "lucide-react";
 
@@ -59,7 +61,8 @@ const EXTRACTION_TARGETS = [
 const SOURCE_OPTIONS = ["sentinel", "elastic", "splunk", "generic"];
 
 export function IndicatorMappingsPage() {
-  const { data, isLoading } = useIndicatorMappings({ page_size: 200 });
+  const { page, setPage, pageSize, handlePageSizeChange, params } = useTableState({});
+  const { data, isLoading } = useIndicatorMappings(params);
   const createMapping = useCreateIndicatorMapping();
   const deleteMapping = useDeleteIndicatorMapping();
   const [open, setOpen] = useState(false);
@@ -71,6 +74,7 @@ export function IndicatorMappingsPage() {
   const [formType, setFormType] = useState("");
 
   const mappings = data?.data ?? [];
+  const meta = data?.meta;
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -116,7 +120,7 @@ export function IndicatorMappingsPage() {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <div>
-            <span className="text-xs text-dim">{mappings.length} mappings</span>
+            <span className="text-xs text-dim">{meta?.total ?? mappings.length} mappings</span>
             <p className="text-[11px] text-dim mt-0.5">
               Define how IOCs are extracted from alert payloads. System mappings apply to all sources.
             </p>
@@ -296,6 +300,16 @@ export function IndicatorMappingsPage() {
             </TableBody>
           </ResizableTable>
         </div>
+
+        {meta && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalPages={meta.total_pages}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        )}
       </div>
 
       <ConfirmDialog

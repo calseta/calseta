@@ -40,7 +40,8 @@ import { WORKFLOW_TEMPLATES } from "@/lib/workflow-templates";
 import { CopyableText } from "@/components/copyable-text";
 import { SortableColumnHeader } from "@/components/sortable-column-header";
 import { ColumnFilterPopover } from "@/components/column-filter-popover";
-import { ShieldCheck, Code, Plus, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { TablePagination } from "@/components/table-pagination";
+import { ShieldCheck, Code, Plus, RefreshCw, X } from "lucide-react";
 
 const WF_COLUMNS: ColumnDef[] = [
   { key: "name", initialWidth: 380, minWidth: 200 },
@@ -569,49 +570,14 @@ export function WorkflowsListPage() {
           </ResizableTable>
         </div>
 
-        {/* Pagination */}
         {meta && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-dim">Rows per page</span>
-              <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
-                <SelectTrigger className="h-7 w-[80px] bg-card border-border text-xs text-dim">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                  <SelectItem value="250">250</SelectItem>
-                  <SelectItem value="500">500</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-dim">
-                Page {meta.page} of {meta.total_pages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= meta.total_pages}
-                onClick={() => setPage((p) => p + 1)}
-                className="h-7 w-7 p-0 bg-card border-border text-muted-foreground"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalPages={meta.total_pages}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+          />
         )}
       </div>
     </AppLayout>
