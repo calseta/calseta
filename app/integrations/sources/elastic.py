@@ -110,7 +110,11 @@ class ElasticSource(AlertSourceBase):
             occurred_at = datetime.now().astimezone()
 
         # Description: prefer rule description, fall back to reason
-        description = _get(raw, "kibana.alert.rule.description") or _get(raw, "kibana.alert.reason") or None
+        description = (
+            _get(raw, "kibana.alert.rule.description")
+            or _get(raw, "kibana.alert.reason")
+            or None
+        )
         # If description equals title, prefer reason as description
         if description and description == str(title):
             description = _get(raw, "kibana.alert.reason") or None

@@ -27,7 +27,9 @@ class Workflow(TimestampMixin, UUIDMixin, Base):
         ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
     time_saved_minutes: Mapped[int | None] = mapped_column(Integer)
-    approval_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="always", server_default="always")
+    approval_mode: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="always", server_default="always"
+    )
     approval_channel: Mapped[str | None] = mapped_column(Text)
     approval_timeout_seconds: Mapped[int] = mapped_column(
         Integer, nullable=False, default=3600

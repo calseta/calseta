@@ -173,9 +173,10 @@ class ProcrastinateBackend(TaskQueueBase):
             total_in_progress += entry.in_progress
             total_failed += entry.failed_30d
             total_succeeded += entry.succeeded_30d
-            if entry.oldest_pending_age_seconds is not None:
-                if max_oldest is None or entry.oldest_pending_age_seconds > max_oldest:
-                    max_oldest = entry.oldest_pending_age_seconds
+            if entry.oldest_pending_age_seconds is not None and (
+                max_oldest is None or entry.oldest_pending_age_seconds > max_oldest
+            ):
+                max_oldest = entry.oldest_pending_age_seconds
 
         return QueueMetrics(
             queues=entries,
