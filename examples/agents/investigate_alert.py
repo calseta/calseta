@@ -30,22 +30,22 @@ Usage:
   make lab
 
   # Investigate with Claude via REST API
-  python examples/live_agent/investigate.py --mode rest --model claude
+  python examples/agents/investigate_alert.py --mode rest --model claude
 
   # Investigate with OpenAI via MCP
-  python examples/live_agent/investigate.py --mode mcp --model openai
+  python examples/agents/investigate_alert.py --mode mcp --model openai
 
   # Target a specific alert
-  python examples/live_agent/investigate.py --alert <uuid>
+  python examples/agents/investigate_alert.py --alert <uuid>
 
   # Investigate all open alerts
-  python examples/live_agent/investigate.py --all
+  python examples/agents/investigate_alert.py --all
 
   # Register as webhook agent (push mode) — listens for alerts from Calseta
-  python examples/live_agent/investigate.py --register
+  python examples/agents/investigate_alert.py --register
 
   # Register with custom port and severity filter
-  python examples/live_agent/investigate.py --register --agent-port 9000 \
+  python examples/agents/investigate_alert.py --register --agent-port 9000 \
     --trigger-severities High,Critical
 
 Environment variables:
@@ -1254,16 +1254,16 @@ def main() -> None:
         epilog="""
 Examples:
   # Investigate one alert with Claude via REST
-  python examples/live_agent/investigate.py --mode rest --model claude
+  python examples/agents/investigate_alert.py --mode rest --model claude
 
   # Investigate via MCP with OpenAI
-  python examples/live_agent/investigate.py --mode mcp --model openai
+  python examples/agents/investigate_alert.py --mode mcp --model openai
 
   # Target a specific alert
-  python examples/live_agent/investigate.py --alert <uuid>
+  python examples/agents/investigate_alert.py --alert <uuid>
 
   # Investigate all open alerts and execute workflows
-  python examples/live_agent/investigate.py --all --execute-workflows
+  python examples/agents/investigate_alert.py --all --execute-workflows
         """,
     )
     parser.add_argument(

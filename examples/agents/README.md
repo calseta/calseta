@@ -16,7 +16,7 @@ set -a && source .env && set +a
 pip install httpx anthropic openai mcp starlette uvicorn
 
 # 4. Run an investigation
-python examples/live_agent/investigate.py --model azure
+python examples/agents/investigate_alert.py --model azure
 ```
 
 ## Modes
@@ -42,7 +42,7 @@ python examples/live_agent/investigate.py --model azure
 Fetch alerts, pick the highest severity one, analyze, post finding.
 
 ```bash
-python examples/live_agent/investigate.py --mode rest --model azure
+python examples/agents/investigate_alert.py --mode rest --model azure
 ```
 
 ### 2. MCP pull investigation
@@ -50,19 +50,19 @@ python examples/live_agent/investigate.py --mode rest --model azure
 Same flow but all data reads/writes go through MCP resources and tools.
 
 ```bash
-python examples/live_agent/investigate.py --mode mcp --model azure
+python examples/agents/investigate_alert.py --mode mcp --model azure
 ```
 
 ### 3. Investigate a specific alert
 
 ```bash
-python examples/live_agent/investigate.py --alert <uuid> --model azure
+python examples/agents/investigate_alert.py --alert <uuid> --model azure
 ```
 
 ### 4. Investigate all open alerts
 
 ```bash
-python examples/live_agent/investigate.py --all --model azure
+python examples/agents/investigate_alert.py --all --model azure
 ```
 
 ### 5. Investigate with workflow execution
@@ -70,7 +70,7 @@ python examples/live_agent/investigate.py --all --model azure
 LLM analyzes the alert and recommends a workflow — this flag actually executes it.
 
 ```bash
-python examples/live_agent/investigate.py --model azure --execute-workflows
+python examples/agents/investigate_alert.py --model azure --execute-workflows
 ```
 
 ### 6. Webhook registration mode (push)
@@ -80,18 +80,18 @@ alerts automatically as they arrive. Deregisters on Ctrl+C.
 
 ```bash
 # Basic — listen on port 9000, all alerts
-python examples/live_agent/investigate.py --register --model azure
+python examples/agents/investigate_alert.py --register --model azure
 
 # Filter to high/critical alerts only
-python examples/live_agent/investigate.py --register --model azure \
+python examples/agents/investigate_alert.py --register --model azure \
   --trigger-severities High,Critical
 
 # Custom port + source filter
-python examples/live_agent/investigate.py --register --model azure \
+python examples/agents/investigate_alert.py --register --model azure \
   --agent-port 9001 --trigger-sources sentinel,elastic
 
 # With workflow execution enabled
-python examples/live_agent/investigate.py --register --model azure \
+python examples/agents/investigate_alert.py --register --model azure \
   --trigger-severities Critical --execute-workflows
 ```
 
@@ -114,13 +114,13 @@ Run all combinations to validate both data paths and the LLM provider:
 
 ```bash
 # REST + Azure
-python examples/live_agent/investigate.py --mode rest --model azure --all
+python examples/agents/investigate_alert.py --mode rest --model azure --all
 
 # MCP + Azure
-python examples/live_agent/investigate.py --mode mcp --model azure --all
+python examples/agents/investigate_alert.py --mode mcp --model azure --all
 
 # Webhook + Azure
-python examples/live_agent/investigate.py --register --model azure
+python examples/agents/investigate_alert.py --register --model azure
 ```
 
 ## Environment Variables
@@ -146,7 +146,7 @@ set -a && source .env && set +a
 ## CLI Reference
 
 ```
-python examples/live_agent/investigate.py --help
+python examples/agents/investigate_alert.py --help
 ```
 
 | Flag | Default | Description |

@@ -13,19 +13,30 @@ Calseta is **not** an AI SOC product -- it is the data infrastructure layer. The
 All examples assume a running Calseta instance:
 
 ```bash
-# Start Calseta (API, worker, database)
-docker compose up -d
+# Start Calseta (API, MCP, worker, database)
+make lab
 
-# Create your first API key
+# Or manually:
+docker compose up -d
+```
+
+### API Key
+
+Create an API key (or use the one printed by `make lab`):
+
+```bash
 curl -X POST http://localhost:8000/v1/api-keys \
   -H "Content-Type: application/json" \
-  -d '{"name": "agent-key", "scopes": ["alerts:read", "alerts:write", "agents:read", "agents:write"]}'
+  -d '{"name": "agent-key", "scopes": ["alerts:read", "alerts:write", "agents:read", "agents:write", "workflows:read", "workflows:execute", "enrichments:read"]}'
 # Save the returned key -- it is shown only once
 ```
 
-### Claude API Key
+### LLM API Key
 
-Both sample agents call Claude for reasoning. You need an [Anthropic API key](https://console.anthropic.com/).
+At least one of:
+- `ANTHROPIC_API_KEY` -- for Claude (default)
+- `OPENAI_API_KEY` -- for GPT-4o
+- `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_DEPLOYMENT` -- for Azure OpenAI
 
 ### Python 3.12+
 
@@ -33,176 +44,190 @@ All examples use Python 3.12+ features (type hints, StrEnum, etc.).
 
 ---
 
-## Sample Agents
+## Investigation Agent (`agents/investigate_alert.py`)
 
-### 1. REST API Agent (`sample_agent_python.py`)
+A full-featured CLI agent that runs real LLM-powered SOC investigations against a live Calseta instance. Supports three data modes, three LLM providers, and both pull and push operation.
 
-**Pattern:** Webhook receiver + REST API calls + Claude reasoning
-
-This agent demonstrates the most common integration pattern:
-
-1. Register as an agent with Calseta
-2. Receive alert webhooks when new enriched alerts arrive
-3. Fetch full alert context from the REST API
-4. Build a token-efficient prompt and call Claude
-5. Post the investigation finding back to the alert
-
-#### Setup
+### Install
 
 ```bash
-# Install dependencies (no agent framework required)
-pip install httpx anthropic uvicorn starlette
+pip install httpx anthropic openai mcp uvicorn starlette
+```
 
-# Set environment variables
-export CALSETA_API_URL=http://localhost:8000
+### Quick Start
+
+```bash
 export CALSETA_API_KEY=cai_your_key_here
 export ANTHROPIC_API_KEY=sk-ant-your_key_here
 
-# Start the agent
-python examples/sample_agent_python.py
+# Investigate the highest-severity enriched alert via REST API + Claude
+python examples/agents/investigate_alert.py
+
+# Same thing via MCP
+python examples/agents/investigate_alert.py --mode mcp
+
+# Use OpenAI instead of Claude
+python examples/agents/investigate_alert.py --model openai
+
+# Target a specific alert
+python examples/agents/investigate_alert.py --alert <uuid>
+
+# Investigate all open enriched alerts
+python examples/agents/investigate_alert.py --all
+
+# Execute workflows recommended by the LLM
+python examples/agents/investigate_alert.py --execute-workflows
+
+# Register as a webhook agent (push mode) -- listens for alerts from Calseta
+python examples/agents/investigate_alert.py --register
+
+# Register with custom port and severity filter
+python examples/agents/investigate_alert.py --register --agent-port 9000 \
+  --trigger-severities High,Critical
 ```
 
-The agent starts a webhook listener on port 9000 (configurable via `AGENT_PORT`).
+### Modes
 
-#### Register with Calseta
+| Mode | Flag | Transport | Description |
+|---|---|---|---|
+| REST (pull) | `--mode rest` | HTTP to port 8000 | Direct REST API calls. Default. |
+| MCP (pull) | `--mode mcp` | SSE to port 8001 | MCP protocol -- framework-agnostic, agent-optimized data. |
+| Webhook (push) | `--register` | HTTP listener | Registers with Calseta, receives alert webhooks, investigates on arrival. |
 
-After starting the agent, register it with Calseta so it receives alert webhooks:
+### LLM Providers
 
-```bash
-curl -X POST http://localhost:8000/v1/agents \
-  -H "Authorization: Bearer cai_your_admin_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "sample-investigation-agent",
-    "endpoint_url": "http://localhost:9000/webhook",
-    "trigger_on_severities": ["Medium", "High", "Critical"],
-    "documentation": "Sample Claude-powered investigation agent"
-  }'
+| Provider | Flag | Env Var |
+|---|---|---|
+| Claude | `--model claude` (default) | `ANTHROPIC_API_KEY` |
+| OpenAI GPT-4o | `--model openai` | `OPENAI_API_KEY` |
+| Azure OpenAI | `--model azure` | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` |
+
+### What It Does
+
+1. Creates a short-lived agent-type API key (scoped to investigation)
+2. Lists alerts and selects one (or uses `--alert UUID`)
+3. Fetches full alert context: indicators, enrichment, detection rule, runbooks
+4. Builds a token-efficient prompt and calls the LLM
+5. Posts the investigation finding back to the alert
+6. Optionally executes suggested workflows (`--execute-workflows`)
+7. Revokes the agent API key on exit
+
+### How It Works (Pull Mode)
+
+```
+Calseta                                   Live Agent
+=======                                   ==========
+
+                                          Create agent API key
+                                          |
+              <-- list alerts ----------  GET /v1/alerts (or calseta://alerts)
+              --- alert list ---------->  Select alert
+                                          |
+              <-- get alert -----------  GET /v1/alerts/{uuid}
+              --- full context -------->  Parse indicators, enrichment
+                                          |
+              <-- get context ---------  GET /v1/alerts/{uuid}/context
+              --- playbooks/SOPs ------>  Read investigation guidance
+                                          |
+              <-- get workflows -------  GET /v1/workflows
+              --- workflow catalog ---->  Know available actions
+                                          |
+                                          Build prompt + call LLM
+                                          |
+              <-- post finding --------  POST /v1/alerts/{uuid}/findings
+                                          |
+              <-- execute workflow -----  POST /v1/workflows/{uuid}/execute
+                                          |
+                                          Revoke agent API key
 ```
 
-#### How It Works
+### How It Works (Webhook/Push Mode)
 
 ```
-Calseta Alert Pipeline                    Sample Agent
-========================                  ============
+Calseta Alert Pipeline                    Live Agent (--register)
+======================                    ========================
 
-Alert ingested
-    |
-Indicators extracted
-    |
-Enrichment completed
-    |
-Agent dispatch triggered ----POST /webhook---->  Receive webhook
-                                                    |
-                         <---GET /v1/alerts/{uuid}-- Fetch full context
-                                                    |
-                         <--GET /v1/alerts/{uuid}/-- Fetch playbooks/SOPs
-                              context                |
-                                                 Build prompt
-                                                    |
-                                                 Call Claude API
-                                                    |
-                         <-POST /v1/alerts/{uuid}/-- Post finding
-                              findings
+                                          Register as agent
+                                          Start webhook listener (:9000)
+Alert ingested                            |
+    |                                     |
+Indicators extracted                      |
+    |                                     |
+Enrichment completed                      |
+    |                                     |
+Agent dispatch triggered --POST /webhook-->  Receive webhook
+                                             |
+                         <--GET /v1/alerts/-- Fetch full context
+                              {uuid}         |
+                                             Build prompt + call LLM
+                                             |
+                         <--POST findings --- Post finding
+                                             |
+                                          Deregister + revoke key on Ctrl+C
 ```
 
-#### Environment Variables
+### Environment Variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `CALSETA_API_URL` | No | `http://localhost:8000` | Calseta API base URL |
-| `CALSETA_API_KEY` | Yes | -- | Calseta API key (starts with `cai_`) |
-| `ANTHROPIC_API_KEY` | Yes | -- | Anthropic API key for Claude |
-| `AGENT_PORT` | No | `9000` | Port for the webhook listener |
-| `CLAUDE_MODEL` | No | `claude-sonnet-4-20250514` | Claude model to use |
-| `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
+| `CALSETA_API_URL` | No | `http://localhost:8000` | Calseta REST API base URL |
+| `CALSETA_MCP_URL` | No | `http://localhost:8001/sse` | Calseta MCP SSE endpoint |
+| `CALSETA_API_KEY` | Yes | -- | Calseta API key (`cai_` prefix) |
+| `ANTHROPIC_API_KEY` | For `--model claude` | -- | Anthropic API key |
+| `OPENAI_API_KEY` | For `--model openai` | -- | OpenAI API key |
+| `AZURE_OPENAI_API_KEY` | For `--model azure` | -- | Azure OpenAI API key |
+| `AZURE_OPENAI_ENDPOINT` | For `--model azure` | -- | Azure OpenAI endpoint URL |
+| `AZURE_OPENAI_DEPLOYMENT` | For `--model azure` | -- | Azure OpenAI deployment name |
 
-#### Token Optimization
+### CLI Reference
 
-The sample agent demonstrates several token optimization patterns that reduce Claude API costs:
+```
+python examples/agents/investigate_alert.py --help
+```
 
-- **Structured prompts over raw dumps:** Alert data is formatted as compact `key=value` pairs, not as raw JSON payloads.
-- **Extracted enrichment verdicts:** Only the meaningful fields from enrichment results (verdict, risk_score, country) are included -- not the full provider API response.
-- **Context documents inline:** Applicable playbooks and SOPs are included directly in the prompt so Claude can follow them, eliminating back-and-forth tool calls.
-- **Concise system prompt:** The system prompt defines the output structure upfront, so Claude does not waste tokens on formatting decisions.
+| Flag | Description |
+|---|---|
+| `--mode rest\|mcp` | Data source (default: `rest`) |
+| `--model claude\|openai\|azure` | LLM provider (default: `claude`) |
+| `--alert UUID` | Investigate a specific alert |
+| `--all` | Investigate all open enriched alerts |
+| `--execute-workflows` | Execute LLM-recommended workflows |
+| `--register` | Webhook registration mode (push) |
+| `--agent-port PORT` | Webhook listener port (default: 9000) |
+| `--trigger-severities X,Y` | Severity filter for webhooks |
+| `--trigger-sources X,Y` | Source filter for webhooks |
 
 ---
 
-### 2. MCP Agent (`sample_agent_mcp.py`)
+## Case Study (`case_study/`)
 
-**Pattern:** MCP client + Claude reasoning (no direct REST API calls)
+A before-and-after comparison showing the difference between a naive agent (raw API dumps, no enrichment) and a Calseta-powered agent (structured, enriched, context-rich data).
 
-This agent demonstrates the MCP-native integration pattern, where the agent communicates with Calseta exclusively through the Model Context Protocol server. No direct HTTP calls to the REST API are needed.
+See `case_study/README.md` for details.
 
-The MCP pattern is particularly powerful for agents built with Claude's native tool-use capabilities, as Calseta's MCP resources and tools map directly to Claude's tool interface.
+---
 
-#### Why MCP-Only?
+## Design Philosophy
 
-| Advantage | REST API Agent | MCP Agent |
-|---|---|---|
-| Framework coupling | Must know endpoint paths, pagination, envelopes | Framework-agnostic protocol |
-| Data optimization | Returns raw API responses | Returns agent-optimized, token-efficient data |
-| Discoverability | Must read API docs | Lists resources and tools at runtime |
-| Client compatibility | Custom HTTP client code | Works with any MCP client (Claude Desktop, Cursor, etc.) |
+### Calseta Does the Data Work, Your Agent Does the Reasoning
 
-#### Setup
+Calseta handles: normalization, enrichment, indicator extraction, context matching, deduplication. Your agent receives clean, structured, enriched data and focuses entirely on investigation logic.
 
-```bash
-# Install dependencies
-pip install mcp anthropic
+### Token Efficiency is First-Class
 
-# Set environment variables
-export CALSETA_MCP_URL=http://localhost:8001/sse
-export CALSETA_API_KEY=cai_your_key_here
-export ANTHROPIC_API_KEY=sk-ant-your_key_here
+Every API response and MCP resource is designed to give agents exactly what they need. The `raw` enrichment responses are stripped from default responses. The `_metadata` block tells the agent what data is available without inspecting every field.
 
-# Start the agent
-python examples/sample_agent_mcp.py
-```
+### Framework Agnosticism
 
-No webhook listener is needed -- the MCP agent proactively reads alerts and investigates.
+These examples use raw `httpx` + `anthropic`/`openai` SDKs. No LangChain, no CrewAI, no framework lock-in. The same patterns work with any framework or no framework at all. Calseta's REST API and MCP server are the integration points.
 
-#### How It Works
+### Graceful Degradation
 
-```
-Calseta MCP Server                         Sample MCP Agent
-==================                         ================
+The agent handles missing data gracefully. If enrichment fails, it notes it and adjusts confidence. If context documents are unavailable, it proceeds without them. If the LLM call fails, the error is logged without crashing.
 
-                                            Connect via SSE
-                    <-- initialize --------  Handshake
-                                            |
-                    <-- read resource -----  calseta://alerts
-                    --- alert list -------->  Select alert
-                                            |
-                    <-- read resource -----  calseta://alerts/{uuid}
-                    --- full context ------>  Parse indicators, enrichment
-                                            |
-                    <-- read resource -----  calseta://alerts/{uuid}/context
-                    --- playbooks/SOPs ---->  Read investigation guidance
-                                            |
-                    <-- read resource -----  calseta://workflows
-                    --- workflow catalog -->  Know available actions
-                                            |
-                                            Build prompt with all context
-                                            |
-                                            Call Claude API
-                                            |
-                    <-- call tool ---------  post_alert_finding
-                    --- finding posted ---->  Record analysis
-                                            |
-                    <-- call tool ---------  execute_workflow
-                    --- queued/approved --->  Trigger response action
-```
+---
 
-#### Environment Variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `CALSETA_MCP_URL` | No | `http://localhost:8001/sse` | MCP server SSE endpoint |
-| `CALSETA_API_KEY` | Yes | -- | Calseta API key (starts with `cai_`) |
-| `ANTHROPIC_API_KEY` | Yes | -- | Anthropic API key for Claude |
-
-#### MCP Resources Used
+## MCP Resources
 
 | Resource URI | What It Provides |
 |---|---|
@@ -216,7 +241,7 @@ Calseta MCP Server                         Sample MCP Agent
 | `calseta://enrichments/{type}/{value}` | On-demand indicator enrichment (cache-first) |
 | `calseta://metrics/summary` | SOC health metrics (last 30 days) |
 
-#### MCP Tools Used
+## MCP Tools
 
 | Tool | What It Does |
 |---|---|
@@ -227,63 +252,21 @@ Calseta MCP Server                         Sample MCP Agent
 | `search_alerts` | Search alerts by status, severity, source, time range, tags |
 | `search_detection_rules` | Search rules by name, MITRE tactic/technique, source |
 
-#### Extending the MCP Agent
-
-- **Multi-alert correlation:** Use `search_alerts` tool to find related alerts by tags or time window
-- **On-demand enrichment:** Use `enrich_indicator` tool for indicators not yet enriched
-- **Activity awareness:** Read `calseta://alerts/{uuid}/activity` to check if other agents already investigated
-- **Status management:** Use `update_alert_status` tool to move alerts through the triage pipeline
-- **Metrics context:** Read `calseta://metrics/summary` to understand current SOC health before triaging
-
----
-
-## Design Philosophy
-
-Both sample agents follow the same principles that Calseta is built on:
-
-### Calseta Does the Data Work, Your Agent Does the Reasoning
-
-Calseta handles: normalization, enrichment, indicator extraction, context matching, deduplication. Your agent receives clean, structured, enriched data and focuses entirely on investigation logic.
-
-### Token Efficiency is First-Class
-
-Every API response and webhook payload is designed to give agents exactly what they need. The `raw` enrichment responses are stripped from webhook payloads and API responses (unless specifically requested). The `_metadata` block tells the agent what data is available without having to inspect every field.
-
-### Framework Agnosticism
-
-These examples use raw `httpx` + `anthropic` SDK. No LangChain, no CrewAI, no framework lock-in. The same patterns work with any framework or no framework at all. Calseta's REST API and MCP server are the integration points.
-
-### Graceful Degradation
-
-Both agents handle missing data gracefully. If enrichment fails, the agent notes it and adjusts confidence. If context documents are unavailable, the agent proceeds without them. If the Claude API call fails, the error is logged without crashing.
-
----
-
-## Extending These Examples
-
-These are starting points. Production agents will typically add:
-
-- **Task queue:** Move investigation work out of the webhook request handler into a durable task queue (Redis, SQS, etc.)
-- **Workflow execution:** Call `POST /v1/workflows/{uuid}/execute` to trigger automated response actions when investigation reveals a confirmed threat
-- **Alert status updates:** Call `PATCH /v1/alerts/{uuid}` to move alerts through the triage lifecycle (Open -> Triaging -> Escalated -> Closed)
-- **Multi-model routing:** Use a fast model for initial triage and a capable model for deep investigation
-- **Feedback loops:** Track which findings lead to true positives vs. false positives and use that data to improve prompts
-
 ---
 
 ## Troubleshooting
 
-### Agent not receiving webhooks
+### Agent not receiving webhooks (--register mode)
 
-1. Verify the agent is registered: `curl http://localhost:8000/v1/agents -H "Authorization: Bearer cai_..."`
+1. Verify the agent registered: check the startup log for `Agent registered: <uuid>`
 2. Test webhook delivery: `curl -X POST http://localhost:8000/v1/agents/{uuid}/test -H "Authorization: Bearer cai_..."`
 3. Check the agent's health endpoint: `curl http://localhost:9000/health`
-4. Verify `trigger_on_severities` and `trigger_on_sources` match the alerts being ingested
+4. Verify `--trigger-severities` and `--trigger-sources` match the alerts being ingested
 
-### Claude API errors
+### LLM API errors
 
-- `401`: Check `ANTHROPIC_API_KEY` is set correctly
-- `429`: Rate limited -- the agent does not implement retry/backoff on Claude calls (add this for production)
+- `401`: Check `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` is set correctly
+- `429`: Rate limited -- add retry/backoff for production use
 - `529`: Anthropic API overloaded -- retry with exponential backoff
 
 ### Finding not posted
@@ -292,15 +275,9 @@ These are starting points. Production agents will typically add:
 - Check the agent logs for HTTP error details
 - Verify the alert UUID exists: `curl http://localhost:8000/v1/alerts/{uuid} -H "Authorization: Bearer cai_..."`
 
-### MCP agent cannot connect
+### MCP connection issues (--mode mcp)
 
 - Verify the MCP server is running: `curl http://localhost:8001/sse` should start an SSE stream
-- Check the MCP server logs for authentication failures: `docker compose logs mcp`
-- Verify `CALSETA_API_KEY` is a valid API key with appropriate scopes (`alerts:read`, `alerts:write`, `workflows:execute`, `enrichments:read`)
-- If using a non-default URL, ensure `CALSETA_MCP_URL` includes the `/sse` path
-
-### MCP resource returns empty data
-
-- Verify alerts have been ingested: `curl http://localhost:8000/v1/alerts -H "Authorization: Bearer cai_..."`
-- For enrichment data, verify enrichment providers are configured (check environment variables for `VIRUSTOTAL_API_KEY`, `ABUSEIPDB_API_KEY`, etc.)
-- For context documents, verify at least one document exists and has targeting rules that match the alert
+- Check the MCP server logs: `docker compose logs mcp`
+- Verify `CALSETA_API_KEY` has appropriate scopes
+- Ensure `CALSETA_MCP_URL` includes the `/sse` path
