@@ -314,6 +314,12 @@ def upgrade() -> None:
         sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("allowed_sources", postgresql.ARRAY(sa.Text()), nullable=True),
         sa.Column(
+            "key_type",
+            sa.Text(),
+            nullable=False,
+            server_default=sa.text("'human'"),
+        ),
+        sa.Column(
             "is_system",
             sa.Boolean(),
             nullable=False,

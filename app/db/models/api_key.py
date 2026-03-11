@@ -23,6 +23,9 @@ class APIKey(TimestampMixin, UUIDMixin, Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     allowed_sources: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    key_type: Mapped[str] = mapped_column(
+        Text, nullable=False, default="human", server_default=text("'human'")
+    )
     is_system: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )

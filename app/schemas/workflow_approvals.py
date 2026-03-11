@@ -9,7 +9,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.indicators import IndicatorType
-from app.schemas.workflows import TRIGGER_SOURCES
 
 
 class WorkflowApprovalRequestResponse(BaseModel):
@@ -39,16 +38,16 @@ class WorkflowApprovalRequestResponse(BaseModel):
 
 class WorkflowExecuteAgentRequest(BaseModel):
     """
-    Request body for POST /v1/workflows/{uuid}/execute when trigger_source="agent".
+    Request body for POST /v1/workflows/{uuid}/execute.
 
-    Extends the base execute request with required `reason` and `confidence` fields
-    that the approval gate uses to populate the approval notification.
+    The trigger source is NOT a request field — it is derived server-side
+    from the API key's ``key_type`` (``human`` or ``agent``). Agent keys
+    must also provide ``reason`` and ``confidence`` for the approval gate.
     """
 
     indicator_type: str
     indicator_value: str
     alert_uuid: UUID | None = None
-    trigger_source: str = "human"
     reason: str | None = None
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
@@ -60,21 +59,14 @@ class WorkflowExecuteAgentRequest(BaseModel):
             raise ValueError(f"indicator_type must be one of: {sorted(valid)}")
         return v
 
-    @field_validator("trigger_source")
-    @classmethod
-    def _validate_trigger_source(cls, v: str) -> str:
-        if v not in TRIGGER_SOURCES:
-            raise ValueError(f"trigger_source must be one of: {sorted(TRIGGER_SOURCES)}")
-        return v
-
-    def validate_agent_fields(self) -> list[str]:
+    def validate_agent_fields(self, trigger_source: str) -> list[str]:
         """Return validation errors specific to agent-triggered executes."""
         errors: list[str] = []
-        if self.trigger_source == "agent":
+        if trigger_source == "agent":
             if not self.reason:
-                errors.append("reason is required when trigger_source='agent'")
+                errors.append("reason is required for agent API keys")
             if self.confidence is None:
-                errors.append("confidence is required when trigger_source='agent'")
+                errors.append("confidence is required for agent API keys")
         return errors
 
 

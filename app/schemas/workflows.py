@@ -178,12 +178,14 @@ TRIGGER_SOURCES = frozenset({"human", "agent", "system"})
 
 
 class WorkflowExecuteRequest(BaseModel):
-    """Request body for POST /v1/workflows/{uuid}/execute."""
+    """Request body for POST /v1/workflows/{uuid}/execute.
+
+    Note: trigger_source is derived server-side from the API key's key_type.
+    """
 
     indicator_type: str
     indicator_value: str
     alert_uuid: uuid.UUID | None = None
-    trigger_source: str = "human"
 
     @field_validator("indicator_type")
     @classmethod
@@ -193,13 +195,6 @@ class WorkflowExecuteRequest(BaseModel):
             raise ValueError(
                 f"indicator_type must be one of: {sorted(valid)}"
             )
-        return v
-
-    @field_validator("trigger_source")
-    @classmethod
-    def _validate_trigger_source(cls, v: str) -> str:
-        if v not in TRIGGER_SOURCES:
-            raise ValueError(f"trigger_source must be one of: {sorted(TRIGGER_SOURCES)}")
         return v
 
 

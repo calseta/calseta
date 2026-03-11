@@ -62,6 +62,37 @@ async def mock_queue() -> AsyncGenerator[AsyncMock, None]:
     app.dependency_overrides.pop(get_queue, None)
 
 
+@pytest_asyncio.fixture
+async def agent_api_key(db_session: Any) -> str:
+    """
+    Creates a test API key with admin scope and key_type='agent'.
+
+    Used for tests that need agent-triggered workflow execution.
+    """
+    import secrets as _secrets
+
+    import bcrypt
+
+    from app.db.models.api_key import APIKey
+
+    plain_key = "cai_" + _secrets.token_urlsafe(32)
+    key_hash = bcrypt.hashpw(plain_key.encode(), bcrypt.gensalt()).decode()
+    key_prefix = plain_key[:8]
+
+    record = APIKey(
+        name="test-agent-key",
+        key_prefix=key_prefix,
+        key_hash=key_hash,
+        scopes=["admin"],
+        is_active=True,
+        key_type="agent",
+    )
+    db_session.add(record)
+    await db_session.flush()
+
+    return plain_key
+
+
 # ===========================================================================
 # Helpers
 # ===========================================================================
@@ -1251,7 +1282,6 @@ class TestWorkflowExecuteEndpointIntegration:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -1282,7 +1312,6 @@ class TestWorkflowExecuteEndpointIntegration:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -1313,7 +1342,6 @@ class TestWorkflowExecuteEndpointIntegration:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -1328,7 +1356,6 @@ class TestWorkflowExecuteEndpointIntegration:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -1367,7 +1394,6 @@ class TestWorkflowRunAuditIntegration:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -1414,10 +1440,10 @@ class TestWorkflowApprovalGateIntegration:
 
     @pytest.mark.asyncio
     async def test_agent_trigger_with_approval_mode_always_creates_request(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
         """
-        When trigger_source=agent AND approval_mode="always",
+        When key_type=agent AND approval_mode="always",
         the execute endpoint should create an approval request.
         """
         create_resp = await test_client.post(
@@ -1442,11 +1468,10 @@ class TestWorkflowApprovalGateIntegration:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "agent",
                 "reason": "Suspicious traffic detected",
                 "confidence": 0.9,
             },
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {agent_api_key}"},
         )
         assert resp.status_code == 202
         data = resp.json()["data"]
@@ -1459,7 +1484,7 @@ class TestWorkflowApprovalGateIntegration:
         self, test_client: Any, api_key: str, mock_queue: Any
     ) -> None:
         """
-        When trigger_source=human, even if approval_mode="always",
+        When key_type=human, even if approval_mode="always",
         the workflow should be immediately queued (not gated).
         """
         create_resp = await test_client.post(
@@ -1483,7 +1508,6 @@ class TestWorkflowApprovalGateIntegration:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers={"Authorization": f"Bearer {api_key}"},
         )
@@ -1495,10 +1519,10 @@ class TestWorkflowApprovalGateIntegration:
 
     @pytest.mark.asyncio
     async def test_agent_trigger_without_approval_goes_straight_to_queue(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
         """
-        When trigger_source=agent but approval_mode="never",
+        When key_type=agent but approval_mode="never",
         the workflow should be immediately queued.
         """
         create_resp = await test_client.post(
@@ -1522,11 +1546,10 @@ class TestWorkflowApprovalGateIntegration:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "agent",
                 "reason": "Test",
                 "confidence": 0.5,
             },
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {agent_api_key}"},
         )
         assert resp.status_code == 202
         data = resp.json()["data"]
@@ -1534,7 +1557,7 @@ class TestWorkflowApprovalGateIntegration:
 
     @pytest.mark.asyncio
     async def test_agent_trigger_missing_reason_422(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
         """agent trigger without reason should return 422."""
         create_resp = await test_client.post(
@@ -1558,10 +1581,9 @@ class TestWorkflowApprovalGateIntegration:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "agent",
                 # Missing reason and confidence
             },
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {agent_api_key}"},
         )
         assert resp.status_code == 422
 
@@ -1577,7 +1599,7 @@ class TestApprovalDecisionEndpointsIntegration:
     """
 
     async def _create_approval(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> str:
         """Helper: create a workflow with approval gate and trigger agent execute."""
         create_resp = await test_client.post(
@@ -1601,19 +1623,18 @@ class TestApprovalDecisionEndpointsIntegration:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "agent",
                 "reason": "Anomalous traffic",
                 "confidence": 0.9,
             },
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {agent_api_key}"},
         )
         return resp.json()["data"]["approval_request_uuid"]  # type: ignore[no-any-return]
 
     @pytest.mark.asyncio
     async def test_approve_returns_200(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
-        approval_uuid = await self._create_approval(test_client, api_key, mock_queue)
+        approval_uuid = await self._create_approval(test_client, api_key, agent_api_key, mock_queue)
 
         resp = await test_client.post(
             f"/v1/workflow-approvals/{approval_uuid}/approve",
@@ -1627,9 +1648,9 @@ class TestApprovalDecisionEndpointsIntegration:
 
     @pytest.mark.asyncio
     async def test_reject_returns_200(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
-        approval_uuid = await self._create_approval(test_client, api_key, mock_queue)
+        approval_uuid = await self._create_approval(test_client, api_key, agent_api_key, mock_queue)
 
         resp = await test_client.post(
             f"/v1/workflow-approvals/{approval_uuid}/reject",
@@ -1642,9 +1663,9 @@ class TestApprovalDecisionEndpointsIntegration:
 
     @pytest.mark.asyncio
     async def test_double_approve_returns_409(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
-        approval_uuid = await self._create_approval(test_client, api_key, mock_queue)
+        approval_uuid = await self._create_approval(test_client, api_key, agent_api_key, mock_queue)
 
         # First approve
         resp1 = await test_client.post(
@@ -1664,9 +1685,9 @@ class TestApprovalDecisionEndpointsIntegration:
 
     @pytest.mark.asyncio
     async def test_double_reject_returns_409(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
-        approval_uuid = await self._create_approval(test_client, api_key, mock_queue)
+        approval_uuid = await self._create_approval(test_client, api_key, agent_api_key, mock_queue)
 
         resp1 = await test_client.post(
             f"/v1/workflow-approvals/{approval_uuid}/reject",
@@ -1684,9 +1705,9 @@ class TestApprovalDecisionEndpointsIntegration:
 
     @pytest.mark.asyncio
     async def test_approve_after_reject_returns_409(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
-        approval_uuid = await self._create_approval(test_client, api_key, mock_queue)
+        approval_uuid = await self._create_approval(test_client, api_key, agent_api_key, mock_queue)
 
         # Reject first
         await test_client.post(
@@ -1705,9 +1726,9 @@ class TestApprovalDecisionEndpointsIntegration:
 
     @pytest.mark.asyncio
     async def test_reject_after_approve_returns_409(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
-        approval_uuid = await self._create_approval(test_client, api_key, mock_queue)
+        approval_uuid = await self._create_approval(test_client, api_key, agent_api_key, mock_queue)
 
         # Approve first
         await test_client.post(
@@ -1748,9 +1769,9 @@ class TestApprovalDecisionEndpointsIntegration:
 
     @pytest.mark.asyncio
     async def test_get_approval_request(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
-        approval_uuid = await self._create_approval(test_client, api_key, mock_queue)
+        approval_uuid = await self._create_approval(test_client, api_key, agent_api_key, mock_queue)
 
         resp = await test_client.get(
             f"/v1/workflow-approvals/{approval_uuid}",
@@ -1763,9 +1784,9 @@ class TestApprovalDecisionEndpointsIntegration:
 
     @pytest.mark.asyncio
     async def test_list_approval_requests(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
-        await self._create_approval(test_client, api_key, mock_queue)
+        await self._create_approval(test_client, api_key, agent_api_key, mock_queue)
 
         resp = await test_client.get(
             "/v1/workflow-approvals",
@@ -1776,9 +1797,9 @@ class TestApprovalDecisionEndpointsIntegration:
 
     @pytest.mark.asyncio
     async def test_list_filter_by_pending_status(
-        self, test_client: Any, api_key: str, mock_queue: Any
+        self, test_client: Any, api_key: str, agent_api_key: str, mock_queue: Any
     ) -> None:
-        await self._create_approval(test_client, api_key, mock_queue)
+        await self._create_approval(test_client, api_key, agent_api_key, mock_queue)
 
         resp = await test_client.get(
             "/v1/workflow-approvals?status=pending",
@@ -1851,9 +1872,8 @@ class TestWorkflowExecuteAgentRequestSchema:
         body = WorkflowExecuteAgentRequest(
             indicator_type="ip",
             indicator_value="1.2.3.4",
-            trigger_source="human",
         )
-        assert body.validate_agent_fields() == []
+        assert body.validate_agent_fields(trigger_source="human") == []
 
     def test_agent_trigger_without_reason_returns_errors(self) -> None:
         from app.schemas.workflow_approvals import WorkflowExecuteAgentRequest
@@ -1861,9 +1881,8 @@ class TestWorkflowExecuteAgentRequestSchema:
         body = WorkflowExecuteAgentRequest(
             indicator_type="ip",
             indicator_value="1.2.3.4",
-            trigger_source="agent",
         )
-        errors = body.validate_agent_fields()
+        errors = body.validate_agent_fields(trigger_source="agent")
         assert any("reason" in e for e in errors)
         assert any("confidence" in e for e in errors)
 
@@ -1873,21 +1892,10 @@ class TestWorkflowExecuteAgentRequestSchema:
         body = WorkflowExecuteAgentRequest(
             indicator_type="ip",
             indicator_value="1.2.3.4",
-            trigger_source="agent",
             reason="Suspicious traffic",
             confidence=0.9,
         )
-        assert body.validate_agent_fields() == []
-
-    def test_invalid_trigger_source_raises(self) -> None:
-        from app.schemas.workflow_approvals import WorkflowExecuteAgentRequest
-
-        with pytest.raises(ValueError):
-            WorkflowExecuteAgentRequest(
-                indicator_type="ip",
-                indicator_value="1.2.3.4",
-                trigger_source="invalid_source",
-            )
+        assert body.validate_agent_fields(trigger_source="agent") == []
 
     def test_invalid_indicator_type_raises(self) -> None:
         from app.schemas.workflow_approvals import WorkflowExecuteAgentRequest
@@ -1896,5 +1904,4 @@ class TestWorkflowExecuteAgentRequestSchema:
             WorkflowExecuteAgentRequest(
                 indicator_type="invalid_type",
                 indicator_value="1.2.3.4",
-                trigger_source="human",
             )

@@ -91,6 +91,69 @@ AZURE_OPENAI_API_VERSION = os.environ.get(
 
 AGENT_NAME = "live-investigation-agent"
 
+AGENT_KEY_SCOPES = [
+    "alerts:read",
+    "alerts:write",
+    "enrichments:read",
+    "workflows:read",
+    "workflows:execute",
+    "agents:read",
+    "agents:write",
+]
+
+
+# ---------------------------------------------------------------------------
+# Agent API key provisioning
+# ---------------------------------------------------------------------------
+
+
+async def _create_agent_api_key(admin_key: str) -> tuple[str, str]:
+    """
+    Use the admin API key to create a short-lived agent-type API key.
+
+    Returns (agent_api_key, key_uuid).
+    """
+    import httpx
+
+    async with httpx.AsyncClient(
+        timeout=15.0,
+        headers={
+            "Authorization": f"Bearer {admin_key}",
+            "Content-Type": "application/json",
+        },
+    ) as client:
+        resp = await client.post(
+            f"{CALSETA_API_URL}/v1/api-keys",
+            json={
+                "name": AGENT_NAME,
+                "key_type": "agent",
+                "scopes": AGENT_KEY_SCOPES,
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json().get("data", {})
+        return data["key"], data["uuid"]
+
+
+async def _revoke_agent_api_key(admin_key: str, key_uuid: str) -> None:
+    """Revoke the agent API key using the admin key."""
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=10.0,
+            headers={"Authorization": f"Bearer {admin_key}"},
+        ) as client:
+            resp = await client.delete(
+                f"{CALSETA_API_URL}/v1/api-keys/{key_uuid}"
+            )
+            if resp.status_code < 300:
+                print("  Agent API key revoked")
+            else:
+                print(f"  Key revocation returned {resp.status_code}")
+    except Exception as exc:
+        print(f"  WARNING: Failed to revoke agent key: {exc}")
+
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -469,8 +532,15 @@ Relevant techniques (if a detection rule matched). Skip if none.
 Numbered list of specific next steps for the SOC team.
 
 ## Workflow Recommendation
-If a workflow should be executed, state which one and why. Include the \
-workflow UUID, indicator type, and indicator value. If none, say "None recommended."
+If one or more workflows should be executed, list each on its own line using \
+EXACTLY this format (one per line):
+
+EXECUTE workflow_uuid=<uuid> indicator_type=<type> indicator_value=<value>
+
+Example:
+EXECUTE workflow_uuid=b8f29992-a6f9-48c8-8b86-c34eedaee0b2 indicator_type=account indicator_value=j.martinez@contoso.com
+
+If none, say "None recommended."
 
 ## Confidence
 State: low, medium, or high. Explain why.
@@ -601,36 +671,49 @@ def extract_section(text: str, heading: str) -> str:
     return section.strip()
 
 
-def extract_workflow_recommendation(text: str) -> dict | None:
-    """Try to extract a workflow UUID and indicator from the LLM response."""
-    section = extract_section(text, "## Workflow Recommendation")
-    if not section or "none" in section.lower()[:50]:
-        return None
-
-    # Look for UUID pattern
+def extract_workflow_recommendations(text: str) -> list[dict]:
+    """Extract structured EXECUTE lines from the Workflow Recommendation section."""
     import re
 
-    uuid_match = re.search(
-        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", section
-    )
-    if not uuid_match:
-        return None
+    section = extract_section(text, "## Workflow Recommendation")
+    if not section or "none" in section.lower()[:50]:
+        return []
 
-    # Try to extract indicator type and value
-    type_match = re.search(
-        r"(?:indicator[_ ]?type|type)[:\s=]+['\"]?(\w+)['\"]?", section, re.IGNORECASE
-    )
-    value_match = re.search(
-        r"(?:indicator[_ ]?value|value)[:\s=]+['\"]?([^\s'\"]+)['\"]?",
+    results = []
+    for match in re.finditer(
+        r"EXECUTE\s+"
+        r"workflow_uuid=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s+"
+        r"indicator_type=(\S+)\s+"
+        r"indicator_value=(\S+)",
         section,
         re.IGNORECASE,
-    )
+    ):
+        results.append({
+            "workflow_uuid": match.group(1),
+            "indicator_type": match.group(2),
+            "indicator_value": match.group(3),
+        })
 
-    return {
-        "workflow_uuid": uuid_match.group(0),
-        "indicator_type": type_match.group(1) if type_match else None,
-        "indicator_value": value_match.group(1) if value_match else None,
-    }
+    # Fallback: try the old loose pattern if no structured lines found
+    if not results:
+        uuid_match = re.search(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", section
+        )
+        type_match = re.search(
+            r"(?:indicator[_ ]?type|type)[:\s=]+['\"]?(\w+)['\"]?", section, re.IGNORECASE
+        )
+        value_match = re.search(
+            r"(?:indicator[_ ]?value|value)[:\s=]+['\"]?([^\s'\"]+)['\"]?",
+            section, re.IGNORECASE,
+        )
+        if uuid_match and type_match and value_match:
+            results.append({
+                "workflow_uuid": uuid_match.group(0),
+                "indicator_type": type_match.group(1),
+                "indicator_value": value_match.group(1),
+            })
+
+    return results
 
 
 async def investigate_alert(
@@ -661,7 +744,7 @@ async def investigate_alert(
         # Detection rule
         detection_rule = None
         # REST returns detection_rule_id or detection_rule nested object
-        rule_ref = alert.get("detection_rule_id") or alert.get("detection_rule", {}).get("uuid")
+        rule_ref = alert.get("detection_rule_id") or (alert.get("detection_rule") or {}).get("uuid")
         if rule_ref:
             print("  Fetching detection rule ...")
             detection_rule = await source.get_detection_rule(str(rule_ref))
@@ -719,25 +802,35 @@ async def investigate_alert(
 
         # Workflow execution (if enabled and suggested)
         if execute_workflows:
-            wf_rec = extract_workflow_recommendation(finding_text)
-            if wf_rec and wf_rec.get("indicator_type") and wf_rec.get("indicator_value"):
-                result.workflow_suggested = wf_rec["workflow_uuid"]
-                print(f"  Executing workflow {wf_rec['workflow_uuid']} ...")
-                try:
-                    confidence_map = {"low": 0.3, "medium": 0.6, "high": 0.9}
-                    wf_result = await source.execute_workflow(
-                        workflow_uuid=wf_rec["workflow_uuid"],
-                        indicator_type=wf_rec["indicator_type"],
-                        indicator_value=wf_rec["indicator_value"],
-                        alert_uuid=alert_uuid,
-                        reason=f"Automated investigation by {AGENT_NAME}",
-                        confidence=confidence_map.get(result.confidence, 0.5),
+            wf_recs = extract_workflow_recommendations(finding_text)
+            if wf_recs:
+                confidence_map = {"low": 0.3, "medium": 0.6, "high": 0.9}
+                wf_uuids = []
+                wf_statuses = []
+                for wf_rec in wf_recs:
+                    wf_uuid = wf_rec["workflow_uuid"]
+                    wf_uuids.append(wf_uuid)
+                    print(
+                        f"  Executing workflow {wf_uuid} "
+                        f"({wf_rec['indicator_type']}={wf_rec['indicator_value']}) ..."
                     )
-                    result.workflow_status = wf_result.get("status", "unknown")
-                    print(f"  Workflow status: {result.workflow_status}")
-                except Exception as exc:
-                    result.workflow_status = f"error: {exc}"
-                    print(f"  WARNING: Workflow execution failed: {exc}")
+                    try:
+                        wf_result = await source.execute_workflow(
+                            workflow_uuid=wf_uuid,
+                            indicator_type=wf_rec["indicator_type"],
+                            indicator_value=wf_rec["indicator_value"],
+                            alert_uuid=alert_uuid,
+                            reason=f"Automated investigation by {AGENT_NAME}",
+                            confidence=confidence_map.get(result.confidence, 0.5),
+                        )
+                        status = wf_result.get("status", "unknown")
+                        wf_statuses.append(status)
+                        print(f"  Workflow {wf_uuid} status: {status}")
+                    except Exception as exc:
+                        wf_statuses.append(f"error: {exc}")
+                        print(f"  WARNING: Workflow {wf_uuid} failed: {exc}")
+                result.workflow_suggested = ", ".join(wf_uuids)
+                result.workflow_status = ", ".join(wf_statuses)
             else:
                 print("  No workflow recommended by analysis")
 
@@ -811,14 +904,19 @@ async def run(args: argparse.Namespace) -> None:
         print("ERROR: CALSETA_API_KEY not set")
         sys.exit(1)
 
-    # Initialize data source
+    # Provision a short-lived agent-type API key
+    print("\n  Creating agent API key ...")
+    agent_key, agent_key_uuid = await _create_agent_api_key(CALSETA_API_KEY)
+    print(f"  Agent key created: {agent_key[:8]}...")
+
+    # Initialize data source using the agent key
     source: RESTDataSource | MCPDataSource
     if args.mode == "rest":
-        print(f"\n  Connecting to REST API at {CALSETA_API_URL} ...")
-        source = RESTDataSource(CALSETA_API_URL, CALSETA_API_KEY)
+        print(f"  Connecting to REST API at {CALSETA_API_URL} ...")
+        source = RESTDataSource(CALSETA_API_URL, agent_key)
     elif args.mode == "mcp":
-        print(f"\n  Connecting to MCP server at {CALSETA_MCP_URL} ...")
-        source = MCPDataSource(CALSETA_MCP_URL, CALSETA_API_KEY)
+        print(f"  Connecting to MCP server at {CALSETA_MCP_URL} ...")
+        source = MCPDataSource(CALSETA_MCP_URL, agent_key)
         await source.connect()
     else:
         print(f"ERROR: Unknown mode '{args.mode}'. Use 'rest' or 'mcp'.")
@@ -890,6 +988,8 @@ async def run(args: argparse.Namespace) -> None:
 
     finally:
         await source.close()
+        print("\n  Revoking agent API key ...")
+        await _revoke_agent_api_key(CALSETA_API_KEY, agent_key_uuid)
 
 
 # ---------------------------------------------------------------------------
@@ -936,8 +1036,13 @@ async def run_registered(args: argparse.Namespace) -> None:
     # Initialize LLM provider
     llm = _create_llm(args.model)
 
+    # Provision a short-lived agent-type API key
+    print("\n  Creating agent API key ...")
+    agent_key, agent_key_uuid = await _create_agent_api_key(CALSETA_API_KEY)
+    print(f"  Agent key created: {agent_key[:8]}...")
+
     # REST source for fetching alert details during investigation
-    source = RESTDataSource(CALSETA_API_URL, CALSETA_API_KEY)
+    source = RESTDataSource(CALSETA_API_URL, agent_key)
 
     # Register agent with Calseta
     print("\n  Registering agent with Calseta ...")
@@ -964,7 +1069,7 @@ async def run_registered(args: argparse.Namespace) -> None:
     async with httpx.AsyncClient(
         timeout=30.0,
         headers={
-            "Authorization": f"Bearer {CALSETA_API_KEY}",
+            "Authorization": f"Bearer {agent_key}",
             "Content-Type": "application/json",
         },
     ) as client:
@@ -1090,7 +1195,7 @@ async def run_registered(args: argparse.Namespace) -> None:
             async with httpx.AsyncClient(
                 timeout=10.0,
                 headers={
-                    "Authorization": f"Bearer {CALSETA_API_KEY}",
+                    "Authorization": f"Bearer {agent_key}",
                 },
             ) as client:
                 resp = await client.delete(
@@ -1103,6 +1208,9 @@ async def run_registered(args: argparse.Namespace) -> None:
         except Exception as exc:
             print(f"  WARNING: Failed to deregister: {exc}")
         await source.close()
+        # Revoke the agent API key (using the admin key)
+        print("  Revoking agent API key ...")
+        await _revoke_agent_api_key(CALSETA_API_KEY, agent_key_uuid)
 
 
 def _create_llm(

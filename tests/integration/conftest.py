@@ -68,7 +68,11 @@ def scoped_api_key(
         key = await scoped_api_key(["alerts:read", "alerts:write"])
     """
 
-    async def _create(scopes: list[str], allowed_sources: list[str] | None = None) -> str:
+    async def _create(
+        scopes: list[str],
+        allowed_sources: list[str] | None = None,
+        key_type: str = "human",
+    ) -> str:
         plain_key = "cai_" + secrets.token_urlsafe(32)
         key_hash = bcrypt.hashpw(plain_key.encode(), bcrypt.gensalt()).decode()
         key_prefix = plain_key[:8]
@@ -80,6 +84,7 @@ def scoped_api_key(
             scopes=scopes,
             is_active=True,
             allowed_sources=allowed_sources,
+            key_type=key_type,
         )
         db_session.add(record)
         await db_session.flush()

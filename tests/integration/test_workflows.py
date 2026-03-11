@@ -222,7 +222,6 @@ class TestWorkflowExecute:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers=auth_header(api_key),
         )
@@ -241,7 +240,6 @@ class TestWorkflowExecute:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers=auth_header(api_key),
         )
@@ -279,7 +277,6 @@ class TestWorkflowExecute:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers=auth_header(api_key),
         )
@@ -296,7 +293,6 @@ class TestWorkflowExecute:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers=auth_header(api_key),
         )
@@ -314,7 +310,6 @@ class TestWorkflowExecute:
             json={
                 "indicator_type": "ip",
                 "indicator_value": "1.2.3.4",
-                "trigger_source": "human",
             },
             headers=auth_header(workflows_read_key),
         )

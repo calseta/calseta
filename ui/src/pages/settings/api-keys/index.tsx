@@ -48,8 +48,9 @@ const ALL_SOURCES = ["sentinel", "elastic", "splunk", "generic"];
 
 const AK_COLUMNS: ColumnDef[] = [
   { key: "prefix", initialWidth: 140, minWidth: 100 },
-  { key: "name", initialWidth: 300, minWidth: 160 },
-  { key: "scopes", initialWidth: 280, minWidth: 120 },
+  { key: "name", initialWidth: 260, minWidth: 160 },
+  { key: "type", initialWidth: 80, minWidth: 70 },
+  { key: "scopes", initialWidth: 260, minWidth: 120 },
   { key: "status", initialWidth: 80, minWidth: 70 },
   { key: "last_used", initialWidth: 110, minWidth: 80 },
   { key: "created", initialWidth: 110, minWidth: 80 },
@@ -68,6 +69,7 @@ export function ApiKeysPage() {
 
   // Create form state
   const [createName, setCreateName] = useState("");
+  const [createKeyType, setCreateKeyType] = useState<"human" | "agent">("human");
   const [createScopes, setCreateScopes] = useState<string[]>([...ALL_SCOPES]);
   const [createSources, setCreateSources] = useState<string[]>([]);
   const [createExpiry, setCreateExpiry] = useState("");
@@ -77,6 +79,7 @@ export function ApiKeysPage() {
 
   function resetCreateForm() {
     setCreateName("");
+    setCreateKeyType("human");
     setCreateScopes([...ALL_SCOPES]);
     setCreateSources([]);
     setCreateExpiry("");
@@ -97,6 +100,7 @@ export function ApiKeysPage() {
   function handleCreate() {
     const body: Record<string, unknown> = {
       name: createName,
+      key_type: createKeyType,
       scopes: createScopes,
     };
     if (createSources.length > 0) body.allowed_sources = createSources;
@@ -213,6 +217,33 @@ export function ApiKeysPage() {
                     />
                   </div>
 
+                  {/* Key Type */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Key Type</Label>
+                    <div className="flex gap-2">
+                      {(["human", "agent"] as const).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setCreateKeyType(type)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-md text-xs border transition-colors capitalize",
+                            createKeyType === type
+                              ? "bg-teal/15 border-teal/40 text-teal-light"
+                              : "bg-surface border-border text-dim hover:border-teal/30",
+                          )}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-dim">
+                      {createKeyType === "agent"
+                        ? "Agent keys trigger workflow approval gates automatically."
+                        : "Human keys bypass agent-only approval gates."}
+                    </p>
+                  </div>
+
                   {/* Scopes */}
                   <div className="space-y-1.5">
                     <Label className="text-sm text-muted-foreground">Scopes</Label>
@@ -304,6 +335,7 @@ export function ApiKeysPage() {
               <TableRow className="border-border hover:bg-transparent">
                 <ResizableTableHead columnKey="prefix" className="text-dim text-xs">Prefix</ResizableTableHead>
                 <ResizableTableHead columnKey="name" className="text-dim text-xs">Name</ResizableTableHead>
+                <ResizableTableHead columnKey="type" className="text-dim text-xs">Type</ResizableTableHead>
                 <ResizableTableHead columnKey="scopes" className="text-dim text-xs">Scopes</ResizableTableHead>
                 <ResizableTableHead columnKey="status" className="text-dim text-xs">Status</ResizableTableHead>
                 <ResizableTableHead columnKey="last_used" className="text-dim text-xs">Last Used</ResizableTableHead>
@@ -315,7 +347,7 @@ export function ApiKeysPage() {
               {isLoading
                 ? Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i} className="border-border">
-                      {Array.from({ length: 7 }).map((_, j) => (
+                      {Array.from({ length: 8 }).map((_, j) => (
                         <TableCell key={j}>
                           <Skeleton className="h-5 w-16" />
                         </TableCell>
@@ -342,6 +374,19 @@ export function ApiKeysPage() {
                         >
                           {k.name}
                         </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[11px] capitalize",
+                            k.key_type === "agent"
+                              ? "text-purple bg-purple/10 border-purple/30"
+                              : "text-dim bg-dim/10 border-dim/30",
+                          )}
+                        >
+                          {k.key_type ?? "human"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-64">
@@ -388,7 +433,7 @@ export function ApiKeysPage() {
                   ))}
               {!isLoading && keys.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-dim py-12">
+                  <TableCell colSpan={8} className="text-center text-sm text-dim py-12">
                     No API keys created
                   </TableCell>
                 </TableRow>

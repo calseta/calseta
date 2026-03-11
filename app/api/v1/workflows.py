@@ -293,6 +293,10 @@ async def execute_workflow(
     """
     Enqueue a workflow for execution. Returns 202 Accepted immediately.
 
+    The trigger source is derived from the API key's `key_type` field —
+    agent keys always trigger as "agent", human keys as "human". This
+    cannot be overridden by the request body.
+
     Approval gate (based on workflow.approval_mode):
     - If approval_mode="always": all triggers go through approval gate.
     - If approval_mode="agent_only": only agent triggers require approval.
@@ -302,13 +306,16 @@ async def execute_workflow(
     notification, and returns:
       {"status": "pending_approval", "approval_request_uuid": "...", "expires_at": "..."}
 
-    When trigger_source="agent", both `reason` and `confidence` are required.
+    When key_type="agent", both `reason` and `confidence` are required.
     """
     from app.queue.factory import get_queue_backend
     from app.repositories.alert_repository import AlertRepository
 
+    # Derive trigger_source from the API key, not the request body
+    trigger_source = auth.key_type  # "human" or "agent"
+
     # Agent-specific field validation
-    agent_errors = body.validate_agent_fields()
+    agent_errors = body.validate_agent_fields(trigger_source)
     if agent_errors:
         raise CalsetaException(
             code="VALIDATION_ERROR",
@@ -359,14 +366,17 @@ async def execute_workflow(
     # ---------------------------------------------------------------------------
     # Approval gate: always, agent_only, or never
     # ---------------------------------------------------------------------------
-    if workflow.approval_mode == "always" or (workflow.approval_mode == "agent_only" and body.trigger_source == "agent"):
+    needs_approval = workflow.approval_mode == "always" or (
+        workflow.approval_mode == "agent_only" and trigger_source == "agent"
+    )
+    if needs_approval:
         from app.workflows.approval import create_approval_request
         from app.workflows.notifiers.factory import get_approval_notifier
 
         notifier = get_approval_notifier(settings)
         approval_req = await create_approval_request(
             workflow=workflow,
-            trigger_type=body.trigger_source,
+            trigger_type=trigger_source,
             trigger_agent_key_prefix=auth.key_prefix,
             trigger_context=trigger_context,
             reason=body.reason or "",
@@ -391,7 +401,7 @@ async def execute_workflow(
                 "workflow_uuid": str(workflow.uuid),
                 "workflow_name": workflow.name,
                 "approval_uuid": str(approval_req.uuid),
-                "trigger_source": body.trigger_source,
+                "trigger_source": trigger_source,
                 "reason": body.reason,
                 "confidence": body.confidence,
                 "indicator_type": body.indicator_type,

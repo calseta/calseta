@@ -50,6 +50,7 @@ async def list_api_keys(
                 name=k.name,
                 key_prefix=k.key_prefix,
                 scopes=list(k.scopes),
+                key_type=k.key_type,
                 is_active=k.is_active,
                 created_at=k.created_at,
                 expires_at=k.expires_at,
@@ -74,6 +75,7 @@ async def create_api_key(
     record, plain_key = await repo.create(
         name=body.name,
         scopes=body.scopes,
+        key_type=body.key_type,
         expires_at=body.expires_at,
         allowed_sources=body.allowed_sources,
     )
@@ -84,6 +86,7 @@ async def create_api_key(
             key_prefix=record.key_prefix,
             key=plain_key,
             scopes=list(record.scopes),
+            key_type=record.key_type,
             is_active=record.is_active,
             created_at=record.created_at,
             expires_at=record.expires_at,

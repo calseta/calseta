@@ -34,6 +34,7 @@ class APIKeyRepository:
         self,
         name: str,
         scopes: list[str],
+        key_type: str = "human",
         expires_at: datetime | None = None,
         allowed_sources: list[str] | None = None,
     ) -> tuple[APIKey, str]:
@@ -52,6 +53,7 @@ class APIKeyRepository:
             key_prefix=key_prefix,
             key_hash=key_hash,
             scopes=scopes,
+            key_type=key_type,
             is_active=True,
             expires_at=expires_at,
             allowed_sources=allowed_sources,

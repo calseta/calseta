@@ -28,6 +28,8 @@ import {
   Save,
   Loader2,
   Lock,
+  User,
+  Bot,
 } from "lucide-react";
 
 const ALL_SCOPES = [
@@ -202,6 +204,23 @@ export function ApiKeyDetailPage() {
               ),
             },
             {
+              label: "Type",
+              icon: apiKey.key_type === "agent" ? Bot : User,
+              value: (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-xs capitalize",
+                    apiKey.key_type === "agent"
+                      ? "text-purple bg-purple/10 border-purple/30"
+                      : "text-dim bg-dim/10 border-dim/30",
+                  )}
+                >
+                  {apiKey.key_type ?? "human"}
+                </Badge>
+              ),
+            },
+            {
               label: "Expires",
               icon: Calendar,
               value: apiKey.expires_at ? formatDate(apiKey.expires_at) : "Never",
@@ -226,6 +245,9 @@ export function ApiKeyDetailPage() {
                 <DetailPageField label="UUID" value={<CopyableText text={apiKey.uuid} mono className="text-xs" />} />
                 <DetailPageField label="Key Prefix" value={<CopyableText text={apiKey.key_prefix + "..."} mono className="text-xs" />} />
                 <DetailPageField label="Name" value={apiKey.name} />
+                <DetailPageField label="Key Type" value={
+                  <span className="capitalize">{apiKey.key_type ?? "human"}</span>
+                } />
                 <DetailPageField label="Created" value={formatDate(apiKey.created_at)} />
                 <DetailPageField
                   label="Last Used"

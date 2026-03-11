@@ -102,6 +102,7 @@ class APIKeyAuthBackend(AuthBackendBase):
             key_prefix=key_prefix,
             scopes=list(record.scopes),
             key_id=record.id,
+            key_type=record.key_type,
             allowed_sources=(
                 list(record.allowed_sources) if record.allowed_sources else None
             ),

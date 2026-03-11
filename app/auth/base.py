@@ -29,6 +29,7 @@ class AuthContext:
     key_prefix: str
     scopes: list[str]
     key_id: int
+    key_type: str = field(default="human")
     allowed_sources: list[str] | None = field(default=None)
 
 
