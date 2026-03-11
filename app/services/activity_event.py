@@ -7,6 +7,7 @@ and silently ignored — audit events must never break the main request flow.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import structlog
@@ -16,6 +17,43 @@ from app.repositories.activity_event_repository import ActivityEventRepository
 from app.schemas.activity_events import ActivityEventType
 
 logger = structlog.get_logger(__name__)
+
+_SECRET_PATTERNS = re.compile(
+    r"(cai_\S+|sk-\S+|xoxb-\S+|Bearer\s+\S+|api[_-]?key[\"']?\s*[:=]\s*[\"']?\S+)",
+    re.IGNORECASE,
+)
+
+_SENSITIVE_KEYS = frozenset({
+    "password", "secret", "token", "api_key", "apikey", "api-key",
+    "authorization", "auth_header", "credential", "private_key",
+    "access_token", "refresh_token", "client_secret",
+})
+
+
+def _sanitize_references(refs: dict | None) -> dict | None:
+    """Remove potentially sensitive values from activity event references."""
+    if refs is None:
+        return None
+
+    sanitized = {}
+    for key, value in refs.items():
+        # Redact keys that look like secrets
+        is_sensitive_key = key.lower() in _SENSITIVE_KEYS
+        is_secret_value = isinstance(value, str) and _SECRET_PATTERNS.search(value)
+        if is_sensitive_key or is_secret_value:
+            sanitized[key] = "[REDACTED]"
+        elif isinstance(value, dict):
+            sanitized[key] = _sanitize_references(value)
+        elif isinstance(value, list):
+            sanitized[key] = [
+                _sanitize_references(v) if isinstance(v, dict)
+                else "[REDACTED]" if isinstance(v, str) and _SECRET_PATTERNS.search(v)
+                else v
+                for v in value
+            ]
+        else:
+            sanitized[key] = value
+    return sanitized
 
 
 class ActivityEventService:
@@ -41,6 +79,7 @@ class ActivityEventService:
         simply log and return on failure rather than propagating.
         """
         try:
+            references = _sanitize_references(references)
             await self._repo.create(
                 event_type=event_type.value,
                 actor_type=actor_type,

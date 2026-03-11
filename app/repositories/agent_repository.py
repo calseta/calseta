@@ -74,6 +74,29 @@ class AgentRepository:
         result = await self._db.execute(stmt)
         return list(result.scalars().all()), total
 
+    _UPDATABLE_FIELDS: frozenset[str] = frozenset({
+        "name",
+        "description",
+        "endpoint_url",
+        "is_active",
+        "auth_header_name",
+        "auth_header_value_encrypted",
+        "trigger_on_sources",
+        "trigger_on_severities",
+        "trigger_filter",
+        "timeout_seconds",
+        "retry_count",
+        "documentation",
+    })
+
+    _NULLABLE_FIELDS: frozenset[str] = frozenset({
+        "description",
+        "auth_header_name",
+        "auth_header_value_encrypted",
+        "trigger_filter",
+        "documentation",
+    })
+
     async def patch(
         self,
         agent: AgentRegistration,
@@ -81,13 +104,9 @@ class AgentRepository:
     ) -> AgentRegistration:
         """Apply partial updates to an agent registration."""
         for key, value in kwargs.items():
-            if value is not None or key in (
-                "description",
-                "auth_header_name",
-                "auth_header_value_encrypted",
-                "trigger_filter",
-                "documentation",
-            ):
+            if key not in self._UPDATABLE_FIELDS:
+                raise ValueError(f"Field '{key}' is not updatable")
+            if value is not None or key in self._NULLABLE_FIELDS:
                 setattr(agent, key, value)
         await self._db.flush()
         await self._db.refresh(agent)

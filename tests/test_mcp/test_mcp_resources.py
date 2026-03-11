@@ -17,6 +17,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # ---------------------------------------------------------------------------
+# Mock MCP Context factory
+# ---------------------------------------------------------------------------
+
+
+def _mock_ctx() -> MagicMock:
+    """Create a MagicMock standing in for mcp.server.fastmcp.Context."""
+    ctx = MagicMock()
+    ctx.client_id = "cai_test"
+    return ctx
+
+
+# ---------------------------------------------------------------------------
 # Shared mock factories
 # ---------------------------------------------------------------------------
 
@@ -241,6 +253,15 @@ def _patch_session() -> tuple[type, AsyncMock]:
     return _FakeCtx, mock_session
 
 
+def _patch_scope(module: str):
+    """Patch check_scope to always pass in the given resource module."""
+    return patch(
+        f"app.mcp.resources.{module}.check_scope",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
+
+
 # ===========================================================================
 # Resource: calseta://alerts
 # ===========================================================================
@@ -260,9 +281,10 @@ class TestListAlerts:
         with (
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_repo),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import list_alerts
-            result = await list_alerts()
+            result = await list_alerts(_mock_ctx())
 
         data = json.loads(result)
         assert "alerts" in data
@@ -281,9 +303,10 @@ class TestListAlerts:
         with (
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_repo),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import list_alerts
-            result = await list_alerts()
+            result = await list_alerts(_mock_ctx())
 
         data = json.loads(result)
         item = data["alerts"][0]
@@ -302,9 +325,10 @@ class TestListAlerts:
         with (
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_repo),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import list_alerts
-            result = await list_alerts()
+            result = await list_alerts(_mock_ctx())
 
         data = json.loads(result)
         assert data["count"] == 0
@@ -337,9 +361,10 @@ class TestGetAlert:
                 "app.mcp.resources.alerts.get_applicable_documents",
                 new_callable=AsyncMock, return_value=[],
             ),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert
-            result = await get_alert(str(alert_uuid))
+            result = await get_alert(str(alert_uuid), _mock_ctx())
 
         data = json.loads(result)
         assert data["uuid"] == str(alert_uuid)
@@ -369,9 +394,10 @@ class TestGetAlert:
                 "app.mcp.resources.alerts.get_applicable_documents",
                 new_callable=AsyncMock, return_value=[doc],
             ),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert
-            result = await get_alert(str(alert_uuid))
+            result = await get_alert(str(alert_uuid), _mock_ctx())
 
         data = json.loads(result)
         assert len(data["context_documents"]) == 1
@@ -388,16 +414,17 @@ class TestGetAlert:
         with (
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert
             with pytest.raises(ValueError, match="Alert not found"):
-                await get_alert(str(alert_uuid))
+                await get_alert(str(alert_uuid), _mock_ctx())
 
     async def test_invalid_uuid_format_raises_value_error(self) -> None:
         """Invalid UUID string raises ValueError."""
         from app.mcp.resources.alerts import get_alert
         with pytest.raises(ValueError, match="Invalid UUID"):
-            await get_alert("not-a-uuid")
+            await get_alert("not-a-uuid", _mock_ctx())
 
     async def test_enrichment_results_raw_stripped(self) -> None:
         """Indicator enrichment_results in alert detail have 'raw' key stripped."""
@@ -426,9 +453,10 @@ class TestGetAlert:
                 "app.mcp.resources.alerts.get_applicable_documents",
                 new_callable=AsyncMock, return_value=[],
             ),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert
-            result = await get_alert(str(alert_uuid))
+            result = await get_alert(str(alert_uuid), _mock_ctx())
 
         data = json.loads(result)
         enrichment = data["indicators"][0]["enrichment_results"]
@@ -454,9 +482,10 @@ class TestGetAlert:
                 "app.mcp.resources.alerts.get_applicable_documents",
                 new_callable=AsyncMock, return_value=[],
             ),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert
-            result = await get_alert(str(alert_uuid))
+            result = await get_alert(str(alert_uuid), _mock_ctx())
 
         data = json.loads(result)
         expected_keys = {
@@ -492,9 +521,10 @@ class TestGetAlertContext:
                 "app.mcp.resources.alerts.get_applicable_documents",
                 new_callable=AsyncMock, return_value=[doc],
             ),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert_context
-            result = await get_alert_context(str(alert_uuid))
+            result = await get_alert_context(str(alert_uuid), _mock_ctx())
 
         data = json.loads(result)
         assert data["count"] == 1
@@ -518,9 +548,10 @@ class TestGetAlertContext:
                 "app.mcp.resources.alerts.get_applicable_documents",
                 new_callable=AsyncMock, return_value=[doc],
             ),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert_context
-            result = await get_alert_context(str(alert_uuid))
+            result = await get_alert_context(str(alert_uuid), _mock_ctx())
 
         data = json.loads(result)
         item = data["context_documents"][0]
@@ -539,10 +570,11 @@ class TestGetAlertContext:
         with (
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert_context
             with pytest.raises(ValueError, match="Alert not found"):
-                await get_alert_context(str(alert_uuid))
+                await get_alert_context(str(alert_uuid), _mock_ctx())
 
 
 # ===========================================================================
@@ -574,9 +606,10 @@ class TestGetAlertActivity:
                 "app.mcp.resources.alerts.ActivityEventRepository",
                 return_value=mock_activity_repo,
             ),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert_activity
-            result = await get_alert_activity(str(alert_uuid))
+            result = await get_alert_activity(str(alert_uuid), _mock_ctx())
 
         data = json.loads(result)
         assert data["count"] == 1
@@ -604,9 +637,10 @@ class TestGetAlertActivity:
                 "app.mcp.resources.alerts.ActivityEventRepository",
                 return_value=mock_activity_repo,
             ),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert_activity
-            result = await get_alert_activity(str(alert_uuid))
+            result = await get_alert_activity(str(alert_uuid), _mock_ctx())
 
         data = json.loads(result)
         item = data["activity"][0]
@@ -622,10 +656,11 @@ class TestGetAlertActivity:
         with (
             patch("app.mcp.resources.alerts.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
+            _patch_scope("alerts"),
         ):
             from app.mcp.resources.alerts import get_alert_activity
             with pytest.raises(ValueError, match="Alert not found"):
-                await get_alert_activity(str(alert_uuid))
+                await get_alert_activity(str(alert_uuid), _mock_ctx())
 
 
 # ===========================================================================
@@ -646,9 +681,10 @@ class TestListDetectionRules:
                 "app.mcp.resources.detection_rules.DetectionRuleRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("detection_rules"),
         ):
             from app.mcp.resources.detection_rules import list_detection_rules
-            result = await list_detection_rules()
+            result = await list_detection_rules(_mock_ctx())
 
         data = json.loads(result)
         assert data["count"] == 1
@@ -669,9 +705,10 @@ class TestListDetectionRules:
                 "app.mcp.resources.detection_rules.DetectionRuleRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("detection_rules"),
         ):
             from app.mcp.resources.detection_rules import list_detection_rules
-            result = await list_detection_rules()
+            result = await list_detection_rules(_mock_ctx())
 
         data = json.loads(result)
         summary = data["detection_rules"][0]["documentation_summary"]
@@ -693,9 +730,10 @@ class TestListDetectionRules:
                 "app.mcp.resources.detection_rules.DetectionRuleRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("detection_rules"),
         ):
             from app.mcp.resources.detection_rules import list_detection_rules
-            result = await list_detection_rules()
+            result = await list_detection_rules(_mock_ctx())
 
         data = json.loads(result)
         assert data["detection_rules"][0]["documentation_summary"] == short_doc
@@ -721,9 +759,10 @@ class TestGetDetectionRule:
                 "app.mcp.resources.detection_rules.DetectionRuleRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("detection_rules"),
         ):
             from app.mcp.resources.detection_rules import get_detection_rule
-            result = await get_detection_rule(str(rule_uuid))
+            result = await get_detection_rule(str(rule_uuid), _mock_ctx())
 
         data = json.loads(result)
         assert data["uuid"] == str(rule_uuid)
@@ -745,9 +784,10 @@ class TestGetDetectionRule:
                 "app.mcp.resources.detection_rules.DetectionRuleRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("detection_rules"),
         ):
             from app.mcp.resources.detection_rules import get_detection_rule
-            result = await get_detection_rule(str(rule_uuid))
+            result = await get_detection_rule(str(rule_uuid), _mock_ctx())
 
         data = json.loads(result)
         expected_keys = {
@@ -770,10 +810,11 @@ class TestGetDetectionRule:
                 "app.mcp.resources.detection_rules.DetectionRuleRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("detection_rules"),
         ):
             from app.mcp.resources.detection_rules import get_detection_rule
             with pytest.raises(ValueError, match="Detection rule not found"):
-                await get_detection_rule(str(rule_uuid))
+                await get_detection_rule(str(rule_uuid), _mock_ctx())
 
 
 # ===========================================================================
@@ -795,9 +836,10 @@ class TestListContextDocuments:
                 "app.mcp.resources.context_documents.ContextDocumentRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("context_documents"),
         ):
             from app.mcp.resources.context_documents import list_context_documents
-            result = await list_context_documents()
+            result = await list_context_documents(_mock_ctx())
 
         data = json.loads(result)
         assert data["count"] == 1
@@ -819,9 +861,10 @@ class TestListContextDocuments:
                 "app.mcp.resources.context_documents.ContextDocumentRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("context_documents"),
         ):
             from app.mcp.resources.context_documents import list_context_documents
-            result = await list_context_documents()
+            result = await list_context_documents(_mock_ctx())
 
         data = json.loads(result)
         item = data["context_documents"][0]
@@ -852,9 +895,10 @@ class TestGetContextDocument:
                 "app.mcp.resources.context_documents.ContextDocumentRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("context_documents"),
         ):
             from app.mcp.resources.context_documents import get_context_document
-            result = await get_context_document(str(doc_uuid))
+            result = await get_context_document(str(doc_uuid), _mock_ctx())
 
         data = json.loads(result)
         assert data["uuid"] == str(doc_uuid)
@@ -875,9 +919,10 @@ class TestGetContextDocument:
                 "app.mcp.resources.context_documents.ContextDocumentRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("context_documents"),
         ):
             from app.mcp.resources.context_documents import get_context_document
-            result = await get_context_document(str(doc_uuid))
+            result = await get_context_document(str(doc_uuid), _mock_ctx())
 
         data = json.loads(result)
         expected_keys = {
@@ -899,10 +944,11 @@ class TestGetContextDocument:
                 "app.mcp.resources.context_documents.ContextDocumentRepository",
                 return_value=mock_repo,
             ),
+            _patch_scope("context_documents"),
         ):
             from app.mcp.resources.context_documents import get_context_document
             with pytest.raises(ValueError, match="Context document not found"):
-                await get_context_document(str(doc_uuid))
+                await get_context_document(str(doc_uuid), _mock_ctx())
 
 
 # ===========================================================================
@@ -921,9 +967,10 @@ class TestListWorkflows:
         with (
             patch("app.mcp.resources.workflows.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.workflows.WorkflowRepository", return_value=mock_repo),
+            _patch_scope("workflows"),
         ):
             from app.mcp.resources.workflows import list_workflows
-            result = await list_workflows()
+            result = await list_workflows(_mock_ctx())
 
         data = json.loads(result)
         assert data["count"] == 1
@@ -939,9 +986,10 @@ class TestListWorkflows:
         with (
             patch("app.mcp.resources.workflows.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.workflows.WorkflowRepository", return_value=mock_repo),
+            _patch_scope("workflows"),
         ):
             from app.mcp.resources.workflows import list_workflows
-            result = await list_workflows()
+            result = await list_workflows(_mock_ctx())
 
         data = json.loads(result)
         item = data["workflows"][0]
@@ -971,9 +1019,10 @@ class TestGetWorkflow:
         with (
             patch("app.mcp.resources.workflows.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.workflows.WorkflowRepository", return_value=mock_repo),
+            _patch_scope("workflows"),
         ):
             from app.mcp.resources.workflows import get_workflow
-            result = await get_workflow(str(wf_uuid))
+            result = await get_workflow(str(wf_uuid), _mock_ctx())
 
         data = json.loads(result)
         assert data["uuid"] == str(wf_uuid)
@@ -991,9 +1040,10 @@ class TestGetWorkflow:
         with (
             patch("app.mcp.resources.workflows.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.workflows.WorkflowRepository", return_value=mock_repo),
+            _patch_scope("workflows"),
         ):
             from app.mcp.resources.workflows import get_workflow
-            result = await get_workflow(str(wf_uuid))
+            result = await get_workflow(str(wf_uuid), _mock_ctx())
 
         data = json.loads(result)
         expected_keys = {
@@ -1015,10 +1065,11 @@ class TestGetWorkflow:
         with (
             patch("app.mcp.resources.workflows.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.workflows.WorkflowRepository", return_value=mock_repo),
+            _patch_scope("workflows"),
         ):
             from app.mcp.resources.workflows import get_workflow
             with pytest.raises(ValueError, match="Workflow not found"):
-                await get_workflow(str(wf_uuid))
+                await get_workflow(str(wf_uuid), _mock_ctx())
 
 
 # ===========================================================================
@@ -1031,6 +1082,7 @@ class TestGetMetricsSummary:
         from app.schemas.metrics import (
             MetricsSummaryAlerts,
             MetricsSummaryApprovals,
+            MetricsSummaryPlatform,
             MetricsSummaryResponse,
             MetricsSummaryWorkflows,
         )
@@ -1041,6 +1093,10 @@ class TestGetMetricsSummary:
                 total=100,
                 active=25,
                 by_severity={"High": 10, "Critical": 5, "Medium": 10},
+                by_status={"Open": 25, "Closed": 75},
+                by_source={"sentinel": 60, "elastic": 40},
+                enrichment_coverage=0.85,
+                mean_time_to_enrich_seconds=45.0,
                 false_positive_rate=0.05,
                 mttd_seconds=120.0,
                 mtta_seconds=300.0,
@@ -1059,6 +1115,15 @@ class TestGetMetricsSummary:
                 approval_rate=0.88,
                 median_response_time_minutes=5.0,
             ),
+            platform=MetricsSummaryPlatform(
+                context_documents=3,
+                detection_rules=10,
+                enrichment_providers=4,
+                enrichment_providers_by_indicator_type={"ip": 2, "domain": 1},
+                agents=2,
+                workflows=5,
+                indicator_mappings=8,
+            ),
         )
 
         session_ctx, mock_session = _patch_session()
@@ -1069,9 +1134,10 @@ class TestGetMetricsSummary:
                 "app.mcp.resources.metrics.compute_metrics_summary",
                 new_callable=AsyncMock, return_value=summary,
             ),
+            _patch_scope("metrics"),
         ):
             from app.mcp.resources.metrics import get_metrics_summary
-            result = await get_metrics_summary()
+            result = await get_metrics_summary(_mock_ctx())
 
         data = json.loads(result)
         assert data["period"] == "last_30_days"
@@ -1114,11 +1180,12 @@ class TestGetEnrichment:
             patch("app.mcp.resources.enrichments.enrichment_registry") as mock_registry,
             patch("app.mcp.resources.enrichments.get_cache_backend", return_value=mock_cache),
             patch("app.mcp.resources.enrichments.EnrichmentService", return_value=mock_service),
+            _patch_scope("enrichments"),
         ):
             mock_registry.list_for_type.return_value = [mock_provider]
 
             from app.mcp.resources.enrichments import get_enrichment
-            result = await get_enrichment("ip", "1.2.3.4")
+            result = await get_enrichment("ip", "1.2.3.4", _mock_ctx())
 
         data = json.loads(result)
         assert data["type"] == "ip"
@@ -1127,26 +1194,38 @@ class TestGetEnrichment:
         assert data["results"]["virustotal"]["success"] is True
 
     async def test_invalid_indicator_type_raises(self) -> None:
-        from app.mcp.resources.enrichments import get_enrichment
-        with pytest.raises(ValueError, match="Invalid indicator type"):
-            await get_enrichment("invalid_type", "1.2.3.4")
+        session_ctx, mock_session = _patch_session()
+        with (
+            patch("app.mcp.resources.enrichments.AsyncSessionLocal", session_ctx),
+            _patch_scope("enrichments"),
+        ):
+            from app.mcp.resources.enrichments import get_enrichment
+            with pytest.raises(ValueError, match="Invalid indicator type"):
+                await get_enrichment("invalid_type", "1.2.3.4", _mock_ctx())
 
     async def test_empty_value_raises(self) -> None:
-        from app.mcp.resources.enrichments import get_enrichment
-        with pytest.raises(ValueError, match="must not be empty"):
-            await get_enrichment("ip", "  ")
+        session_ctx, mock_session = _patch_session()
+        with (
+            patch("app.mcp.resources.enrichments.AsyncSessionLocal", session_ctx),
+            _patch_scope("enrichments"),
+        ):
+            from app.mcp.resources.enrichments import get_enrichment
+            with pytest.raises(ValueError, match="must not be empty"):
+                await get_enrichment("ip", "  ", _mock_ctx())
 
     async def test_no_providers_returns_empty(self) -> None:
         """When no providers support the type, return empty results with message."""
         session_ctx, mock_session = _patch_session()
 
         with (
+            patch("app.mcp.resources.enrichments.AsyncSessionLocal", session_ctx),
             patch("app.mcp.resources.enrichments.enrichment_registry") as mock_registry,
+            _patch_scope("enrichments"),
         ):
             mock_registry.list_for_type.return_value = []
 
             from app.mcp.resources.enrichments import get_enrichment
-            result = await get_enrichment("ip", "1.2.3.4")
+            result = await get_enrichment("ip", "1.2.3.4", _mock_ctx())
 
         data = json.loads(result)
         assert data["provider_count"] == 0
@@ -1183,11 +1262,12 @@ class TestGetEnrichment:
             patch("app.mcp.resources.enrichments.enrichment_registry") as mock_registry,
             patch("app.mcp.resources.enrichments.get_cache_backend", return_value=mock_cache),
             patch("app.mcp.resources.enrichments.EnrichmentService", return_value=mock_service),
+            _patch_scope("enrichments"),
         ):
             mock_registry.list_for_type.return_value = [mock_provider]
 
             from app.mcp.resources.enrichments import get_enrichment
-            result = await get_enrichment("ip", "1.2.3.4")
+            result = await get_enrichment("ip", "1.2.3.4", _mock_ctx())
 
         data = json.loads(result)
         assert data["results"]["virustotal"]["cache_hit"] is True

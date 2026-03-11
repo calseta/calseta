@@ -16,14 +16,17 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.models.api_key import APIKey as ApiKeyModel
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.workflow_approvals import (
     WorkflowApprovalRequestResponse,
@@ -63,7 +66,9 @@ async def _materialize_expired(rows: list, db: AsyncSession) -> None:
 
 
 @router.get("", response_model=PaginatedResponse[WorkflowApprovalRequestResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_approval_requests(
+    request: Request,
     auth: _Approve,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -137,7 +142,9 @@ async def list_approval_requests(
 
 
 @router.get("/{approval_uuid}", response_model=DataResponse[WorkflowApprovalRequestResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_approval_request(
+    request: Request,
     approval_uuid: UUID,
     auth: _Approve,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -176,7 +183,9 @@ async def get_approval_request(
     "/{approval_uuid}/approve",
     response_model=DataResponse[WorkflowApprovalRequestResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def approve_workflow(
+    request: Request,
     approval_uuid: UUID,
     auth: _Approve,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -242,7 +251,9 @@ async def approve_workflow(
     "/{approval_uuid}/reject",
     response_model=DataResponse[WorkflowApprovalRequestResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def reject_workflow(
+    request: Request,
     approval_uuid: UUID,
     auth: _Approve,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -257,11 +268,9 @@ async def reject_workflow(
     from app.workflows.approval import process_approval_decision
 
     try:
-        from app.db.models.api_key import APIKey as ApiKeyModel
-
         key_name: str | None = None
         key_row = (await db.execute(
-            __import__("sqlalchemy").select(ApiKeyModel.name).where(ApiKeyModel.id == auth.key_id)
+            select(ApiKeyModel.name).where(ApiKeyModel.id == auth.key_id)
         )).scalar_one_or_none()
         if key_row:
             key_name = key_row

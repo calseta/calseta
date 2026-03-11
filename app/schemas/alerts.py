@@ -12,9 +12,10 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.alert import AlertCloseClassification, AlertSeverity, AlertStatus, EnrichmentStatus
+from app.schemas.common import JSONB_SIZE_SMALL, validate_jsonb_size
 from app.schemas.context_documents import ContextDocumentResponse
 from app.schemas.detection_rules import DetectionRuleResponse
 from app.schemas.indicators import EnrichedIndicator, MaliceLevel
@@ -120,6 +121,11 @@ class FindingCreate(BaseModel):
     confidence: FindingConfidence | None = None
     recommended_action: str | None = None
     evidence: dict[str, Any] | None = None
+
+    @field_validator("evidence")
+    @classmethod
+    def _validate_evidence_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return validate_jsonb_size(v, JSONB_SIZE_SMALL, "evidence")  # type: ignore[return-value]
 
 
 class FindingResponse(BaseModel):

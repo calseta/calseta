@@ -8,6 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.schemas.common import JSONB_SIZE_MEDIUM, validate_jsonb_size
 from app.schemas.indicators import IndicatorType
 
 WORKFLOW_TYPES = frozenset({"indicator", "alert"})
@@ -280,6 +281,11 @@ class WorkflowTestRequest(BaseModel):
         if v not in valid:
             raise ValueError(f"indicator_type must be one of: {sorted(valid)}")
         return v
+
+    @field_validator("mock_http_responses")
+    @classmethod
+    def _validate_mock_http_responses_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return validate_jsonb_size(v, JSONB_SIZE_MEDIUM, "mock_http_responses")  # type: ignore[return-value]
 
 
 class WorkflowTestResponse(BaseModel):

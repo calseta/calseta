@@ -174,7 +174,15 @@ async def execute_workflow(
 
     integrations = _build_integrations()
 
-    async with httpx.AsyncClient(timeout=float(workflow.timeout_seconds)) as http:
+    async def _ssrf_check_hook(request: httpx.Request) -> None:
+        from app.services.url_validation import validate_outbound_url
+
+        validate_outbound_url(str(request.url))
+
+    async with httpx.AsyncClient(
+        timeout=float(workflow.timeout_seconds),
+        event_hooks={"request": [_ssrf_check_hook]},
+    ) as http:
         ctx = WorkflowContext(
             indicator=indicator_ctx,
             alert=alert_ctx,

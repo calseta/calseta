@@ -59,8 +59,16 @@ class TemplateResolver:
             "steps": step_results or {},
         }
 
-    def resolve_string(self, template: str) -> str:
-        """Resolve all placeholders in a single string."""
+    def resolve_string(self, template: str, *, url_encode_all: bool = False) -> str:
+        """Resolve all placeholders in a single string.
+
+        Args:
+            template: String containing {{namespace.field}} placeholders.
+            url_encode_all: If True, URL-encode ALL resolved values (used for
+                URL templates where auth fields like ``{{auth.api_key}}`` may
+                contain ``&`` or other URL-special characters). Explicit
+                ``| urlencode`` filter is still respected regardless.
+        """
 
         def _replace(match: re.Match[str]) -> str:
             expr = match.group(1).strip()
@@ -90,11 +98,20 @@ class TemplateResolver:
                 return ""
 
             result = str(value)
-            if apply_urlencode:
+            if apply_urlencode or url_encode_all:
                 result = quote(result, safe="")
             return result
 
         return _PLACEHOLDER_RE.sub(_replace, template)
+
+    def resolve_url(self, template: str) -> str:
+        """Resolve placeholders in a URL template with automatic URL-encoding.
+
+        All substituted values — including auth fields — are URL-encoded to
+        prevent query-parameter injection when credentials contain ``&``, ``=``,
+        or other URL-special characters.
+        """
+        return self.resolve_string(template, url_encode_all=True)
 
     def resolve_value(self, value: Any) -> Any:
         """Resolve placeholders in any value — string, dict, or list."""

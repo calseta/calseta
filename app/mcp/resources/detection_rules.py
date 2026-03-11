@@ -12,7 +12,10 @@ import json
 import uuid as _uuid
 from datetime import datetime
 
+from mcp.server.fastmcp import Context
+
 from app.db.session import AsyncSessionLocal
+from app.mcp.scope import check_scope
 from app.mcp.server import mcp_server
 from app.repositories.detection_rule_repository import DetectionRuleRepository
 
@@ -36,9 +39,13 @@ def _truncate_doc(documentation: str | None, max_length: int = 200) -> str | Non
 
 
 @mcp_server.resource("calseta://detection-rules")
-async def list_detection_rules() -> str:
+async def list_detection_rules(ctx: Context) -> str:
     """Detection rule catalog with MITRE mappings and documentation summaries."""
     async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "alerts:read")
+        if scope_err:
+            return scope_err
+
         repo = DetectionRuleRepository(session)
         rules, _total = await repo.list(page=1, page_size=500)
 
@@ -66,7 +73,7 @@ async def list_detection_rules() -> str:
 
 
 @mcp_server.resource("calseta://detection-rules/{uuid}")
-async def get_detection_rule(uuid: str) -> str:
+async def get_detection_rule(uuid: str, ctx: Context) -> str:
     """Full detection rule with complete documentation."""
     try:
         rule_uuid = _uuid.UUID(uuid)
@@ -74,6 +81,10 @@ async def get_detection_rule(uuid: str) -> str:
         raise ValueError(f"Invalid UUID: {uuid}") from None
 
     async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "alerts:read")
+        if scope_err:
+            return scope_err
+
         repo = DetectionRuleRepository(session)
         rule = await repo.get_by_uuid(rule_uuid)
         if rule is None:

@@ -16,8 +16,10 @@ from datetime import datetime
 from typing import Any
 
 import structlog
+from mcp.server.fastmcp import Context
 
 from app.db.session import AsyncSessionLocal
+from app.mcp.scope import check_scope
 from app.mcp.server import mcp_server
 from app.repositories.activity_event_repository import ActivityEventRepository
 from app.repositories.alert_repository import AlertRepository
@@ -50,9 +52,13 @@ def _filter_enrichment_results(raw_results: dict[str, Any] | None) -> dict[str, 
 
 
 @mcp_server.resource("calseta://alerts")
-async def list_alerts() -> str:
+async def list_alerts(ctx: Context) -> str:
     """Recent alerts (last 50) with status, severity, source, and enrichment state."""
     async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "alerts:read")
+        if scope_err:
+            return scope_err
+
         repo = AlertRepository(session)
         alerts, _total = await repo.list_alerts(page=1, page_size=50)
 
@@ -79,7 +85,7 @@ async def list_alerts() -> str:
 
 
 @mcp_server.resource("calseta://alerts/{uuid}")
-async def get_alert(uuid: str) -> str:
+async def get_alert(uuid: str, ctx: Context) -> str:
     """Full alert with indicators, detection rule documentation, and applicable context docs."""
     try:
         alert_uuid = _uuid.UUID(uuid)
@@ -87,6 +93,10 @@ async def get_alert(uuid: str) -> str:
         raise ValueError(f"Invalid UUID: {uuid}") from None
 
     async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "alerts:read")
+        if scope_err:
+            return scope_err
+
         alert_repo = AlertRepository(session)
         indicator_repo = IndicatorRepository(session)
 
@@ -172,7 +182,7 @@ async def get_alert(uuid: str) -> str:
 
 
 @mcp_server.resource("calseta://alerts/{uuid}/context")
-async def get_alert_context(uuid: str) -> str:
+async def get_alert_context(uuid: str, ctx: Context) -> str:
     """Applicable context documents for an alert, ordered by global-first then targeted."""
     try:
         alert_uuid = _uuid.UUID(uuid)
@@ -180,6 +190,10 @@ async def get_alert_context(uuid: str) -> str:
         raise ValueError(f"Invalid UUID: {uuid}") from None
 
     async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "alerts:read")
+        if scope_err:
+            return scope_err
+
         alert_repo = AlertRepository(session)
         alert = await alert_repo.get_by_uuid(alert_uuid)
         if alert is None:
@@ -203,7 +217,7 @@ async def get_alert_context(uuid: str) -> str:
 
 
 @mcp_server.resource("calseta://alerts/{uuid}/activity")
-async def get_alert_activity(uuid: str) -> str:
+async def get_alert_activity(uuid: str, ctx: Context) -> str:
     """Activity log for an alert, newest-first, max 100 events."""
     try:
         alert_uuid = _uuid.UUID(uuid)
@@ -211,6 +225,10 @@ async def get_alert_activity(uuid: str) -> str:
         raise ValueError(f"Invalid UUID: {uuid}") from None
 
     async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "alerts:read")
+        if scope_err:
+            return scope_err
+
         alert_repo = AlertRepository(session)
         activity_repo = ActivityEventRepository(session)
 

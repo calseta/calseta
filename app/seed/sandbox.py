@@ -58,7 +58,7 @@ async def _seed_sandbox_api_key(db: AsyncSession) -> None:
     if existing.scalar_one_or_none() is not None:
         return
 
-    key_hash = bcrypt.hashpw(_SANDBOX_API_KEY.encode(), bcrypt.gensalt()).decode()
+    key_hash = bcrypt.hashpw(_SANDBOX_API_KEY.encode(), bcrypt.gensalt(rounds=12)).decode()
     api_key = APIKey(
         name="Sandbox Demo Key (read-only)",
         key_prefix=_SANDBOX_KEY_PREFIX,
@@ -87,7 +87,7 @@ async def _seed_lab_api_key(db: AsyncSession) -> None:
     if existing.scalar_one_or_none() is not None:
         return
 
-    key_hash = bcrypt.hashpw(_LAB_API_KEY.encode(), bcrypt.gensalt()).decode()
+    key_hash = bcrypt.hashpw(_LAB_API_KEY.encode(), bcrypt.gensalt(rounds=12)).decode()
     api_key = APIKey(
         name="Lab Demo Key (full access)",
         key_prefix=_LAB_KEY_PREFIX,

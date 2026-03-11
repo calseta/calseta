@@ -58,6 +58,7 @@ class TestScopes:
             "workflows:read",
             "workflows:write",
             "workflows:execute",
+            "approvals:write",
             "agents:read",
             "agents:write",
             "admin",

@@ -15,13 +15,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.repositories.detection_rule_repository import DetectionRuleRepository
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.detection_rules import (
@@ -44,7 +47,9 @@ _DR_SORT_FIELDS = {"name", "source_name", "severity", "created_at"}
 
 
 @router.get("", response_model=PaginatedResponse[DetectionRuleResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_detection_rules(
+    request: Request,
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -94,7 +99,9 @@ async def list_detection_rules(
     response_model=DataResponse[DetectionRuleResponse],
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def create_detection_rule(
+    request: Request,
     body: DetectionRuleCreate,
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -108,7 +115,9 @@ async def create_detection_rule(
 
 
 @router.get("/{rule_uuid}", response_model=DataResponse[DetectionRuleResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_detection_rule(
+    request: Request,
     rule_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -125,7 +134,9 @@ async def get_detection_rule(
 
 
 @router.patch("/{rule_uuid}", response_model=DataResponse[DetectionRuleResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def patch_detection_rule(
+    request: Request,
     rule_uuid: UUID,
     body: DetectionRulePatch,
     auth: _Write,
@@ -144,7 +155,9 @@ async def patch_detection_rule(
 
 
 @router.delete("/{rule_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def delete_detection_rule(
+    request: Request,
     rule_uuid: UUID,
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],

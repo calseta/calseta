@@ -19,13 +19,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.repositories.api_key_repository import APIKeyRepository
 from app.schemas.api_keys import APIKeyCreate, APIKeyCreated, APIKeyResponse, APIKeyUpdate
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
@@ -36,7 +39,9 @@ _AdminAuth = Annotated[AuthContext, Depends(require_scope(Scope.ADMIN))]
 
 
 @router.get("", response_model=PaginatedResponse[APIKeyResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_api_keys(
+    request: Request,
     auth: _AdminAuth,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -66,7 +71,9 @@ async def list_api_keys(
 
 
 @router.post("", response_model=DataResponse[APIKeyCreated], status_code=status.HTTP_201_CREATED)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def create_api_key(
+    request: Request,
     auth: _AdminAuth,
     body: APIKeyCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -96,7 +103,9 @@ async def create_api_key(
 
 
 @router.get("/{key_uuid}", response_model=DataResponse[APIKeyResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_api_key(
+    request: Request,
     auth: _AdminAuth,
     key_uuid: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -125,7 +134,9 @@ async def get_api_key(
 
 
 @router.patch("/{key_uuid}", response_model=DataResponse[APIKeyResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def update_api_key(
+    request: Request,
     auth: _AdminAuth,
     key_uuid: UUID,
     body: APIKeyUpdate,
@@ -169,7 +180,9 @@ async def update_api_key(
 
 
 @router.delete("/{key_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def delete_api_key(
+    request: Request,
     auth: _AdminAuth,
     key_uuid: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],

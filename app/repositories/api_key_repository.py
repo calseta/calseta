@@ -46,7 +46,7 @@ class APIKeyRepository:
         """
         plain_key = "cai_" + secrets.token_urlsafe(32)
         key_prefix = plain_key[:8]
-        key_hash = bcrypt.hashpw(plain_key.encode(), bcrypt.gensalt()).decode()
+        key_hash = bcrypt.hashpw(plain_key.encode(), bcrypt.gensalt(rounds=12)).decode()
 
         record = APIKey(
             name=name,

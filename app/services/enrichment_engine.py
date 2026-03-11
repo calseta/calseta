@@ -35,6 +35,7 @@ from app.schemas.enrichment_providers import HttpStepDebug
 from app.services.enrichment_template import TemplateResolver
 from app.services.field_extractor import FieldExtractor
 from app.services.malice_evaluator import MaliceRuleEvaluator
+from app.services.url_validation import validate_outbound_url
 
 logger = structlog.get_logger(__name__)
 
@@ -59,9 +60,7 @@ def mask_sensitive_headers(
     """Mask sensitive header values for debug output."""
     masked: dict[str, str] = {}
     for name, value in headers.items():
-        if _SENSITIVE_HEADER_RE.search(name):
-            masked[name] = _mask_value(value)
-        elif any(av and av in value for av in auth_values):
+        if _SENSITIVE_HEADER_RE.search(name) or any(av and av in value for av in auth_values):
             masked[name] = _mask_value(value)
         else:
             masked[name] = value
@@ -168,7 +167,29 @@ class GenericHttpEnrichmentEngine:
                 else:
                     url_template = step.get("url", "")
 
-                url = resolver.resolve_string(url_template)
+                url = resolver.resolve_url(url_template)
+
+                # SSRF protection — block requests to private/internal addresses
+                try:
+                    validate_outbound_url(url)
+                except ValueError as exc:
+                    if is_optional:
+                        logger.warning(
+                            "enrichment_step_ssrf_blocked_optional",
+                            provider=self._provider_name,
+                            step=step_name,
+                            url=url,
+                            reason=str(exc),
+                        )
+                        continue
+                    result = EnrichmentResult.failure_result(
+                        self._provider_name,
+                        f"Step '{step_name}' SSRF blocked: {exc}",
+                    )
+                    if capture_debug:
+                        result.debug_steps = debug_steps
+                    return result
+
                 method = step.get("method", "GET").upper()
                 timeout = step.get("timeout_seconds", 30)
 
@@ -209,7 +230,11 @@ class GenericHttpEnrichmentEngine:
                     masked_params = None
                     if resolved_params:
                         masked_params = {
-                            k: (_mask_value(str(v)) if any(av and av in str(v) for av in auth_values) else str(v))
+                            k: (
+                                _mask_value(str(v))
+                                if any(av and av in str(v) for av in auth_values)
+                                else str(v)
+                            )
                             for k, v in resolved_params.items()
                         }
                     step_debug = HttpStepDebug(

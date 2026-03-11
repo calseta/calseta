@@ -6,7 +6,9 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.schemas.common import JSONB_SIZE_MEDIUM, validate_jsonb_size
 
 
 class SourceIntegrationCreate(BaseModel):
@@ -16,6 +18,11 @@ class SourceIntegrationCreate(BaseModel):
     auth_type: str | None = None
     auth_config: dict[str, Any] | None = None  # encrypted before storage
     documentation: str | None = None
+
+    @field_validator("auth_config")
+    @classmethod
+    def _validate_auth_config_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return validate_jsonb_size(v, JSONB_SIZE_MEDIUM, "auth_config")  # type: ignore[return-value]
 
 
 class SourceIntegrationResponse(BaseModel):
@@ -38,3 +45,8 @@ class SourceIntegrationPatch(BaseModel):
     auth_type: str | None = None
     auth_config: dict[str, Any] | None = None
     documentation: str | None = None
+
+    @field_validator("auth_config")
+    @classmethod
+    def _validate_auth_config_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return validate_jsonb_size(v, JSONB_SIZE_MEDIUM, "auth_config")  # type: ignore[return-value]

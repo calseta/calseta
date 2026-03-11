@@ -15,14 +15,17 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.session import get_db
 from app.integrations.sources.registry import source_registry
+from app.middleware.rate_limit import limiter
 from app.repositories.indicator_mapping_repository import IndicatorMappingRepository
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.indicator_mappings import (
@@ -44,7 +47,9 @@ def _to_response(mapping: object) -> IndicatorFieldMappingResponse:
 
 
 @router.get("", response_model=PaginatedResponse[IndicatorFieldMappingResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_indicator_mappings(
+    request: Request,
     auth: _AdminOrWrite,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -75,7 +80,9 @@ async def list_indicator_mappings(
     response_model=DataResponse[IndicatorFieldMappingResponse],
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def create_indicator_mapping(
+    request: Request,
     auth: _AdminOrWrite,
     body: IndicatorFieldMappingCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -89,7 +96,9 @@ async def create_indicator_mapping(
     "/source-plugin-fields",
     response_model=DataResponse[list[IndicatorFieldMappingResponse]],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_source_plugin_fields(
+    request: Request,
     auth: _AdminOrWrite,
 ) -> DataResponse[list[IndicatorFieldMappingResponse]]:
     """Return hardcoded Pass 1 extraction fields from all registered sources."""
@@ -120,7 +129,9 @@ async def list_source_plugin_fields(
     "/test-extraction",
     response_model=DataResponse[TestExtractionResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def test_extraction_endpoint(
+    request: Request,
     body: TestExtractionRequest,
     auth: _AdminOrWrite,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -153,7 +164,9 @@ async def test_extraction_endpoint(
 
 
 @router.get("/{mapping_uuid}", response_model=DataResponse[IndicatorFieldMappingResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_indicator_mapping(
+    request: Request,
     mapping_uuid: UUID,
     auth: _AdminOrWrite,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -170,7 +183,9 @@ async def get_indicator_mapping(
 
 
 @router.patch("/{mapping_uuid}", response_model=DataResponse[IndicatorFieldMappingResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def patch_indicator_mapping(
+    request: Request,
     mapping_uuid: UUID,
     body: IndicatorFieldMappingPatch,
     auth: _AdminOrWrite,
@@ -195,7 +210,9 @@ async def patch_indicator_mapping(
 
 
 @router.delete("/{mapping_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def delete_indicator_mapping(
+    request: Request,
     mapping_uuid: UUID,
     auth: _AdminOrWrite,
     db: Annotated[AsyncSession, Depends(get_db)],

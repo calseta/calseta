@@ -8,6 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.schemas.common import JSONB_SIZE_SMALL, validate_jsonb_size
+
 DOCUMENT_TYPES = frozenset(
     {"runbook", "ir_plan", "sop", "playbook", "detection_guide", "other"}
 )
@@ -99,6 +101,7 @@ class ContextDocumentCreate(BaseModel):
     @classmethod
     def _validate_targeting_rules(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
         if v is not None:
+            validate_jsonb_size(v, JSONB_SIZE_SMALL, "targeting_rules")
             errors = validate_targeting_rules(v)
             if errors:
                 raise ValueError("; ".join(errors))
@@ -127,6 +130,7 @@ class ContextDocumentPatch(BaseModel):
     @classmethod
     def _validate_targeting_rules(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
         if v is not None:
+            validate_jsonb_size(v, JSONB_SIZE_SMALL, "targeting_rules")
             errors = validate_targeting_rules(v)
             if errors:
                 raise ValueError("; ".join(errors))

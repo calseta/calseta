@@ -113,9 +113,9 @@ class ProcrastinateBackend(TaskQueueBase):
 
     async def get_queue_metrics(self) -> QueueMetrics:
         """Query procrastinate_jobs for per-queue health metrics."""
-        import psycopg
-
         from datetime import UTC, datetime, timedelta
+
+        import psycopg
 
         now = datetime.now(UTC)
         thirty_days_ago = now - timedelta(days=30)

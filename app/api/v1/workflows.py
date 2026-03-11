@@ -23,6 +23,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
@@ -31,6 +32,7 @@ from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
 from app.config import settings
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.repositories.workflow_code_version_repository import WorkflowCodeVersionRepository
 from app.repositories.workflow_repository import WorkflowRepository
 from app.repositories.workflow_run_repository import WorkflowRunRepository
@@ -87,7 +89,9 @@ _WORKFLOW_SORT_FIELDS = {"name", "state", "risk_level", "updated_at", "created_a
 
 
 @router.get("", response_model=PaginatedResponse[WorkflowSummary])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_workflows(
+    request: Request,
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -144,7 +148,9 @@ async def list_workflows(
     response_model=DataResponse[WorkflowResponse],
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def create_workflow(
+    request: Request,
     body: WorkflowCreate,
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -178,7 +184,9 @@ async def create_workflow(
 
 
 @router.get("/{workflow_uuid}", response_model=DataResponse[WorkflowResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_workflow(
+    request: Request,
     workflow_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -200,7 +208,9 @@ async def get_workflow(
 
 
 @router.patch("/{workflow_uuid}", response_model=DataResponse[WorkflowResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def patch_workflow(
+    request: Request,
     workflow_uuid: UUID,
     body: WorkflowPatch,
     auth: _Write,
@@ -253,7 +263,9 @@ async def patch_workflow(
 
 
 @router.delete("/{workflow_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def delete_workflow(
+    request: Request,
     workflow_uuid: UUID,
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -284,7 +296,9 @@ async def delete_workflow(
     "/{workflow_uuid}/execute",
     status_code=status.HTTP_202_ACCEPTED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_WORKFLOW_EXECUTE_PER_MINUTE}/minute")
 async def execute_workflow(
+    request: Request,
     workflow_uuid: UUID,
     body: WorkflowExecuteAgentRequest,
     auth: _Execute,
@@ -473,7 +487,9 @@ async def execute_workflow(
     "/{workflow_uuid}/runs",
     response_model=PaginatedResponse[WorkflowRunResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_workflow_runs(
+    request: Request,
     workflow_uuid: UUID,
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
@@ -510,7 +526,9 @@ workflow_runs_router = APIRouter(prefix="/workflow-runs", tags=["workflow-runs"]
 
 
 @workflow_runs_router.get("", response_model=PaginatedResponse[WorkflowRunResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_all_workflow_runs(
+    request: Request,
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -556,7 +574,9 @@ async def list_all_workflow_runs(
     response_model=DataResponse[WorkflowGenerateResponse],
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def generate_workflow(
+    request: Request,
     body: WorkflowGenerateRequest,
     auth: _Write,
 ) -> DataResponse[WorkflowGenerateResponse]:
@@ -596,7 +616,9 @@ async def generate_workflow(
     response_model=DataResponse[WorkflowTestResponse],
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def test_workflow(
+    request: Request,
     workflow_uuid: UUID,
     body: WorkflowTestRequest,
     auth: _Execute,
@@ -745,7 +767,9 @@ async def test_workflow(
     "/{workflow_uuid}/versions",
     response_model=DataResponse[list[WorkflowVersionResponse]],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_workflow_versions(
+    request: Request,
     workflow_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],

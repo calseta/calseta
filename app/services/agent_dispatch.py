@@ -33,6 +33,7 @@ from app.repositories.alert_repository import AlertRepository
 from app.repositories.indicator_repository import IndicatorRepository
 from app.services.agent_runs import record_agent_run
 from app.services.context_targeting import get_applicable_documents
+from app.services.url_validation import validate_outbound_url
 
 logger = structlog.get_logger(__name__)
 
@@ -275,6 +276,23 @@ async def dispatch_to_agent(
                 "agent_auth_decrypt_failed",
                 agent_uuid=str(agent.uuid),
             )
+
+    # SSRF protection — validate endpoint URL before any HTTP calls
+    try:
+        validate_outbound_url(agent.endpoint_url)
+    except ValueError as exc:
+        logger.error(
+            "agent_webhook_ssrf_blocked",
+            agent_uuid=str(agent.uuid),
+            endpoint_url=agent.endpoint_url,
+            reason=str(exc),
+        )
+        return {
+            "status": "failed",
+            "status_code": None,
+            "attempt_count": 0,
+            "error": str(exc),
+        }
 
     max_attempts = max(1, agent.retry_count + 1)  # retry_count retries after initial attempt
     last_status_code: int | None = None

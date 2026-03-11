@@ -57,12 +57,18 @@ async def calseta_exception_handler(
 async def validation_exception_handler(
     _request: Request, exc: RequestValidationError
 ) -> JSONResponse:
+    # Strip 'input' and 'ctx' from error details to avoid leaking user data
+    sanitized_errors = []
+    for err in exc.errors():
+        sanitized = {k: v for k, v in err.items() if k not in ("input", "ctx", "url")}
+        sanitized_errors.append(sanitized)
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=_error_body(
             "VALIDATION_ERROR",
             "Request validation failed.",
-            {"errors": exc.errors()},
+            {"errors": sanitized_errors},
         ),
     )
 

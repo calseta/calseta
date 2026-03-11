@@ -22,13 +22,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.queue.base import TaskQueueBase
 from app.queue.dependencies import get_queue
 from app.repositories.activity_event_repository import ActivityEventRepository
@@ -166,7 +169,9 @@ _ALLOWED_SORT_ORDER = {"asc", "desc"}
 
 
 @router.get("", response_model=PaginatedResponse[AlertSummary])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_alerts(
+    request: Request,
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -231,7 +236,9 @@ async def list_alerts(
 
 
 @router.get("/{alert_uuid}", response_model=DataResponse[AlertResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_alert(
+    request: Request,
     alert_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -284,7 +291,9 @@ async def get_alert(
 
 
 @router.patch("/{alert_uuid}", response_model=DataResponse[AlertResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def patch_alert(
+    request: Request,
     alert_uuid: UUID,
     body: AlertPatch,
     auth: _Write,
@@ -405,7 +414,9 @@ async def patch_alert(
 
 
 @router.delete("/{alert_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def delete_alert(
+    request: Request,
     alert_uuid: UUID,
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -426,7 +437,9 @@ async def delete_alert(
     response_model=DataResponse[FindingResponse],
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def add_finding(
+    request: Request,
     alert_uuid: UUID,
     body: FindingCreate,
     auth: _Write,
@@ -487,7 +500,9 @@ async def add_finding(
     "/{alert_uuid}/enrich",
     status_code=status.HTTP_202_ACCEPTED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_ENRICHMENT_PER_MINUTE}/minute")
 async def enrich_alert(
+    request: Request,
     alert_uuid: UUID,
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -523,7 +538,9 @@ async def enrich_alert(
     "/{alert_uuid}/findings",
     response_model=DataResponse[list[FindingResponse]],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_findings(
+    request: Request,
     alert_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -564,7 +581,9 @@ async def list_findings(
     "/{alert_uuid}/context",
     response_model=DataResponse[list[ContextDocumentResponse]],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_alert_context(
+    request: Request,
     alert_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -597,7 +616,9 @@ async def get_alert_context(
     "/{alert_uuid}/indicators",
     response_model=DataResponse[list[IndicatorResponse]],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_alert_indicators(
+    request: Request,
     alert_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -651,7 +672,9 @@ async def list_alert_indicators(
     response_model=DataResponse[IndicatorAddResponse],
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def add_indicators(
+    request: Request,
     alert_uuid: UUID,
     body: IndicatorAddRequest,
     auth: _Write,
@@ -745,7 +768,9 @@ async def add_indicators(
     "/{alert_uuid}/activity",
     response_model=PaginatedResponse[ActivityEventResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_alert_activity(
+    request: Request,
     alert_uuid: UUID,
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
@@ -809,7 +834,9 @@ def _build_enrichment_summary(enrichment_results: dict | None) -> dict[str, str]
     "/{alert_uuid}/relationship-graph",
     response_model=DataResponse[AlertRelationshipGraph],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_relationship_graph(
+    request: Request,
     alert_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -892,7 +919,9 @@ async def get_relationship_graph(
     "/{alert_uuid}/trigger-agents",
     status_code=status.HTTP_202_ACCEPTED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def trigger_agents(
+    request: Request,
     alert_uuid: UUID,
     auth: Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_WRITE))],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -941,7 +970,9 @@ async def trigger_agents(
     "/{alert_uuid}/dispatch-agent",
     status_code=status.HTTP_202_ACCEPTED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def dispatch_agent(
+    request: Request,
     alert_uuid: UUID,
     agent_uuid: Annotated[UUID, Query(description="UUID of the agent to dispatch to")],
     auth: Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_WRITE))],

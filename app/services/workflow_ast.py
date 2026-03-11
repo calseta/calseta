@@ -8,7 +8,7 @@ Safety rules enforced:
 - Must define `async def run`
 - Only allowed imports: stdlib safe modules + `calseta.workflows`
 - No dangerous module references: os, subprocess, importlib, sys, builtins,
-  open, exec, eval, __import__, socket, ctypes, pickle, pathlib, shutil
+  open, exec, eval, __import__, socket, ctypes, pickle, shutil, pathlib, io
 """
 
 from __future__ import annotations
@@ -31,14 +31,12 @@ _ALLOWED_IMPORTS: frozenset[str] = frozenset(
         "html",
         "http",
         "inspect",
-        "io",
         "ipaddress",
         "itertools",
         "json",
         "logging",
         "math",
         "operator",
-        "pathlib",
         "re",
         "statistics",
         "string",
@@ -66,6 +64,8 @@ _BLOCKED_MODULES: frozenset[str] = frozenset(
         "socket",
         "ctypes",
         "pickle",
+        "pathlib",
+        "io",
         "shelve",
         "shutil",
         "tempfile",

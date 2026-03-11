@@ -22,15 +22,79 @@ from typing import Any
 from app.workflows.context import WorkflowContext, WorkflowResult
 
 # ---------------------------------------------------------------------------
+# Allowed modules (must match _ALLOWED_IMPORTS in workflow_ast.py)
+# ---------------------------------------------------------------------------
+
+_ALLOWED_MODULES: frozenset[str] = frozenset(
+    {
+        "asyncio",
+        "base64",
+        "collections",
+        "copy",
+        "datetime",
+        "enum",
+        "functools",
+        "hashlib",
+        "hmac",
+        "html",
+        "http",
+        "inspect",
+        "ipaddress",
+        "itertools",
+        "json",
+        "logging",
+        "math",
+        "operator",
+        "re",
+        "statistics",
+        "string",
+        "textwrap",
+        "time",
+        "typing",
+        "typing_extensions",
+        "unicodedata",
+        "urllib",
+        "uuid",
+        # Calseta workflow SDK
+        "calseta",
+        "app",
+    }
+)
+
+# ---------------------------------------------------------------------------
+# Restricted __import__ — runtime enforcement of module whitelist
+# ---------------------------------------------------------------------------
+
+_real_import = builtins.__import__
+
+
+def _restricted_import(
+    name: str,
+    globals: dict[str, Any] | None = None,
+    locals: dict[str, Any] | None = None,
+    fromlist: tuple[str, ...] = (),
+    level: int = 0,
+) -> Any:
+    """A restricted __import__ that only allows whitelisted modules.
+
+    This provides runtime enforcement in addition to the AST-level validation
+    performed by validate_workflow_code() at save time. Even if a workflow
+    somehow bypasses AST checks, the sandbox will block disallowed imports.
+    """
+    # Allow relative imports (level > 0) — these resolve within the already-loaded module
+    if level == 0 and name.split(".")[0] not in _ALLOWED_MODULES:
+        raise ImportError(f"Import of '{name}' is not allowed in workflows")
+    return _real_import(name, globals, locals, fromlist, level)
+
+
+# ---------------------------------------------------------------------------
 # Restricted builtins namespace
 # ---------------------------------------------------------------------------
 
-# Allow common builtins but strip dangerous ones
+# Allow common builtins but strip dangerous ones (including __import__)
 _BLOCKED_BUILTIN_NAMES: frozenset[str] = frozenset(
     {
-        # Note: __import__ is NOT blocked here — Python's import machinery needs it
-        # for `import` and `from ... import` statements to work. Security over which
-        # modules may be imported is enforced by validate_workflow_code() at save time.
+        "__import__",
         "open",
         "exec",
         "eval",
@@ -46,13 +110,16 @@ _SAFE_BUILTINS: dict[str, Any] = {
     for name in dir(builtins)
     if name not in _BLOCKED_BUILTIN_NAMES and not name.startswith("__")
 }
-# Re-add essential dunder names needed by Python's import machinery and module loading
-for _dunder in ("__name__", "__doc__", "__package__", "__loader__", "__spec__", "__import__"):
+# Re-add essential dunder names needed by Python's module loading (but NOT __import__)
+for _dunder in ("__name__", "__doc__", "__package__", "__loader__", "__spec__"):
     _safe_val = getattr(builtins, _dunder, None)
     if _safe_val is not None:
         _SAFE_BUILTINS[_dunder] = _safe_val
     else:
         _SAFE_BUILTINS[_dunder] = None
+
+# Inject the restricted __import__ so import/from statements work only for allowed modules
+_SAFE_BUILTINS["__import__"] = _restricted_import
 
 
 # ---------------------------------------------------------------------------

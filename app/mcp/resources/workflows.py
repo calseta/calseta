@@ -12,7 +12,10 @@ import json
 import uuid as _uuid
 from datetime import datetime
 
+from mcp.server.fastmcp import Context
+
 from app.db.session import AsyncSessionLocal
+from app.mcp.scope import check_scope
 from app.mcp.server import mcp_server
 from app.repositories.workflow_repository import WorkflowRepository
 
@@ -27,9 +30,13 @@ def _json_serial(obj: object) -> str:
 
 
 @mcp_server.resource("calseta://workflows")
-async def list_workflows() -> str:
+async def list_workflows(ctx: Context) -> str:
     """Workflow catalog with documentation so agents can reason about available automations."""
     async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "workflows:read")
+        if scope_err:
+            return scope_err
+
         repo = WorkflowRepository(session)
         workflows, _total = await repo.list_workflows(page=1, page_size=500)
 
@@ -61,7 +68,7 @@ async def list_workflows() -> str:
 
 
 @mcp_server.resource("calseta://workflows/{uuid}")
-async def get_workflow(uuid: str) -> str:
+async def get_workflow(uuid: str, ctx: Context) -> str:
     """Full workflow with code, documentation, and complete approval configuration."""
     try:
         workflow_uuid = _uuid.UUID(uuid)
@@ -69,6 +76,10 @@ async def get_workflow(uuid: str) -> str:
         raise ValueError(f"Invalid UUID: {uuid}") from exc
 
     async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "workflows:read")
+        if scope_err:
+            return scope_err
+
         repo = WorkflowRepository(session)
         wf = await repo.get_by_uuid(workflow_uuid)
         if wf is None:

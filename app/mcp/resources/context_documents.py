@@ -12,7 +12,10 @@ import json
 import uuid as _uuid
 from datetime import datetime
 
+from mcp.server.fastmcp import Context
+
 from app.db.session import AsyncSessionLocal
+from app.mcp.scope import check_scope
 from app.mcp.server import mcp_server
 from app.repositories.context_document_repository import ContextDocumentRepository
 
@@ -27,9 +30,13 @@ def _json_serial(obj: object) -> str:
 
 
 @mcp_server.resource("calseta://context-documents")
-async def list_context_documents() -> str:
+async def list_context_documents(ctx: Context) -> str:
     """Context document catalog — title, type, description. No content (token efficiency)."""
     async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "alerts:read")
+        if scope_err:
+            return scope_err
+
         repo = ContextDocumentRepository(session)
         docs, _total = await repo.list_documents(page=1, page_size=500)
 
@@ -55,7 +62,7 @@ async def list_context_documents() -> str:
 
 
 @mcp_server.resource("calseta://context-documents/{uuid}")
-async def get_context_document(uuid: str) -> str:
+async def get_context_document(uuid: str, ctx: Context) -> str:
     """Full context document including content and targeting rules."""
     try:
         doc_uuid = _uuid.UUID(uuid)
@@ -63,6 +70,10 @@ async def get_context_document(uuid: str) -> str:
         raise ValueError(f"Invalid UUID: {uuid}") from exc
 
     async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "alerts:read")
+        if scope_err:
+            return scope_err
+
         repo = ContextDocumentRepository(session)
         doc = await repo.get_by_uuid(doc_uuid)
         if doc is None:

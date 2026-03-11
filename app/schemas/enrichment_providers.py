@@ -6,7 +6,9 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.schemas.common import JSONB_SIZE_MEDIUM, validate_jsonb_size
 
 
 class EnrichmentProviderCreate(BaseModel):
@@ -25,6 +27,21 @@ class EnrichmentProviderCreate(BaseModel):
     cache_ttl_by_type: dict[str, int] | None = None
     malice_rules: dict[str, Any] | None = None
 
+    @field_validator("http_config")
+    @classmethod
+    def _validate_http_config_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return validate_jsonb_size(v, JSONB_SIZE_MEDIUM, "http_config")  # type: ignore[return-value]
+
+    @field_validator("auth_config")
+    @classmethod
+    def _validate_auth_config_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return validate_jsonb_size(v, JSONB_SIZE_MEDIUM, "auth_config")  # type: ignore[return-value]
+
+    @field_validator("malice_rules")
+    @classmethod
+    def _validate_malice_rules_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return validate_jsonb_size(v, JSONB_SIZE_MEDIUM, "malice_rules")  # type: ignore[return-value]
+
 
 class EnrichmentProviderPatch(BaseModel):
     """Request body for PATCH /v1/enrichment-providers/{uuid}."""
@@ -39,6 +56,21 @@ class EnrichmentProviderPatch(BaseModel):
     default_cache_ttl_seconds: int | None = Field(None, ge=0, le=86400)
     cache_ttl_by_type: dict[str, int] | None = None
     malice_rules: dict[str, Any] | None = None
+
+    @field_validator("http_config")
+    @classmethod
+    def _validate_http_config_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return validate_jsonb_size(v, JSONB_SIZE_MEDIUM, "http_config")  # type: ignore[return-value]
+
+    @field_validator("auth_config")
+    @classmethod
+    def _validate_auth_config_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return validate_jsonb_size(v, JSONB_SIZE_MEDIUM, "auth_config")  # type: ignore[return-value]
+
+    @field_validator("malice_rules")
+    @classmethod
+    def _validate_malice_rules_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return validate_jsonb_size(v, JSONB_SIZE_MEDIUM, "malice_rules")  # type: ignore[return-value]
 
 
 class EnrichmentProviderResponse(BaseModel):

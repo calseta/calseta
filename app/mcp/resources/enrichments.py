@@ -15,11 +15,13 @@ import json
 from datetime import datetime
 
 import structlog
+from mcp.server.fastmcp import Context
 
 from app.cache.factory import get_cache_backend
 from app.cache.keys import make_enrichment_key
 from app.db.session import AsyncSessionLocal
 from app.integrations.enrichment.registry import enrichment_registry
+from app.mcp.scope import check_scope
 from app.mcp.server import mcp_server
 from app.schemas.indicators import IndicatorType
 from app.services.enrichment import EnrichmentService
@@ -49,8 +51,14 @@ def _validate_indicator_type(type_str: str) -> IndicatorType:
 
 
 @mcp_server.resource("calseta://enrichments/{type}/{value}")
-async def get_enrichment(type: str, value: str) -> str:
+async def get_enrichment(type: str, value: str, ctx: Context) -> str:
     """Enrich an indicator on demand against all configured providers (cache-first)."""
+    # Scope check before any work
+    async with AsyncSessionLocal() as session:
+        scope_err = await check_scope(ctx, session, "enrichments:read")
+        if scope_err:
+            return scope_err
+
     indicator_type = _validate_indicator_type(type)
 
     if not value or not value.strip():

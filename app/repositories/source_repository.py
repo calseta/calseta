@@ -62,19 +62,30 @@ class SourceRepository:
         result = await self._db.execute(stmt)
         return list(result.scalars().all()), total
 
+    _UPDATABLE_FIELDS: frozenset[str] = frozenset({
+        "display_name",
+        "is_active",
+        "auth_type",
+        "auth_config",
+        "documentation",
+    })
+
+    _NULLABLE_FIELDS: frozenset[str] = frozenset({
+        "auth_type",
+        "auth_config",
+        "documentation",
+    })
+
     async def patch(
         self,
         integration: SourceIntegration,
         **kwargs: Any,
     ) -> SourceIntegration:
         """Apply partial updates to a source integration."""
-        nullable_fields = {
-            "auth_type",
-            "auth_config",
-            "documentation",
-        }
         for key, value in kwargs.items():
-            if value is not None or key in nullable_fields:
+            if key not in self._UPDATABLE_FIELDS:
+                raise ValueError(f"Field '{key}' is not updatable")
+            if value is not None or key in self._NULLABLE_FIELDS:
                 setattr(integration, key, value)
         await self._db.flush()
         await self._db.refresh(integration)

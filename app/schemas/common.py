@@ -7,10 +7,50 @@ Errors use ErrorResponse. These are the only shapes that cross the HTTP boundary
 
 from __future__ import annotations
 
+import json
 import math
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
+
+# ---------------------------------------------------------------------------
+# JSONB size limits (bytes)
+# ---------------------------------------------------------------------------
+JSONB_SIZE_LARGE = 1_048_576  # 1 MB — raw_payload, large data blobs
+JSONB_SIZE_MEDIUM = 262_144  # 256 KB — config objects (http_config, auth_config, etc.)
+JSONB_SIZE_SMALL = 65_536  # 64 KB — small structured fields (trigger_filter, etc.)
+
+
+def validate_jsonb_size(
+    value: dict[str, Any] | list[Any] | None,
+    max_bytes: int,
+    field_name: str,
+) -> dict[str, Any] | list[Any] | None:
+    """
+    Validate that a JSONB-bound value does not exceed the given size limit.
+
+    Returns the value unchanged if valid; raises ValueError otherwise.
+    Use in Pydantic field_validator or model_validator calls.
+    """
+    if value is None:
+        return value
+    serialized_size = len(json.dumps(value, separators=(",", ":")))
+    if serialized_size > max_bytes:
+        limit_label = _human_size(max_bytes)
+        raise ValueError(
+            f"{field_name} exceeds maximum size of {limit_label} "
+            f"({serialized_size:,} bytes serialized)"
+        )
+    return value
+
+
+def _human_size(n: int) -> str:
+    """Return a human-friendly size label (e.g. '1 MB', '256 KB')."""
+    if n >= 1_048_576 and n % 1_048_576 == 0:
+        return f"{n // 1_048_576} MB"
+    if n >= 1024 and n % 1024 == 0:
+        return f"{n // 1024} KB"
+    return f"{n:,} bytes"
 
 T = TypeVar("T")
 

@@ -17,15 +17,17 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import CalsetaException
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.session import get_db
 from app.integrations.sources.registry import source_registry
+from app.middleware.rate_limit import limiter
 from app.queue.base import TaskQueueBase
 from app.queue.dependencies import get_queue
 from app.schemas.common import DataResponse
@@ -47,15 +49,23 @@ class GenericIngestBody(BaseModel):
     source_name: str
     payload: dict[str, Any]
 
+    @field_validator("payload")
+    @classmethod
+    def _validate_payload_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        from app.schemas.common import JSONB_SIZE_LARGE, validate_jsonb_size
+
+        return validate_jsonb_size(v, JSONB_SIZE_LARGE, "payload")  # type: ignore[return-value]
+
 
 @router.post(
     "/ingest/{source_name}",
     status_code=status.HTTP_202_ACCEPTED,
     response_model=DataResponse[IngestResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_INGEST_PER_MINUTE}/minute")
 async def webhook_ingest(
-    source_name: str,
     request: Request,
+    source_name: str,
     auth: _AlertsWrite,
     db: Annotated[AsyncSession, Depends(get_db)],
     queue: Annotated[TaskQueueBase, Depends(get_queue)],
@@ -143,7 +153,9 @@ async def webhook_ingest(
     status_code=status.HTTP_202_ACCEPTED,
     response_model=DataResponse[IngestResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_INGEST_PER_MINUTE}/minute")
 async def generic_ingest(
+    request: Request,
     body: GenericIngestBody,
     auth: _AlertsWrite,
     db: Annotated[AsyncSession, Depends(get_db)],

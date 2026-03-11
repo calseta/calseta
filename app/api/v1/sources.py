@@ -16,6 +16,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
@@ -24,6 +25,7 @@ from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
 from app.config import settings
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.repositories.source_repository import SourceRepository
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.sources import (
@@ -76,7 +78,9 @@ def _encrypt_auth_config(auth_config: dict | None) -> dict | None:  # type: igno
 
 
 @router.get("", response_model=PaginatedResponse[SourceIntegrationResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_sources(
+    request: Request,
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -103,7 +107,9 @@ async def list_sources(
     response_model=DataResponse[SourceIntegrationResponse],
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def create_source(
+    request: Request,
     body: SourceIntegrationCreate,
     auth: _Admin,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -134,7 +140,9 @@ async def create_source(
 
 
 @router.get("/{source_uuid}", response_model=DataResponse[SourceIntegrationResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_source(
+    request: Request,
     source_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -156,7 +164,9 @@ async def get_source(
 
 
 @router.patch("/{source_uuid}", response_model=DataResponse[SourceIntegrationResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def patch_source(
+    request: Request,
     source_uuid: UUID,
     body: SourceIntegrationPatch,
     auth: _Admin,
@@ -194,7 +204,9 @@ async def patch_source(
 
 
 @router.delete("/{source_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def delete_source(
+    request: Request,
     source_uuid: UUID,
     auth: _Admin,
     db: Annotated[AsyncSession, Depends(get_db)],

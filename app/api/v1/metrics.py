@@ -7,11 +7,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.queue.base import TaskQueueBase
 from app.queue.dependencies import get_queue
 from app.schemas.common import DataResponse
@@ -38,7 +41,9 @@ def _default_window() -> tuple[datetime, datetime]:
 
 
 @router.get("/alerts", response_model=DataResponse[AlertMetricsResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_alert_metrics(
+    request: Request,
     auth: _AlertsRead,
     db: Annotated[AsyncSession, Depends(get_db)],
     from_time: datetime | None = Query(None),
@@ -51,7 +56,9 @@ async def get_alert_metrics(
 
 
 @router.get("/summary", response_model=DataResponse[MetricsSummaryResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_metrics_summary(
+    request: Request,
     auth: _AlertsRead,
     db: Annotated[AsyncSession, Depends(get_db)],
     queue: Annotated[TaskQueueBase, Depends(get_queue)],
@@ -66,7 +73,9 @@ async def get_metrics_summary(
 
 
 @router.get("/workflows", response_model=DataResponse[WorkflowMetricsResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_workflow_metrics(
+    request: Request,
     auth: _WorkflowsRead,
     db: Annotated[AsyncSession, Depends(get_db)],
     from_time: datetime | None = Query(None),

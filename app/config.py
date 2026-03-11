@@ -23,6 +23,7 @@ import json
 import logging
 from typing import Any
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 # Use stdlib logger here (not structlog) — structlog isn't configured yet
@@ -171,6 +172,13 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""
 
     # ------------------------------------------------------------------
+    # SSRF Protection
+    # ------------------------------------------------------------------
+    # Comma-separated hostnames exempt from SSRF checks.
+    # Use for dev (e.g. "host.docker.internal,localhost") — never in prod.
+    SSRF_ALLOWED_HOSTS: str = ""
+
+    # ------------------------------------------------------------------
     # Rate Limiting
     # ------------------------------------------------------------------
     RATE_LIMIT_UNAUTHED_PER_MINUTE: int = 30
@@ -236,7 +244,8 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Base URLs
     # ------------------------------------------------------------------
-    CALSETA_BASE_URL: str = "http://localhost:8000"  # Public URL (Teams card links, approval callbacks)
+    # Public URL (Teams card links, approval callbacks)
+    CALSETA_BASE_URL: str = "http://localhost:8000"
     CALSETA_API_BASE_URL: str = "http://localhost:8000"  # Included in agent webhook payloads
 
     # ------------------------------------------------------------------
@@ -255,6 +264,46 @@ class Settings(BaseSettings):
     ENRICHMENT_MOCK_MODE: bool = False
     SANDBOX_MODE: bool = False
     SANDBOX_RESET_INTERVAL_HOURS: int = 24
+
+    @model_validator(mode="after")
+    def _validate_encryption_key(self) -> Settings:
+        """Warn if ENCRYPTION_KEY is missing or not a valid Fernet key.
+
+        Does NOT raise — the app starts regardless. Encryption operations
+        fail at runtime via ``get_fernet()`` if the key is invalid.
+        This keeps dev/test environments working while surfacing a clear
+        warning that operators can act on before enabling encryption.
+        """
+        _gen_hint = (
+            "Generate with: python -c "
+            '"from cryptography.fernet import Fernet; '
+            'print(Fernet.generate_key().decode())"'
+        )
+        if self.ENCRYPTION_KEY:
+            import base64
+
+            key_bytes = self.ENCRYPTION_KEY.encode()
+            valid = False
+            if len(key_bytes) == 44:
+                try:
+                    decoded = base64.urlsafe_b64decode(key_bytes)
+                    valid = len(decoded) == 32
+                except Exception:
+                    pass
+            if not valid:
+                logger.warning(
+                    "ENCRYPTION_KEY is set but is not a valid "
+                    "44-character Fernet key. Encryption operations "
+                    "will fail at runtime. %s",
+                    _gen_hint,
+                )
+        else:
+            logger.warning(
+                "ENCRYPTION_KEY is not set. Encryption features "
+                "will fail at runtime if used. %s",
+                _gen_hint,
+            )
+        return self
 
     @classmethod
     def settings_customise_sources(

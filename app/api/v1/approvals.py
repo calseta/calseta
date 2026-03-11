@@ -21,6 +21,7 @@ from fastapi import APIRouter, Form, Header, Query, Request, Response, status
 from fastapi.responses import HTMLResponse
 
 from app.config import settings
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
@@ -260,7 +261,9 @@ def _esc(val: str) -> str:
 
 
 @router.get("/{approval_uuid}/decide")
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_approval_decide_page(
+    request: Request,
     approval_uuid: UUID,
     token: Annotated[str, Query()],
 ) -> HTMLResponse:
@@ -353,7 +356,9 @@ async def get_approval_decide_page(
 
 
 @router.post("/{approval_uuid}/decide")
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def post_approval_decide(
+    request: Request,
     approval_uuid: UUID,
     token: Annotated[str, Form()],
     decision: Annotated[str, Form()],

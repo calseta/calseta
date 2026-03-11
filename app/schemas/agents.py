@@ -6,7 +6,9 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.schemas.common import JSONB_SIZE_SMALL, validate_jsonb_size
 
 
 class AgentRegistrationCreate(BaseModel):
@@ -22,6 +24,21 @@ class AgentRegistrationCreate(BaseModel):
     retry_count: int = Field(default=3, ge=0, le=10)
     is_active: bool = True
     documentation: str | None = None
+
+    @field_validator("trigger_filter")
+    @classmethod
+    def _validate_trigger_filter_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return validate_jsonb_size(v, JSONB_SIZE_SMALL, "trigger_filter")  # type: ignore[return-value]
+
+    @model_validator(mode="after")
+    def _validate_auth_header_pair(self) -> AgentRegistrationCreate:
+        name_set = self.auth_header_name is not None
+        value_set = self.auth_header_value is not None
+        if name_set != value_set:
+            raise ValueError(
+                "auth_header_name and auth_header_value must both be provided or both be omitted"
+            )
+        return self
 
 
 class AgentRegistrationResponse(BaseModel):
@@ -57,6 +74,11 @@ class AgentRegistrationPatch(BaseModel):
     retry_count: int | None = Field(default=None, ge=0, le=10)
     is_active: bool | None = None
     documentation: str | None = None
+
+    @field_validator("trigger_filter")
+    @classmethod
+    def _validate_trigger_filter_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return validate_jsonb_size(v, JSONB_SIZE_SMALL, "trigger_filter")  # type: ignore[return-value]
 
 
 class AgentTestResponse(BaseModel):

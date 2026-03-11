@@ -13,12 +13,15 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.repositories.indicator_repository import IndicatorRepository
 from app.schemas.activity_events import ActivityEventType
 from app.schemas.common import DataResponse
@@ -55,7 +58,9 @@ def _build_detail(indicator: object) -> IndicatorDetailResponse:
     "/{indicator_uuid}",
     response_model=DataResponse[IndicatorDetailResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_indicator(
+    request: Request,
     indicator_uuid: UUID,
     auth: _EnrichRead,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -80,7 +85,9 @@ async def get_indicator(
     "/{indicator_uuid}",
     response_model=DataResponse[IndicatorDetailResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def patch_indicator(
+    request: Request,
     indicator_uuid: UUID,
     body: IndicatorPatch,
     auth: _AlertsWrite,

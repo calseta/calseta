@@ -31,7 +31,9 @@ from app.api.pagination import PaginationParams
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.repositories.context_document_repository import ContextDocumentRepository
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.context_documents import (
@@ -168,7 +170,9 @@ _CD_SORT_FIELDS = {"title", "document_type", "updated_at", "created_at"}
 
 
 @router.get("", response_model=PaginatedResponse[ContextDocumentSummary])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_context_documents(
+    request: Request,
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -224,6 +228,7 @@ async def list_context_documents(
     response_model=DataResponse[ContextDocumentResponse],
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def create_context_document(
     request: Request,
     auth: _Write,
@@ -279,7 +284,9 @@ async def create_context_document(
 
 
 @router.get("/{doc_uuid}", response_model=DataResponse[ContextDocumentResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_context_document(
+    request: Request,
     doc_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -301,7 +308,9 @@ async def get_context_document(
 
 
 @router.patch("/{doc_uuid}", response_model=DataResponse[ContextDocumentResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def patch_context_document(
+    request: Request,
     doc_uuid: UUID,
     body: ContextDocumentPatch,
     auth: _Write,
@@ -334,7 +343,9 @@ async def patch_context_document(
 
 
 @router.delete("/{doc_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def delete_context_document(
+    request: Request,
     doc_uuid: UUID,
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],

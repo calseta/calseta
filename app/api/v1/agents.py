@@ -19,6 +19,7 @@ from uuid import UUID
 import httpx
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
@@ -27,6 +28,7 @@ from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
 from app.config import settings
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.repositories.agent_repository import AgentRepository
 from app.schemas.agents import (
     AgentRegistrationCreate,
@@ -35,6 +37,7 @@ from app.schemas.agents import (
     AgentTestResponse,
 )
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
+from app.services.url_validation import is_safe_outbound_url
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -74,7 +77,9 @@ def _maybe_encrypt(plaintext: str) -> str:
 
 
 @router.get("", response_model=PaginatedResponse[AgentRegistrationResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_agents(
+    request: Request,
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -99,11 +104,22 @@ async def list_agents(
     response_model=DataResponse[AgentRegistrationResponse],
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def create_agent(
+    request: Request,
     body: AgentRegistrationCreate,
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[AgentRegistrationResponse]:
+    # SSRF protection — reject private/internal endpoint URLs at creation time
+    safe, reason = is_safe_outbound_url(body.endpoint_url)
+    if not safe:
+        raise CalsetaException(
+            code="INVALID_ENDPOINT_URL",
+            message=f"endpoint_url blocked by SSRF protection: {reason}",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
     auth_header_value_encrypted: str | None = None
     if body.auth_header_value is not None:
         auth_header_value_encrypted = _maybe_encrypt(body.auth_header_value)
@@ -119,7 +135,9 @@ async def create_agent(
 
 
 @router.get("/{agent_uuid}", response_model=DataResponse[AgentRegistrationResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_agent(
+    request: Request,
     agent_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -141,7 +159,9 @@ async def get_agent(
 
 
 @router.patch("/{agent_uuid}", response_model=DataResponse[AgentRegistrationResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def patch_agent(
+    request: Request,
     agent_uuid: UUID,
     body: AgentRegistrationPatch,
     auth: _Write,
@@ -155,6 +175,16 @@ async def patch_agent(
             message="Agent not found.",
             status_code=status.HTTP_404_NOT_FOUND,
         )
+
+    # SSRF protection — reject private/internal endpoint URLs on update
+    if body.endpoint_url is not None:
+        safe, reason = is_safe_outbound_url(body.endpoint_url)
+        if not safe:
+            raise CalsetaException(
+                code="INVALID_ENDPOINT_URL",
+                message=f"endpoint_url blocked by SSRF protection: {reason}",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
     updates: dict[str, object] = {}
 
@@ -193,7 +223,9 @@ async def patch_agent(
 
 
 @router.delete("/{agent_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def delete_agent(
+    request: Request,
     agent_uuid: UUID,
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -215,7 +247,9 @@ async def delete_agent(
 
 
 @router.post("/{agent_uuid}/test", response_model=DataResponse[AgentTestResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def test_agent_webhook(
+    request: Request,
     agent_uuid: UUID,
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],

@@ -22,15 +22,18 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
+from app.config import settings
 from app.db.session import get_db
 from app.integrations.enrichment.database_provider import DatabaseDrivenProvider
 from app.integrations.enrichment.registry import enrichment_registry
+from app.middleware.rate_limit import limiter
 from app.repositories.enrichment_field_extraction_repository import (
     EnrichmentFieldExtractionRepository,
 )
@@ -115,7 +118,9 @@ def _encrypt_auth_config(auth_config: dict | None) -> dict | None:
 
 
 @router.get("", response_model=PaginatedResponse[EnrichmentProviderResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_enrichment_providers(
+    request: Request,
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -147,7 +152,9 @@ async def list_enrichment_providers(
     response_model=DataResponse[EnrichmentProviderResponse],
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def create_enrichment_provider(
+    request: Request,
     body: EnrichmentProviderCreate,
     auth: _Admin,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -204,7 +211,9 @@ async def create_enrichment_provider(
 
 
 @router.get("/{provider_uuid}", response_model=DataResponse[EnrichmentProviderResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_enrichment_provider(
+    request: Request,
     provider_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -228,7 +237,9 @@ async def get_enrichment_provider(
 @router.patch(
     "/{provider_uuid}", response_model=DataResponse[EnrichmentProviderResponse]
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def patch_enrichment_provider(
+    request: Request,
     provider_uuid: UUID,
     body: EnrichmentProviderPatch,
     auth: _Admin,
@@ -284,7 +295,9 @@ async def patch_enrichment_provider(
 
 
 @router.delete("/{provider_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def delete_enrichment_provider(
+    request: Request,
     provider_uuid: UUID,
     auth: _Admin,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -332,7 +345,9 @@ async def delete_enrichment_provider(
     "/{provider_uuid}/test",
     response_model=DataResponse[EnrichmentProviderTestResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_ENRICHMENT_PER_MINUTE}/minute")
 async def test_enrichment_provider(
+    request: Request,
     provider_uuid: UUID,
     body: EnrichmentProviderTestRequest,
     auth: _Admin,
@@ -400,7 +415,9 @@ async def test_enrichment_provider(
     "/{provider_uuid}/activate",
     response_model=DataResponse[EnrichmentProviderResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def activate_enrichment_provider(
+    request: Request,
     provider_uuid: UUID,
     auth: _Admin,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -423,7 +440,9 @@ async def activate_enrichment_provider(
     "/{provider_uuid}/deactivate",
     response_model=DataResponse[EnrichmentProviderResponse],
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def deactivate_enrichment_provider(
+    request: Request,
     provider_uuid: UUID,
     auth: _Admin,
     db: Annotated[AsyncSession, Depends(get_db)],

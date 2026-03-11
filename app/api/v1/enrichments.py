@@ -14,14 +14,17 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
 from app.cache.base import CacheBackendBase
 from app.cache.factory import get_cache_backend
 from app.cache.keys import make_enrichment_key
+from app.config import settings
 from app.db.session import get_db
 from app.integrations.enrichment.registry import enrichment_registry
+from app.middleware.rate_limit import limiter
 from app.schemas.common import DataResponse
 from app.schemas.enrichment import (
     EnrichmentProviderInfo,
@@ -50,7 +53,9 @@ def _get_cache() -> CacheBackendBase:
     response_model=DataResponse[OnDemandEnrichmentResponse],
     summary="Enrich an indicator on-demand",
 )
+@limiter.limit(f"{settings.RATE_LIMIT_ENRICHMENT_PER_MINUTE}/minute")
 async def enrich_on_demand(
+    request: Request,
     body: OnDemandEnrichmentRequest,
     auth: Annotated[object, Depends(require_scope(Scope.ENRICHMENTS_READ))],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -118,7 +123,9 @@ async def enrich_on_demand(
     response_model=DataResponse[list[EnrichmentProviderInfo]],
     summary="List all registered enrichment providers",
 )
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_providers(
+    request: Request,
     auth: Annotated[object, Depends(require_scope(Scope.ENRICHMENTS_READ))],
 ) -> DataResponse[list[EnrichmentProviderInfo]]:
     """
