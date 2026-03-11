@@ -19,7 +19,7 @@ from typing import Any
 import structlog
 
 from app.config import settings
-from app.integrations.sources.base import AlertSourceBase
+from app.integrations.sources.base import AlertSourceBase, SourcePluginExtraction
 from app.schemas.alert import AlertSeverity, CalsetaAlert
 from app.schemas.indicators import IndicatorExtract, IndicatorType
 
@@ -215,3 +215,26 @@ class ElasticSource(AlertSourceBase):
         expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
         received = signature_header.removeprefix("sha256=")
         return hmac.compare_digest(expected, received)
+
+    def documented_extractions(self) -> list[SourcePluginExtraction]:
+        _e = SourcePluginExtraction
+        return [
+            _e("source.ip", "ip", "Source IP (ECS)"),
+            _e("destination.ip", "ip", "Destination IP (ECS)"),
+            _e("host.ip", "ip", "Host IP (ECS, array)"),
+            _e("threat.indicator.ip", "ip", "Threat indicator IP"),
+            _e("destination.domain", "domain", "Destination domain"),
+            _e("dns.question.name", "domain", "DNS query name"),
+            _e("url.domain", "domain", "URL domain"),
+            _e("threat.indicator.domain", "domain", "Threat indicator domain"),
+            _e("url.full", "url", "Full URL (ECS)"),
+            _e("process.hash.sha256", "hash_sha256", "Process SHA-256"),
+            _e("file.hash.sha256", "hash_sha256", "File SHA-256"),
+            _e("threat.indicator.file.hash.sha256", "hash_sha256", "Threat indicator file SHA-256"),
+            _e("process.hash.sha1", "hash_sha1", "Process SHA-1"),
+            _e("file.hash.sha1", "hash_sha1", "File SHA-1"),
+            _e("process.hash.md5", "hash_md5", "Process MD5"),
+            _e("file.hash.md5", "hash_md5", "File MD5"),
+            _e("user.email", "email", "User email (ECS)"),
+            _e("user.name", "account", "User name (ECS)"),
+        ]

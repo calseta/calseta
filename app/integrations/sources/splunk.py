@@ -23,7 +23,7 @@ from datetime import UTC, datetime
 import structlog
 
 from app.config import settings
-from app.integrations.sources.base import AlertSourceBase
+from app.integrations.sources.base import AlertSourceBase, SourcePluginExtraction
 from app.schemas.alert import AlertSeverity, CalsetaAlert
 from app.schemas.indicators import IndicatorExtract, IndicatorType
 
@@ -173,3 +173,17 @@ class SplunkSource(AlertSourceBase):
             return False
 
         return hmac.compare_digest(secret.encode(), token.encode())
+
+    def documented_extractions(self) -> list[SourcePluginExtraction]:
+        return [
+            SourcePluginExtraction("result.src_ip", "ip", "Source IP"),
+            SourcePluginExtraction("result.dest_ip", "ip", "Destination IP"),
+            SourcePluginExtraction("result.src", "ip", "Source (IP fallback)"),
+            SourcePluginExtraction("result.dest", "ip", "Destination (IP fallback)"),
+            SourcePluginExtraction("result.user", "account", "User account"),
+            SourcePluginExtraction("result.sha256", "hash_sha256", "SHA-256 hash"),
+            SourcePluginExtraction("result.md5", "hash_md5", "MD5 hash"),
+            SourcePluginExtraction("result.sha1", "hash_sha1", "SHA-1 hash"),
+            SourcePluginExtraction("result.url", "url", "URL"),
+            SourcePluginExtraction("result.domain", "domain", "Domain"),
+        ]

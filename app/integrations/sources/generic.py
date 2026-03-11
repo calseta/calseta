@@ -20,7 +20,7 @@ from __future__ import annotations
 from contextlib import suppress
 from datetime import UTC, datetime
 
-from app.integrations.sources.base import AlertSourceBase
+from app.integrations.sources.base import AlertSourceBase, SourcePluginExtraction
 from app.schemas.alert import AlertSeverity, CalsetaAlert
 from app.schemas.indicators import IndicatorExtract, IndicatorType
 
@@ -137,3 +137,24 @@ class GenericSource(AlertSourceBase):
     def extract_detection_rule_ref(self, raw: dict) -> str | None:  # type: ignore[type-arg]
         """Return rule_id or rule_name if present in the payload."""
         return raw.get("rule_id") or raw.get("rule_name") or None
+
+    def documented_extractions(self) -> list[SourcePluginExtraction]:
+        _e = SourcePluginExtraction
+        return [
+            _e("indicators[].type+value", "ip", "Explicit array (all types)"),
+            _e("src_ip", "ip", "Source IP"),
+            _e("dest_ip", "ip", "Destination IP"),
+            _e("source_ip", "ip", "Source IP (alt)"),
+            _e("destination_ip", "ip", "Destination IP (alt)"),
+            _e("ip", "ip", "IP address"),
+            _e("domain", "domain", "Domain name"),
+            _e("hostname", "domain", "Hostname"),
+            _e("url", "url", "URL"),
+            _e("user", "account", "User account"),
+            _e("username", "account", "Username"),
+            _e("email", "email", "Email address"),
+            _e("md5", "hash_md5", "MD5 hash"),
+            _e("sha1", "hash_sha1", "SHA-1 hash"),
+            _e("sha256", "hash_sha256", "SHA-256 hash"),
+            _e("hash", "hash_sha256", "Hash (assumed SHA-256)"),
+        ]

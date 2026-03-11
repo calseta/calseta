@@ -5,6 +5,7 @@ Pydantic schemas for indicator field mapping management endpoints.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -62,3 +63,35 @@ class IndicatorFieldMappingResponse(BaseModel):
     description: str | None
     created_at: datetime
     updated_at: datetime
+
+
+# --- Test Extraction (dry-run) ---
+
+
+class TestExtractionRequest(BaseModel):
+    source_name: str
+    raw_payload: dict[str, Any]
+
+
+class TestExtractionIndicator(BaseModel):
+    type: str
+    value: str
+    source_field: str | None = None
+
+
+class TestExtractionPassResult(BaseModel):
+    pass_name: str
+    pass_label: str
+    indicators: list[TestExtractionIndicator]
+    error: str | None = None
+
+
+class TestExtractionResponse(BaseModel):
+    success: bool
+    source_name: str
+    passes: list[TestExtractionPassResult]
+    deduplicated: list[TestExtractionIndicator]
+    deduplicated_count: int
+    normalization_preview: dict[str, Any] | None = None
+    error_message: str | None = None
+    duration_ms: int = 0

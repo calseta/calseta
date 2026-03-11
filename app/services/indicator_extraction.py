@@ -23,6 +23,11 @@ from app.integrations.sources.base import AlertSourceBase
 from app.repositories.indicator_mapping_repository import IndicatorMappingRepository
 from app.repositories.indicator_repository import IndicatorRepository
 from app.schemas.alert import CalsetaAlert
+from app.schemas.indicator_mappings import (
+    TestExtractionIndicator,
+    TestExtractionPassResult,
+    TestExtractionResponse,
+)
 from app.schemas.indicators import IndicatorExtract, IndicatorType
 
 logger = structlog.get_logger(__name__)
@@ -156,6 +161,121 @@ def extract_for_fingerprint(
         unique=len(unique),
     )
     return unique
+
+
+def _to_test_indicator(ind: IndicatorExtract) -> TestExtractionIndicator:
+    return TestExtractionIndicator(
+        type=str(ind.type),
+        value=ind.value,
+        source_field=ind.source_field,
+    )
+
+
+def test_extraction(
+    source: AlertSourceBase,
+    raw_payload: dict[str, Any],
+    norm_mappings: list[Any],
+    raw_mappings: list[Any],
+) -> TestExtractionResponse:
+    """
+    Dry-run the 3-pass indicator extraction pipeline — no DB persistence.
+
+    Returns per-pass breakdown plus deduplicated results.
+    """
+    import time
+
+    start = time.monotonic()
+    passes: list[TestExtractionPassResult] = []
+    normalized: CalsetaAlert | None = None
+    normalization_preview: dict[str, Any] | None = None
+
+    # Normalize
+    try:
+        normalized = source.normalize(raw_payload)
+        normalization_preview = normalized.model_dump(mode="json")
+    except Exception as exc:
+        logger.warning("test_extraction_normalize_failed", error=str(exc))
+
+    # Pass 1: source plugin
+    try:
+        pass1 = source.extract_indicators(raw_payload)
+        passes.append(TestExtractionPassResult(
+            pass_name="source_plugin",
+            pass_label="Source Plugin",
+            indicators=[_to_test_indicator(i) for i in pass1],
+        ))
+    except Exception as exc:
+        pass1 = []
+        passes.append(TestExtractionPassResult(
+            pass_name="source_plugin",
+            pass_label="Source Plugin",
+            indicators=[],
+            error=str(exc),
+        ))
+
+    # Pass 2: normalized field mappings
+    if normalized is not None:
+        try:
+            pass2 = _extract_normalized(normalized, norm_mappings)
+            passes.append(TestExtractionPassResult(
+                pass_name="normalized_mappings",
+                pass_label="Normalized Mappings",
+                indicators=[_to_test_indicator(i) for i in pass2],
+            ))
+        except Exception as exc:
+            pass2 = []
+            passes.append(TestExtractionPassResult(
+                pass_name="normalized_mappings",
+                pass_label="Normalized Mappings",
+                indicators=[],
+                error=str(exc),
+            ))
+    else:
+        pass2 = []
+        passes.append(TestExtractionPassResult(
+            pass_name="normalized_mappings",
+            pass_label="Normalized Mappings",
+            indicators=[],
+            error="Normalization failed — cannot run Pass 2",
+        ))
+
+    # Pass 3: raw_payload field mappings
+    try:
+        pass3 = _extract_raw(raw_payload, raw_mappings)
+        passes.append(TestExtractionPassResult(
+            pass_name="raw_payload_mappings",
+            pass_label="Raw Payload Mappings",
+            indicators=[_to_test_indicator(i) for i in pass3],
+        ))
+    except Exception as exc:
+        pass3 = []
+        passes.append(TestExtractionPassResult(
+            pass_name="raw_payload_mappings",
+            pass_label="Raw Payload Mappings",
+            indicators=[],
+            error=str(exc),
+        ))
+
+    # Deduplicate by (type, value)
+    seen: set[tuple[str, str]] = set()
+    deduped: list[TestExtractionIndicator] = []
+    for ind in [*pass1, *pass2, *pass3]:
+        key = (str(ind.type), ind.value.strip())
+        if key[1] and key not in seen:
+            seen.add(key)
+            deduped.append(_to_test_indicator(ind))
+
+    elapsed_ms = int((time.monotonic() - start) * 1000)
+
+    return TestExtractionResponse(
+        success=True,
+        source_name=source.source_name,
+        passes=passes,
+        deduplicated=deduped,
+        deduplicated_count=len(deduped),
+        normalization_preview=normalization_preview,
+        duration_ms=elapsed_ms,
+    )
 
 
 class IndicatorExtractionService:

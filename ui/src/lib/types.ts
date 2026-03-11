@@ -164,15 +164,28 @@ export interface ContextDocument {
 // Metrics
 export interface MetricsSummary {
   period: string;
+  platform: {
+    context_documents: number;
+    detection_rules: number;
+    enrichment_providers: number;
+    enrichment_providers_by_indicator_type: Record<string, number>;
+    agents: number;
+    workflows: number;
+    indicator_mappings: number;
+  };
   alerts: {
     total: number;
     active: number;
     by_severity: Record<string, number>;
+    by_status: Record<string, number>;
+    by_source: Record<string, number>;
     false_positive_rate: number;
+    enrichment_coverage: number;
     mttd_seconds: number | null;
     mtta_seconds: number | null;
     mttt_seconds: number | null;
     mttc_seconds: number | null;
+    mean_time_to_enrich_seconds: number | null;
   };
   workflows: {
     total_configured: number;
@@ -429,6 +442,31 @@ export interface IndicatorFieldMapping {
   description: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Test Extraction
+export interface TestExtractionIndicator {
+  type: string;
+  value: string;
+  source_field: string | null;
+}
+
+export interface TestExtractionPassResult {
+  pass_name: string;
+  pass_label: string;
+  indicators: TestExtractionIndicator[];
+  error: string | null;
+}
+
+export interface TestExtractionResult {
+  success: boolean;
+  source_name: string;
+  passes: TestExtractionPassResult[];
+  deduplicated: TestExtractionIndicator[];
+  deduplicated_count: number;
+  normalization_preview: Record<string, unknown> | null;
+  error_message: string | null;
+  duration_ms: number;
 }
 
 // Settings

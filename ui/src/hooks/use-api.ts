@@ -23,6 +23,7 @@ import type {
   EnrichmentProviderTestResult,
   EnrichmentFieldExtraction,
   IndicatorFieldMapping,
+  TestExtractionResult,
   ApprovalDefaults,
 } from "@/lib/types";
 
@@ -726,6 +727,22 @@ export function useCreateIndicatorMapping() {
     mutationFn: (body: Record<string, unknown>) =>
       api.post<DataResponse<IndicatorFieldMapping>>("/indicator-mappings", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["indicator-mappings"] }),
+  });
+}
+
+export function useSourcePluginFields() {
+  return useQuery({
+    queryKey: ["indicator-mappings", "source-plugin-fields"],
+    queryFn: () =>
+      api.get<DataResponse<IndicatorFieldMapping[]>>("/indicator-mappings/source-plugin-fields"),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useTestExtraction() {
+  return useMutation({
+    mutationFn: (body: { source_name: string; raw_payload: Record<string, unknown> }) =>
+      api.post<DataResponse<TestExtractionResult>>("/indicator-mappings/test-extraction", body),
   });
 }
 

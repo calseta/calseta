@@ -17,7 +17,7 @@ from datetime import datetime
 import structlog
 
 from app.config import settings
-from app.integrations.sources.base import AlertSourceBase
+from app.integrations.sources.base import AlertSourceBase, SourcePluginExtraction
 from app.schemas.alert import AlertSeverity, CalsetaAlert
 from app.schemas.indicators import IndicatorExtract, IndicatorType
 
@@ -186,3 +186,15 @@ class SentinelSource(AlertSourceBase):
         # Strip optional "sha256=" prefix
         received = signature_header.removeprefix("sha256=")
         return hmac.compare_digest(expected, received)
+
+    def documented_extractions(self) -> list[SourcePluginExtraction]:
+        _e = SourcePluginExtraction
+        return [
+            _e("Entities[type=ip].Address", "ip", "IP entity"),
+            _e("Entities[type=account].Name@UPNSuffix", "account", "Account entity"),
+            _e("Entities[type=host].HostName.DnsDomain", "domain", "FQDN host entity"),
+            _e("Entities[type=url].Url", "url", "URL entity"),
+            _e("Entities[type=filehash].Value", "hash_sha256", "SHA-256 hash entity"),
+            _e("Entities[type=filehash].Value", "hash_sha1", "SHA-1 hash entity"),
+            _e("Entities[type=filehash].Value", "hash_md5", "MD5 hash entity"),
+        ]

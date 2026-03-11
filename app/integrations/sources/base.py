@@ -13,12 +13,13 @@ Extension pattern:
     4. Optionally override extract_detection_rule_ref and verify_webhook_signature
     5. Import and register in app/integrations/sources/__init__.py
 
-See docs/HOW_TO_ADD_ALERT_SOURCE.md for the full walkthrough.
+See docs/guides/HOW_TO_ADD_ALERT_SOURCE.md for the full walkthrough.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import structlog
 
@@ -26,6 +27,15 @@ from app.schemas.alert import CalsetaAlert
 from app.schemas.indicators import IndicatorExtract
 
 logger = structlog.get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class SourcePluginExtraction:
+    """Metadata describing a field extraction hardcoded in a source plugin."""
+
+    field_path: str
+    indicator_type: str
+    description: str
 
 
 class AlertSourceBase(ABC):
@@ -111,3 +121,12 @@ class AlertSourceBase(ABC):
             source_name=self.source_name,
         )
         return True
+
+    def documented_extractions(self) -> list[SourcePluginExtraction]:
+        """
+        Return metadata describing what this source plugin extracts in Pass 1.
+
+        Override in each source to document the hardcoded extraction fields.
+        Default returns an empty list.
+        """
+        return []
