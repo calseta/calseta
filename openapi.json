@@ -1364,6 +1364,69 @@
         }
       }
     },
+    "/v1/indicator-mappings/source-plugin-fields": {
+      "get": {
+        "tags": [
+          "indicator-mappings"
+        ],
+        "summary": "List Source Plugin Fields",
+        "description": "Return hardcoded Pass 1 extraction fields from all registered sources.",
+        "operationId": "list_source_plugin_fields_v1_indicator_mappings_source_plugin_fields_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_list_IndicatorFieldMappingResponse__"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/indicator-mappings/test-extraction": {
+      "post": {
+        "tags": [
+          "indicator-mappings"
+        ],
+        "summary": "Test Extraction Endpoint",
+        "operationId": "test_extraction_endpoint_v1_indicator_mappings_test_extraction_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestExtractionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_TestExtractionResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/indicator-mappings/{mapping_uuid}": {
       "get": {
         "tags": [
@@ -6802,6 +6865,23 @@
         ],
         "title": "DataResponse[SourceIntegrationResponse]"
       },
+      "DataResponse_TestExtractionResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TestExtractionResponse"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "DataResponse[TestExtractionResponse]"
+      },
       "DataResponse_WorkflowApprovalRequestResponse_": {
         "properties": {
           "data": {
@@ -7006,6 +7086,27 @@
           "data"
         ],
         "title": "DataResponse[list[FindingResponse]]"
+      },
+      "DataResponse_list_IndicatorFieldMappingResponse__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorFieldMappingResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "DataResponse[list[IndicatorFieldMappingResponse]]"
       },
       "DataResponse_list_IndicatorResponse__": {
         "properties": {
@@ -9144,6 +9245,35 @@
             "type": "object",
             "title": "By Severity"
           },
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Status"
+          },
+          "by_source": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Source"
+          },
+          "enrichment_coverage": {
+            "type": "number",
+            "title": "Enrichment Coverage"
+          },
+          "mean_time_to_enrich_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Time To Enrich Seconds"
+          },
           "false_positive_rate": {
             "type": "number",
             "title": "False Positive Rate"
@@ -9198,6 +9328,10 @@
           "total",
           "active",
           "by_severity",
+          "by_status",
+          "by_source",
+          "enrichment_coverage",
+          "mean_time_to_enrich_seconds",
           "false_positive_rate",
           "mttd_seconds",
           "mtta_seconds",
@@ -9241,6 +9375,157 @@
         ],
         "title": "MetricsSummaryApprovals"
       },
+      "MetricsSummaryPlatform": {
+        "properties": {
+          "context_documents": {
+            "type": "integer",
+            "title": "Context Documents"
+          },
+          "detection_rules": {
+            "type": "integer",
+            "title": "Detection Rules"
+          },
+          "enrichment_providers": {
+            "type": "integer",
+            "title": "Enrichment Providers"
+          },
+          "enrichment_providers_by_indicator_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Enrichment Providers By Indicator Type"
+          },
+          "agents": {
+            "type": "integer",
+            "title": "Agents"
+          },
+          "workflows": {
+            "type": "integer",
+            "title": "Workflows"
+          },
+          "indicator_mappings": {
+            "type": "integer",
+            "title": "Indicator Mappings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "context_documents",
+          "detection_rules",
+          "enrichment_providers",
+          "enrichment_providers_by_indicator_type",
+          "agents",
+          "workflows",
+          "indicator_mappings"
+        ],
+        "title": "MetricsSummaryPlatform"
+      },
+      "MetricsSummaryQueue": {
+        "properties": {
+          "queues": {
+            "items": {
+              "$ref": "#/components/schemas/MetricsSummaryQueueEntry"
+            },
+            "type": "array",
+            "title": "Queues"
+          },
+          "total_pending": {
+            "type": "integer",
+            "title": "Total Pending"
+          },
+          "total_in_progress": {
+            "type": "integer",
+            "title": "Total In Progress"
+          },
+          "total_failed_30d": {
+            "type": "integer",
+            "title": "Total Failed 30D"
+          },
+          "total_succeeded_30d": {
+            "type": "integer",
+            "title": "Total Succeeded 30D"
+          },
+          "oldest_pending_age_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Pending Age Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queues",
+          "total_pending",
+          "total_in_progress",
+          "total_failed_30d",
+          "total_succeeded_30d",
+          "oldest_pending_age_seconds"
+        ],
+        "title": "MetricsSummaryQueue"
+      },
+      "MetricsSummaryQueueEntry": {
+        "properties": {
+          "queue": {
+            "type": "string",
+            "title": "Queue"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "in_progress": {
+            "type": "integer",
+            "title": "In Progress"
+          },
+          "succeeded_30d": {
+            "type": "integer",
+            "title": "Succeeded 30D"
+          },
+          "failed_30d": {
+            "type": "integer",
+            "title": "Failed 30D"
+          },
+          "avg_duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Duration Seconds"
+          },
+          "oldest_pending_age_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Pending Age Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue",
+          "pending",
+          "in_progress",
+          "succeeded_30d",
+          "failed_30d",
+          "avg_duration_seconds",
+          "oldest_pending_age_seconds"
+        ],
+        "title": "MetricsSummaryQueueEntry"
+      },
       "MetricsSummaryResponse": {
         "properties": {
           "period": {
@@ -9256,13 +9541,27 @@
           },
           "approvals": {
             "$ref": "#/components/schemas/MetricsSummaryApprovals"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/MetricsSummaryPlatform"
+          },
+          "queue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricsSummaryQueue"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "alerts",
           "workflows",
-          "approvals"
+          "approvals",
+          "platform"
         ],
         "title": "MetricsSummaryResponse"
       },
@@ -9876,6 +10175,158 @@
         ],
         "title": "SourceIntegrationResponse"
       },
+      "TestExtractionIndicator": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "source_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Field"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "value"
+        ],
+        "title": "TestExtractionIndicator"
+      },
+      "TestExtractionPassResult": {
+        "properties": {
+          "pass_name": {
+            "type": "string",
+            "title": "Pass Name"
+          },
+          "pass_label": {
+            "type": "string",
+            "title": "Pass Label"
+          },
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/TestExtractionIndicator"
+            },
+            "type": "array",
+            "title": "Indicators"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pass_name",
+          "pass_label",
+          "indicators"
+        ],
+        "title": "TestExtractionPassResult"
+      },
+      "TestExtractionRequest": {
+        "properties": {
+          "source_name": {
+            "type": "string",
+            "title": "Source Name"
+          },
+          "raw_payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Raw Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_name",
+          "raw_payload"
+        ],
+        "title": "TestExtractionRequest"
+      },
+      "TestExtractionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name"
+          },
+          "passes": {
+            "items": {
+              "$ref": "#/components/schemas/TestExtractionPassResult"
+            },
+            "type": "array",
+            "title": "Passes"
+          },
+          "deduplicated": {
+            "items": {
+              "$ref": "#/components/schemas/TestExtractionIndicator"
+            },
+            "type": "array",
+            "title": "Deduplicated"
+          },
+          "deduplicated_count": {
+            "type": "integer",
+            "title": "Deduplicated Count"
+          },
+          "normalization_preview": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalization Preview"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "source_name",
+          "passes",
+          "deduplicated",
+          "deduplicated_count"
+        ],
+        "title": "TestExtractionResponse"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -9953,6 +10404,17 @@
           "trigger_type": {
             "type": "string",
             "title": "Trigger Type"
+          },
+          "trigger_agent_key_prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Agent Key Prefix"
           },
           "trigger_context": {
             "anyOf": [
@@ -11018,6 +11480,11 @@
             "type": "object",
             "title": "Mock Http Responses",
             "default": {}
+          },
+          "live_http": {
+            "type": "boolean",
+            "title": "Live Http",
+            "default": false
           }
         },
         "type": "object",
