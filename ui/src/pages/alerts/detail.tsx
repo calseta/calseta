@@ -632,12 +632,15 @@ export function AlertDetailPage() {
                 <div className="space-y-3">
                   {alert.agent_findings.map((f) => (
                     <Card key={f.id} className="bg-card border-border">
-                      <CardContent className="p-4">
+                      <CardContent className="px-4 pt-2.5 pb-4">
                         <div className="flex items-start justify-between">
                           <div>
-                            <span className="text-xs font-medium text-teal-light">
+                            <Link
+                              to="/manage/agents"
+                              className="text-xs font-medium text-teal-light hover:underline"
+                            >
                               {f.agent_name}
-                            </span>
+                            </Link>
                             {f.confidence && (
                               <Badge
                                 variant="outline"
@@ -651,9 +654,9 @@ export function AlertDetailPage() {
                             {formatDate(f.posted_at)}
                           </span>
                         </div>
-                        <p className="mt-2 text-sm text-foreground whitespace-pre-wrap">
-                          {f.summary}
-                        </p>
+                        <div className="mt-2 text-foreground">
+                          <MarkdownPreview content={f.summary} />
+                        </div>
                         {f.recommended_action && (
                           <div className="mt-2 flex items-start gap-2 rounded bg-teal/5 p-2">
                             <CheckCircle className="h-3.5 w-3.5 mt-0.5 text-teal" />
