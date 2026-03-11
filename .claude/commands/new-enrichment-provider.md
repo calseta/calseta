@@ -7,7 +7,7 @@ allowed-tools: Read, Write, Glob, WebFetch, WebSearch
 
 Scaffold a new enrichment provider for: **$ARGUMENTS**
 
-Enrichment providers are **database-driven** — each provider is a row in the `enrichment_providers` table with templated HTTP configs, malice rules, and field extraction mappings. No Python code is needed. Read `app/integrations/enrichment/CONTEXT.md` and `docs/HOW_TO_ADD_ENRICHMENT_PROVIDER.md` for full architecture context.
+Enrichment providers are **database-driven** — each provider is a row in the `enrichment_providers` table with templated HTTP configs, malice rules, and field extraction mappings. No Python code is needed. Read `app/integrations/enrichment/CONTEXT.md` and `docs/guides/HOW_TO_ADD_ENRICHMENT_PROVIDER.md` for full architecture context.
 
 Follow these steps exactly:
 

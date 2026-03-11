@@ -325,11 +325,11 @@ If running without `--skip-enrichment`, make sure the worker is running (`docker
 
 ## Adding a new alert source
 
-See `docs/HOW_TO_ADD_ALERT_SOURCE.md`.
+See `docs/guides/HOW_TO_ADD_ALERT_SOURCE.md`.
 
 ## Adding a new enrichment provider
 
-See `docs/HOW_TO_ADD_ENRICHMENT_PROVIDER.md`.
+See `docs/guides/HOW_TO_ADD_ENRICHMENT_PROVIDER.md`.
 
 ---
 

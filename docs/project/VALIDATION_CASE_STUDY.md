@@ -274,4 +274,4 @@ The `--models` flag accepts `claude` (default), `openai`, or `all`.
 | `examples/case_study/results/quality_scores.csv` | Quality scores per finding |
 | `examples/case_study/results/cost_projections.md` | Cost analysis and scale projections |
 | `examples/case_study/results/findings/` | Raw finding text from each agent run |
-| `docs/VALIDATION_CASE_STUDY.md` | This document |
+| `docs/project/VALIDATION_CASE_STUDY.md` | This document |

@@ -187,7 +187,7 @@ Provider is immediately available in the enrichment pipeline. No restart needed.
 
 ### Option C: Community Provider (JSON Config — PR to Repo)
 
-See `docs/COMMUNITY_INTEGRATIONS.md` for the full contribution guide.
+See `docs/project/COMMUNITY_INTEGRATIONS.md` for the full contribution guide.
 
 ## Database Schema
 

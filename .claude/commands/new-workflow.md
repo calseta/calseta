@@ -15,7 +15,7 @@ Read these files to understand the workflow interface, sandbox constraints, and 
 
 1. `app/workflows/context.py` — `WorkflowContext`, `WorkflowResult`, `SecretsAccessor`, integration clients
 2. `app/services/workflow_ast.py` — allowed imports list and blocked modules/builtins
-3. `docs/HOW_TO_WRITE_WORKFLOWS.md` — patterns and examples
+3. `docs/guides/HOW_TO_WRITE_WORKFLOWS.md` — patterns and examples
 4. `docs/workflows/examples/` — 5 standalone example files
 
 ## Workflow rules

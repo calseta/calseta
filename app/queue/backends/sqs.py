@@ -1,7 +1,7 @@
 """
 SQSBackend — stub.
 
-Not implemented. See docs/QUEUE_BACKENDS.md for switching instructions.
+Not implemented. See docs/architecture/QUEUE_BACKENDS.md for switching instructions.
 """
 
 from __future__ import annotations
@@ -20,15 +20,15 @@ class SQSBackend(TaskQueueBase):
         priority: int = 0,
     ) -> str:
         raise NotImplementedError(
-            "Set QUEUE_BACKEND=postgres or see docs/QUEUE_BACKENDS.md"
+            "Set QUEUE_BACKEND=postgres or see docs/architecture/QUEUE_BACKENDS.md"
         )
 
     async def get_task_status(self, task_id: str) -> TaskStatus:
         raise NotImplementedError(
-            "Set QUEUE_BACKEND=postgres or see docs/QUEUE_BACKENDS.md"
+            "Set QUEUE_BACKEND=postgres or see docs/architecture/QUEUE_BACKENDS.md"
         )
 
     async def start_worker(self, queues: list[str]) -> None:
         raise NotImplementedError(
-            "Set QUEUE_BACKEND=postgres or see docs/QUEUE_BACKENDS.md"
+            "Set QUEUE_BACKEND=postgres or see docs/architecture/QUEUE_BACKENDS.md"
         )

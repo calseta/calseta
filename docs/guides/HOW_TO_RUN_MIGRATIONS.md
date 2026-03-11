@@ -356,7 +356,7 @@ Auto-migration on startup is convenient for development but dangerous in product
 - **Timeout risk**: Long-running migrations (adding indexes to large tables, backfilling data) can exceed container startup timeouts, causing orchestrators (ECS, Kubernetes) to kill the container and restart it in a loop.
 - **Controlled blast radius**: A failed migration in a separate step stops the deployment pipeline. A failed migration embedded in startup may crash one replica while others continue serving traffic with an inconsistent schema.
 
-For the full production deployment workflow, see [HOW_TO_DEPLOY.md](HOW_TO_DEPLOY.md), Section 4 (Production Deployment) and Section 7 (Updating to a New Version).
+For the full production deployment workflow, see [HOW_TO_DEPLOY.md](./HOW_TO_DEPLOY.md), Section 4 (Production Deployment) and Section 7 (Updating to a New Version).
 
 ---
 

@@ -31,7 +31,7 @@ def get_queue_backend() -> TaskQueueBase:
         raise ValueError(
             f"Unknown QUEUE_BACKEND={backend_name!r}. "
             f"Valid values: {sorted(_VALID_BACKENDS)}. "
-            "See docs/QUEUE_BACKENDS.md for configuration instructions."
+            "See docs/architecture/QUEUE_BACKENDS.md for configuration instructions."
         )
 
     if backend_name == "postgres":

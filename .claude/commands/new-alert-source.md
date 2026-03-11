@@ -41,6 +41,6 @@ Follow these steps exactly:
    - Indicator extraction returns expected IOC types and values
    - Unknown fields land in `ocsf_data.unmapped`
 
-6. **Update `docs/HOW_TO_ADD_ALERT_SOURCE.md`** if the implementation reveals anything not covered by the existing guide.
+6. **Update `docs/guides/HOW_TO_ADD_ALERT_SOURCE.md`** if the implementation reveals anything not covered by the existing guide.
 
 Do not implement polling/pull behavior — push/webhook only in v1.

@@ -75,7 +75,7 @@ docker compose exec api python -m app.cli.create_api_key \
 
 API reference docs are available at `http://localhost:8000/redoc` once the stack is running.
 
-Full setup guide at `docs/DEVELOPMENT.md`. Production deployment at `docs/HOW_TO_DEPLOY.md`.
+Full setup guide at `docs/architecture/DEVELOPMENT.md`. Production deployment at `docs/guides/HOW_TO_DEPLOY.md`.
 
 ---
 
@@ -306,7 +306,7 @@ Contributions are welcome. The most valuable areas right now:
 
 See `CONTRIBUTING.md` for how to get started. Read `CLAUDE.md` and `PRD.md` before opening a PR — they cover architecture decisions, coding philosophy, and extension patterns.
 
-The platform is designed for extension. Alert sources use a clean plugin interface — adding a new source is one file with no core changes required. Enrichment providers are database-driven — adding a new provider is a single API call or JSON config, with no code changes and no restart needed. Community providers are shared as JSON files and installed with one `curl` command. Full how-to guides (`docs/HOW_TO_ADD_ALERT_SOURCE.md`, `docs/HOW_TO_ADD_ENRICHMENT_PROVIDER.md`, `docs/COMMUNITY_INTEGRATIONS.md`) and runnable example agents ship with the v1 release.
+The platform is designed for extension. Alert sources use a clean plugin interface — adding a new source is one file with no core changes required. Enrichment providers are database-driven — adding a new provider is a single API call or JSON config, with no code changes and no restart needed. Community providers are shared as JSON files and installed with one `curl` command. Full how-to guides (`docs/guides/HOW_TO_ADD_ALERT_SOURCE.md`, `docs/guides/HOW_TO_ADD_ENRICHMENT_PROVIDER.md`, `docs/project/COMMUNITY_INTEGRATIONS.md`) and runnable example agents ship with the v1 release.
 
 ---
 

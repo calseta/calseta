@@ -21,7 +21,7 @@ Thanks for your interest in contributing. Calseta is currently in pre-MVP develo
 Once MVP ships, we'll update this file with full contribution guidelines. The general shape of what we'll be looking for:
 
 - **Alert source integrations** — new `AlertSourceBase` implementations for additional SIEMs and security tools
-- **Enrichment providers** — new provider configurations (JSON) for additional threat intel and identity sources (see `docs/COMMUNITY_INTEGRATIONS.md` and `docs/HOW_TO_ADD_ENRICHMENT_PROVIDER.md`)
+- **Enrichment providers** — new provider configurations (JSON) for additional threat intel and identity sources (see `docs/project/COMMUNITY_INTEGRATIONS.md` and `docs/guides/HOW_TO_ADD_ENRICHMENT_PROVIDER.md`)
 - **Example agents** — additions to the `/examples` directory showing how to build on top of Calseta
 - **Bug fixes and API improvements** — issues labeled `good first issue` will be the right entry point
 

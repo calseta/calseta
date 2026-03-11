@@ -93,12 +93,11 @@ app/
   services/              # Business logic (enrichment engine, indicator extraction, etc.)
   auth/                  # API key auth (BetterAuth-ready interface)
 docs/
+  guides/                # HOW_TO_* user-facing guides
   integrations/          # {integration_name}/api_notes.md — API research artifacts
   workflows/examples/    # Canonical workflow examples (primary LLM training material)
-  HOW_TO_ADD_ALERT_SOURCE.md
-  HOW_TO_ADD_ENRICHMENT_PROVIDER.md
-  HOW_TO_DEPLOY.md
-  VALIDATION_CASE_STUDY.md
+  architecture/          # DEVELOPMENT.md, QUEUE_BACKENDS.md
+  project/               # ROADMAP.md, VALIDATION_CASE_STUDY.md, COMMUNITY_INTEGRATIONS.md
 examples/
   case_study/            # naive_agent.py, calseta_agent.py, fixtures/, results/
 alembic/                 # Database migrations
@@ -176,7 +175,7 @@ Every workflow is an HTTP automation script: an `async def run(ctx: WorkflowCont
 - `WorkflowResult` has `success: bool`, `message: str`, `data: dict`
 - Must never raise; all errors returned as `WorkflowResult.fail(...)`
 - Allowed imports validated via AST at save time (standard lib + `calseta.workflows` only)
-- See `docs/HOW_TO_WRITE_WORKFLOWS.md` for patterns and copy-paste examples
+- See `docs/guides/HOW_TO_WRITE_WORKFLOWS.md` for patterns and copy-paste examples
 
 ---
 

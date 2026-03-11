@@ -30,9 +30,9 @@ class TaskQueueBase(ABC):
 
     Implementations:
         - ProcrastinateBackend (default, postgres)
-        - CeleryRedisBackend   (stub — see docs/QUEUE_BACKENDS.md)
-        - SQSBackend           (stub — see docs/QUEUE_BACKENDS.md)
-        - AzureServiceBusBackend (stub — see docs/QUEUE_BACKENDS.md)
+        - CeleryRedisBackend   (stub — see docs/architecture/QUEUE_BACKENDS.md)
+        - SQSBackend           (stub — see docs/architecture/QUEUE_BACKENDS.md)
+        - AzureServiceBusBackend (stub — see docs/architecture/QUEUE_BACKENDS.md)
 
     Selected via QUEUE_BACKEND env var in app/queue/factory.py.
     """

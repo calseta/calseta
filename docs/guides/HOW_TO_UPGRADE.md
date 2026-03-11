@@ -639,6 +639,6 @@ No `critical` or `startup_*_failed` log lines should appear. Occasional `error` 
 
 ## Related Documentation
 
-- [HOW_TO_DEPLOY.md](HOW_TO_DEPLOY.md) -- Full deployment guide, including initial setup and production hardening
-- [HOW_TO_RUN_MIGRATIONS.md](HOW_TO_RUN_MIGRATIONS.md) -- Detailed migration operations: checking status, rollback, creating new migrations
-- [DEVELOPMENT.md](DEVELOPMENT.md) -- Local development workflow
+- [HOW_TO_DEPLOY.md](./HOW_TO_DEPLOY.md) -- Full deployment guide, including initial setup and production hardening
+- [HOW_TO_RUN_MIGRATIONS.md](./HOW_TO_RUN_MIGRATIONS.md) -- Detailed migration operations: checking status, rollback, creating new migrations
+- [DEVELOPMENT.md](../architecture/DEVELOPMENT.md) -- Local development workflow
