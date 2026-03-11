@@ -505,4 +505,6 @@ export interface HealthResponse {
   version: string;
   database: string;
   queue: string;
+  queue_depth: number;
+  enrichment_providers: Record<string, string>;
 }

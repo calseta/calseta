@@ -14,7 +14,9 @@ class TestHealth:
         resp = await test_client.get("/health")
         body = resp.json()
         assert "status" in body
-        assert "db" in body
+        assert "version" in body
+        assert "database" in body
+        assert "queue" in body
         assert "queue_depth" in body
         assert "enrichment_providers" in body
 

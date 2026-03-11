@@ -29,7 +29,7 @@ from app.integrations.sources.elastic import ElasticSource
 from app.integrations.sources.sentinel import SentinelSource
 from app.integrations.sources.splunk import SplunkSource
 from app.logging_config import configure_logging
-from app.queue.base import TaskQueueBase, TaskStatus
+from app.queue.base import QueueMetrics, TaskQueueBase, TaskStatus
 from app.repositories.context_document_repository import ContextDocumentRepository
 from app.repositories.detection_rule_repository import DetectionRuleRepository
 from app.schemas.detection_rules import DetectionRuleCreate
@@ -60,6 +60,9 @@ class _NoOpQueue(TaskQueueBase):
 
     async def get_task_status(self, task_id: str) -> TaskStatus:
         return TaskStatus.SUCCESS
+
+    async def get_queue_metrics(self) -> QueueMetrics:
+        return QueueMetrics()
 
     async def start_worker(self, queues: list[str]) -> None:
         pass

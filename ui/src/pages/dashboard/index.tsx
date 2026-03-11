@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,7 +38,39 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { Responsive, useContainerWidth } from "react-grid-layout";
+import { Responsive } from "react-grid-layout";
+
+function useResizeWidth() {
+  const [width, setWidth] = useState(0);
+  const observerRef = useRef<ResizeObserver | null>(null);
+
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    // Clean up previous observer
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+    if (!el) return;
+
+    // Read initial width synchronously
+    const initial = el.getBoundingClientRect().width;
+    if (initial > 0) setWidth(initial);
+
+    // Watch for resizes
+    observerRef.current = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w && w > 0) setWidth(w);
+    });
+    observerRef.current.observe(el);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => observerRef.current?.disconnect();
+  }, []);
+
+  return { ref, width };
+}
 import "react-grid-layout/css/styles.css";
 
 const severityColors: Record<string, string> = {
@@ -60,7 +92,7 @@ const statusColors: Record<string, string> = {
 const SEVERITY_ORDER = ["Critical", "High", "Medium", "Low", "Informational", "Pending"];
 const STATUS_ORDER = ["Open", "Triaging", "Escalated", "Closed"];
 
-const tooltipStyle = {
+const tooltipStyle: React.CSSProperties = {
   backgroundColor: "#0d1117",
   border: "1px solid #1e2a25",
   borderRadius: 8,
@@ -68,11 +100,23 @@ const tooltipStyle = {
   fontSize: 12,
 };
 
+const tooltipLabelStyle: React.CSSProperties = {
+  color: "#CCD0CF",
+};
+
+const tooltipItemStyle: React.CSSProperties = {
+  color: "#7FCAB8",
+};
+
+const tooltipCursor = {
+  fill: "rgba(77, 125, 113, 0.08)",
+};
+
 export function DashboardPage() {
   const { data: metricsResp, isLoading: metricsLoading, refetch, isFetching } = useMetricsSummary();
   const { data: approvalsResp } = useApprovals("pending");
   const { layout, handleLayoutChange, resetLayout } = useDashboardLayout();
-  const { width, containerRef, mounted } = useContainerWidth({ initialWidth: 1200 });
+  const { ref: containerRef, width } = useResizeWidth();
 
   const metrics = metricsResp?.data;
   const pendingApprovals = approvalsResp?.data?.length ?? 0;
@@ -276,7 +320,7 @@ export function DashboardPage() {
         <BarChart data={severityData} barSize={32}>
           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
           <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
-          <Tooltip contentStyle={tooltipStyle} />
+          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} cursor={tooltipCursor} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
             {severityData.map((entry) => (
               <Cell key={entry.name} fill={severityColors[entry.name] ?? "#57635F"} />
@@ -290,7 +334,7 @@ export function DashboardPage() {
         <BarChart data={statusData} barSize={32}>
           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
           <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
-          <Tooltip contentStyle={tooltipStyle} />
+          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} cursor={tooltipCursor} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
             {statusData.map((entry) => (
               <Cell key={entry.name} fill={statusColors[entry.name] ?? "#57635F"} />
@@ -304,7 +348,7 @@ export function DashboardPage() {
         <BarChart data={sourceData} barSize={32}>
           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
           <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
-          <Tooltip contentStyle={tooltipStyle} />
+          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} cursor={tooltipCursor} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#4D7D71" />
         </BarChart>
       </ChartCard>
@@ -318,7 +362,7 @@ export function DashboardPage() {
         <BarChart data={providerByTypeData} barSize={32}>
           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
           <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} allowDecimals={false} />
-          <Tooltip contentStyle={tooltipStyle} />
+          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} cursor={tooltipCursor} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#4D7D71" />
         </BarChart>
       </ChartCard>
@@ -328,7 +372,7 @@ export function DashboardPage() {
         <BarChart data={queueData} barSize={20}>
           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} />
           <YAxis axisLine={false} tickLine={false} tick={{ fill: "#57635F", fontSize: 11 }} allowDecimals={false} />
-          <Tooltip contentStyle={tooltipStyle} />
+          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} cursor={tooltipCursor} />
           <Legend wrapperStyle={{ fontSize: 11, color: "#57635F" }} />
           <Bar dataKey="Pending" fill="#FFBB1A" radius={[4, 4, 0, 0]} />
           <Bar dataKey="In Progress" fill="#4D7D71" radius={[4, 4, 0, 0]} />
@@ -338,34 +382,49 @@ export function DashboardPage() {
     ),
 
     // Workflow performance
-    "wf-perf": (
-      <Card className="bg-card border-border h-full">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Workflow Performance
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-            <StatRow label="Total Configured" value={metrics?.workflows.total_configured ?? 0} />
-            <StatRow label="Executions (30d)" value={metrics?.workflows.executions ?? 0} />
-            <StatRow label="Success Rate" value={formatPercent(metrics?.workflows.success_rate ?? 0)} />
-            <StatRow label="Approvals (30d)" value={metrics?.approvals.approved_last_30_days ?? 0} />
-            <StatRow
-              label="Median Approval Time"
-              value={
-                metrics?.approvals.median_response_time_minutes != null
-                  ? `${metrics.approvals.median_response_time_minutes.toFixed(1)} min`
-                  : "--"
-              }
-            />
-            <StatRow
-              label="Mean Time to Enrich"
-              value={formatSeconds(metrics?.alerts.mean_time_to_enrich_seconds ?? null)}
-            />
-          </div>
-        </CardContent>
-      </Card>
+    "wf-configured": (
+      <KpiCard
+        icon={Workflow}
+        label="Workflows Configured"
+        value={metrics?.workflows.total_configured ?? 0}
+        sub="Total active workflows"
+      />
+    ),
+    "wf-success-rate": (
+      <KpiCard
+        icon={Target}
+        label="Workflow Success Rate"
+        value={formatPercent(metrics?.workflows.success_rate ?? 0)}
+        sub="Last 30 days"
+      />
+    ),
+    "approvals-30d": (
+      <KpiCard
+        icon={CheckCircle2}
+        label="Approvals (30d)"
+        value={metrics?.approvals.approved_last_30_days ?? 0}
+        sub={`${formatPercent(metrics?.approvals.approval_rate ?? 0)} approval rate`}
+      />
+    ),
+    "median-approval-time": (
+      <KpiCard
+        icon={Timer}
+        label="Median Approval Time"
+        value={
+          metrics?.approvals.median_response_time_minutes != null
+            ? `${metrics.approvals.median_response_time_minutes.toFixed(1)} min`
+            : "--"
+        }
+        sub="Response latency"
+      />
+    ),
+    "mtte": (
+      <KpiCard
+        icon={Search}
+        label="MTTE"
+        value={formatSeconds(metrics?.alerts.mean_time_to_enrich_seconds ?? null)}
+        sub="Mean Time to Enrich"
+      />
     ),
   };
 
@@ -394,7 +453,7 @@ export function DashboardPage() {
         </div>
 
         <div ref={containerRef} className="w-full">
-          {mounted && (
+          {width > 0 && (
             <Responsive
               className="dashboard-grid"
               width={width}
@@ -536,14 +595,5 @@ function ChartCard({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function StatRow({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="text-center">
-      <p className="text-xs text-muted-foreground mb-1">{label}</p>
-      <p className="text-lg font-heading font-extrabold tracking-tight text-foreground">{value}</p>
-    </div>
   );
 }

@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.cache.factory import get_cache_backend
 from app.db.models.alert import Alert
 from app.integrations.sources.registry import source_registry
-from app.queue.base import TaskQueueBase, TaskStatus
+from app.queue.base import QueueMetrics, TaskQueueBase, TaskStatus
 from app.services.alert_ingestion import AlertIngestionService
 from app.services.enrichment import EnrichmentService
 from app.services.indicator_extraction import IndicatorExtractionService
@@ -59,6 +59,9 @@ class _NoOpQueue(TaskQueueBase):
 
     async def get_task_status(self, task_id: str) -> TaskStatus:
         return TaskStatus.SUCCESS
+
+    async def get_queue_metrics(self) -> QueueMetrics:
+        return QueueMetrics()
 
     async def start_worker(self, queues: list[str]) -> None:
         pass

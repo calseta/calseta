@@ -3,7 +3,7 @@ import type { Layout } from "react-grid-layout";
 
 // Bump version when grid columns or default card set changes.
 // This discards stale layouts from localStorage automatically.
-const LAYOUT_VERSION = 2;
+const LAYOUT_VERSION = 3;
 const STORAGE_KEY = `calseta:dashboard-grid:v${LAYOUT_VERSION}`;
 
 // 12-column grid (industry standard — divisible by 1,2,3,4,6,12).
@@ -46,8 +46,12 @@ const DEFAULT_LAYOUT: Layout[] = [
   // Row 10–11: Charts — 1 × 6 cols (provider type chart)
   { i: "provider-type-chart", x: 0, y: 10, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
 
-  // Row 13: Workflow performance — full width
-  { i: "wf-perf", x: 0, y: 13, w: 12, h: 2, minW: 6, maxW: 12, minH: 1 },
+  // Row 13: Workflow & enrichment KPIs — 5 items
+  { i: "wf-configured",      x: 0,    y: 13, w: 3, h: 1, minW: 2, maxW: 6 },
+  { i: "wf-success-rate",    x: 3,    y: 13, w: 3, h: 1, minW: 2, maxW: 6 },
+  { i: "approvals-30d",      x: 6,    y: 13, w: 2, h: 1, minW: 2, maxW: 6 },
+  { i: "median-approval-time", x: 8,  y: 13, w: 2, h: 1, minW: 2, maxW: 6 },
+  { i: "mtte",               x: 10,   y: 13, w: 2, h: 1, minW: 2, maxW: 6 },
 ];
 
 function loadLayout(): Layout[] | null {

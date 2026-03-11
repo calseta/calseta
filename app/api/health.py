@@ -9,6 +9,8 @@ import structlog
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
+from app.config import settings
+
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["health"])
 
@@ -31,8 +33,8 @@ async def _check_db() -> str:
         return "error"
 
 
-async def _get_queue_depth() -> int:
-    """Return pending task count. Returns 0 on failure."""
+async def _check_queue() -> tuple[str, int]:
+    """Check queue connectivity and return (status, depth)."""
     try:
         from sqlalchemy import text
 
@@ -45,9 +47,11 @@ async def _get_queue_depth() -> int:
                 )
                 return int(result.scalar_one())
 
-        return await asyncio.wait_for(_query(), timeout=2.0)
-    except Exception:
-        return 0
+        depth = await asyncio.wait_for(_query(), timeout=2.0)
+        return "ok", depth
+    except Exception as exc:
+        logger.warning("health_check_queue_failed", error=str(exc))
+        return "error", 0
 
 
 def _get_provider_status() -> dict[str, str]:
@@ -70,7 +74,7 @@ async def health_check() -> JSONResponse:
     subsystem check hangs — each check runs with asyncio.wait_for timeout.
     """
     db_status = await _check_db()
-    queue_depth = await _get_queue_depth()
+    queue_status, queue_depth = await _check_queue()
     providers = _get_provider_status()
 
     if db_status == "error":
@@ -80,7 +84,9 @@ async def health_check() -> JSONResponse:
 
     body: dict[str, Any] = {
         "status": overall,
-        "db": db_status,
+        "version": settings.APP_VERSION,
+        "database": db_status,
+        "queue": queue_status,
         "queue_depth": queue_depth,
         "enrichment_providers": providers,
     }

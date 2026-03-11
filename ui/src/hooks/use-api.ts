@@ -41,7 +41,11 @@ export function useApprovalDefaults() {
 export function useHealth() {
   return useQuery({
     queryKey: ["health"],
-    queryFn: () => api.get<HealthResponse>("/health"),
+    queryFn: async () => {
+      const res = await fetch("/health");
+      if (!res.ok) throw new Error(`Health check failed: ${res.status}`);
+      return res.json() as Promise<HealthResponse>;
+    },
     refetchInterval: 30000,
     retry: 1,
   });

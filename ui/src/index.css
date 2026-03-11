@@ -206,3 +206,10 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #2a3530;
 }
+
+/* Recharts — force transparent backgrounds to match dark theme */
+.recharts-responsive-container,
+.recharts-wrapper,
+.recharts-surface {
+  background: transparent !important;
+}
