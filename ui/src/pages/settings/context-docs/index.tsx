@@ -217,7 +217,7 @@ export function ContextDocsPage() {
                 Add Document
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
               <DialogHeader>
                 <DialogTitle>Create Context Document</DialogTitle>
               </DialogHeader>

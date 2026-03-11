@@ -105,15 +105,11 @@ export interface AgentFinding {
 }
 
 // Indicator Types
-export type IndicatorType =
-  | "ip"
-  | "domain"
-  | "hash_md5"
-  | "hash_sha1"
-  | "hash_sha256"
-  | "url"
-  | "email"
-  | "account";
+export const INDICATOR_TYPES = [
+  "ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account",
+] as const;
+
+export type IndicatorType = (typeof INDICATOR_TYPES)[number];
 
 // Indicator detail (includes raw enrichment data)
 export interface IndicatorDetailResponse {
@@ -241,6 +237,7 @@ export interface WorkflowApproval {
   workflow_name: string | null;
   workflow_uuid: string | null;
   trigger_type: string;
+  trigger_agent_key_prefix: string | null;
   trigger_context: Record<string, unknown> | null;
   reason: string;
   confidence: number;

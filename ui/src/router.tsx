@@ -58,6 +58,9 @@ const workflowDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/workflows/$uuid",
   component: WorkflowDetailPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || undefined,
+  }),
 });
 
 const approvalsRoute = createRoute({

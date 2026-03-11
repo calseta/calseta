@@ -10,19 +10,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAddIndicators } from "@/hooks/use-api";
+import { INDICATOR_TYPES } from "@/lib/types";
 import type { IndicatorType } from "@/lib/types";
 import { Trash2, Plus } from "lucide-react";
-
-const INDICATOR_TYPES: { value: IndicatorType; label: string }[] = [
-  { value: "ip", label: "IP Address" },
-  { value: "domain", label: "Domain" },
-  { value: "url", label: "URL" },
-  { value: "email", label: "Email" },
-  { value: "account", label: "Account" },
-  { value: "hash_md5", label: "MD5 Hash" },
-  { value: "hash_sha1", label: "SHA1 Hash" },
-  { value: "hash_sha256", label: "SHA256 Hash" },
-];
 
 interface Row {
   id: string;
@@ -94,8 +84,8 @@ export function AddIndicatorsForm({ alertUuid, onDone }: AddIndicatorsFormProps)
               </SelectTrigger>
               <SelectContent className="bg-card border-border">
                 {INDICATOR_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value} className="text-xs">
-                    {t.label}
+                  <SelectItem key={t} value={t} className="text-xs">
+                    {t}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -52,6 +52,7 @@ import { formatDate } from "@/lib/format";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FieldExtractionEditor } from "@/components/field-extraction-editor";
 import { useNavigate } from "@tanstack/react-router";
+import { INDICATOR_TYPES as ALL_INDICATOR_TYPES } from "@/lib/types";
 import type { HttpStepDebug, EnrichmentProviderTestResult } from "@/lib/types";
 import {
   Shield,
@@ -72,7 +73,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const ALL_INDICATOR_TYPES = ["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"];
 
 const CACHE_TTL_OPTIONS = [
   { value: "300", label: "5 min" },

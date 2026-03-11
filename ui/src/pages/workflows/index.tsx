@@ -76,7 +76,7 @@ const SORT_KEY_MAP: Record<string, string> = {
 };
 
 const WORKFLOW_TYPE_OPTIONS = ["indicator", "enrichment", "response", "notification", "containment"];
-const INDICATOR_TYPE_OPTIONS = ["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"];
+import { INDICATOR_TYPES as INDICATOR_TYPE_OPTIONS } from "@/lib/types";
 
 const INITIAL_CREATE_STATE: Record<string, unknown> = {
   name: "",

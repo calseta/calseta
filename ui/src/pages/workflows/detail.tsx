@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useParams, useSearch } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +70,8 @@ import {
   WifiOff,
 } from "lucide-react";
 
-const INDICATOR_TYPE_OPTIONS = ["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"];
+// Use central INDICATOR_TYPES from types.ts
+import { INDICATOR_TYPES as INDICATOR_TYPE_OPTIONS } from "@/lib/types";
 const RISK_LEVELS = ["low", "medium", "high", "critical"];
 const WORKFLOW_STATES = ["draft", "active", "inactive"];
 
@@ -417,6 +418,8 @@ function TestResultDisplay({ result }: { result: Record<string, unknown> }) {
 
 export function WorkflowDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
+  const { tab: tabParam } = useSearch({ strict: false }) as { tab?: string };
+  const initialTab = ["code", "test", "runs", "docs"].includes(tabParam ?? "") ? tabParam! : "code";
   const { data: wfResp, isLoading, refetch, isFetching } = useWorkflow(uuid);
   const { data: runsResp } = useWorkflowRuns(uuid);
   const patchWorkflow = usePatchWorkflow();
@@ -763,7 +766,7 @@ export function WorkflowDetailPage() {
             </DetailPageSidebar>
           }
         >
-          <Tabs defaultValue="code">
+          <Tabs defaultValue={initialTab}>
             <TabsList className="bg-surface border border-border">
               <TabsTrigger value="code" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
                 Code

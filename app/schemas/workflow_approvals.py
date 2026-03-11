@@ -22,6 +22,7 @@ class WorkflowApprovalRequestResponse(BaseModel):
     workflow_name: str | None = None
     workflow_uuid: UUID | None = None
     trigger_type: str
+    trigger_agent_key_prefix: str | None = None
     trigger_context: dict[str, Any] | None
     reason: str
     confidence: float

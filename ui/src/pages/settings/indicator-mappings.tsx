@@ -51,7 +51,7 @@ const COLUMNS: ColumnDef[] = [
   { key: "actions", initialWidth: 44, minWidth: 44, maxWidth: 44 },
 ];
 
-const INDICATOR_TYPES = ["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"];
+import { INDICATOR_TYPES } from "@/lib/types";
 const EXTRACTION_TARGETS = [
   { value: "normalized", label: "Normalized" },
   { value: "raw_payload", label: "Raw Payload" },

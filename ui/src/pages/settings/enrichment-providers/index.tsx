@@ -47,7 +47,7 @@ import { Plus, Trash2, RefreshCw, ChevronLeft, ChevronRight, X, Microscope } fro
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
 
-const ALL_INDICATOR_TYPES = ["ip", "domain", "hash_md5", "hash_sha1", "hash_sha256", "url", "email", "account"];
+import { INDICATOR_TYPES as ALL_INDICATOR_TYPES } from "@/lib/types";
 
 const EP_COLUMNS: ColumnDef[] = [
   { key: "display_name", initialWidth: 200, minWidth: 140 },

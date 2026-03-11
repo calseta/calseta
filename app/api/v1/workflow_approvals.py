@@ -9,6 +9,7 @@ POST   /v1/workflow-approvals/{uuid}/reject   — Reject (human REST)
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -33,6 +34,27 @@ from app.schemas.workflow_approvals import (
 router = APIRouter(prefix="/workflow-approvals", tags=["workflow-approvals"])
 
 _Approve = Annotated[AuthContext, Depends(require_scope(Scope.APPROVALS_WRITE))]
+
+
+async def _materialize_expired(rows: list, db: AsyncSession) -> None:
+    """Check-on-access materialization: any pending row whose expires_at has
+    passed is updated to 'expired' in-place.  This ensures API consumers
+    always see the correct status without relying on a background sweep."""
+    now = datetime.now(UTC)
+    dirty = False
+    for r in rows:
+        if r.status != "pending":
+            continue
+        # expires_at may be timezone-naive depending on DB driver; normalize
+        expires_at = r.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if now > expires_at:
+            r.status = "expired"
+            dirty = True
+    if dirty:
+        await db.flush()
+        await db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +102,8 @@ async def list_approval_requests(
     stmt = stmt.order_by(WAR.created_at.desc()).offset(offset).limit(pagination.page_size)
     result = await db.execute(stmt)
     rows = list(result.scalars().all())
+
+    await _materialize_expired(rows, db)
 
     # Batch-load workflow names for all rows
     wf_ids = {r.workflow_id for r in rows}
@@ -131,6 +155,7 @@ async def get_approval_request(
             message=f"Approval request {approval_uuid} not found",
             status_code=status.HTTP_404_NOT_FOUND,
         )
+    await _materialize_expired([request], db)
     resp = WorkflowApprovalRequestResponse.model_validate(request)
     wf_result = await db.execute(
         select(Workflow.name, Workflow.uuid).where(Workflow.id == request.workflow_id)
