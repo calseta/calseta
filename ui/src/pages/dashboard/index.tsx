@@ -114,7 +114,7 @@ const tooltipCursor = {
 
 export function DashboardPage() {
   const { data: metricsResp, isLoading: metricsLoading, refetch, isFetching } = useMetricsSummary();
-  const { data: approvalsResp } = useApprovals("pending");
+  const { data: approvalsResp } = useApprovals({ status: "pending" });
   const { layout, handleLayoutChange, resetLayout } = useDashboardLayout();
   const { ref: containerRef, width } = useResizeWidth();
 
@@ -466,7 +466,7 @@ export function DashboardPage() {
               isDraggable
               isResizable
               draggableHandle=".drag-handle"
-              onLayoutChange={(current) => handleLayoutChange(current)}
+              onLayoutChange={(current) => handleLayoutChange([...current])}
               useCSSTransforms
             >
               {layout.map((item) => (
