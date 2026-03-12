@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { Layout } from "react-grid-layout";
+import type { Layout, LayoutItem } from "react-grid-layout/legacy";
 
 // Bump version when grid columns or default card set changes.
 // This discards stale layouts from localStorage automatically.
@@ -8,7 +8,7 @@ const STORAGE_KEY = `calseta:dashboard-grid:v${LAYOUT_VERSION}`;
 
 // 12-column grid (industry standard — divisible by 1,2,3,4,6,12).
 // rowHeight=80px. Cards fill every row edge-to-edge.
-const DEFAULT_LAYOUT: Layout[] = [
+const DEFAULT_LAYOUT: LayoutItem[] = [
   // Row 0: Platform stats — 6 items × 2 cols = 12 (full row)
   { i: "ctx-docs",        x: 0,  y: 0, w: 2, h: 1, minW: 1, maxW: 4 },
   { i: "det-rules",       x: 2,  y: 0, w: 2, h: 1, minW: 1, maxW: 4 },
@@ -54,11 +54,11 @@ const DEFAULT_LAYOUT: Layout[] = [
   { i: "mtte",               x: 10,   y: 13, w: 2, h: 1, minW: 2, maxW: 6 },
 ];
 
-function loadLayout(): Layout[] | null {
+function loadLayout(): LayoutItem[] | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const saved: Layout[] = JSON.parse(raw);
+    const saved: LayoutItem[] = JSON.parse(raw);
     const defaultMap = new Map(DEFAULT_LAYOUT.map((l) => [l.i, l]));
     const savedIds = new Set(saved.map((l) => l.i));
     const reconciled = saved.filter((l) => defaultMap.has(l.i));
@@ -71,7 +71,7 @@ function loadLayout(): Layout[] | null {
   }
 }
 
-function saveLayout(layout: Layout[]) {
+function saveLayout(layout: readonly LayoutItem[]) {
   try {
     const minimal = layout.map(({ i, x, y, w, h }) => ({ i, x, y, w, h }));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
@@ -81,25 +81,25 @@ function saveLayout(layout: Layout[]) {
 }
 
 export function useDashboardLayout() {
-  const [layout, setLayout] = useState<Layout[]>(() => {
+  const [layout, setLayout] = useState<LayoutItem[]>(() => {
     const saved = loadLayout();
-    return saved ?? DEFAULT_LAYOUT;
+    return saved ?? [...DEFAULT_LAYOUT];
   });
 
-  const handleLayoutChange = useCallback((newLayout: Layout[]) => {
+  const handleLayoutChange = useCallback((newLayout: Layout) => {
     const defaultMap = new Map(DEFAULT_LAYOUT.map((l) => [l.i, l]));
     const merged = newLayout.map((item) => {
       const defaults = defaultMap.get(item.i);
       return defaults
         ? { ...item, minW: defaults.minW, maxW: defaults.maxW, minH: defaults.minH }
-        : item;
+        : { ...item };
     });
     setLayout(merged);
     saveLayout(merged);
   }, []);
 
   const resetLayout = useCallback(() => {
-    setLayout(DEFAULT_LAYOUT);
+    setLayout([...DEFAULT_LAYOUT]);
     try {
       localStorage.removeItem(STORAGE_KEY);
       // Clean up legacy keys from older versions

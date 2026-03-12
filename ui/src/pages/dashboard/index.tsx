@@ -38,7 +38,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { Responsive } from "react-grid-layout";
+import { Responsive } from "react-grid-layout/legacy";
 
 function useResizeWidth() {
   const [width, setWidth] = useState(0);
@@ -466,7 +466,7 @@ export function DashboardPage() {
               isDraggable
               isResizable
               draggableHandle=".drag-handle"
-              onLayoutChange={(current) => handleLayoutChange([...current])}
+              onLayoutChange={(current) => handleLayoutChange(current)}
               useCSSTransforms
             >
               {layout.map((item) => (

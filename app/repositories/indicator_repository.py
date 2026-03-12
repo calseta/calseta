@@ -122,6 +122,7 @@ class IndicatorRepository:
             indicator.malice_source = "enrichment"
             indicator.malice_overridden_at = None
         await self._db.flush()
+        await self._db.refresh(indicator)
 
     @staticmethod
     def _compute_malice_from_enrichment(indicator: Indicator) -> str:
