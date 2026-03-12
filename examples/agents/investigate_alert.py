@@ -402,20 +402,25 @@ class MCPDataSource:
     def __init__(self, mcp_url: str, api_key: str) -> None:
         self.mcp_url = mcp_url
         self.api_key = api_key
-        self._session = None
-        self._read_stream = None
-        self._write_stream = None
-        self._ctx = None
+        self._session: Any = None
+        self._exit_stack: Any = None
 
     async def connect(self) -> None:
+        from contextlib import AsyncExitStack
+
         from mcp import ClientSession
         from mcp.client.sse import sse_client
 
+        self._exit_stack = AsyncExitStack()
+        await self._exit_stack.__aenter__()
+
         headers = {"Authorization": f"Bearer {self.api_key}"}
-        self._ctx = sse_client(self.mcp_url, headers=headers)
-        self._read_stream, self._write_stream = await self._ctx.__aenter__()
-        self._session = ClientSession(self._read_stream, self._write_stream)
-        await self._session.__aenter__()
+        read_stream, write_stream = await self._exit_stack.enter_async_context(
+            sse_client(self.mcp_url, headers=headers)
+        )
+        self._session = await self._exit_stack.enter_async_context(
+            ClientSession(read_stream, write_stream)
+        )
         await self._session.initialize()
         print("  MCP connected and initialized")
 
@@ -425,10 +430,8 @@ class MCPDataSource:
         print(f"  Resources: {len(resources.resources)} | Tools: {len(tools.tools)}")
 
     async def close(self) -> None:
-        if self._session:
-            await self._session.__aexit__(None, None, None)
-        if self._ctx:
-            await self._ctx.__aexit__(None, None, None)
+        if self._exit_stack:
+            await self._exit_stack.aclose()
 
     def _parse_resource(self, result: Any) -> Any:
         for block in result.contents:
