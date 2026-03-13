@@ -15,6 +15,7 @@ function WorkflowLink({ name, uuid }: { name?: string; uuid?: string }) {
       <Link
         to="/workflows/$uuid"
         params={{ uuid: String(uuid) }}
+        search={{ tab: undefined }}
         className="text-xs text-teal hover:underline"
       >
         {String(name)}
@@ -44,8 +45,8 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
       return (
         <div className="flex items-center gap-2 flex-wrap">
           <Shield className="h-3 w-3 text-teal shrink-0" />
-          {r.source_name && <span className="text-xs text-foreground">{String(r.source_name)}</span>}
-          {r.severity && (
+          {r.source_name != null && <span className="text-xs text-foreground">{String(r.source_name)}</span>}
+          {r.severity != null && (
             <Badge variant="outline" className={`text-[10px] ${severityColor(String(r.severity))}`}>
               {String(r.severity)}
             </Badge>
@@ -73,7 +74,7 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
               </Badge>
             ))}
           </div>
-          {r.malice_counts && typeof r.malice_counts === "object" && (
+          {r.malice_counts != null && typeof r.malice_counts === "object" && (
             <div className="flex items-center gap-1.5 flex-wrap">
               {Object.entries(r.malice_counts as Record<string, number>).map(([malice, count]) => (
                 <Badge key={malice} variant="outline" className={`text-[10px] ${maliceColor(malice)}`}>
@@ -114,7 +115,7 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
     case "alert_closed":
       return (
         <div className="flex items-center gap-2">
-          {r.close_classification && (
+          {r.close_classification != null && (
             <Badge variant="outline" className="text-[10px] text-foreground border-border">
               {String(r.close_classification)}
             </Badge>
@@ -125,18 +126,18 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
     case "alert_finding_added":
       return (
         <div className="flex items-center gap-2 flex-wrap">
-          {r.agent_name && (
+          {r.agent_name != null && (
             <span className="text-xs text-teal">{String(r.agent_name)}</span>
           )}
-          {r.confidence && (
+          {r.confidence != null && (
             <Badge variant="outline" className="text-[10px] text-foreground border-border">
               {String(r.confidence)} confidence
             </Badge>
           )}
-          {r.finding_id && (
+          {r.finding_id != null && (
             <span className="text-[10px] text-dim font-mono">{String(r.finding_id).slice(0, 8)}</span>
           )}
-          {r.summary && (
+          {r.summary != null && (
             <span className="text-[11px] text-dim italic truncate max-w-72">
               {String(r.summary)}
             </span>
@@ -173,10 +174,10 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
     case "alert_workflow_triggered":
       return (
         <div className="flex items-center gap-2">
-          {r.workflow_name && (
+          {r.workflow_name != null && (
             <span className="text-xs text-foreground">{String(r.workflow_name)}</span>
           )}
-          {r.trigger_type && (
+          {r.trigger_type != null && (
             <Badge variant="outline" className="text-[10px] text-dim border-border">
               {String(r.trigger_type)}
             </Badge>
@@ -198,13 +199,13 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
           >
             {r.status === "success" || r.success === true ? "Success" : "Failed"}
           </Badge>
-          {r.trigger_type && (
+          {r.trigger_type != null && (
             <Badge variant="outline" className="text-[10px] text-dim border-border">
               {String(r.trigger_type)}
             </Badge>
           )}
           <IndicatorBadge type={r.indicator_type} value={r.indicator_value} />
-          {r.approval_uuid && (
+          {r.approval_uuid != null && (
             <Badge variant="outline" className="text-[10px] text-amber bg-amber/10 border-amber/30">
               via approval
             </Badge>
@@ -212,7 +213,7 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
           {r.duration_ms != null && (
             <span className="text-[10px] text-dim">{String(r.duration_ms)}ms</span>
           )}
-          {r.run_uuid && (
+          {r.run_uuid != null && (
             <span className="text-[10px] text-dim font-mono">{String(r.run_uuid).slice(0, 8)}</span>
           )}
         </div>
@@ -222,7 +223,7 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
       return (
         <div className="flex items-center gap-2 flex-wrap">
           <WorkflowLink name={r.workflow_name as string} uuid={r.workflow_uuid as string} />
-          {r.trigger_source && (
+          {r.trigger_source != null && (
             <Badge variant="outline" className="text-[10px] text-dim border-border">
               {String(r.trigger_source)}
             </Badge>
@@ -233,10 +234,10 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
               {String(r.confidence)} confidence
             </Badge>
           )}
-          {r.approval_uuid && (
+          {r.approval_uuid != null && (
             <span className="text-[10px] text-dim font-mono">{String(r.approval_uuid).slice(0, 8)}</span>
           )}
-          {r.reason && (
+          {r.reason != null && (
             <span className="text-[11px] text-dim italic truncate max-w-64">
               {String(r.reason)}
             </span>
@@ -259,16 +260,16 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
             {r.decision === "approved" ? "Approved" : "Rejected"}
           </Badge>
           <IndicatorBadge type={r.indicator_type} value={r.indicator_value} />
-          {r.actor_key_prefix && (
+          {r.actor_key_prefix != null && (
             <span className="text-[10px] text-dim">
               by{" "}
               <span className="font-mono">{String(r.actor_key_prefix)}...</span>
-              {r.actor_key_name && (
+              {r.actor_key_name != null && (
                 <span className="text-foreground ml-1">({String(r.actor_key_name)})</span>
               )}
             </span>
           )}
-          {!r.actor_key_prefix && r.responder_id && (
+          {r.actor_key_prefix == null && r.responder_id != null && (
             <span className="text-[10px] text-dim font-mono">{String(r.responder_id)}</span>
           )}
         </div>
@@ -282,10 +283,10 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
               {String(r.duplicate_count)} duplicates
             </Badge>
           )}
-          {r.source_name && (
+          {r.source_name != null && (
             <span className="text-xs text-dim">{String(r.source_name)}</span>
           )}
-          {r.fingerprint && (
+          {r.fingerprint != null && (
             <span className="text-[10px] text-dim font-mono">
               {String(r.fingerprint).length > 16
                 ? String(r.fingerprint).slice(0, 16) + "..."
@@ -298,7 +299,7 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
     case "agent_webhook_dispatched":
       return (
         <div className="flex items-center gap-2 flex-wrap">
-          {r.agent_name && (
+          {r.agent_name != null && (
             <span className="text-xs text-foreground">{String(r.agent_name)}</span>
           )}
           <Badge
@@ -321,8 +322,8 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
       return (
         <div className="flex items-center gap-2">
           <Shield className="h-3 w-3 text-teal shrink-0" />
-          {r.source_name && <span className="text-xs text-foreground">{String(r.source_name)}</span>}
-          {r.rule_id && <span className="text-[10px] text-dim font-mono">{String(r.rule_id)}</span>}
+          {r.source_name != null && <span className="text-xs text-foreground">{String(r.source_name)}</span>}
+          {r.rule_id != null && <span className="text-[10px] text-dim font-mono">{String(r.rule_id)}</span>}
         </div>
       );
 
@@ -342,14 +343,14 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
       return (
         <div className="flex items-center gap-1.5 flex-wrap">
           <Zap className="h-3 w-3 text-amber shrink-0" />
-          {r.indicator_type && r.indicator_value && (
+          {r.indicator_type != null && r.indicator_value != null && (
             <span className="text-xs text-dim font-mono">
               {String(r.indicator_type)}: {String(r.indicator_value).length > 30
                 ? String(r.indicator_value).slice(0, 30) + "..."
                 : String(r.indicator_value)}
             </span>
           )}
-          {r.from_malice && (
+          {r.from_malice != null && (
             <Badge variant="outline" className={`text-[10px] ${maliceColor(String(r.from_malice))}`}>
               {String(r.from_malice)}
             </Badge>
@@ -358,7 +359,7 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
           <Badge variant="outline" className={`text-[10px] ${maliceColor(String(r.to_malice ?? "Pending"))}`}>
             {String(r.to_malice ?? "enrichment")}
           </Badge>
-          {r.malice_source && (
+          {r.malice_source != null && (
             <span className="text-[10px] text-dim">({String(r.malice_source)})</span>
           )}
         </div>
@@ -368,20 +369,20 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
       return (
         <div className="flex items-center gap-1.5">
           <Zap className="h-3 w-3 text-amber shrink-0" />
-          {r.from_malice && (
+          {r.from_malice != null && (
             <Badge variant="outline" className={`text-[10px] ${maliceColor(String(r.from_malice))}`}>
               {String(r.from_malice)}
             </Badge>
           )}
           <ArrowRight className="h-3 w-3 text-dim" />
-          {r.to_malice ? (
+          {r.to_malice != null ? (
             <Badge variant="outline" className={`text-[10px] ${maliceColor(String(r.to_malice))}`}>
               {String(r.to_malice)}
             </Badge>
           ) : (
             <span className="text-[10px] text-dim">reset to computed</span>
           )}
-          {r.malice_source && (
+          {r.malice_source != null && (
             <span className="text-[10px] text-dim">({String(r.malice_source)})</span>
           )}
         </div>

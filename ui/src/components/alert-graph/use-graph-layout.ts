@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import dagre from "@dagrejs/dagre";
-import type { AlertRelationshipGraph, GraphAlertNode, GraphIndicatorNode } from "@/lib/types";
+import type { AlertRelationshipGraph } from "@/lib/types";
 
 export interface GraphLayoutResult {
   nodes: Node[];
@@ -34,7 +34,7 @@ export function useGraphLayout(graph: AlertRelationshipGraph | undefined): Graph
       id: alertNodeId,
       type: "alertCurrent",
       position: { x: 0, y: 0 },
-      data: graph.alert,
+      data: graph.alert as unknown as Record<string, unknown>,
     });
 
     // 2) Indicator nodes
@@ -45,7 +45,7 @@ export function useGraphLayout(graph: AlertRelationshipGraph | undefined): Graph
         id: indNodeId,
         type: "indicator",
         position: { x: 0, y: 0 },
-        data: ind,
+        data: ind as unknown as Record<string, unknown>,
       });
 
       edges.push({
@@ -68,7 +68,7 @@ export function useGraphLayout(graph: AlertRelationshipGraph | undefined): Graph
             id: siblingNodeId,
             type: "alertSibling",
             position: { x: 0, y: 0 },
-            data: sibling,
+            data: sibling as unknown as Record<string, unknown>,
           });
         }
 

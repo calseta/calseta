@@ -8,7 +8,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,10 +74,6 @@ const COLUMNS: ColumnDef[] = [
 ];
 
 import { INDICATOR_TYPES } from "@/lib/types";
-const EXTRACTION_TARGETS = [
-  { value: "normalized", label: "Normalized" },
-  { value: "raw_payload", label: "Raw Payload" },
-];
 const SOURCE_OPTIONS = ["sentinel", "elastic", "splunk", "generic"];
 
 // --- Test Extraction sub-components ---
@@ -278,8 +273,8 @@ function MappingsTab({
   meta: { total: number; page: number; page_size: number; total_pages: number } | undefined;
   page: number;
   pageSize: number;
-  setPage: (p: number) => void;
-  handlePageSizeChange: (s: number) => void;
+  setPage: (p: number | ((prev: number) => number)) => void;
+  handlePageSizeChange: (s: string) => void;
   onDelete: (uuid: string, path: string) => void;
   onOpenCreate: () => void;
 }) {

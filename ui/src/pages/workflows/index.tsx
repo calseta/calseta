@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -478,6 +477,7 @@ export function WorkflowsListPage() {
                         <Link
                           to="/workflows/$uuid"
                           params={{ uuid: wf.uuid }}
+                          search={{ tab: undefined }}
                           className="text-sm text-foreground hover:text-teal-light transition-colors"
                         >
                           <div className="flex items-center gap-2">

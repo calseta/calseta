@@ -20,7 +20,6 @@ import { useApiKey, usePatchApiKey, useDeactivateApiKey } from "@/hooks/use-api"
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
-  Key,
   Shield,
   Clock,
   Calendar,

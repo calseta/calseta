@@ -369,7 +369,8 @@ export function ApiKeysPage() {
                       </TableCell>
                       <TableCell>
                         <Link
-                          to={`/settings/api-keys/${k.uuid}`}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          to={`/settings/api-keys/${k.uuid}` as any}
                           className="text-sm text-teal-light hover:underline"
                         >
                           {k.name}

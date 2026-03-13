@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { HttpConfig, HttpStep } from "./types";
+import type { HttpStep } from "./types";
 import { parseHttpConfig, METHOD_COLORS } from "./types";
 import type { HttpMethod } from "./types";
 import { TemplatePills } from "./template-input";

@@ -63,6 +63,7 @@ export interface AlertSummary {
 }
 
 export interface AlertResponse extends AlertSummary {
+  description: string | null;
   enriched_at: string | null;
   fingerprint: string | null;
   close_classification: AlertCloseClassification | null;
@@ -344,6 +345,7 @@ export interface ApiKeyResponse {
   uuid: string;
   key_prefix: string;
   name: string;
+  key_type: string | null;
   scopes: string[];
   allowed_sources: string[] | null;
   is_active: boolean;
