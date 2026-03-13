@@ -1958,6 +1958,84 @@
         }
       }
     },
+    "/v1/detection-rules/{rule_uuid}/metrics": {
+      "get": {
+        "tags": [
+          "detection-rules"
+        ],
+        "summary": "Get Detection Rule Metrics",
+        "description": "Per-detection-rule effectiveness metrics (FP/TP rate, volume, trends).",
+        "operationId": "get_detection_rule_metrics_v1_detection_rules__rule_uuid__metrics_get",
+        "parameters": [
+          {
+            "name": "rule_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_DetectionRuleMetricsResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/enrichments": {
       "post": {
         "tags": [
@@ -6260,10 +6338,38 @@
             "type": "array",
             "title": "Tags"
           },
+          "close_classification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Classification"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
           }
         },
         "type": "object",
@@ -6278,7 +6384,8 @@
           "ingested_at",
           "is_enriched",
           "tags",
-          "created_at"
+          "created_at",
+          "updated_at"
         ],
         "title": "AlertSummary",
         "description": "Compact alert for list views \u2014 GET /v1/alerts."
@@ -6676,6 +6783,23 @@
           "data"
         ],
         "title": "DataResponse[ContextDocumentResponse]"
+      },
+      "DataResponse_DetectionRuleMetricsResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DetectionRuleMetricsResponse"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "DataResponse[DetectionRuleMetricsResponse]"
       },
       "DataResponse_DetectionRuleResponse_": {
         "properties": {
@@ -7279,6 +7403,148 @@
           "name"
         ],
         "title": "DetectionRuleCreate"
+      },
+      "DetectionRuleMetricsResponse": {
+        "properties": {
+          "detection_rule_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Detection Rule Uuid"
+          },
+          "detection_rule_name": {
+            "type": "string",
+            "title": "Detection Rule Name"
+          },
+          "period_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Period From"
+          },
+          "period_to": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Period To"
+          },
+          "total_alerts": {
+            "type": "integer",
+            "title": "Total Alerts"
+          },
+          "active_alerts": {
+            "type": "integer",
+            "title": "Active Alerts"
+          },
+          "alerts_by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Alerts By Status"
+          },
+          "alerts_by_severity": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Alerts By Severity"
+          },
+          "false_positive_rate": {
+            "type": "number",
+            "title": "False Positive Rate"
+          },
+          "true_positive_rate": {
+            "type": "number",
+            "title": "True Positive Rate"
+          },
+          "close_classifications": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Close Classifications"
+          },
+          "alerts_over_time": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Alerts Over Time"
+          },
+          "fp_over_time": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Fp Over Time"
+          },
+          "mtta_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mtta Seconds"
+          },
+          "mttc_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mttc Seconds"
+          },
+          "severity_distribution": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Severity Distribution"
+          },
+          "top_indicators": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Top Indicators"
+          },
+          "alert_sources": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Alert Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detection_rule_uuid",
+          "detection_rule_name",
+          "period_from",
+          "period_to",
+          "total_alerts",
+          "active_alerts",
+          "alerts_by_status",
+          "alerts_by_severity",
+          "false_positive_rate",
+          "true_positive_rate",
+          "close_classifications",
+          "alerts_over_time",
+          "fp_over_time",
+          "mtta_seconds",
+          "mttc_seconds",
+          "severity_distribution",
+          "top_indicators",
+          "alert_sources"
+        ],
+        "title": "DetectionRuleMetricsResponse"
       },
       "DetectionRulePatch": {
         "properties": {
