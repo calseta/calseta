@@ -4,7 +4,7 @@
 
 Calseta ingests security alerts from any SIEM, enriches them with threat intelligence and identity context, and delivers clean, structured payloads to your security agents — so agents spend their tokens on reasoning, not plumbing.
 
-> **Status: Active development.** Calseta is currently being built toward an initial MVP release. The architecture and API design are stable. Core functionality is not yet complete. Watch or star this repo to follow along.
+> **v1.0.0 released.** Calseta is live and ready for use. Self-host with `docker compose up`, connect your SIEM, and start building agents. Star this repo to follow development.
 
 ---
 
@@ -279,20 +279,21 @@ Python 3.12 · FastAPI · PostgreSQL 15 · SQLAlchemy 2.0 async · Pydantic v2 �
 
 ## Project Status
 
-Calseta is actively being built. Current progress:
+v1.0.0 is released. All core systems are built and tested:
 
-- [ ] Architecture and API design finalized
-- [ ] Project scaffold and Docker Compose
-- [ ] Database schema and migrations
-- [ ] Alert ingestion (Sentinel, Elastic, Splunk)
-- [ ] Enrichment engine (VirusTotal, AbuseIPDB, Okta, Entra)
-- [ ] Context document system
-- [ ] Agent registry and webhook dispatch
-- [ ] REST API (full)
-- [ ] MCP server
-- [ ] Examples
-
-This checklist will be updated as chunks complete. Track detailed progress in `PROJECT_PLAN.md`.
+- [x] Architecture and API design
+- [x] Project scaffold and Docker Compose
+- [x] Database schema and migrations
+- [x] Alert ingestion (Sentinel, Elastic, Splunk, generic webhook)
+- [x] Enrichment engine (VirusTotal, AbuseIPDB, Okta, Entra)
+- [x] Context document system
+- [x] Workflow engine with approval gate
+- [x] Agent registry and webhook dispatch
+- [x] REST API (full CRUD, OpenAPI spec)
+- [x] MCP server (12 resources, 6 tools)
+- [x] Admin UI
+- [x] Example agents
+- [x] 1,200+ tests
 
 ---
 
@@ -300,9 +301,10 @@ This checklist will be updated as chunks complete. Track detailed progress in `P
 
 Contributions are welcome. The most valuable areas right now:
 
-- Bug reports and feedback on the API design
-- Review of the architecture and data model
-- Additional alert source and enrichment provider integrations (once the core is built)
+- Bug reports and feedback
+- Additional alert source integrations
+- Additional enrichment providers (code-free via the CRUD API, or community JSON configs)
+- Example agents and workflow scripts
 
 See `CONTRIBUTING.md` for how to get started. Read `CLAUDE.md` and `PRD.md` before opening a PR — they cover architecture decisions, coding philosophy, and extension patterns.
 
