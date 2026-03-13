@@ -172,7 +172,7 @@ ${dataSources}
 export function DetectionRuleDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
   const { tab: activeTab } = useSearch({ from: "/manage/detection-rules/$uuid" });
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/manage/detection-rules/$uuid" });
   const { data, isLoading, refetch, isFetching } = useDetectionRule(uuid);
   const patchRule = usePatchDetectionRule();
 

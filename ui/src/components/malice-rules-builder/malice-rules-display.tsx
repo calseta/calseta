@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { MaliceRules, MaliceRule } from "./types";
+import type { MaliceRule } from "./types";
 import { parseMaliceRules, VERDICT_COLORS } from "./types";
 import type { MaliceVerdict } from "./types";
 

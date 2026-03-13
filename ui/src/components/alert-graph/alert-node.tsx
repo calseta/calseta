@@ -42,7 +42,7 @@ export const AlertSiblingNode = memo(function AlertSiblingNode({
   return (
     <div
       className="rounded-md border border-border bg-card px-3 py-2 hover:border-teal/40 transition-colors cursor-pointer min-w-[200px]"
-      onClick={() => navigate({ to: "/alerts/$uuid", params: { uuid: alert.uuid } })}
+      onClick={() => navigate({ to: "/alerts/$uuid", params: { uuid: alert.uuid }, search: { tab: "indicators" } })}
     >
       <Handle type="target" position={Position.Top} className="!bg-border !w-1.5 !h-1.5" />
       <div className="flex items-center gap-1.5 mb-1">

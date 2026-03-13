@@ -336,6 +336,7 @@ export function ContextDocsPage() {
                         <Link
                           to="/manage/context-docs/$uuid"
                           params={{ uuid: doc.uuid }}
+                          search={{ tab: "content" }}
                           className="flex items-center gap-2 text-sm text-foreground hover:text-teal-light transition-colors"
                         >
                           {doc.document_type === "runbook" ? (

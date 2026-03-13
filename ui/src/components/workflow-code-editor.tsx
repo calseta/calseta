@@ -390,31 +390,6 @@ const workflowAutocompletion = autocompletion({
 // Workflow linter — catches common mistakes before you hit "Test"
 // ---------------------------------------------------------------------------
 
-/** Modules blocked by the backend AST validator */
-const BLOCKED_MODULES = new Set([
-  "os", "subprocess", "importlib", "sys", "builtins", "socket", "ctypes",
-  "pickle", "shelve", "shutil", "tempfile", "pty", "termios", "resource",
-  "signal", "multiprocessing", "concurrent", "threading", "gc", "weakref",
-  "code", "codeop", "compileall", "dis", "tokenize", "token",
-]);
-
-/** Blocked built-in function calls */
-const BLOCKED_BUILTINS = new Set([
-  "exec", "eval", "compile", "__import__", "open", "breakpoint", "input", "memoryview",
-]);
-
-/** Valid ctx.* top-level attributes */
-const VALID_CTX_ATTRS = new Set([
-  "indicator", "alert", "http", "log", "secrets", "integrations",
-]);
-
-/** Known invalid response attributes that people try to use */
-const INVALID_RESP_ATTRS: Record<string, string> = {
-  body: "Use .text (string) or .json() (dict) instead",
-  data: "Use .json() to parse the response body",
-  status: "Use .status_code instead",
-  ok: "Use .is_success instead",
-};
 
 interface LintRule {
   /** Regex to match against each line (non-comment) */

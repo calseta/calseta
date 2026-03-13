@@ -169,7 +169,8 @@ export function AgentsPage() {
                     <TableRow key={agent.uuid} className="border-border hover:bg-accent/50">
                       <TableCell>
                         <Link
-                          to={`/manage/agents/${agent.uuid}`}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          to={`/manage/agents/${agent.uuid}` as any}
                           className="flex items-center gap-2 hover:text-teal transition-colors"
                         >
                           <Bot className="h-3.5 w-3.5 text-teal" />

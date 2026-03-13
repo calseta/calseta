@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,7 +39,6 @@ import {
   useWorkflowRuns,
   usePatchWorkflow,
   useTestWorkflow,
-  useExecuteWorkflow,
 } from "@/hooks/use-api";
 import { formatDate, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -424,7 +423,6 @@ export function WorkflowDetailPage() {
   const { data: runsResp } = useWorkflowRuns(uuid);
   const patchWorkflow = usePatchWorkflow();
   const testWorkflow = useTestWorkflow();
-  const executeWorkflow = useExecuteWorkflow();
 
   const [code, setCode] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
@@ -559,23 +557,6 @@ export function WorkflowDetailPage() {
       setTestResult({ error: String(err) });
       toast.error("Test request failed");
     }
-  }
-
-  function handleExecute() {
-    executeWorkflow.mutate(
-      {
-        uuid,
-        body: {
-          indicator_type: testType,
-          indicator_value: testIndicator,
-          trigger_source: "human",
-        },
-      },
-      {
-        onSuccess: () => toast.success("Workflow execution started"),
-        onError: () => toast.error("Failed to execute workflow"),
-      },
-    );
   }
 
   return (

@@ -40,7 +40,7 @@ import {
 export function ContextDocDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
   const { tab: activeTab } = useSearch({ from: "/manage/context-docs/$uuid" });
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/manage/context-docs/$uuid" });
   const { data, isLoading, refetch, isFetching } = useContextDocument(uuid);
   const patchDoc = usePatchContextDocument();
   const [editingRules, setEditingRules] = useState(false);

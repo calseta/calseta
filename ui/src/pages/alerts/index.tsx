@@ -248,6 +248,7 @@ export function AlertsListPage() {
                         <Link
                           to="/alerts/$uuid"
                           params={{ uuid: alert.uuid }}
+                          search={{ tab: "indicators" }}
                           className="text-sm text-foreground hover:text-teal-light transition-colors"
                         >
                           {alert.title}

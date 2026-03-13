@@ -177,7 +177,7 @@ export function usePatchIndicator() {
     mutationFn: ({
       uuid,
       body,
-      alertUuid,
+      alertUuid: _alertUuid,
     }: {
       uuid: string;
       body: Record<string, unknown>;

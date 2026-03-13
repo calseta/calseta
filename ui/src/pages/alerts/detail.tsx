@@ -111,7 +111,7 @@ const indicatorIcons: Record<string, React.ComponentType<{ className?: string }>
 export function AlertDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
   const { tab: activeTab } = useSearch({ from: "/alerts/$uuid" });
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/alerts/$uuid" });
   const { data: alertResp, isLoading, refetch, isFetching } = useAlert(uuid);
   const { data: activityResp, refetch: refetchActivity } = useAlertActivity(uuid);
   const { data: contextResp, refetch: refetchContext } = useAlertContext(uuid);
@@ -429,6 +429,7 @@ export function AlertDetailPage() {
                       <Link
                         to="/manage/detection-rules/$uuid"
                         params={{ uuid: alert.detection_rule.uuid }}
+                        search={{ tab: "documentation" }}
                         className="text-teal hover:underline text-xs truncate max-w-[160px] inline-block"
                       >
                         {alert.detection_rule.name}
@@ -753,6 +754,7 @@ export function AlertDetailPage() {
                       <Link
                         to="/manage/detection-rules/$uuid"
                         params={{ uuid: alert.detection_rule.uuid }}
+                        search={{ tab: "documentation" }}
                         className="text-xs text-teal hover:underline"
                       >
                         View Rule

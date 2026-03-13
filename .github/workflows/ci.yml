@@ -28,9 +28,16 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
       - run: pip install -e ".[dev]"
       - run: make lint
       - run: make typecheck
+      - name: UI build
+        run: cd ui && npm ci && npm run build
       - name: Run migrations
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test

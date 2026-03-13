@@ -585,6 +585,7 @@ export function DetectionRulesPage() {
                         <Link
                           to="/manage/detection-rules/$uuid"
                           params={{ uuid: rule.uuid }}
+                          search={{ tab: "documentation" }}
                           className="text-sm text-foreground hover:text-teal-light transition-colors block truncate"
                           title={rule.name}
                         >

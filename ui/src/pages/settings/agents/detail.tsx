@@ -65,7 +65,7 @@ const RETRY_OPTIONS = [0, 1, 2, 3, 4, 5];
 export function AgentDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
   const { tab: activeTab } = useSearch({ from: "/manage/agents/$uuid" });
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/manage/agents/$uuid" });
   const { data, isLoading, refetch, isFetching } = useAgent(uuid);
   const patchAgent = usePatchAgent();
   const testAgent = useTestAgent();
