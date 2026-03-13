@@ -654,7 +654,7 @@ async def test_workflow(
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    if workflow.state != "active":
+    if workflow.state != "active" or not workflow.is_active:
         raise CalsetaException(
             code="WORKFLOW_NOT_EXECUTABLE",
             message=(

@@ -1480,17 +1480,17 @@ class TestWorkflowApprovalGateIntegration:
         assert "expires_at" in data
 
     @pytest.mark.asyncio
-    async def test_human_trigger_bypasses_approval_gate(
+    async def test_human_trigger_respects_always_approval_gate(
         self, test_client: Any, api_key: str, mock_queue: Any
     ) -> None:
         """
-        When key_type=human, even if approval_mode="always",
-        the workflow should be immediately queued (not gated).
+        When approval_mode="always", even human triggers go through the
+        approval gate — the mode is defined by the workflow, not the caller.
         """
         create_resp = await test_client.post(
             "/v1/workflows",
             json={
-                "name": "Human Bypass Test",
+                "name": "Human Approval Test",
                 "code": VALID_WORKFLOW_CODE,
                 "state": "active",
                 "is_active": True,
@@ -1513,9 +1513,9 @@ class TestWorkflowApprovalGateIntegration:
         )
         assert resp.status_code == 202
         data = resp.json()["data"]
-        # Human trigger should go straight to "queued", not "pending_approval"
-        assert data.get("status") == "queued"
-        assert "run_uuid" in data
+        # approval_mode="always" gates all triggers, including human
+        assert data.get("status") == "pending_approval"
+        assert "approval_request_uuid" in data
 
     @pytest.mark.asyncio
     async def test_agent_trigger_without_approval_goes_straight_to_queue(

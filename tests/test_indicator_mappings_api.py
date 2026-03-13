@@ -560,6 +560,13 @@ class TestIndicatorMappingScopes:
 
 
 class TestSeederIdempotencyViaAPI:
+    @pytest_asyncio.fixture(autouse=True)
+    async def _seed(self, db_session: AsyncSession) -> None:
+        """Run the system mappings seeder before each test in this class."""
+        from app.seed.indicator_mappings import seed_system_mappings
+
+        await seed_system_mappings(db_session)
+
     async def test_system_mappings_count_is_14(
         self, test_client: AsyncClient, api_key: str
     ) -> None:
