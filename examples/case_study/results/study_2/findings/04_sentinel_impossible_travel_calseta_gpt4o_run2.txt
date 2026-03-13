@@ -1,0 +1,57 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Alert Title**: Impossible travel activity detected for user r.chen@contoso.com
+- **Severity**: High
+- **Classification**: Identity Threat involving a high-privilege Global Administrator account.
+
+### Analysis of Enriched Indicators
+
+1. **Account: r.chen@contoso.com**
+   - **Malice Verdict**: Pending
+   - **Risk Level**: High due to the account's Global Administrator privileges and the suspicious sign-in activity from a distant location.
+   - **Notes**: The account is associated with Jorge Martinez, not R. Chen, indicating potential account misconfiguration or compromise.
+
+2. **IP: 91.234.56.78**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: Identified as a TOR exit node with a high abuse confidence score and numerous reports. This IP is associated with malicious activity and is not a known asset.
+
+3. **IP: 203.0.113.25**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: Similar to the previous IP, this is also a TOR exit node with a high abuse confidence score and numerous reports. It is not a known asset.
+
+4. **Domain: RChen-Laptop.contoso.com**
+   - **Malice Verdict**: Malicious
+   - **Risk Level**: High
+   - **Details**: Associated with command and control (C2) activity and malware. This domain is likely used for malicious purposes.
+
+5. **URL: https://portal.azure.com**
+   - **Malice Verdict**: Pending
+   - **Risk Level**: Low
+   - **Details**: This is a legitimate URL for Azure portal access. No malicious activity is directly associated with this URL.
+
+### Overall Verdict
+- **True Positive**: The alert is a true positive due to the confirmed malicious activity from the TOR exit nodes and the suspicious domain associated with C2 activity. The use of a high-privilege account further elevates the risk.
+
+### Recommended Next Steps
+
+1. **Immediate Actions**:
+   - Suspend the account r.chen@contoso.com to prevent further unauthorized access.
+   - Revoke all active sessions and reset the account password.
+   - Notify the user and relevant stakeholders about the potential compromise.
+
+2. **Further Investigation**:
+   - Verify the account configuration and investigate any discrepancies in user identity (e.g., Jorge Martinez vs. R. Chen).
+   - Review sign-in history for any other suspicious activities or IP addresses.
+   - Assess potential lateral movement by checking access logs for new resources or elevated privileges.
+
+3. **Containment and Mitigation**:
+   - Block the malicious IPs and domain at the network perimeter.
+   - Enable step-up MFA for the affected account and monitor for any further suspicious activity.
+   - Implement a conditional access policy to block access from TOR exit nodes and similar high-risk IP ranges.
+
+4. **Documentation and Closure**:
+   - Document the incident details, investigation findings, and response actions.
+   - Close the alert as a confirmed compromise after ensuring all containment and mitigation steps are completed.

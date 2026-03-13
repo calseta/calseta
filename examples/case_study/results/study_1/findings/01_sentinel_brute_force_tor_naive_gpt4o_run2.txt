@@ -1,0 +1,57 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Title:** Brute force sign-in attempts from TOR network detected
+- **Description:** Multiple failed sign-in attempts from a known TOR exit node IP address targeting user account j.martinez@contoso.com. 47 failed attempts observed over a 15-minute window followed by one successful authentication. The source IP 185.220.101.34 is a documented TOR exit relay.
+- **Severity:** High
+- **Status:** New
+- **Tactics:** Initial Access, Credential Access
+- **Techniques:** T1110 (Brute Force), T1110.001 (Credential Stuffing)
+
+#### Indicators of Compromise and Enrichment Results
+
+1. **IP Address: 185.220.101.34**
+   - **VirusTotal Results:**
+     - **Malicious Detections:** 17 engines flagged as malicious.
+     - **Reputation:** -25 (negative reputation indicating malicious activity).
+     - **Tags:** TOR
+     - **ASN:** 60729 (Stiftung Erneuerbare Freiheit)
+     - **Country:** Germany
+     - **Last Analysis Date:** Recent analysis shows multiple malicious detections.
+   - **AbuseIPDB Results:**
+     - **Abuse Confidence Score:** 100 (indicating high confidence in abuse reports).
+     - **Total Reports:** 143 reports from 69 distinct users.
+     - **Usage Type:** Commercial, used for TOR exit traffic.
+     - **Last Reported:** 2026-03-07
+     - **Categories:** Includes brute force, hacking, phishing, and spam activities.
+
+2. **Account: j.martinez@contoso.com**
+   - **Details:** Targeted account for brute force attempts. No additional enrichment available.
+
+#### Risk Assessment for Each Indicator
+
+- **IP Address 185.220.101.34:** 
+  - **Risk Level:** High
+  - **Reason:** The IP is a known TOR exit node with a high abuse confidence score and numerous reports of malicious activity including brute force attacks, phishing, and hacking attempts.
+
+- **Account j.martinez@contoso.com:**
+  - **Risk Level:** High
+  - **Reason:** The account was successfully accessed after multiple failed attempts, indicating potential compromise.
+
+#### Overall Verdict
+- **Verdict:** True Positive
+- **Reason:** The IP address is confirmed to be involved in malicious activities, and the account was successfully accessed after brute force attempts.
+
+#### Recommended Next Steps
+
+1. **Immediate Actions:**
+   - **Account Security:** Reset the password for j.martinez@contoso.com and review account activity for any unauthorized changes or access.
+   - **Network Security:** Block the IP address 185.220.101.34 at the network perimeter to prevent further access attempts.
+
+2. **Further Investigation:**
+   - **Log Analysis:** Review logs for other accounts targeted by similar brute force attempts.
+   - **User Education:** Inform the user about the incident and provide guidance on recognizing phishing attempts and securing their account.
+
+3. **Long-term Actions:**
+   - **Security Policies:** Implement stricter access controls and multi-factor authentication for sensitive accounts.
+   - **Monitoring:** Increase monitoring for signs of credential stuffing and brute force attacks, especially from anonymization networks like TOR.

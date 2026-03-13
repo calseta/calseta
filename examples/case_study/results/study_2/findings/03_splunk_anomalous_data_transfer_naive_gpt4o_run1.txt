@@ -1,0 +1,38 @@
+### Investigation Summary
+
+**Alert Classification and Severity Assessment:**
+- **Alert Type:** Anomalous Outbound Data Transfer Detected
+- **Severity:** High
+- **Category:** Exfiltration
+- **Rule Name:** Anomalous Outbound Data Transfer
+- **Signature:** Data Exfiltration - Anomalous Volume
+
+**Indicators of Compromise and Enrichment Results:**
+
+1. **Source IP: 10.0.8.55**
+   - **VirusTotal:** Clean, no malicious detections.
+   - **AbuseIPDB:** Private IP, no reports.
+   - **Risk Assessment:** Low risk, as it is a private IP address used internally.
+
+2. **Destination IP: 45.33.32.156**
+   - **VirusTotal:** Mixed results with 4 malicious detections and 1 suspicious detection.
+   - **AbuseIPDB:** 3 reports, associated with honeypot activity and scanning.
+   - **Risk Assessment:** High risk due to malicious activity and abuse reports.
+
+3. **Domain: suspicious-cloud-sync.com**
+   - **VirusTotal:** No malicious detections, but undetected by all engines.
+   - **Risk Assessment:** Medium risk due to lack of reputation data and association with suspicious activity.
+
+4. **URL: https://suspicious-cloud-sync.com/api/v2/upload**
+   - **VirusTotal:** Not found, indicating potential issues with URL reputation or existence.
+   - **Risk Assessment:** High risk due to association with suspicious domain and potential exfiltration activity.
+
+**Overall Verdict:**
+- **Needs Investigation:** The alert indicates potential data exfiltration activity to a suspicious IP and domain. The destination IP has multiple malicious detections and abuse reports, warranting further investigation.
+
+**Recommended Next Steps:**
+1. **Network Analysis:** Conduct a deeper network analysis to identify any unusual patterns or connections to the destination IP and domain.
+2. **Endpoint Investigation:** Check the endpoint associated with the source IP (FILESERVER03) for any signs of compromise or unauthorized data transfer.
+3. **Review Firewall Logs:** Examine firewall logs for any other connections to the destination IP or domain to assess the scope of the activity.
+4. **User Account Audit:** Investigate the user account `svc_backup` for any unauthorized access or activity.
+5. **Block and Monitor:** Consider blocking the destination IP and domain temporarily while further investigation is conducted, and set up monitoring for any future attempts to connect.

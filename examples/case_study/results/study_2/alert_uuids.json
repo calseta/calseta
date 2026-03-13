@@ -1,0 +1,7 @@
+{
+  "01_sentinel_brute_force_tor.json": "3f4109c5-054c-4adf-b2f7-c1046ff83ab8",
+  "02_elastic_malware_hash.json": "49a134f4-c798-4cc0-a06f-54cfecdcdc42",
+  "03_splunk_anomalous_data_transfer.json": "b6dd6014-69d9-4452-8811-375b5cc19461",
+  "04_sentinel_impossible_travel.json": "118027d6-cc63-411d-a683-d8f76c0ced79",
+  "05_elastic_suspicious_powershell.json": "7e7962a2-9c5d-4c9b-a654-967fb6521c0c"
+}

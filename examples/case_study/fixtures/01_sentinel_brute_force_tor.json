@@ -1,0 +1,73 @@
+{
+  "id": "/subscriptions/a1b2c3d4-e5f6-7890-abcd-ef1234567890/resourceGroups/soc-rg/providers/Microsoft.SecurityInsights/Incidents/f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "name": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "type": "Microsoft.SecurityInsights/Incidents",
+  "properties": {
+    "title": "Brute force sign-in attempts from TOR network detected",
+    "description": "Multiple failed sign-in attempts detected originating from a known TOR exit node IP address targeting user account j.martinez@contoso.com. 47 failed attempts observed over a 15-minute window followed by one successful authentication. The source IP 185.220.101.34 is a documented TOR exit relay. This pattern is consistent with credential stuffing or brute force attacks routed through anonymization networks to evade IP-based detection.",
+    "severity": "High",
+    "status": "New",
+    "classification": null,
+    "classificationComment": null,
+    "classificationReason": null,
+    "owner": {
+      "objectId": null,
+      "email": null,
+      "assignedTo": null,
+      "userPrincipalName": null
+    },
+    "labels": [
+      {"labelName": "TOR"},
+      {"labelName": "BruteForce"},
+      {"labelName": "IdentityThreat"}
+    ],
+    "firstActivityTimeUtc": "2026-03-01T14:23:11.000Z",
+    "lastActivityTimeUtc": "2026-03-01T14:38:47.000Z",
+    "createdTimeUtc": "2026-03-01T14:39:02.000Z",
+    "lastModifiedTimeUtc": "2026-03-01T14:39:02.000Z",
+    "incidentNumber": 48291,
+    "incidentUrl": "https://portal.azure.com/#blade/Microsoft_Azure_Security_Insights/IncidentBlade/incidentId/f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "providerName": "Azure Sentinel",
+    "providerIncidentId": "48291",
+    "additionalData": {
+      "alertsCount": 1,
+      "bookmarksCount": 0,
+      "commentsCount": 0,
+      "alertProductNames": ["Azure Active Directory Identity Protection"],
+      "tactics": ["InitialAccess", "CredentialAccess"],
+      "techniques": ["T1110", "T1110.001"]
+    },
+    "relatedAnalyticRuleIds": [
+      "/subscriptions/a1b2c3d4-e5f6-7890-abcd-ef1234567890/resourceGroups/soc-rg/providers/Microsoft.SecurityInsights/alertRules/c9a7e4d2-3b1f-4e8a-9c6d-f0123456789a"
+    ],
+    "alertsCount": 1
+  },
+  "Entities": [
+    {
+      "Type": "account",
+      "Name": "j.martinez",
+      "UPNSuffix": "contoso.com",
+      "AadUserId": "e8d4c6b2-a1f3-4e7d-9c5b-d0123456789a",
+      "DisplayName": "Julia Martinez",
+      "IsDomainJoined": true
+    },
+    {
+      "Type": "ip",
+      "Address": "185.220.101.34",
+      "GeoLocation": {
+        "Country": "Germany",
+        "State": "Hessen",
+        "City": "Frankfurt am Main",
+        "Latitude": 50.1109,
+        "Longitude": 8.6821
+      }
+    },
+    {
+      "Type": "host",
+      "HostName": "AAD-SIGNIN-SVC",
+      "DnsDomain": "contoso.com",
+      "OSFamily": "Windows",
+      "OSVersion": null
+    }
+  ]
+}

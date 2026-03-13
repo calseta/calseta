@@ -1,0 +1,69 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Classification:** True Positive - Credential Attack via TOR
+**Severity:** High (Confirmed)
+
+This alert represents a confirmed brute force attack that successfully compromised a privileged user account. The attack pattern shows 47 failed authentication attempts followed by one successful login, all originating from a known TOR exit node, which is a classic indicator of credential stuffing or brute force attacks using anonymization networks.
+
+## Indicator Analysis
+
+### IP Address: 185.220.101.34
+**Risk Level: CRITICAL**
+- **Verdict:** Malicious (confirmed across multiple sources)
+- **TOR Exit Node:** Confirmed by AbuseIPDB (is_tor: True)
+- **Reputation:** Extremely poor with 100% abuse confidence score
+- **Intelligence:** 2,847 total reports from 312 distinct users, last reported March 6, 2026
+- **VirusTotal:** -42 reputation score, 14 malicious detections, tagged as 'tor' and 'proxy'
+- **Assessment:** This is a known malicious TOR exit relay actively used for attacks
+
+### User Account: j.martinez@contoso.com
+**Risk Level: HIGH**
+- **Verdict:** Pending (victim account)
+- **Profile:** Jorge Martinez, Senior Engineer in Engineering department
+- **Privileged Access:** Member of 'GlobalAdmins' group in Entra ID, indicating elevated privileges
+- **Security Posture:** Password last changed January 10, 2026 (nearly 2 months old)
+- **Last Legitimate Login:** March 6, 2026 at 14:22:00 (2 days before attack)
+- **Devices:** 2 managed devices with partial EDR coverage
+- **Assessment:** High-value target due to administrative privileges; successful compromise confirmed
+
+### Domain: AAD-SIGNIN-SVC.contoso.com
+**Risk Level: CRITICAL**
+- **Verdict:** Malicious
+- **VirusTotal Intelligence:** Tagged as 'c2' and 'malware', -15 reputation
+- **Detections:** 8 malicious, 1 suspicious classification
+- **Assessment:** This appears to be a command and control domain, suggesting the attack may involve malware deployment
+
+## Overall Verdict: TRUE POSITIVE
+
+This is a confirmed security incident involving:
+1. Successful credential compromise of a privileged user account
+2. Attack originating from a malicious TOR exit node
+3. Potential malware C2 infrastructure involvement
+4. High-value target with administrative privileges compromised
+
+## Recommended Next Steps (IMMEDIATE - within 15 minutes)
+
+### Critical Actions:
+1. **Suspend j.martinez@contoso.com account immediately** in both Okta and Entra ID
+2. **Revoke all active sessions** for the compromised account
+3. **Network isolate** both of Jorge's devices (JMartinez-MBP and JMartinez-iPhone)
+4. **Block IP 185.220.101.34** at firewall/proxy level
+5. **Block domain AAD-SIGNIN-SVC.contoso.com** at DNS/firewall level
+
+### Investigation Actions:
+1. **Review sign-in logs** for any successful authentications from 185.220.101.34 after the attack
+2. **Check for lateral movement** - audit what resources j.martinez account accessed post-compromise
+3. **Search for C2 domain connections** across all network logs in the last 24 hours
+4. **Notify Jorge Martinez and manager Sunita Patel** of the compromise
+5. **Force password reset** once account is secured
+6. **Enable enhanced monitoring** on the account once restored
+
+### Follow-up (within 24 hours):
+1. Conduct forensic analysis of Jorge's devices
+2. Review all administrative actions performed by the account since March 1st
+3. Assess if any other accounts were compromised using similar patterns
+4. Implement conditional access policies to block TOR traffic for privileged accounts
+
+This incident requires immediate escalation to the Security Operations Manager due to the successful compromise of a privileged account and potential malware involvement.

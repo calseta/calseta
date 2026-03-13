@@ -1,0 +1,50 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+The alert is classified as a "High" severity due to the detection of impossible travel activity for a high-privilege user account, r.chen@contoso.com, tagged with "GlobalAdmin". The presence of multiple malicious indicators, including IP addresses associated with TOR exit nodes and a domain linked to command-and-control (C2) activity, further elevates the risk level.
+
+### Analysis of Enriched Indicators
+
+#### ACCOUNT: r.chen@contoso.com
+- **Malice Verdict**: Pending
+- **Risk Level**: High due to the account's high privilege (GlobalAdmin) and involvement in an impossible travel alert. The account status is active, and there are no recent password changes or risk flags, which suggests potential unauthorized access.
+
+#### IP: 91.234.56.78
+- **Malice Verdict**: Malicious
+- **Risk Level**: High. This IP is associated with TOR, has a high abuse confidence score, and numerous reports of malicious activity. It is not a known asset and is classified as external_unknown.
+
+#### IP: 203.0.113.25
+- **Malice Verdict**: Malicious
+- **Risk Level**: High. Similar to the previous IP, it is associated with TOR, has a high abuse confidence score, and numerous reports of malicious activity. It is also classified as external_unknown.
+
+#### URL: https://portal.azure.com
+- **Malice Verdict**: Pending
+- **Risk Level**: Moderate. While the URL itself is legitimate, its involvement in the alert requires further investigation to determine if it was accessed maliciously.
+
+#### DOMAIN: RChen-Laptop.contoso.com
+- **Malice Verdict**: Malicious
+- **Risk Level**: High. The domain is associated with C2 activity and malware, indicating potential compromise of the device named RChen-Laptop.
+
+### Overall Verdict
+**True Positive**: The combination of high-risk indicators, including malicious IPs and a domain linked to C2 activity, suggests a genuine security incident involving unauthorized access and potential compromise of a high-privilege account.
+
+### Recommended Next Steps
+
+1. **Immediate Actions**:
+   - Suspend the account r.chen@contoso.com and revoke all active sessions.
+   - Reset the account password and notify the user of the security incident.
+   - Isolate the host RChen-Laptop using endpoint management tools to prevent further network communication.
+
+2. **Further Investigation**:
+   - Review sign-in history for r.chen@contoso.com to identify any successful authentications from the suspicious IPs.
+   - Assess potential lateral movement by checking access logs for new resources or elevated privileges.
+   - Investigate the URL access to https://portal.azure.com for any unauthorized activities.
+
+3. **Containment and Mitigation**:
+   - Block the malicious IPs and domain on the firewall to prevent further access.
+   - Enable step-up MFA for r.chen@contoso.com and monitor account activity for 24 hours.
+   - Collect forensic artifacts from RChen-Laptop, including memory dumps and event logs, for further analysis.
+
+4. **Documentation and Reporting**:
+   - Document the incident thoroughly, including all findings and actions taken.
+   - Report the incident to relevant stakeholders and prepare a post-incident review to improve future detection and response capabilities.

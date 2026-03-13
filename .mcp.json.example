@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+
+    "postgres": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "${DATABASE_URL}"],
+      "description": "Direct access to the local Calseta dev database. Use for schema inspection, data verification, and debugging during development. DATABASE_URL must be set in your environment (see .env.local.example)."
+    },
+
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "description": "GitHub API access for managing issues, PRs, and repo content. Requires GITHUB_TOKEN in your environment (classic token with repo scope, or fine-grained token with issues + pull_requests + contents)."
+    },
+
+    "calseta": {
+      "type": "sse",
+      "url": "http://localhost:8001/sse",
+      "headers": {
+        "Authorization": "Bearer ${CALSETA_DEV_API_KEY}"
+      },
+      "description": "The Calseta MCP server (the product we are building). Uncomment and use this to test the MCP server locally once `docker compose up` is running. CALSETA_DEV_API_KEY is the key you create via POST /v1/api-keys after first boot."
+    }
+
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "provider_name": "greynoise",
+  "display_name": "GreyNoise",
+  "description": "GreyNoise Community API — IP noise classification and internet scanner identification. Identifies IPs that are mass-scanning the internet (noise) vs targeted attackers.",
+  "supported_indicator_types": ["ip"],
+  "auth_type": "api_key",
+  "http_config": {
+    "steps": [
+      {
+        "name": "lookup",
+        "method": "GET",
+        "url": "https://api.greynoise.io/v3/community/{{indicator.value}}",
+        "headers": {
+          "key": "{{auth.api_key}}",
+          "Accept": "application/json"
+        },
+        "timeout_seconds": 30,
+        "expected_status": [200],
+        "not_found_status": [404]
+      }
+    ]
+  },
+  "malice_rules": {
+    "rules": [
+      {
+        "field": "classification",
+        "operator": "==",
+        "value": "malicious",
+        "verdict": "Malicious"
+      },
+      {
+        "field": "noise",
+        "operator": "==",
+        "value": true,
+        "verdict": "Suspicious"
+      }
+    ],
+    "default_verdict": "Benign",
+    "not_found_verdict": "Pending"
+  },
+  "default_cache_ttl_seconds": 3600,
+  "cache_ttl_by_type": {
+    "ip": 3600
+  }
+}

@@ -1,0 +1,309 @@
+"""
+Workflow approval management endpoints (Chunk 4.11).
+
+GET    /v1/workflow-approvals           — Paginated list with status/workflow filters
+GET    /v1/workflow-approvals/{uuid}    — Full approval request state
+POST   /v1/workflow-approvals/{uuid}/approve  — Approve (human REST)
+POST   /v1/workflow-approvals/{uuid}/reject   — Reject (human REST)
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
+
+from app.api.errors import CalsetaException
+from app.api.pagination import PaginationParams
+from app.auth.base import AuthContext
+from app.auth.dependencies import require_scope
+from app.auth.scopes import Scope
+from app.config import settings
+from app.db.models.api_key import APIKey as ApiKeyModel
+from app.db.session import get_db
+from app.middleware.rate_limit import limiter
+from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
+from app.schemas.workflow_approvals import (
+    WorkflowApprovalRequestResponse,
+    WorkflowApproveRequest,
+    WorkflowRejectRequest,
+)
+
+router = APIRouter(prefix="/workflow-approvals", tags=["workflow-approvals"])
+
+_Approve = Annotated[AuthContext, Depends(require_scope(Scope.APPROVALS_WRITE))]
+
+
+async def _materialize_expired(rows: list, db: AsyncSession) -> None:
+    """Check-on-access materialization: any pending row whose expires_at has
+    passed is updated to 'expired' in-place.  This ensures API consumers
+    always see the correct status without relying on a background sweep."""
+    now = datetime.now(UTC)
+    dirty = False
+    for r in rows:
+        if r.status != "pending":
+            continue
+        # expires_at may be timezone-naive depending on DB driver; normalize
+        expires_at = r.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if now > expires_at:
+            r.status = "expired"
+            dirty = True
+    if dirty:
+        await db.flush()
+        await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/workflow-approvals
+# ---------------------------------------------------------------------------
+
+
+@router.get("", response_model=PaginatedResponse[WorkflowApprovalRequestResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def list_approval_requests(
+    request: Request,
+    auth: _Approve,
+    pagination: Annotated[PaginationParams, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    approval_status: str | None = Query(None, alias="status"),
+    workflow_uuid: UUID | None = Query(None),
+) -> PaginatedResponse[WorkflowApprovalRequestResponse]:
+    """List workflow approval requests. Filterable by status and workflow_uuid."""
+    from sqlalchemy import func, select
+
+    from app.db.models.workflow import Workflow
+    from app.db.models.workflow_approval_request import WorkflowApprovalRequest as WAR
+
+    stmt = select(WAR)
+    count_stmt = select(func.count()).select_from(WAR)
+
+    if approval_status is not None:
+        stmt = stmt.where(WAR.status == approval_status)
+        count_stmt = count_stmt.where(WAR.status == approval_status)
+
+    if workflow_uuid is not None:
+        wf_result = await db.execute(select(Workflow).where(Workflow.uuid == workflow_uuid))
+        wf = wf_result.scalar_one_or_none()
+        if wf is None:
+            raise CalsetaException(
+                code="NOT_FOUND",
+                message=f"Workflow {workflow_uuid} not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        stmt = stmt.where(WAR.workflow_id == wf.id)
+        count_stmt = count_stmt.where(WAR.workflow_id == wf.id)
+
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar_one()
+
+    offset = (pagination.page - 1) * pagination.page_size
+    stmt = stmt.order_by(WAR.created_at.desc()).offset(offset).limit(pagination.page_size)
+    result = await db.execute(stmt)
+    rows = list(result.scalars().all())
+
+    await _materialize_expired(rows, db)
+
+    # Batch-load workflow names for all rows
+    wf_ids = {r.workflow_id for r in rows}
+    wf_map: dict[int, tuple[str, str]] = {}
+    if wf_ids:
+        wf_result = await db.execute(
+            select(Workflow.id, Workflow.name, Workflow.uuid).where(Workflow.id.in_(wf_ids))
+        )
+        for wf_id, wf_name, wf_uuid in wf_result.all():
+            wf_map[wf_id] = (wf_name, str(wf_uuid))
+
+    data = []
+    for r in rows:
+        resp = WorkflowApprovalRequestResponse.model_validate(r)
+        if r.workflow_id in wf_map:
+            resp.workflow_name = wf_map[r.workflow_id][0]
+            resp.workflow_uuid = UUID(wf_map[r.workflow_id][1])
+        data.append(resp)
+
+    return PaginatedResponse(
+        data=data,
+        meta=PaginationMeta.from_total(
+            total=total, page=pagination.page, page_size=pagination.page_size
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/workflow-approvals/{uuid}
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{approval_uuid}", response_model=DataResponse[WorkflowApprovalRequestResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def get_approval_request(
+    request: Request,
+    approval_uuid: UUID,
+    auth: _Approve,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[WorkflowApprovalRequestResponse]:
+    from sqlalchemy import select
+
+    from app.db.models.workflow import Workflow
+    from app.db.models.workflow_approval_request import WorkflowApprovalRequest as WAR
+
+    result = await db.execute(select(WAR).where(WAR.uuid == approval_uuid))
+    approval = result.scalar_one_or_none()
+    if approval is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message=f"Approval request {approval_uuid} not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    await _materialize_expired([approval], db)
+    resp = WorkflowApprovalRequestResponse.model_validate(approval)
+    wf_result = await db.execute(
+        select(Workflow.name, Workflow.uuid).where(Workflow.id == approval.workflow_id)
+    )
+    wf_row = wf_result.one_or_none()
+    if wf_row:
+        resp.workflow_name = wf_row[0]
+        resp.workflow_uuid = wf_row[1]
+    return DataResponse(data=resp)
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/workflow-approvals/{uuid}/approve
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{approval_uuid}/approve",
+    response_model=DataResponse[WorkflowApprovalRequestResponse],
+)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def approve_workflow(
+    request: Request,
+    approval_uuid: UUID,
+    auth: _Approve,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: WorkflowApproveRequest | None = None,
+) -> DataResponse[WorkflowApprovalRequestResponse]:
+    """
+    Approve a pending workflow approval request.
+
+    Enqueues execute_approved_workflow_task so the workflow runs asynchronously.
+    Returns 409 if the request has expired or is already in a terminal state.
+    """
+    from app.workflows.approval import process_approval_decision
+
+    try:
+        # Resolve API key name for audit display
+        key_name: str | None = None
+        key_row = (await db.execute(
+            select(ApiKeyModel.name).where(ApiKeyModel.id == auth.key_id)
+        )).scalar_one_or_none()
+        if key_row:
+            key_name = key_row
+
+        responder = (body.responder_id if body else None) or str(auth.key_prefix)
+        approval = await process_approval_decision(
+            approval_uuid=approval_uuid,
+            approved=True,
+            responder_id=responder,
+            db=db,
+            actor_key_prefix=auth.key_prefix,
+            actor_key_name=key_name,
+        )
+        await db.commit()
+        await db.refresh(approval)
+    except ValueError as exc:
+        err_msg = str(exc)
+        if "expired" in err_msg.lower():
+            raise CalsetaException(
+                code="APPROVAL_EXPIRED",
+                message=err_msg,
+                status_code=status.HTTP_409_CONFLICT,
+            ) from exc
+        if "terminal" in err_msg.lower():
+            raise CalsetaException(
+                code="APPROVAL_ALREADY_DECIDED",
+                message=err_msg,
+                status_code=status.HTTP_409_CONFLICT,
+            ) from exc
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message=err_msg,
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
+
+    return DataResponse(data=WorkflowApprovalRequestResponse.model_validate(approval))
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/workflow-approvals/{uuid}/reject
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{approval_uuid}/reject",
+    response_model=DataResponse[WorkflowApprovalRequestResponse],
+)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def reject_workflow(
+    request: Request,
+    approval_uuid: UUID,
+    auth: _Approve,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: WorkflowRejectRequest | None = None,
+) -> DataResponse[WorkflowApprovalRequestResponse]:
+    """
+    Reject a pending workflow approval request.
+
+    No execution is enqueued. Returns 409 if the request has expired or is
+    already in a terminal state.
+    """
+    from app.workflows.approval import process_approval_decision
+
+    try:
+        key_name: str | None = None
+        key_row = (await db.execute(
+            select(ApiKeyModel.name).where(ApiKeyModel.id == auth.key_id)
+        )).scalar_one_or_none()
+        if key_row:
+            key_name = key_row
+
+        responder = (body.responder_id if body else None) or str(auth.key_prefix)
+        approval = await process_approval_decision(
+            approval_uuid=approval_uuid,
+            approved=False,
+            responder_id=responder,
+            db=db,
+            actor_key_prefix=auth.key_prefix,
+            actor_key_name=key_name,
+        )
+        await db.commit()
+        await db.refresh(approval)
+    except ValueError as exc:
+        err_msg = str(exc)
+        if "expired" in err_msg.lower():
+            raise CalsetaException(
+                code="APPROVAL_EXPIRED",
+                message=err_msg,
+                status_code=status.HTTP_409_CONFLICT,
+            ) from exc
+        if "terminal" in err_msg.lower():
+            raise CalsetaException(
+                code="APPROVAL_ALREADY_DECIDED",
+                message=err_msg,
+                status_code=status.HTTP_409_CONFLICT,
+            ) from exc
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message=err_msg,
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
+
+    return DataResponse(data=WorkflowApprovalRequestResponse.model_validate(approval))

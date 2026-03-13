@@ -1,0 +1,57 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Alert Title**: Impossible travel activity detected for user r.chen@contoso.com
+- **Severity**: High
+- **Classification**: This alert indicates a potential account compromise due to impossible travel activity, suggesting unauthorized access to a high-privilege account.
+
+### Analysis of Enriched Indicators
+
+#### ACCOUNT: r.chen@contoso.com
+- **Malice Verdict**: Pending
+- **Risk Level**: High due to the account's Global Administrator privileges and the suspicious sign-in activity.
+- **Notes**: The account is associated with Jorge Martinez, not R. Chen, indicating potential account misconfiguration or compromise.
+
+#### IP: 91.234.56.78
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+- **Details**: This IP is a known TOR exit node with a high abuse confidence score and numerous reports of malicious activity. It is not associated with any known assets or VPNs within the organization.
+
+#### IP: 203.0.113.25
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+- **Details**: Similar to the previous IP, this is also a TOR exit node with a high abuse confidence score and numerous reports of malicious activity.
+
+#### DOMAIN: RChen-Laptop.contoso.com
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+- **Details**: The domain is associated with command and control (C2) activities and malware, indicating potential compromise of a device.
+
+#### URL: https://portal.azure.com
+- **Malice Verdict**: Pending
+- **Risk Level**: Low
+- **Details**: This is a legitimate URL for Azure portal access, but its involvement in the alert requires further investigation to rule out misuse.
+
+### Overall Verdict
+- **Verdict**: True Positive
+- **Rationale**: The combination of impossible travel activity, use of malicious IPs, and a compromised domain strongly suggests unauthorized access to a high-privilege account.
+
+### Recommended Next Steps
+1. **Immediate Account Actions**:
+   - Suspend the account r.chen@contoso.com.
+   - Revoke all active sessions and reset the account password.
+   - Notify the user and their manager about the incident.
+
+2. **Network and Endpoint Actions**:
+   - Isolate any devices associated with the domain RChen-Laptop.contoso.com.
+   - Block the malicious IPs (91.234.56.78 and 203.0.113.25) at the network perimeter.
+   - Conduct a thorough scan of the network for any signs of lateral movement or additional compromised devices.
+
+3. **Monitoring and Follow-up**:
+   - Enable step-up MFA for the affected account and monitor for any further suspicious activity.
+   - Review sign-in logs for any other accounts showing similar impossible travel patterns.
+   - Document the incident and update security policies to prevent future occurrences.
+
+4. **Forensic and Incident Response**:
+   - Collect forensic artifacts from affected devices for further analysis.
+   - Engage with the incident response team to assess the full scope of the compromise and implement additional containment measures if necessary.

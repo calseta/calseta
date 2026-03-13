@@ -1,0 +1,71 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Classification:** Data Exfiltration via Tor Network  
+**Severity:** HIGH (Confirmed)  
+**Alert Type:** Anomalous Outbound Data Transfer
+
+This alert represents a high-severity security incident involving potential data exfiltration through Tor network infrastructure to a malicious domain.
+
+## Analysis of Enriched Indicators
+
+### IP Addresses (10.0.8.55 & 45.33.32.156)
+**Risk Level: CRITICAL**
+- Both IPs are confirmed Tor exit nodes operated by Zwiebelfreunde e.V.
+- AbuseIPDB shows maximum abuse confidence score (100%) with 2,847 reports
+- VirusTotal confirms malicious classification with negative reputation scores (-42)
+- Recent abuse reports (last reported 2026-03-06) indicate active malicious use
+- Zero previous sightings in internal network, indicating new threat vectors
+
+### Account (svc_backup)
+**Risk Level: HIGH**
+- **Critical Discrepancy:** Account name suggests service account ("svc_backup") but enrichment shows human user Jorge Martinez
+- User has elevated privileges: member of GlobalAdmins and AWS-ReadOnly groups
+- Account shows normal employment status but is on privileged access watchlist
+- Recent password change (2026-01-10) and active status with compliant devices
+- **Concern:** Potential account compromise or misuse of privileged credentials
+
+### Domain (suspicious-cloud-sync.com)
+**Risk Level: CRITICAL**
+- VirusTotal confirms malicious classification with C2 and malware tags
+- Negative reputation score (-15) with 8 malicious detections
+- Recently registered domain (late 2023) suggesting infrastructure setup for malicious purposes
+- Domain name designed to appear legitimate ("cloud-sync") - classic social engineering
+
+### URL (https://suspicious-cloud-sync.com/api/v2/upload)
+**Risk Level: HIGH**
+- Upload endpoint on confirmed malicious domain
+- API structure suggests automated data exfiltration capability
+- HTTPS encryption would obscure payload inspection
+
+## Overall Verdict: TRUE POSITIVE
+
+This is a confirmed security incident involving:
+1. Data exfiltration to a known malicious domain
+2. Use of Tor network for anonymization
+3. Potential compromise of privileged account credentials
+4. Connection to confirmed C2 infrastructure
+
+## Recommended Next Steps
+
+### Immediate Actions (0-15 minutes)
+1. **Isolate affected systems** - Network isolate any hosts associated with Jorge Martinez/svc_backup account
+2. **Block indicators** - Add suspicious-cloud-sync.com and both Tor IPs to firewall/proxy blocklists
+3. **Disable account** - Immediately disable svc_backup account pending investigation
+4. **Preserve evidence** - Retain all network flow logs, proxy logs, and endpoint telemetry
+
+### Investigation Phase (15 minutes - 4 hours)
+1. **Quantify data transfer** - Determine volume and content of data transferred to malicious domain
+2. **Timeline analysis** - Map account activity timeline around incident timeframe
+3. **Scope assessment** - Search for additional connections to suspicious-cloud-sync.com across environment
+4. **Account verification** - Confirm legitimate use of svc_backup account vs. Jorge Martinez credentials
+5. **DLP review** - Check for any triggered Data Loss Prevention policies
+
+### Recovery and Hardening
+1. **Forensic collection** - Image affected systems for detailed analysis
+2. **Credential reset** - Force password reset for Jorge Martinez and related accounts
+3. **Access review** - Audit privileged group memberships and remove unnecessary access
+4. **Monitoring enhancement** - Implement additional monitoring for Tor network connections
+
+**Priority:** This incident requires immediate escalation to incident response team due to confirmed data exfiltration and use of anonymization networks.

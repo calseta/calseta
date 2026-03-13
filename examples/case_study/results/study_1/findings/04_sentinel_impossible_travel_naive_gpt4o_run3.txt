@@ -1,0 +1,45 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Type:** Impossible travel activity detected
+- **Severity:** High
+- **Description:** User `r.chen@contoso.com` authenticated from two geographically distant locations (New York, US and Moscow, Russia) within a short timeframe, indicating potential account compromise. The account has Global Administrator privileges in Azure AD.
+
+#### Indicators of Compromise and Enrichment Results
+
+1. **IP Address: 91.234.56.78 (Moscow, Russia)**
+   - **VirusTotal:**
+     - **Reputation:** 0 (harmless)
+     - **ASN:** 49074 (Sc Technological Srl)
+     - **Last Analysis:** No malicious detections
+   - **AbuseIPDB:**
+     - **Abuse Confidence Score:** 0
+     - **Reports:** 0
+     - **Country:** Germany (DE)
+   - **Risk Assessment:** Low risk based on current data, but unusual location for the user.
+
+2. **IP Address: 203.0.113.25 (New York, US)**
+   - **VirusTotal:**
+     - **Reputation:** 0 (harmless)
+     - **Last Analysis:** No malicious detections
+   - **AbuseIPDB:**
+     - **Abuse Confidence Score:** 0
+     - **Reports:** 1 (reported for abuse attack)
+     - **Country:** Reserved IP space
+   - **Risk Assessment:** Low risk, but flagged for abuse in one report.
+
+3. **URL: https://portal.azure.com**
+   - **VirusTotal:**
+     - **Reputation:** 2 (mostly harmless)
+     - **Last Analysis:** No malicious detections
+   - **Risk Assessment:** Low risk, legitimate Microsoft Azure portal.
+
+#### Overall Verdict
+- **Needs Investigation:** The alert indicates potential account compromise due to impossible travel activity. While the IP addresses and URL do not show immediate malicious activity, the context of the alert and the high privilege level of the account warrant further investigation.
+
+#### Recommended Next Steps
+1. **Verify User Activity:** Contact the user `r.chen@contoso.com` to confirm if they were traveling or if the sign-ins were legitimate.
+2. **Review Account Security:** Check for any unauthorized changes or activities in the account settings, especially given the Global Administrator privileges.
+3. **Monitor for Further Anomalies:** Set up additional monitoring for the account and related IP addresses to detect any further suspicious activities.
+4. **Consider Password Reset:** If unauthorized access is suspected, initiate a password reset and review multi-factor authentication settings.
+5. **Investigate Network Logs:** Analyze network logs for any other suspicious activities related to the IP addresses involved.

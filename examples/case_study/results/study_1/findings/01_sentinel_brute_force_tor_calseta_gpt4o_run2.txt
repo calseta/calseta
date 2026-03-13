@@ -1,0 +1,60 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Title**: Brute force sign-in attempts from TOR network detected
+- **Severity**: High
+- **Status**: Open
+- **Source**: Sentinel
+- **Tags**: TOR, BruteForce, IdentityThreat
+
+The alert is classified as a high-severity identity threat due to brute force sign-in attempts originating from a TOR network, which is often used to anonymize malicious activities.
+
+### Analysis of Enriched Indicators
+
+#### ACCOUNT: j.martinez@contoso.com
+- **Malice Verdict**: Pending
+- **Risk Level**: Moderate
+  - The account is active and belongs to a Senior Engineer with access to sensitive groups such as 'GlobalAdmins' and 'Azure-Contributors'.
+  - No immediate signs of compromise, but the account's involvement in a brute force attempt raises concerns.
+  - Last password change was recent (2026-01-10), reducing the likelihood of a successful brute force attack if MFA is enabled.
+
+#### IP: 185.220.101.34
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+  - The IP is confirmed to be a TOR exit node with a high abuse confidence score (100) and numerous reports (2847).
+  - Classified as malicious by both AbuseIPDB and VirusTotal, indicating a high likelihood of involvement in malicious activities.
+
+#### DOMAIN: AAD-SIGNIN-SVC.contoso.com
+- **Malice Verdict**: Malicious
+- **Risk Level**: High
+  - The domain is associated with command and control (C2) activities and malware, as indicated by VirusTotal.
+  - The presence of tags such as 'c2' and 'malware' suggests it is used for malicious purposes.
+
+### Overall Verdict
+- **True Positive**: The alert is a true positive, given the malicious nature of the IP and domain involved, and the high-risk context of the brute force attempt.
+
+### Recommended Next Steps
+
+1. **Verify the Alert**:
+   - Confirm the source IP, target account, and timestamp are consistent with the alert details.
+
+2. **Immediate Response**:
+   - **Suspend the Account**: Temporarily suspend j.martinez@contoso.com to prevent potential unauthorized access.
+   - **Revoke Sessions**: Revoke all active sessions for the account to ensure no unauthorized access persists.
+   - **Reset Password**: Force a password reset for the account and ensure MFA is enabled.
+
+3. **Monitor and Block**:
+   - **Enable Step-up MFA**: Implement step-up MFA for the account and monitor for any further suspicious activity.
+   - **Block IP Range**: Create a conditional access policy to block the IP range associated with the TOR network.
+
+4. **Further Investigation**:
+   - **Review Sign-in History**: Check for any successful authentications from the suspicious IP within the last 24 hours.
+   - **Assess Lateral Movement**: Investigate if the account accessed any new resources or elevated privileges recently.
+
+5. **Network Security**:
+   - **Block Malicious Domain**: Add AAD-SIGNIN-SVC.contoso.com to the firewall block list to prevent any potential C2 communication.
+
+6. **User Notification**:
+   - Notify Jorge Martinez and his manager, Sunita Patel, about the incident and the actions taken.
+
+By following these steps, the organization can mitigate the risk of unauthorized access and potential data breaches resulting from this brute force attempt.

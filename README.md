@@ -59,22 +59,23 @@ The goal is agents that spend tokens on reasoning, not parsing.
 ```bash
 git clone https://github.com/calseta/calseta
 cd calseta
-cp .env.example .env
+cp .env.local.example .env
 docker compose up
 ```
 
-Three services start: API server (`localhost:8000`), MCP server (`localhost:8001`), PostgreSQL (`localhost:5432`).
+Three services start: API server (`localhost:8000`), MCP server (`localhost:8001`), PostgreSQL (`localhost:5432`). The admin UI is served at `localhost:8000` if you've run `make ui-build`.
 
 ```bash
-# Create an API key
-curl -X POST localhost:8000/v1/api-keys \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-agent"}'
+# Bootstrap your first admin API key
+docker compose exec api python -m app.cli.create_api_key \
+  --name my-admin --scopes admin
 
-# → {"key": "cai_...", "show_once": true}
+# Save the printed key (cai_...) — it's shown once, never again
 ```
 
-Full setup guide at `docs/DEVELOPMENT.md`. Production deployment at `docs/HOW_TO_DEPLOY.md`.
+API reference docs are available at `http://localhost:8000/redoc` once the stack is running.
+
+Full setup guide at `docs/architecture/DEVELOPMENT.md`. Production deployment at `docs/guides/HOW_TO_DEPLOY.md`.
 
 ---
 
@@ -203,12 +204,76 @@ A single enriched payload on every alert:
 | **MCP server** | Native MCP on port 8001. Works with any MCP-compatible agent or tool |
 | **Metrics API** | Alert volume, MTTD, false positive rates — accessible via REST and MCP |
 | **API key auth** | Scoped API keys for agent access |
+| **Admin UI** | Built-in dark-themed admin panel for triage, configuration, and monitoring |
+
+---
+
+## Admin UI
+
+Calseta ships with a built-in admin panel served from the same FastAPI container — no additional infrastructure required.
+
+The UI provides:
+- **Dashboard** — KPI cards and charts from the metrics API
+- **Alerts** — paginated list with filters, drill-down with indicators, findings, context, activity timeline, and raw payload viewer
+- **Workflows** — list, create, code editor, test sandbox, run history, and approval management
+- **Settings** — detection rules, context documents, source integrations, agent registrations, and API keys
+
+Authentication uses the same API keys as the REST API. Paste a `cai_` key to log in.
+
+The UI is a React SPA built with Vite. In production, it's compiled to static files and served by FastAPI at the root path. In development, Vite's dev server runs on port 5173 with hot reload and proxies API calls to the backend.
+
+```bash
+# Development (hot reload)
+make ui-dev          # http://localhost:5173
+
+# Production build (served at http://localhost:8000)
+make ui-build
+```
+
+---
+
+## Sandbox Mode
+
+Sandbox mode lets you explore the full platform with mock enrichment data and pre-seeded alerts — no real API keys required.
+
+**Enable it** by setting two env vars:
+
+```bash
+ENRICHMENT_MOCK_MODE=true
+SANDBOX_MODE=true
+```
+
+Then start normally:
+
+```bash
+docker compose up
+```
+
+**What you get:**
+- 4 mock enrichment providers (VirusTotal, AbuseIPDB, Okta, Entra) — deterministic responses, no HTTP calls
+- 5 pre-seeded alerts from Sentinel, Elastic, and Splunk with realistic scenarios (brute force, malware, impossible travel, data exfiltration, encoded PowerShell)
+- Detection rules with MITRE mappings and investigation documentation
+- Context documents (runbooks, SOPs, IR plans) matched to alerts via targeting rules
+- A public read-only API key: `cai_sandbox_demo_key_not_for_production`
+- Daily auto-reset at midnight UTC — user-created data is wiped and fixtures re-seeded
+
+**Manual seed/reset:**
+
+```bash
+# Seed sandbox data on an existing database
+docker compose exec api python -m app.cli.seed_sandbox
+
+# Or via Make
+make seed-sandbox
+```
+
+**Disable it** by removing or setting the env vars to `false`. The same Docker images are used — no separate sandbox build.
 
 ---
 
 ## Tech Stack
 
-Python 3.12 · FastAPI · PostgreSQL 15 · SQLAlchemy 2.0 async · Pydantic v2 · Alembic · procrastinate · httpx · MCP Python SDK · Docker
+Python 3.12 · FastAPI · PostgreSQL 15 · SQLAlchemy 2.0 async · Pydantic v2 · Alembic · procrastinate · httpx · MCP Python SDK · Docker · React 19 · Vite · Tailwind CSS · TanStack Query/Router
 
 ---
 
@@ -241,7 +306,7 @@ Contributions are welcome. The most valuable areas right now:
 
 See `CONTRIBUTING.md` for how to get started. Read `CLAUDE.md` and `PRD.md` before opening a PR — they cover architecture decisions, coding philosophy, and extension patterns.
 
-The platform is designed for extension. Both the alert source and enrichment provider systems use clean plugin interfaces — adding a new source or provider is one file with no core changes required. Full how-to guides (`docs/HOW_TO_ADD_ALERT_SOURCE.md`, `docs/HOW_TO_ADD_ENRICHMENT_PROVIDER.md`) and runnable example agents ship with the v1 release.
+The platform is designed for extension. Alert sources use a clean plugin interface — adding a new source is one file with no core changes required. Enrichment providers are database-driven — adding a new provider is a single API call or JSON config, with no code changes and no restart needed. Community providers are shared as JSON files and installed with one `curl` command. Full how-to guides (`docs/guides/HOW_TO_ADD_ALERT_SOURCE.md`, `docs/guides/HOW_TO_ADD_ENRICHMENT_PROVIDER.md`, `docs/project/COMMUNITY_INTEGRATIONS.md`) and runnable example agents ship with the v1 release.
 
 ---
 

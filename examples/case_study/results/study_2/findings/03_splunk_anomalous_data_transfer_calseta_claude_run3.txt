@@ -1,0 +1,84 @@
+# Security Alert Investigation Summary
+
+## Alert Classification and Severity Assessment
+
+**Classification:** Data Exfiltration via Tor Network  
+**Severity:** HIGH (Confirmed)  
+**Alert Type:** Anomalous Outbound Data Transfer
+
+This alert represents a high-severity data exfiltration incident involving the use of Tor infrastructure to anonymize malicious traffic. The combination of anomalous data volumes and connections to known malicious infrastructure indicates sophisticated threat actor activity.
+
+## Indicator Analysis
+
+### Malicious IP Addresses (10.0.8.55 & 45.33.32.156)
+**Risk Level: CRITICAL**
+- Both IPs are confirmed Tor exit nodes operated by Zwiebelfreunde e.V. (ASN 205100)
+- AbuseIPDB shows extremely high confidence scores (100%) with 2,847 total reports from 312 distinct users
+- VirusTotal confirms malicious classification with reputation scores of -42
+- Both tagged as 'tor' and 'proxy' infrastructure
+- Recent abuse reports (last reported 2026-03-06) indicate active malicious use
+- No previous sightings in internal network, confirming external threat
+
+### Compromised Account (svc_backup)
+**Risk Level: HIGH**
+- **Critical Discrepancy:** Account name "svc_backup" suggests a service account, but enrichment data shows human user "Jorge Martinez"
+- User has elevated privileges: member of 'GlobalAdmins' and 'Azure-Contributors' groups
+- Account shows normal employment status (active, full-time, no risk flags)
+- Last legitimate login: 2026-03-06T14:22:00.000Z (3 days before alert)
+- Password last changed: 2026-01-10 (nearly 2 months ago - potential stale credentials)
+- User on 'privileged_access' insider threat watchlist due to admin rights
+
+### Malicious Domain (suspicious-cloud-sync.com)
+**Risk Level: CRITICAL**
+- VirusTotal confirms malicious classification with reputation score of -15
+- Tagged as 'c2' (command and control) and 'malware' infrastructure
+- 8 security vendors classify as malicious, 1 as suspicious
+- Domain created: 2023-11-30 (relatively new registration)
+- Registrar: Namecheap Inc. (commonly used for malicious domains)
+
+### Suspicious URL (https://suspicious-cloud-sync.com/api/v2/upload)
+**Risk Level: HIGH**
+- Upload endpoint on confirmed malicious domain
+- API structure suggests automated data exfiltration capability
+- No enrichment data available, but inherits risk from parent domain
+
+## Timeline and Context Analysis
+
+- **Alert Occurrence:** 2024-03-01T15:00:00Z (business hours)
+- **User's Last Login:** 2026-03-06T14:22:00.000Z 
+- **Investigation Gap:** 5-day delay between incident and investigation
+- **Account Compromise Window:** Likely occurred between last legitimate login and alert time
+
+## Overall Verdict: TRUE POSITIVE
+
+This is a confirmed data exfiltration incident with the following evidence:
+1. **Confirmed malicious infrastructure** - Tor exit nodes and C2 domain
+2. **Privileged account compromise** - Admin-level service account used for exfiltration
+3. **Sophisticated evasion** - Use of Tor network to anonymize traffic
+4. **Active C2 communication** - Connection to known malware infrastructure
+
+## Recommended Next Steps
+
+### Immediate Actions (0-15 minutes)
+1. **Disable the svc_backup account** immediately to prevent further unauthorized access
+2. **Block malicious indicators** at firewall/proxy level:
+   - IPs: 10.0.8.55, 45.33.32.156
+   - Domain: suspicious-cloud-sync.com
+3. **Isolate Jorge Martinez's devices** (JMartinez-MBP, JMartinez-iPhone) pending investigation
+
+### Investigation Actions (15-60 minutes)
+1. **Quantify data loss** - Analyze proxy logs to determine volume and types of data transferred
+2. **Timeline reconstruction** - Review authentication logs for svc_backup account usage patterns
+3. **Lateral movement assessment** - Search for connections to malicious IPs from other internal hosts
+4. **DLP alert correlation** - Check for any Data Loss Prevention policy violations during the incident window
+
+### Containment and Recovery (1-4 hours)
+1. **Force password reset** for Jorge Martinez and audit all service accounts
+2. **Review privileged access** - Audit all members of GlobalAdmins and Azure-Contributors groups
+3. **Forensic collection** - Preserve network flow logs, proxy logs, and endpoint artifacts
+4. **Threat hunting** - Search environment for additional indicators of compromise related to this campaign
+
+### Follow-up Actions
+1. **Incident classification** as data breach pending data volume assessment
+2. **Legal/compliance notification** if sensitive data was exfiltrated
+3. **Security control review** - Evaluate service account management and monitoring gaps

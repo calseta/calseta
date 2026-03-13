@@ -1,0 +1,52 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Type:** Suspicious PowerShell Execution with Encoded Command
+- **Category:** Defense Evasion
+- **Severity:** High
+- **Risk Score:** 87
+
+#### Indicators of Compromise and Enrichment Results
+
+1. **Domain: `c2-relay.darkops.net`**
+   - **VirusTotal Analysis:** 
+     - **Malicious Detections:** 0
+     - **Suspicious Detections:** 0
+     - **Undetected:** 94
+     - **Reputation:** 0
+     - **Tags:** DGA (Domain Generation Algorithm)
+   - **Risk Assessment:** The domain is not flagged as malicious, but its association with DGA suggests potential use in automated malicious activities. Needs further investigation.
+
+2. **IP Address: `198.51.100.99`**
+   - **VirusTotal Analysis:**
+     - **Malicious Detections:** 0
+     - **Harmless Detections:** 58
+     - **Reputation:** 0
+     - **Tags:** Private
+   - **AbuseIPDB Analysis:**
+     - **Abuse Confidence Score:** 0
+     - **Total Reports:** 5 (Categories include Security Threats and Miscellaneous Attacks)
+   - **Risk Assessment:** The IP is reserved for documentation and sample configurations, not routable on the internet. Reports suggest misuse in test environments. Likely a false positive.
+
+3. **File Hash: `de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c`**
+   - **VirusTotal Analysis:**
+     - **Malicious Detections:** 0
+     - **Harmless Detections:** 71
+     - **Reputation:** 73
+     - **File Description:** Windows PowerShell executable, signed by Microsoft
+   - **Risk Assessment:** The file is a legitimate PowerShell executable signed by Microsoft. No malicious activity detected. Likely a false positive.
+
+4. **URL: `https://c2-relay.darkops.net/stager.ps1`**
+   - **VirusTotal Analysis:** Not found
+   - **Risk Assessment:** The URL could not be analyzed, suggesting it may be inactive or removed. Needs further investigation.
+
+#### Overall Verdict
+- **Verdict:** Needs Investigation
+  - The domain and URL require further scrutiny due to their potential association with command-and-control activities.
+  - The IP address and file hash appear to be false positives based on current data.
+
+#### Recommended Next Steps
+1. **Domain Investigation:** Conduct deeper analysis on `c2-relay.darkops.net` to determine its role in potential malicious activities.
+2. **URL Verification:** Attempt to access or retrieve historical data on `https://c2-relay.darkops.net/stager.ps1` to confirm its status and usage.
+3. **Network Monitoring:** Implement monitoring for any traffic to/from the domain and IP to detect unusual patterns.
+4. **Review PowerShell Usage:** Ensure PowerShell usage policies are enforced to prevent misuse of encoded commands and execution policy bypasses.

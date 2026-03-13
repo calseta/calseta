@@ -1,0 +1,55 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Title:** Brute force sign-in attempts from TOR network detected
+- **Description:** Multiple failed sign-in attempts from a known TOR exit node IP address targeting user account j.martinez@contoso.com. 47 failed attempts observed over a 15-minute window followed by one successful authentication.
+- **Severity:** High
+- **Classification:** Identity Threat, Brute Force, TOR
+
+#### Indicators of Compromise (IOCs) and Enrichment Results
+
+1. **IP Address:** 185.220.101.34
+   - **VirusTotal Results:**
+     - **Reputation:** -25
+     - **Malicious Detections:** 17 engines flagged as malicious
+     - **Tags:** TOR
+     - **ASN:** 60729 (Stiftung Erneuerbare Freiheit)
+     - **Country:** Germany
+   - **AbuseIPDB Results:**
+     - **Abuse Confidence Score:** 100
+     - **Total Reports:** 143
+     - **Usage Type:** Commercial (TOR Exit Node)
+     - **Last Reported:** 2026-03-07
+     - **Comments:** Reports of SSH brute force, web app attacks, and spam activities.
+
+2. **Account:** j.martinez@contoso.com
+   - **User Principal Name:** Julia Martinez
+   - **Domain:** contoso.com
+
+#### Risk Assessment for Each Indicator
+
+- **IP Address 185.220.101.34:**
+  - **Risk Level:** High
+  - **Reason:** The IP is a known TOR exit node with a high abuse confidence score and multiple reports of malicious activities including brute force attacks and web app probing.
+
+- **Account j.martinez@contoso.com:**
+  - **Risk Level:** High
+  - **Reason:** The account was targeted by a brute force attack from a malicious IP, indicating potential compromise.
+
+#### Overall Verdict
+- **Verdict:** True Positive
+- **Reason:** The IP address is confirmed to be involved in malicious activities, and the pattern of failed and successful login attempts suggests a successful brute force attack.
+
+#### Recommended Next Steps
+
+1. **Immediate Actions:**
+   - **Account Security:** Reset the password for j.martinez@contoso.com and enforce multi-factor authentication (MFA).
+   - **IP Blocking:** Block the IP address 185.220.101.34 at the network perimeter to prevent further access attempts.
+
+2. **Further Investigation:**
+   - **Log Analysis:** Review logs for any other suspicious activities related to the compromised account.
+   - **User Notification:** Inform the user about the incident and advise on security best practices.
+
+3. **Long-term Measures:**
+   - **Security Awareness:** Conduct training sessions on recognizing phishing attempts and securing accounts.
+   - **Network Monitoring:** Implement enhanced monitoring for unusual login patterns and TOR exit node traffic.

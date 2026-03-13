@@ -1,0 +1,49 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Type:** Suspicious PowerShell Execution with Encoded Command
+- **Category:** Defense Evasion
+- **Severity:** High
+- **Risk Score:** 87
+
+#### Indicators of Compromise and Enrichment Results
+
+1. **IP Address: 198.51.100.99**
+   - **VirusTotal:** No malicious detections; categorized as harmless by multiple engines.
+   - **AbuseIPDB:** Reserved IP address, not routable on the internet. Reported 5 times, but abuse confidence score is 0.
+   - **Risk Assessment:** Low risk due to being a reserved IP address used for documentation and sample configurations.
+
+2. **Domain: c2-relay.darkops.net**
+   - **VirusTotal:** Domain not found.
+   - **Risk Assessment:** Needs further investigation as the domain is not recognized by VirusTotal.
+
+3. **URL: https://c2-relay.darkops.net/stager.ps1**
+   - **VirusTotal:** URL not found.
+   - **Risk Assessment:** Needs further investigation due to lack of information.
+
+4. **File Hash: de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c**
+   - **VirusTotal:** No malicious detections; identified as a legitimate Microsoft PowerShell executable.
+   - **Risk Assessment:** Low risk as it is a signed Microsoft executable.
+
+#### Overall Verdict
+- **Verdict:** Needs Investigation
+  - The alert is triggered by suspicious PowerShell activity, but the key indicators (IP, domain, URL) do not show clear malicious activity. The domain and URL need further investigation due to lack of information.
+
+#### Recommended Next Steps
+1. **Investigate the Domain and URL:**
+   - Conduct a deeper investigation into the domain `c2-relay.darkops.net` and the URL `https://c2-relay.darkops.net/stager.ps1` using additional threat intelligence sources or internal logs.
+   - Check for any historical data or patterns associated with these indicators.
+
+2. **Review PowerShell Activity:**
+   - Analyze the PowerShell command execution on the host `DC01` to understand the context and intent.
+   - Check for any other related activities or anomalies on the host.
+
+3. **Monitor Network Traffic:**
+   - Set up monitoring for any outbound connections to the domain `c2-relay.darkops.net` and similar patterns.
+   - Ensure that the network is protected against potential command-and-control communications.
+
+4. **Update Security Policies:**
+   - Review and update security policies to detect and prevent encoded command execution and policy bypass attempts.
+
+5. **Engage with Security Teams:**
+   - Collaborate with security teams to assess the situation and determine if further action is required based on additional findings.

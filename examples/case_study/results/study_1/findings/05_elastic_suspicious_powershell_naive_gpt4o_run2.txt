@@ -1,0 +1,47 @@
+### Investigation Summary
+
+#### Alert Classification and Severity Assessment
+- **Alert Type:** Suspicious PowerShell Execution with Encoded Command
+- **Category:** Defense Evasion
+- **Severity:** High
+- **Risk Score:** 87
+
+#### Indicators of Compromise and Enrichment Results
+
+1. **Domain:** `c2-relay.darkops.net`
+   - **VirusTotal:** Not found
+   - **Risk Assessment:** Needs further investigation as it is associated with a suspicious activity but not found in VirusTotal.
+
+2. **IP Address:** `198.51.100.99`
+   - **VirusTotal:** 
+     - Reputation: 0 (harmless)
+     - Tags: Reserved for documentation and sample configurations
+     - Last Analysis: Clean by multiple engines
+   - **AbuseIPDB:**
+     - Abuse Confidence Score: 0
+     - Usage Type: Reserved
+     - Reports: 5 (various categories including security threat)
+   - **Risk Assessment:** False Positive. This IP is reserved for documentation and should not be used in live configurations.
+
+3. **URL:** `https://c2-relay.darkops.net/stager.ps1`
+   - **VirusTotal:** Not found
+   - **Risk Assessment:** Needs further investigation as it is associated with a suspicious activity but not found in VirusTotal.
+
+4. **File Hash (SHA256):** `de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c`
+   - **VirusTotal:**
+     - File Type: Microsoft Visual C++ compiled executable
+     - Signature: Verified, signed by Microsoft
+     - Last Analysis: Clean by multiple engines
+     - Sandbox Verdict: Zenbox categorized it as malicious (MALWARE, EVADER)
+   - **Risk Assessment:** Needs Investigation. Although signed by Microsoft, sandbox analysis indicates potential malicious behavior.
+
+#### Overall Verdict
+- **Verdict:** Needs Investigation
+  - The alert involves a suspicious PowerShell execution attempting to download a payload from a domain not found in VirusTotal, and the IP used is reserved for documentation purposes. The file hash is signed by Microsoft but flagged by a sandbox as potentially malicious.
+
+#### Recommended Next Steps
+1. **Domain Investigation:** Conduct further investigation on `c2-relay.darkops.net` to determine its legitimacy and any associated malicious activities.
+2. **File Analysis:** Perform a deeper analysis of the file associated with the hash `de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c` using additional sandbox environments and manual inspection.
+3. **Network Monitoring:** Ensure that the network does not route traffic to reserved IP addresses like `198.51.100.99`.
+4. **PowerShell Command Review:** Decode and analyze the PowerShell command to understand its intent and any potential impact on the system.
+5. **User and Host Monitoring:** Monitor the host `DC01` and the user `SYSTEM` for any further suspicious activities.

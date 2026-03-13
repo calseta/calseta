@@ -1,0 +1,66 @@
+[
+  {
+    "provider_name": "greynoise",
+    "indicator_type": "ip",
+    "source_path": "ip",
+    "target_key": "ip",
+    "value_type": "string",
+    "description": "Queried IP address"
+  },
+  {
+    "provider_name": "greynoise",
+    "indicator_type": "ip",
+    "source_path": "noise",
+    "target_key": "is_noise",
+    "value_type": "bool",
+    "description": "Whether the IP is seen as internet background noise (mass-scanning)"
+  },
+  {
+    "provider_name": "greynoise",
+    "indicator_type": "ip",
+    "source_path": "riot",
+    "target_key": "is_riot",
+    "value_type": "bool",
+    "description": "Whether the IP belongs to a known benign service (RIOT dataset)"
+  },
+  {
+    "provider_name": "greynoise",
+    "indicator_type": "ip",
+    "source_path": "classification",
+    "target_key": "classification",
+    "value_type": "string",
+    "description": "GreyNoise classification: benign, malicious, or unknown"
+  },
+  {
+    "provider_name": "greynoise",
+    "indicator_type": "ip",
+    "source_path": "name",
+    "target_key": "actor_name",
+    "value_type": "string",
+    "description": "Name of the actor or service associated with the IP"
+  },
+  {
+    "provider_name": "greynoise",
+    "indicator_type": "ip",
+    "source_path": "link",
+    "target_key": "visualizer_link",
+    "value_type": "string",
+    "description": "Link to the GreyNoise visualizer for this IP"
+  },
+  {
+    "provider_name": "greynoise",
+    "indicator_type": "ip",
+    "source_path": "last_seen",
+    "target_key": "last_seen",
+    "value_type": "string",
+    "description": "Last time the IP was observed by GreyNoise"
+  },
+  {
+    "provider_name": "greynoise",
+    "indicator_type": "ip",
+    "source_path": "message",
+    "target_key": "message",
+    "value_type": "string",
+    "description": "GreyNoise status message for this IP"
+  }
+]

@@ -1,0 +1,40 @@
+"""
+SQSBackend — stub.
+
+Not implemented. See docs/architecture/QUEUE_BACKENDS.md for switching instructions.
+"""
+
+from __future__ import annotations
+
+from app.queue.base import QueueMetrics, TaskQueueBase, TaskStatus
+
+
+class SQSBackend(TaskQueueBase):
+    async def enqueue(
+        self,
+        task_name: str,
+        payload: dict[str, object],
+        *,
+        queue: str,
+        delay_seconds: int = 0,
+        priority: int = 0,
+    ) -> str:
+        raise NotImplementedError(
+            "Set QUEUE_BACKEND=postgres or see docs/architecture/QUEUE_BACKENDS.md"
+        )
+
+    async def get_task_status(self, task_id: str) -> TaskStatus:
+        raise NotImplementedError(
+            "Set QUEUE_BACKEND=postgres or see docs/architecture/QUEUE_BACKENDS.md"
+        )
+
+    async def get_queue_metrics(self) -> QueueMetrics:
+        raise NotImplementedError(
+            "Queue metrics not implemented for this backend. "
+            "Set QUEUE_BACKEND=postgres or see docs/architecture/QUEUE_BACKENDS.md"
+        )
+
+    async def start_worker(self, queues: list[str]) -> None:
+        raise NotImplementedError(
+            "Set QUEUE_BACKEND=postgres or see docs/architecture/QUEUE_BACKENDS.md"
+        )

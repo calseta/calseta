@@ -1,0 +1,68 @@
+## Investigation Summary
+
+### Alert Classification and Severity Assessment
+- **Alert Type:** Impossible Travel Detection (Identity-based threat)
+- **Severity:** HIGH ✅ (Confirmed appropriate)
+- **Classification:** True Positive - Suspicious Activity Detected
+- **MITRE ATT&CK Techniques:** T1078 (Valid Accounts), T1078.004 (Cloud Accounts)
+
+### Indicators of Compromise Analysis
+
+#### 1. IP Address: 91.234.56.78 (Moscow, Russia)
+**Risk Assessment: MEDIUM-HIGH** ⚠️
+- **VirusTotal:** Clean (0/94 detections) but hosted in Germany, not Russia as claimed
+- **AbuseIPDB:** Clean (0% abuse confidence, 0 reports)
+- **ASN:** AS49074 (SC Technological SRL) - Romanian hosting provider
+- **Geolocation Discrepancy:** Alert claims Moscow, Russia but WHOIS shows Germany/Romania
+- **Concern:** VPS/Cloud hosting service commonly used for anonymization
+
+#### 2. IP Address: 203.0.113.25 (New York, US)
+**Risk Assessment: CRITICAL** 🚨
+- **VirusTotal:** Clean but flagged as "private" address
+- **AbuseIPDB:** Reserved/Documentation IP range (RFC 5737)
+- **Major Red Flag:** This is a TEST-NET-3 documentation IP that should never appear in real traffic
+- **Verdict:** This IP indicates either a testing scenario or data fabrication
+
+#### 3. User Account: r.chen@contoso.com (Robert Chen)
+**Risk Assessment: HIGH** ⚠️
+- **Privileges:** Global Administrator (highest risk)
+- **Account ID:** f9e8d7c6-b5a4-3210-9876-543210fedcba
+- **Domain:** contoso.com (Microsoft's example domain)
+- **Concern:** High-privilege account with impossible travel pattern
+
+#### 4. URL: https://portal.azure.com
+**Risk Assessment: LOW** ✅
+- **VirusTotal:** Clean (0/95 detections)
+- **Reputation:** Legitimate Microsoft Azure portal
+- **Status:** No security concerns
+
+### Key Findings
+
+1. **Geographic Inconsistency:** The Moscow IP (91.234.56.78) actually resolves to a German/Romanian hosting provider, not Russia
+2. **Documentation IP Usage:** 203.0.113.25 is a reserved documentation IP that should never appear in production
+3. **High-Risk Account:** Global Administrator privileges make this a critical security concern
+4. **Hosting Infrastructure:** The suspicious IP uses VPS hosting commonly associated with anonymization
+
+### Overall Verdict: **NEEDS INVESTIGATION** 🔍
+
+**Reasoning:**
+- The presence of a documentation IP (203.0.113.25) suggests this may be test data or a fabricated scenario
+- However, if this is production data, the impossible travel pattern with a high-privilege account represents a serious security threat
+- Geographic discrepancies in IP geolocation require further investigation
+
+### Recommended Next Steps
+
+**Immediate Actions:**
+1. **Verify Alert Authenticity** - Confirm if this is production data or test/training scenario
+2. **Account Security Review** - If real, immediately review r.chen@contoso.com account activity
+3. **IP Investigation** - Investigate why 91.234.56.78 shows geographic inconsistencies
+4. **Access Review** - Check for any unauthorized access or privilege escalation
+
+**If Production Alert:**
+1. **Force Password Reset** - Immediately reset r.chen@contoso.com credentials
+2. **Revoke Sessions** - Terminate all active sessions for the account
+3. **Enable MFA** - Ensure multi-factor authentication is enforced
+4. **Audit Logs** - Review all activities performed by this account during the timeframe
+5. **Network Analysis** - Block or monitor traffic from 91.234.56.78
+
+**Investigation Priority:** HIGH (due to Global Admin privileges and impossible travel pattern)
