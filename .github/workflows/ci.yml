@@ -30,6 +30,28 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: make lint
       - run: make typecheck
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test
+        run: alembic upgrade head
+      - name: Apply procrastinate schema
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test
+        run: |
+          python -c "
+          import asyncio
+          from app.queue.registry import procrastinate_app
+          async def _apply():
+              try:
+                  async with procrastinate_app.open_async():
+                      await procrastinate_app.schema_manager.apply_schema_async()
+              except Exception as e:
+                  if 'already exists' in str(e):
+                      print('Procrastinate schema already applied.')
+                  else:
+                      raise
+          asyncio.run(_apply())
+          " || true
       - run: make test
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test
