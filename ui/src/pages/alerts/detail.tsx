@@ -471,15 +471,19 @@ export function AlertDetailPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="bg-surface border border-border">
               <TabsTrigger value="indicators" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Shield className="h-3.5 w-3.5 mr-1" />
                 Indicators ({alert.indicators?.length ?? 0})
               </TabsTrigger>
               <TabsTrigger value="findings" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Zap className="h-3.5 w-3.5 mr-1" />
                 Findings ({alert.agent_findings?.length ?? 0})
               </TabsTrigger>
               <TabsTrigger value="context" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <FileText className="h-3.5 w-3.5 mr-1" />
                 Context ({contextDocs.length})
               </TabsTrigger>
               <TabsTrigger value="activity" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Activity className="h-3.5 w-3.5 mr-1" />
                 Activity ({activities.length})
               </TabsTrigger>
               <TabsTrigger value="ads" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">

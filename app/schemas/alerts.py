@@ -90,7 +90,10 @@ class AlertSummary(BaseModel):
     is_enriched: bool
     duplicate_count: int = 0
     tags: list[str]
+    close_classification: str | None = None
+    closed_at: datetime | None = None
     created_at: datetime
+    updated_at: datetime
 
 
 class AlertPatch(BaseModel):

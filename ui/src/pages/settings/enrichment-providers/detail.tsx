@@ -72,6 +72,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Settings,
 } from "lucide-react";
 
 
@@ -676,12 +677,15 @@ export function EnrichmentProviderDetailPage() {
           <Tabs defaultValue="configuration" className="w-full">
             <TabsList className="bg-surface border border-border">
               <TabsTrigger value="configuration" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Settings className="h-3.5 w-3.5 mr-1" />
                 Configuration
               </TabsTrigger>
               <TabsTrigger value="extractions" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <FileCode2 className="h-3.5 w-3.5 mr-1" />
                 Field Extractions
               </TabsTrigger>
               <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Beaker className="h-3.5 w-3.5 mr-1" />
                 Test
               </TabsTrigger>
               <TabsTrigger value="docs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">

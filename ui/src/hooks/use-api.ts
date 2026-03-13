@@ -25,6 +25,7 @@ import type {
   IndicatorFieldMapping,
   TestExtractionResult,
   ApprovalDefaults,
+  DetectionRuleMetrics,
 } from "@/lib/types";
 
 // Settings
@@ -354,6 +355,15 @@ export function useDetectionRule(uuid: string) {
   return useQuery({
     queryKey: ["detection-rule", uuid],
     queryFn: () => api.get<DataResponse<DetectionRule>>(`/detection-rules/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function useDetectionRuleMetrics(uuid: string) {
+  return useQuery({
+    queryKey: ["detection-rule-metrics", uuid],
+    queryFn: () =>
+      api.get<DataResponse<DetectionRuleMetrics>>(`/detection-rules/${uuid}/metrics`),
     enabled: !!uuid,
   });
 }

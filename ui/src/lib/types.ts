@@ -56,7 +56,10 @@ export interface AlertSummary {
   is_enriched: boolean;
   duplicate_count: number;
   tags: string[];
+  close_classification: string | null;
+  closed_at: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface AlertResponse extends AlertSummary {
@@ -507,4 +510,25 @@ export interface HealthResponse {
   queue: string;
   queue_depth: number;
   enrichment_providers: Record<string, string>;
+}
+
+export interface DetectionRuleMetrics {
+  detection_rule_uuid: string;
+  detection_rule_name: string;
+  period_from: string;
+  period_to: string;
+  total_alerts: number;
+  active_alerts: number;
+  alerts_by_status: Record<string, number>;
+  alerts_by_severity: Record<string, number>;
+  false_positive_rate: number;
+  true_positive_rate: number;
+  close_classifications: Record<string, number>;
+  alerts_over_time: { date: string; count: number }[];
+  fp_over_time: { date: string; count: number }[];
+  mtta_seconds: number | null;
+  mttc_seconds: number | null;
+  severity_distribution: Record<string, number>;
+  top_indicators: { type: string; value: string; count: number; malice: string }[];
+  alert_sources: Record<string, number>;
 }

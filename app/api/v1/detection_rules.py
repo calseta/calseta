@@ -6,10 +6,12 @@ POST   /v1/detection-rules             — Create a rule
 GET    /v1/detection-rules/{uuid}      — Get rule by UUID
 PATCH  /v1/detection-rules/{uuid}      — Update a rule
 DELETE /v1/detection-rules/{uuid}      — Delete a rule
+GET    /v1/detection-rules/{uuid}/metrics — Per-rule effectiveness metrics
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -27,11 +29,13 @@ from app.db.session import get_db
 from app.middleware.rate_limit import limiter
 from app.repositories.detection_rule_repository import DetectionRuleRepository
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
+from app.schemas.detection_rule_metrics import DetectionRuleMetricsResponse
 from app.schemas.detection_rules import (
     DetectionRuleCreate,
     DetectionRulePatch,
     DetectionRuleResponse,
 )
+from app.services.detection_rule_metrics import compute_detection_rule_metrics
 
 router = APIRouter(prefix="/detection-rules", tags=["detection-rules"])
 
@@ -171,3 +175,46 @@ async def delete_detection_rule(
             status_code=status.HTTP_404_NOT_FOUND,
         )
     await repo.delete(rule)
+
+
+# ------------------------------------------------------------------
+# Metrics
+# ------------------------------------------------------------------
+
+
+@router.get(
+    "/{rule_uuid}/metrics",
+    response_model=DataResponse[DetectionRuleMetricsResponse],
+)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def get_detection_rule_metrics(
+    request: Request,
+    rule_uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    from_time: datetime | None = Query(None, alias="from"),
+    to_time: datetime | None = Query(None, alias="to"),
+) -> DataResponse[DetectionRuleMetricsResponse]:
+    """Per-detection-rule effectiveness metrics (FP/TP rate, volume, trends)."""
+    repo = DetectionRuleRepository(db)
+    rule = await repo.get_by_uuid(rule_uuid)
+    if rule is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Detection rule not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    now = datetime.now(UTC)
+    resolved_from = from_time if from_time else now - timedelta(days=30)
+    resolved_to = to_time if to_time else now
+
+    metrics = await compute_detection_rule_metrics(
+        db=db,
+        detection_rule_id=rule.id,
+        detection_rule_uuid=rule.uuid,
+        detection_rule_name=rule.name,
+        from_time=resolved_from,
+        to_time=resolved_to,
+    )
+    return DataResponse(data=metrics)

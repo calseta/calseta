@@ -35,8 +35,10 @@ import { CopyableText } from "@/components/copyable-text";
 import { useDetectionRule, usePatchDetectionRule } from "@/hooks/use-api";
 import { formatDate, severityColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Shield, AlertTriangle, Radio, FileText, Settings, Save, Loader2, X, Plus } from "lucide-react";
+import { Shield, AlertTriangle, Radio, FileText, Settings, Save, Loader2, X, Plus, BarChart3, Bell } from "lucide-react";
 import type { DetectionRule } from "@/lib/types";
+import { DetectionRuleMetricsTab } from "./metrics-tab";
+import { DetectionRuleAlertsTab } from "./alerts-tab";
 
 const SEVERITY_OPTIONS = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
 
@@ -465,6 +467,14 @@ export function DetectionRuleDetailPage() {
                 <FileText className="h-3.5 w-3.5 mr-1" />
                 Documentation
               </TabsTrigger>
+              <TabsTrigger value="alerts" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Bell className="h-3.5 w-3.5 mr-1" />
+                Alerts
+              </TabsTrigger>
+              <TabsTrigger value="metrics" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                Metrics
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="documentation" className="mt-4">
@@ -474,6 +484,14 @@ export function DetectionRuleDetailPage() {
                 isSaving={patchRule.isPending}
                 templateContent={buildDocumentationTemplate(rule)}
               />
+            </TabsContent>
+
+            <TabsContent value="alerts" className="mt-4">
+              <DetectionRuleAlertsTab ruleUuid={uuid} />
+            </TabsContent>
+
+            <TabsContent value="metrics" className="mt-4">
+              <DetectionRuleMetricsTab uuid={uuid} />
             </TabsContent>
           </Tabs>
         </DetailPageLayout>

@@ -769,12 +769,15 @@ export function WorkflowDetailPage() {
           <Tabs defaultValue={initialTab}>
             <TabsList className="bg-surface border border-border">
               <TabsTrigger value="code" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <FileCode className="h-3.5 w-3.5 mr-1" />
                 Code
               </TabsTrigger>
               <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <FlaskConical className="h-3.5 w-3.5 mr-1" />
                 Test
               </TabsTrigger>
               <TabsTrigger value="runs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Play className="h-3.5 w-3.5 mr-1" />
                 Runs ({runs.length})
               </TabsTrigger>
               <TabsTrigger value="docs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
