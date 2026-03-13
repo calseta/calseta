@@ -253,7 +253,7 @@ def _patch_session() -> tuple[type, AsyncMock]:
     return _FakeCtx, mock_session
 
 
-def _patch_scope(module: str):
+def _patch_scope(module: str) -> Any:
     """Patch check_scope to always pass in the given resource module."""
     return patch(
         f"app.mcp.resources.{module}.check_scope",

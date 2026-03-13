@@ -30,12 +30,12 @@ _SENSITIVE_KEYS = frozenset({
 })
 
 
-def _sanitize_references(refs: dict | None) -> dict | None:
+def _sanitize_references(refs: dict | None) -> dict[str, object] | None:
     """Remove potentially sensitive values from activity event references."""
     if refs is None:
         return None
 
-    sanitized = {}
+    sanitized: dict[str, object] = {}
     for key, value in refs.items():
         # Redact keys that look like secrets
         is_sensitive_key = key.lower() in _SENSITIVE_KEYS

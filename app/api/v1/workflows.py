@@ -455,7 +455,7 @@ async def execute_workflow(
     run_repo = WorkflowRunRepository(db)
     run = await run_repo.create(
         workflow_id=workflow.id,
-        trigger_type=body.trigger_source,
+        trigger_type=trigger_source,
         trigger_context=trigger_context,
         code_version_executed=workflow.code_version,
         status="queued",

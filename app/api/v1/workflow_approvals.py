@@ -155,17 +155,17 @@ async def get_approval_request(
     from app.db.models.workflow_approval_request import WorkflowApprovalRequest as WAR
 
     result = await db.execute(select(WAR).where(WAR.uuid == approval_uuid))
-    request = result.scalar_one_or_none()
-    if request is None:
+    approval = result.scalar_one_or_none()
+    if approval is None:
         raise CalsetaException(
             code="NOT_FOUND",
             message=f"Approval request {approval_uuid} not found",
             status_code=status.HTTP_404_NOT_FOUND,
         )
-    await _materialize_expired([request], db)
-    resp = WorkflowApprovalRequestResponse.model_validate(request)
+    await _materialize_expired([approval], db)
+    resp = WorkflowApprovalRequestResponse.model_validate(approval)
     wf_result = await db.execute(
-        select(Workflow.name, Workflow.uuid).where(Workflow.id == request.workflow_id)
+        select(Workflow.name, Workflow.uuid).where(Workflow.id == approval.workflow_id)
     )
     wf_row = wf_result.one_or_none()
     if wf_row:
@@ -209,7 +209,7 @@ async def approve_workflow(
             key_name = key_row
 
         responder = (body.responder_id if body else None) or str(auth.key_prefix)
-        request = await process_approval_decision(
+        approval = await process_approval_decision(
             approval_uuid=approval_uuid,
             approved=True,
             responder_id=responder,
@@ -218,7 +218,7 @@ async def approve_workflow(
             actor_key_name=key_name,
         )
         await db.commit()
-        await db.refresh(request)
+        await db.refresh(approval)
     except ValueError as exc:
         err_msg = str(exc)
         if "expired" in err_msg.lower():
@@ -239,7 +239,7 @@ async def approve_workflow(
             status_code=status.HTTP_404_NOT_FOUND,
         ) from exc
 
-    return DataResponse(data=WorkflowApprovalRequestResponse.model_validate(request))
+    return DataResponse(data=WorkflowApprovalRequestResponse.model_validate(approval))
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ async def reject_workflow(
             key_name = key_row
 
         responder = (body.responder_id if body else None) or str(auth.key_prefix)
-        request = await process_approval_decision(
+        approval = await process_approval_decision(
             approval_uuid=approval_uuid,
             approved=False,
             responder_id=responder,
@@ -285,7 +285,7 @@ async def reject_workflow(
             actor_key_name=key_name,
         )
         await db.commit()
-        await db.refresh(request)
+        await db.refresh(approval)
     except ValueError as exc:
         err_msg = str(exc)
         if "expired" in err_msg.lower():
@@ -306,4 +306,4 @@ async def reject_workflow(
             status_code=status.HTTP_404_NOT_FOUND,
         ) from exc
 
-    return DataResponse(data=WorkflowApprovalRequestResponse.model_validate(request))
+    return DataResponse(data=WorkflowApprovalRequestResponse.model_validate(approval))
