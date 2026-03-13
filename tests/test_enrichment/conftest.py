@@ -1,13 +1,14 @@
 """
 Fixtures for enrichment API tests.
 
-Re-exports scoped API key fixtures needed by test_enrichment_api.py.
+Provides scoped API key fixtures and enrichment registry seeding
+needed by test_enrichment_api.py.
 """
 
 from __future__ import annotations
 
 import secrets
-from collections.abc import Callable, Coroutine
+from collections.abc import AsyncGenerator, Callable, Coroutine
 from typing import Any
 
 import bcrypt
@@ -15,6 +16,27 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.api_key import APIKey
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _seed_enrichment_providers(db_session: AsyncSession) -> AsyncGenerator[None, None]:
+    """Seed builtin enrichment providers and load the registry before each test."""
+    from app.integrations.enrichment.registry import enrichment_registry
+    from app.seed.enrichment_providers import (
+        seed_builtin_field_extractions,
+        seed_builtin_providers,
+    )
+
+    try:
+        await seed_builtin_providers(db_session)
+        await seed_builtin_field_extractions(db_session)
+        await db_session.flush()
+        await enrichment_registry.load_from_database(db_session)
+    except Exception:
+        pass  # Table may not exist in some test configs
+    yield
+    # Clear registry after test to avoid cross-test contamination
+    enrichment_registry._providers.clear()
 
 
 @pytest_asyncio.fixture  # type: ignore[type-var]
