@@ -28,6 +28,30 @@ The deterministic pipeline is never altered. LLM features are power tools for hu
 
 ---
 
+## Progress Overview
+
+| Chunk | Name | Wave | Status |
+|-------|------|------|--------|
+| A.1 | Detection Rule Metrics Service + API | A | COMPLETE |
+| A.2 | Detection Rule Metrics Tab (DnD) | A | COMPLETE |
+| A.3 | Detection Rule Alerts Tab | A | COMPLETE |
+| B.1 | LLM Provider DB Model + Migration | B | Pending |
+| B.2 | LLM Provider Repository + Schemas | B | Pending |
+| B.3 | LLM Provider API Routes | B | Pending |
+| B.4 | LLM Provider Settings Page (UI) | B | Pending |
+| B.5 | Migrate Workflow Generator to Multi-Provider | B | Pending |
+| C.1 | Prompt DB Model + Migration + Seed | C | Pending |
+| C.2 | Prompt Repository + Schemas + API | C | Pending |
+| C.3 | Prompt Management UI | C | Pending |
+| D.1 | Rule Tuning Analysis Service | D | Pending |
+| D.2 | Rule Tuning Analysis UI | D | Pending |
+| E.1 | Workflow Generator → DB Prompts | E | Pending |
+| E.2 | Iterative Workflow Generation UX | E | Pending |
+
+**Progress: 3 / 15 chunks complete (Wave A)**
+
+---
+
 ## Wave Overview
 
 | Wave | Name | Description | Depends On |
