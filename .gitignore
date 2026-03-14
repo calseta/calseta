@@ -47,9 +47,11 @@ postgres_data/
 .mcp.local.json
 .mcp.json
 
-# Admin UI build output
+# Admin UI
 ui/dist/
+ui/dist-ssr/
 ui/node_modules/
+ui/.vite/
 
 # Personal testing notes
 JC-TODO.md

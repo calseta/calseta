@@ -51,11 +51,13 @@ COPY . .
 # ============================================================
 FROM base AS prod
 
-COPY pyproject.toml .
-RUN pip install --no-cache-dir .
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 
-# Copy application source
+# Copy source first — pip install needs the package
+COPY pyproject.toml .
 COPY app/ app/
+RUN pip install --no-cache-dir .
 
 # Copy Alembic config and migrations (needed for containers that run migrations)
 COPY alembic.ini* ./
