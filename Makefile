@@ -127,6 +127,7 @@ lab:
 	docker compose run --rm -e SANDBOX_MODE=true -e ENRICHMENT_MOCK_MODE=true api python -m app.cli.seed_sandbox
 	@echo "Starting backend services..."
 	docker compose up -d api worker mcp
+	@-pkill -f "vite" 2>/dev/null || true
 	@cd ui && npm install --silent 2>/dev/null && nohup npm run dev > /dev/null 2>&1 &
 	@echo ""
 	@echo "=== Calseta Lab ==="
@@ -143,6 +144,7 @@ lab:
 
 # Wipe everything and re-seed from scratch
 lab-reset:
+	@-pkill -f "vite" 2>/dev/null || true
 	docker compose down -v
 	$(MAKE) lab
 

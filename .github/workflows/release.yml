@@ -17,9 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -30,47 +27,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push API image
+      - name: Build and push image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
           target: prod
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           build-args: |
             APP_VERSION=${{ github.ref_name }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/calseta-api:${{ github.ref_name }}
-            ghcr.io/${{ github.repository_owner }}/calseta-api:latest
-
-      - name: Build and push Worker image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: Dockerfile.worker
-          target: prod
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: |
-            APP_VERSION=${{ github.ref_name }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/calseta-worker:${{ github.ref_name }}
-            ghcr.io/${{ github.repository_owner }}/calseta-worker:latest
-
-      - name: Build and push MCP image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: Dockerfile.mcp
-          target: prod
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: |
-            APP_VERSION=${{ github.ref_name }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/calseta-mcp:${{ github.ref_name }}
-            ghcr.io/${{ github.repository_owner }}/calseta-mcp:latest
+            ghcr.io/${{ github.repository_owner }}/calseta:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/calseta:latest
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
