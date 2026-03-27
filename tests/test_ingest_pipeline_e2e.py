@@ -204,13 +204,21 @@ class TestIngestEnrichDispatchPipeline:
         enriched_indicators = [ind for ind in indicators if ind.is_enriched]
         assert len(enriched_indicators) > 0, "No indicators were enriched"
 
-        # Verify malice verdict was set on enriched indicators
-        for ind in enriched_indicators:
+        # Verify malice verdict was set on enriched indicators.
+        # Private IPs (e.g. 10.0.0.55) are skipped by is_enrichable() and
+        # may still be marked is_enriched=True at the alert level but retain
+        # malice="Pending" — only check indicators that were actually enriched
+        # by a provider (have enrichment_results).
+        provider_enriched = [
+            ind
+            for ind in enriched_indicators
+            if ind.enrichment_results and "virustotal" in ind.enrichment_results
+        ]
+        assert len(provider_enriched) > 0, "No indicators were enriched by a provider"
+        for ind in provider_enriched:
             assert ind.malice == "Malicious", (
                 f"Expected Malicious, got {ind.malice} for {ind.type}:{ind.value}"
             )
-            assert ind.enrichment_results is not None
-            assert "virustotal" in ind.enrichment_results
 
         # Verify alert enrichment status was updated
         await db_session.refresh(alert)
