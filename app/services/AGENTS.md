@@ -13,10 +13,10 @@
 ### Enrichment Pipeline (async, worker process)
 - Entry: `enrichment.py:EnrichmentService.enrich_alert(alert_id)`
 - Steps: load indicators -> enrich_indicator() per indicator (concurrent) -> update indicator enrichment_results/malice -> mark alert enriched -> write activity event
-- Call graph per indicator: `enrich_indicator()` -> `is_enrichable()` (indicator_validation.py) -> `enrichment_registry.list_for_type()` -> cache check -> `provider.enrich()` (DatabaseDrivenProvider) -> `GenericHttpEnrichmentEngine.execute()` (enrichment_engine.py) -> `TemplateResolver` + `FieldExtractor` + `MaliceRuleEvaluator` (enrichment_pipeline/ subpackage)
+- Call graph per indicator: `enrich_indicator()` -> `is_enrichable()` (indicator_validation.py) -> `enrichment_registry.list_for_type()` -> cache check -> `provider.enrich()` (DatabaseDrivenProvider) -> `EnrichmentPipeline.run()` (enrichment_pipeline/) -> `TemplateResolver` + `GenericHttpEnrichmentEngine` + `FieldExtractor` + `MaliceRuleEvaluator` (all internal to enrichment_pipeline/)
 - Key seams: Cache miss triggers live HTTP call; `_worst_malice()` aggregates across providers; `provider.enrich()` never raises (contract)
-- To debug: Check `is_enrichable()` first (skips private IPs, localhost). Then check provider `is_configured()`. Then trace HTTP execution in enrichment_engine.py
-- To extend: Add enrichment provider via DB seed or `POST /v1/enrichment-providers` -- zero code changes. Add new malice logic in malice_evaluator.py
+- To debug: Check `is_enrichable()` first (skips private IPs, localhost). Then check provider `is_configured()`. Then trace HTTP execution in `enrichment_pipeline/engine.py`
+- To extend: Add enrichment provider via DB seed or `POST /v1/enrichment-providers` -- zero code changes. Add new malice logic in `enrichment_pipeline/malice_evaluator.py`
 
 ### Indicator Extraction (3-pass, called from worker task)
 - Entry: `indicator_extraction.py:IndicatorExtractionService.extract_and_persist()`
@@ -40,7 +40,13 @@
 |------|------|-------|
 | alert_ingestion.py | 8-step ingest pipeline | AlertRepository, DetectionRuleService, extract_for_fingerprint, ActivityEventService, TaskQueueBase |
 | enrichment.py | Cache-first enrichment orchestration, alert-level enrichment | enrichment_registry, IndicatorRepository, AlertRepository, CacheBackendBase |
-| enrichment_engine.py | Multi-step HTTP execution for providers | TemplateResolver, FieldExtractor, MaliceRuleEvaluator, url_validation |
+| enrichment_pipeline/ | Deep module: template resolution, HTTP execution, field extraction, malice evaluation | url_validation |
+| enrichment_pipeline/__init__.py | Exports `EnrichmentPipeline` (single public entry point) | engine, field_extractor, malice_evaluator, template_resolver |
+| enrichment_pipeline/engine.py | Multi-step HTTP execution for providers | template_resolver, field_extractor, malice_evaluator, url_validation |
+| enrichment_pipeline/template_resolver.py | Placeholder resolution in HTTP configs | _dot_path |
+| enrichment_pipeline/field_extractor.py | Dot-path field extraction from responses | _dot_path |
+| enrichment_pipeline/malice_evaluator.py | Threshold-based malice verdict rules | _dot_path |
+| enrichment_pipeline/_dot_path.py | Shared dot-path traversal utility | (pure function) |
 | indicator_extraction.py | 3-pass IOC extraction + persistence | IndicatorRepository, IndicatorMappingRepository, source plugins |
 | workflow_executor.py | Workflow sandbox orchestration (no DB writes) | IndicatorRepository, AlertRepository, run_workflow_code |
 | activity_event.py | Fire-and-forget audit log writes | ActivityEventRepository |
@@ -53,7 +59,4 @@
 | workflow_generator.py | LLM-powered workflow code generation | settings (LLM config) |
 | indicator_validation.py | Enrichability checks (skip private IPs, etc.) | (pure function) |
 | url_validation.py | SSRF outbound URL validation | settings (SSRF_ALLOWED_HOSTS) |
-| enrichment_template.py | Placeholder resolution in HTTP configs | (pure function) |
-| field_extractor.py | Dot-path field extraction from responses | (pure function) |
-| malice_evaluator.py | Threshold-based malice verdict rules | (pure function) |
 | indicator_mapping_cache.py | In-memory cache for normalized field mappings | (module-level dict) |
