@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
+from app.api.utils import get_or_404, paginated_list
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
@@ -35,7 +36,7 @@ from app.config import settings
 from app.db.session import get_db
 from app.middleware.rate_limit import limiter
 from app.repositories.context_document_repository import ContextDocumentRepository
-from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
+from app.schemas.common import DataResponse, PaginatedResponse
 from app.schemas.context_documents import (
     DOCUMENT_TYPES,
     ContextDocumentCreate,
@@ -210,12 +211,7 @@ async def list_context_documents(
         page=pagination.page,
         page_size=pagination.page_size,
     )
-    return PaginatedResponse(
-        data=[_to_summary(d) for d in docs],
-        meta=PaginationMeta.from_total(
-            total=total, page=pagination.page, page_size=pagination.page_size
-        ),
-    )
+    return await paginated_list(docs, total, ContextDocumentSummary, pagination)
 
 
 # ---------------------------------------------------------------------------
@@ -292,13 +288,7 @@ async def get_context_document(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[ContextDocumentResponse]:
     repo = ContextDocumentRepository(db)
-    doc = await repo.get_by_uuid(doc_uuid)
-    if doc is None:
-        raise CalsetaException(
-            code="NOT_FOUND",
-            message=f"Context document {doc_uuid} not found",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    doc = await get_or_404(repo, doc_uuid, "Context document")
     return DataResponse(data=_to_response(doc))
 
 
@@ -317,13 +307,7 @@ async def patch_context_document(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[ContextDocumentResponse]:
     repo = ContextDocumentRepository(db)
-    doc = await repo.get_by_uuid(doc_uuid)
-    if doc is None:
-        raise CalsetaException(
-            code="NOT_FOUND",
-            message=f"Context document {doc_uuid} not found",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    doc = await get_or_404(repo, doc_uuid, "Context document")
     doc = await repo.patch(
         doc,
         title=body.title,
@@ -351,11 +335,5 @@ async def delete_context_document(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     repo = ContextDocumentRepository(db)
-    doc = await repo.get_by_uuid(doc_uuid)
-    if doc is None:
-        raise CalsetaException(
-            code="NOT_FOUND",
-            message=f"Context document {doc_uuid} not found",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    doc = await get_or_404(repo, doc_uuid, "Context document")
     await repo.delete(doc)

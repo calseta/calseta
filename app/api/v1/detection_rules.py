@@ -21,6 +21,7 @@ from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
+from app.api.utils import get_or_404, paginated_list
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
@@ -28,7 +29,7 @@ from app.config import settings
 from app.db.session import get_db
 from app.middleware.rate_limit import limiter
 from app.repositories.detection_rule_repository import DetectionRuleRepository
-from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
+from app.schemas.common import DataResponse, PaginatedResponse
 from app.schemas.detection_rule_metrics import DetectionRuleMetricsResponse
 from app.schemas.detection_rules import (
     DetectionRuleCreate,
@@ -90,12 +91,7 @@ async def list_detection_rules(
         page=pagination.page,
         page_size=pagination.page_size,
     )
-    return PaginatedResponse(
-        data=[_to_response(r) for r in rules],
-        meta=PaginationMeta.from_total(
-            total=total, page=pagination.page, page_size=pagination.page_size
-        ),
-    )
+    return await paginated_list(rules, total, DetectionRuleResponse, pagination)
 
 
 @router.post(
@@ -127,13 +123,7 @@ async def get_detection_rule(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[DetectionRuleResponse]:
     repo = DetectionRuleRepository(db)
-    rule = await repo.get_by_uuid(rule_uuid)
-    if rule is None:
-        raise CalsetaException(
-            code="NOT_FOUND",
-            message="Detection rule not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    rule = await get_or_404(repo, rule_uuid, "Detection rule")
     return DataResponse(data=_to_response(rule))
 
 
@@ -147,13 +137,7 @@ async def patch_detection_rule(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[DetectionRuleResponse]:
     repo = DetectionRuleRepository(db)
-    rule = await repo.get_by_uuid(rule_uuid)
-    if rule is None:
-        raise CalsetaException(
-            code="NOT_FOUND",
-            message="Detection rule not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    rule = await get_or_404(repo, rule_uuid, "Detection rule")
     updated = await repo.patch(rule, body)
     return DataResponse(data=_to_response(updated))
 
@@ -167,13 +151,7 @@ async def delete_detection_rule(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     repo = DetectionRuleRepository(db)
-    rule = await repo.get_by_uuid(rule_uuid)
-    if rule is None:
-        raise CalsetaException(
-            code="NOT_FOUND",
-            message="Detection rule not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    rule = await get_or_404(repo, rule_uuid, "Detection rule")
     await repo.delete(rule)
 
 
@@ -197,13 +175,7 @@ async def get_detection_rule_metrics(
 ) -> DataResponse[DetectionRuleMetricsResponse]:
     """Per-detection-rule effectiveness metrics (FP/TP rate, volume, trends)."""
     repo = DetectionRuleRepository(db)
-    rule = await repo.get_by_uuid(rule_uuid)
-    if rule is None:
-        raise CalsetaException(
-            code="NOT_FOUND",
-            message="Detection rule not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    rule = await get_or_404(repo, rule_uuid, "Detection rule")
 
     now = datetime.now(UTC)
     resolved_from = from_time if from_time else now - timedelta(days=30)

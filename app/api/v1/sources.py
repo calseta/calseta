@@ -20,6 +20,7 @@ from starlette.requests import Request
 
 from app.api.errors import CalsetaException
 from app.api.pagination import PaginationParams
+from app.api.utils import detail_response, get_or_404, paginated_list
 from app.auth.base import AuthContext
 from app.auth.dependencies import require_scope
 from app.auth.scopes import Scope
@@ -27,7 +28,7 @@ from app.config import settings
 from app.db.session import get_db
 from app.middleware.rate_limit import limiter
 from app.repositories.source_repository import SourceRepository
-from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
+from app.schemas.common import DataResponse, PaginatedResponse
 from app.schemas.sources import (
     SourceIntegrationCreate,
     SourceIntegrationPatch,
@@ -86,15 +87,10 @@ async def list_sources(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> PaginatedResponse[SourceIntegrationResponse]:
     repo = SourceRepository(db)
-    integrations, total = await repo.list_all(
+    items, total = await repo.list_all(
         page=pagination.page, page_size=pagination.page_size
     )
-    return PaginatedResponse(
-        data=[SourceIntegrationResponse.model_validate(i) for i in integrations],
-        meta=PaginationMeta.from_total(
-            total=total, page=pagination.page, page_size=pagination.page_size
-        ),
-    )
+    return await paginated_list(items, total, SourceIntegrationResponse, pagination)
 
 
 # ---------------------------------------------------------------------------
@@ -148,14 +144,9 @@ async def get_source(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[SourceIntegrationResponse]:
     repo = SourceRepository(db)
-    integration = await repo.get_by_uuid(source_uuid)
-    if integration is None:
-        raise CalsetaException(
-            code="NOT_FOUND",
-            message="Source integration not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
-    return DataResponse(data=SourceIntegrationResponse.model_validate(integration))
+    return await detail_response(
+        repo, SourceIntegrationResponse, source_uuid, "Source integration"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -173,13 +164,7 @@ async def patch_source(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[SourceIntegrationResponse]:
     repo = SourceRepository(db)
-    integration = await repo.get_by_uuid(source_uuid)
-    if integration is None:
-        raise CalsetaException(
-            code="NOT_FOUND",
-            message="Source integration not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    integration = await get_or_404(repo, source_uuid, "Source integration")
 
     updates: dict[str, object] = {}
 
@@ -212,11 +197,5 @@ async def delete_source(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     repo = SourceRepository(db)
-    integration = await repo.get_by_uuid(source_uuid)
-    if integration is None:
-        raise CalsetaException(
-            code="NOT_FOUND",
-            message="Source integration not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    integration = await get_or_404(repo, source_uuid, "Source integration")
     await repo.delete(integration)
