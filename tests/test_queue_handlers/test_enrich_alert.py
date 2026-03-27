@@ -17,7 +17,6 @@ import pytest
 from app.queue.handlers.enrich_alert import EnrichAlertHandler
 from app.queue.handlers.payloads import EnrichAlertPayload
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

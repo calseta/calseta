@@ -18,7 +18,6 @@ import pytest
 from app.queue.handlers.execute_workflow import ExecuteWorkflowHandler
 from app.queue.handlers.payloads import ExecuteWorkflowRunPayload
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
