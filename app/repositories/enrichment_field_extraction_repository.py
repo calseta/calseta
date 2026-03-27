@@ -2,28 +2,16 @@
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
-from sqlalchemy import delete, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete
 
 from app.db.models.enrichment_field_extraction import EnrichmentFieldExtraction
+from app.repositories.base import BaseRepository
 
 
-class EnrichmentFieldExtractionRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
-
-    async def get_by_uuid(
-        self, extraction_uuid: uuid.UUID
-    ) -> EnrichmentFieldExtraction | None:
-        result = await self._db.execute(
-            select(EnrichmentFieldExtraction).where(
-                EnrichmentFieldExtraction.uuid == extraction_uuid
-            )
-        )
-        return result.scalar_one_or_none()
+class EnrichmentFieldExtractionRepository(BaseRepository[EnrichmentFieldExtraction]):
+    model = EnrichmentFieldExtraction
 
     async def list_extractions(
         self,
@@ -36,45 +24,27 @@ class EnrichmentFieldExtractionRepository:
         page_size: int = 50,
     ) -> tuple[list[EnrichmentFieldExtraction], int]:
         """Return (extractions, total_count) matching filters."""
-        stmt = select(EnrichmentFieldExtraction)
-        count_stmt = select(func.count()).select_from(EnrichmentFieldExtraction)
+        filters = []
 
         if provider_name is not None:
-            stmt = stmt.where(
-                EnrichmentFieldExtraction.provider_name == provider_name
-            )
-            count_stmt = count_stmt.where(
+            filters.append(
                 EnrichmentFieldExtraction.provider_name == provider_name
             )
         if indicator_type is not None:
-            stmt = stmt.where(
-                EnrichmentFieldExtraction.indicator_type == indicator_type
-            )
-            count_stmt = count_stmt.where(
+            filters.append(
                 EnrichmentFieldExtraction.indicator_type == indicator_type
             )
         if is_system is not None:
-            stmt = stmt.where(EnrichmentFieldExtraction.is_system == is_system)
-            count_stmt = count_stmt.where(
-                EnrichmentFieldExtraction.is_system == is_system
-            )
+            filters.append(EnrichmentFieldExtraction.is_system == is_system)
         if is_active is not None:
-            stmt = stmt.where(EnrichmentFieldExtraction.is_active == is_active)
-            count_stmt = count_stmt.where(
-                EnrichmentFieldExtraction.is_active == is_active
-            )
+            filters.append(EnrichmentFieldExtraction.is_active == is_active)
 
-        total_result = await self._db.execute(count_stmt)
-        total = total_result.scalar_one()
-
-        offset = (page - 1) * page_size
-        stmt = (
-            stmt.order_by(EnrichmentFieldExtraction.created_at.asc())
-            .offset(offset)
-            .limit(page_size)
+        return await self.paginate(
+            *filters,
+            order_by=EnrichmentFieldExtraction.created_at.asc(),
+            page=page,
+            page_size=page_size,
         )
-        result = await self._db.execute(stmt)
-        return list(result.scalars().all()), total
 
     async def create(
         self,
@@ -135,10 +105,6 @@ class EnrichmentFieldExtractionRepository:
         await self._db.flush()
         await self._db.refresh(extraction)
         return extraction
-
-    async def delete(self, extraction: EnrichmentFieldExtraction) -> None:
-        await self._db.delete(extraction)
-        await self._db.flush()
 
     async def delete_by_provider(self, provider_name: str) -> int:
         """Delete all non-system extractions for a provider. Returns count deleted."""

@@ -5,16 +5,15 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.models.agent_registration import AgentRegistration
+from app.repositories.base import BaseRepository
 from app.schemas.agents import AgentRegistrationCreate
 
 
-class AgentRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
+class AgentRepository(BaseRepository[AgentRegistration]):
+    model = AgentRegistration
 
     async def create(
         self,
@@ -42,37 +41,17 @@ class AgentRepository:
         await self._db.refresh(agent)
         return agent
 
-    async def get_by_uuid(self, agent_uuid: uuid.UUID) -> AgentRegistration | None:
-        result = await self._db.execute(
-            select(AgentRegistration).where(AgentRegistration.uuid == agent_uuid)
-        )
-        return result.scalar_one_or_none()
-
-    async def get_by_id(self, agent_id: int) -> AgentRegistration | None:
-        result = await self._db.execute(
-            select(AgentRegistration).where(AgentRegistration.id == agent_id)
-        )
-        return result.scalar_one_or_none()
-
     async def list_all(
         self,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[AgentRegistration], int]:
         """Return (agents, total_count) ordered by created_at descending."""
-        count_stmt = select(func.count()).select_from(AgentRegistration)
-        total_result = await self._db.execute(count_stmt)
-        total = total_result.scalar_one()
-
-        offset = (page - 1) * page_size
-        stmt = (
-            select(AgentRegistration)
-            .order_by(AgentRegistration.created_at.desc())
-            .offset(offset)
-            .limit(page_size)
+        return await self.paginate(
+            order_by=AgentRegistration.created_at.desc(),
+            page=page,
+            page_size=page_size,
         )
-        result = await self._db.execute(stmt)
-        return list(result.scalars().all()), total
 
     _UPDATABLE_FIELDS: frozenset[str] = frozenset({
         "name",
@@ -111,10 +90,6 @@ class AgentRepository:
         await self._db.flush()
         await self._db.refresh(agent)
         return agent
-
-    async def delete(self, agent: AgentRegistration) -> None:
-        await self._db.delete(agent)
-        await self._db.flush()
 
     async def list_active(self) -> list[AgentRegistration]:
         """Return all active agent registrations. Used by trigger evaluation."""

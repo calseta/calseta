@@ -8,9 +8,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import case, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.alert import Alert
+from app.repositories.base import BaseRepository
 from app.schemas.alert import AlertSeverity, AlertStatus, CalsetaAlert, EnrichmentStatus
 
 # Whitelist of columns that can be used for sorting
@@ -47,9 +47,8 @@ def generate_fingerprint(
     return hashlib.md5(hash_input.encode()).hexdigest()
 
 
-class AlertRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
+class AlertRepository(BaseRepository[Alert]):
+    model = Alert
 
     async def create(
         self,
@@ -100,18 +99,6 @@ class AlertRepository:
         await self._db.flush()
         await self._db.refresh(alert)
         return alert
-
-    async def get_by_id(self, alert_id: int) -> Alert | None:
-        result = await self._db.execute(
-            select(Alert).where(Alert.id == alert_id)
-        )
-        return result.scalar_one_or_none()
-
-    async def get_by_uuid(self, alert_uuid: uuid.UUID) -> Alert | None:
-        result = await self._db.execute(
-            select(Alert).where(Alert.uuid == alert_uuid)
-        )
-        return result.scalar_one_or_none()
 
     async def list_alerts(
         self,
@@ -243,10 +230,6 @@ class AlertRepository:
         await self._db.flush()
         await self._db.refresh(alert)
         return alert
-
-    async def delete(self, alert: Alert) -> None:
-        await self._db.delete(alert)
-        await self._db.flush()
 
     async def set_detection_rule(self, alert: Alert, rule_id: int) -> None:
         alert.detection_rule_id = rule_id

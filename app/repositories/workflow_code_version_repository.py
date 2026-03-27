@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.workflow_code_version import WorkflowCodeVersion
+from app.repositories.base import BaseRepository
 
 
-class WorkflowCodeVersionRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
+class WorkflowCodeVersionRepository(BaseRepository[WorkflowCodeVersion]):
+    model = WorkflowCodeVersion
 
     async def save_version(
         self,

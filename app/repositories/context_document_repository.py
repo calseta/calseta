@@ -6,9 +6,9 @@ import uuid
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.context_document import ContextDocument
+from app.repositories.base import BaseRepository
 
 # Whitelist of columns that can be used for sorting
 _SORT_COLUMNS: dict[str, str] = {
@@ -19,9 +19,8 @@ _SORT_COLUMNS: dict[str, str] = {
 }
 
 
-class ContextDocumentRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
+class ContextDocumentRepository(BaseRepository[ContextDocument]):
+    model = ContextDocument
 
     async def create(
         self,
@@ -49,12 +48,6 @@ class ContextDocumentRepository:
         await self._db.flush()
         await self._db.refresh(doc)
         return doc
-
-    async def get_by_uuid(self, doc_uuid: uuid.UUID) -> ContextDocument | None:
-        result = await self._db.execute(
-            select(ContextDocument).where(ContextDocument.uuid == doc_uuid)
-        )
-        return result.scalar_one_or_none()
 
     async def list_documents(
         self,
@@ -136,7 +129,3 @@ class ContextDocumentRepository:
         await self._db.flush()
         await self._db.refresh(doc)
         return doc
-
-    async def delete(self, doc: ContextDocument) -> None:
-        await self._db.delete(doc)
-        await self._db.flush()

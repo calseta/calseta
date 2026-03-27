@@ -11,21 +11,20 @@ import secrets
 from datetime import datetime
 
 import bcrypt
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.models.api_key import APIKey
+from app.repositories.base import BaseRepository
 
 _UNSET = object()  # sentinel for "field not provided"
 
 
-class APIKeyRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self.db = db
+class APIKeyRepository(BaseRepository[APIKey]):
+    model = APIKey
 
     async def get_by_prefix(self, key_prefix: str) -> APIKey | None:
         """Return the APIKey row whose key_prefix matches, or None."""
-        result = await self.db.execute(
+        result = await self._db.execute(
             select(APIKey).where(APIKey.key_prefix == key_prefix, APIKey.is_active.is_(True))
         )
         return result.scalar_one_or_none()
@@ -58,14 +57,14 @@ class APIKeyRepository:
             expires_at=expires_at,
             allowed_sources=allowed_sources,
         )
-        self.db.add(record)
-        await self.db.flush()
-        await self.db.refresh(record)
+        self._db.add(record)
+        await self._db.flush()
+        await self._db.refresh(record)
         return record, plain_key
 
-    async def get_by_uuid(self, uuid: str) -> APIKey | None:
+    async def get_by_uuid(self, uuid: str) -> APIKey | None:  # type: ignore[override]
         """Return the APIKey row matching the UUID, or None."""
-        result = await self.db.execute(
+        result = await self._db.execute(
             select(APIKey).where(APIKey.uuid == uuid)  # type: ignore[arg-type]
         )
         return result.scalar_one_or_none()
@@ -91,8 +90,8 @@ class APIKeyRepository:
             record.allowed_sources = allowed_sources  # type: ignore[assignment]
         if is_active is not None:
             record.is_active = is_active
-        await self.db.flush()
-        await self.db.refresh(record)
+        await self._db.flush()
+        await self._db.refresh(record)
         return record
 
     async def deactivate(self, uuid: str) -> bool:
@@ -101,14 +100,14 @@ class APIKeyRepository:
 
         Returns True if the key was found and deactivated, False if not found.
         """
-        result = await self.db.execute(
+        result = await self._db.execute(
             select(APIKey).where(APIKey.uuid == uuid)  # type: ignore[arg-type]
         )
         record = result.scalar_one_or_none()
         if record is None:
             return False
         record.is_active = False
-        await self.db.flush()
+        await self._db.flush()
         return True
 
     async def list_active(
@@ -117,12 +116,9 @@ class APIKeyRepository:
         """Return (page of active API keys, total active count)."""
         where = APIKey.is_active.is_(True)
 
-        count_result = await self.db.execute(
-            select(func.count()).select_from(APIKey).where(where)
-        )
-        total: int = count_result.scalar_one()
+        total = await self.count(where)
 
-        result = await self.db.execute(
+        result = await self._db.execute(
             select(APIKey).where(where).order_by(APIKey.created_at.desc()).offset(offset).limit(limit)
         )
         return list(result.scalars().all()), total

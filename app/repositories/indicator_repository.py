@@ -7,16 +7,15 @@ from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.alert import Alert
 from app.db.models.alert_indicator import AlertIndicator
 from app.db.models.indicator import Indicator
+from app.repositories.base import BaseRepository
 
 
-class IndicatorRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
+class IndicatorRepository(BaseRepository[Indicator]):
+    model = Indicator
 
     async def upsert(self, itype: str, value: str, now: datetime) -> Indicator:
         """
@@ -58,7 +57,7 @@ class IndicatorRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_uuid(self, indicator_uuid: str) -> Indicator | None:
+    async def get_by_uuid(self, indicator_uuid: str) -> Indicator | None:  # type: ignore[override]
         result = await self._db.execute(
             select(Indicator).where(Indicator.uuid == indicator_uuid)  # type: ignore[arg-type]
         )

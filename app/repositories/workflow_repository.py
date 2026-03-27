@@ -6,9 +6,9 @@ import uuid
 from typing import Any
 
 from sqlalchemy import case, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.workflow import Workflow
+from app.repositories.base import BaseRepository
 
 # Whitelist of columns that can be used for sorting
 _SORT_COLUMNS: dict[str, str] = {
@@ -28,9 +28,8 @@ _RISK_ORDER = case(
 )
 
 
-class WorkflowRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
+class WorkflowRepository(BaseRepository[Workflow]):
+    model = Workflow
 
     async def create(
         self,
@@ -76,12 +75,6 @@ class WorkflowRepository:
         await self._db.flush()
         await self._db.refresh(workflow)
         return workflow
-
-    async def get_by_uuid(self, workflow_uuid: uuid.UUID) -> Workflow | None:
-        result = await self._db.execute(
-            select(Workflow).where(Workflow.uuid == workflow_uuid)
-        )
-        return result.scalar_one_or_none()
 
     async def get_by_name_and_system(self, name: str) -> Workflow | None:
         """Find a system workflow by name (used by seeders for idempotency)."""
@@ -219,7 +212,3 @@ class WorkflowRepository:
         if existing is not None:
             return existing
         return await self.create(is_system=True, **kwargs)
-
-    async def delete(self, workflow: Workflow) -> None:
-        await self._db.delete(workflow)
-        await self._db.flush()

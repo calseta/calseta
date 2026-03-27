@@ -2,29 +2,18 @@
 
 from __future__ import annotations
 
-import uuid
-
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.indicator_field_mapping import IndicatorFieldMapping
+from app.repositories.base import BaseRepository
 from app.schemas.indicator_mappings import (
     IndicatorFieldMappingCreate,
     IndicatorFieldMappingPatch,
 )
 
 
-class IndicatorMappingRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
-
-    async def get_by_uuid(self, mapping_uuid: uuid.UUID) -> IndicatorFieldMapping | None:
-        result = await self._db.execute(
-            select(IndicatorFieldMapping).where(
-                IndicatorFieldMapping.uuid == mapping_uuid
-            )
-        )
-        return result.scalar_one_or_none()
+class IndicatorMappingRepository(BaseRepository[IndicatorFieldMapping]):
+    model = IndicatorFieldMapping
 
     async def list_mappings(
         self,
@@ -37,39 +26,25 @@ class IndicatorMappingRepository:
         page_size: int = 50,
     ) -> tuple[list[IndicatorFieldMapping], int]:
         """Return (mappings, total_count) matching filters."""
-        from sqlalchemy import func
-
-        stmt = select(IndicatorFieldMapping)
-        count_stmt = select(func.count()).select_from(IndicatorFieldMapping)
+        filters = []
 
         if source_name is not None:
-            stmt = stmt.where(IndicatorFieldMapping.source_name == source_name)
-            count_stmt = count_stmt.where(IndicatorFieldMapping.source_name == source_name)
+            filters.append(IndicatorFieldMapping.source_name == source_name)
         if is_system is not None:
-            stmt = stmt.where(IndicatorFieldMapping.is_system == is_system)
-            count_stmt = count_stmt.where(IndicatorFieldMapping.is_system == is_system)
+            filters.append(IndicatorFieldMapping.is_system == is_system)
         if is_active is not None:
-            stmt = stmt.where(IndicatorFieldMapping.is_active == is_active)
-            count_stmt = count_stmt.where(IndicatorFieldMapping.is_active == is_active)
+            filters.append(IndicatorFieldMapping.is_active == is_active)
         if extraction_target is not None:
-            stmt = stmt.where(
-                IndicatorFieldMapping.extraction_target == extraction_target
-            )
-            count_stmt = count_stmt.where(
+            filters.append(
                 IndicatorFieldMapping.extraction_target == extraction_target
             )
 
-        total_result = await self._db.execute(count_stmt)
-        total = total_result.scalar_one()
-
-        offset = (page - 1) * page_size
-        stmt = (
-            stmt.order_by(IndicatorFieldMapping.created_at.asc())
-            .offset(offset)
-            .limit(page_size)
+        return await self.paginate(
+            *filters,
+            order_by=IndicatorFieldMapping.created_at.asc(),
+            page=page,
+            page_size=page_size,
         )
-        result = await self._db.execute(stmt)
-        return list(result.scalars().all()), total
 
     async def get_active_for_extraction(
         self,
@@ -117,7 +92,3 @@ class IndicatorMappingRepository:
         await self._db.flush()
         await self._db.refresh(mapping)
         return mapping
-
-    async def delete(self, mapping: IndicatorFieldMapping) -> None:
-        await self._db.delete(mapping)
-        await self._db.flush()
