@@ -4,15 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.db.models.activity_event import ActivityEvent
+from app.repositories.base import BaseRepository
 
 
-class ActivityEventRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
+class ActivityEventRepository(BaseRepository[ActivityEvent]):
+    model = ActivityEvent
 
     async def create(
         self,
@@ -46,21 +43,9 @@ class ActivityEventRepository:
         page_size: int = 50,
     ) -> tuple[list[ActivityEvent], int]:
         """Return (events, total_count) for an alert, ordered newest-first."""
-        from sqlalchemy import func
-
-        count_result = await self._db.execute(
-            select(func.count())
-            .select_from(ActivityEvent)
-            .where(ActivityEvent.alert_id == alert_id)
+        return await self.paginate(
+            ActivityEvent.alert_id == alert_id,
+            order_by=ActivityEvent.created_at.desc(),
+            page=page,
+            page_size=page_size,
         )
-        total = count_result.scalar_one()
-
-        offset = (page - 1) * page_size
-        result = await self._db.execute(
-            select(ActivityEvent)
-            .where(ActivityEvent.alert_id == alert_id)
-            .order_by(ActivityEvent.created_at.desc())
-            .offset(offset)
-            .limit(page_size)
-        )
-        return list(result.scalars().all()), total

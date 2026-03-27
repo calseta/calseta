@@ -34,6 +34,7 @@ from app.db.session import get_db
 from app.middleware.rate_limit import limiter
 from app.queue.base import TaskQueueBase
 from app.queue.dependencies import get_queue
+from app.queue.handlers.dispatch_webhooks import get_matching_agents
 from app.repositories.activity_event_repository import ActivityEventRepository
 from app.repositories.agent_repository import AgentRepository
 from app.repositories.alert_repository import AlertRepository
@@ -64,7 +65,6 @@ from app.schemas.relationship_graph import (
     GraphIndicatorNode,
 )
 from app.services.activity_event import ActivityEventService
-from app.services.agent_trigger import get_matching_agents
 from app.services.context_targeting import get_applicable_documents
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])

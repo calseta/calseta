@@ -2,24 +2,16 @@
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.models.enrichment_provider import EnrichmentProvider
+from app.repositories.base import BaseRepository
 
 
-class EnrichmentProviderRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
-
-    async def get_by_uuid(self, provider_uuid: uuid.UUID) -> EnrichmentProvider | None:
-        result = await self._db.execute(
-            select(EnrichmentProvider).where(EnrichmentProvider.uuid == provider_uuid)
-        )
-        return result.scalar_one_or_none()
+class EnrichmentProviderRepository(BaseRepository[EnrichmentProvider]):
+    model = EnrichmentProvider
 
     async def get_by_name(self, provider_name: str) -> EnrichmentProvider | None:
         result = await self._db.execute(
@@ -37,23 +29,18 @@ class EnrichmentProviderRepository:
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[EnrichmentProvider], int]:
-        stmt = select(EnrichmentProvider)
-        count_stmt = select(func.count()).select_from(EnrichmentProvider)
-
+        filters = []
         if is_active is not None:
-            stmt = stmt.where(EnrichmentProvider.is_active == is_active)
-            count_stmt = count_stmt.where(EnrichmentProvider.is_active == is_active)
+            filters.append(EnrichmentProvider.is_active == is_active)
         if is_builtin is not None:
-            stmt = stmt.where(EnrichmentProvider.is_builtin == is_builtin)
-            count_stmt = count_stmt.where(EnrichmentProvider.is_builtin == is_builtin)
+            filters.append(EnrichmentProvider.is_builtin == is_builtin)
 
-        total_result = await self._db.execute(count_stmt)
-        total = total_result.scalar_one()
-
-        offset = (page - 1) * page_size
-        stmt = stmt.order_by(EnrichmentProvider.created_at.asc()).offset(offset).limit(page_size)
-        result = await self._db.execute(stmt)
-        return list(result.scalars().all()), total
+        return await self.paginate(
+            *filters,
+            order_by=EnrichmentProvider.created_at.asc(),
+            page=page,
+            page_size=page_size,
+        )
 
     async def create(self, **kwargs: Any) -> EnrichmentProvider:
         provider = EnrichmentProvider(**kwargs)
@@ -70,7 +57,3 @@ class EnrichmentProviderRepository:
         await self._db.flush()
         await self._db.refresh(provider)
         return provider
-
-    async def delete(self, provider: EnrichmentProvider) -> None:
-        await self._db.delete(provider)
-        await self._db.flush()

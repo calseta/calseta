@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.schemas.indicators import IndicatorType
-from app.services.indicator_validation import is_enrichable
+from app.services.enrichment import is_enrichable
 
 
 class TestIPEnrichable:

@@ -19,28 +19,9 @@ import re
 from typing import Any
 from urllib.parse import quote
 
+from ._dot_path import resolve_dot_path
+
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([^}]+?)\s*\}\}")
-
-
-def _resolve_dot_path(obj: Any, path: str) -> Any:
-    """Traverse a nested dict/list by dot-separated path.
-
-    Returns None if any segment is missing.
-    """
-    current = obj
-    for segment in path.split("."):
-        if isinstance(current, dict):
-            current = current.get(segment)
-        elif isinstance(current, list):
-            try:
-                current = current[int(segment)]
-            except (ValueError, IndexError):
-                return None
-        else:
-            return None
-        if current is None:
-            return None
-    return current
 
 
 class TemplateResolver:
@@ -83,7 +64,7 @@ class TemplateResolver:
                 if filter_name == "urlencode":
                     apply_urlencode = True
 
-            # Support shorthand: {{value}} → {{indicator.value}}, {{type}} → {{indicator.type}}
+            # Support shorthand: {{value}} -> {{indicator.value}}, {{type}} -> {{indicator.type}}
             if raw_path in ("value", "type"):
                 raw_path = f"indicator.{raw_path}"
 
@@ -91,9 +72,9 @@ class TemplateResolver:
             segments = raw_path.split(".", 1)
             namespace = segments[0]
             if namespace not in self._context:
-                return match.group(0)  # Unknown namespace — leave as-is
+                return match.group(0)  # Unknown namespace -- leave as-is
 
-            value = _resolve_dot_path(self._context, raw_path)
+            value = resolve_dot_path(self._context, raw_path)
             if value is None:
                 return ""
 
@@ -107,14 +88,14 @@ class TemplateResolver:
     def resolve_url(self, template: str) -> str:
         """Resolve placeholders in a URL template with automatic URL-encoding.
 
-        All substituted values — including auth fields — are URL-encoded to
+        All substituted values -- including auth fields -- are URL-encoded to
         prevent query-parameter injection when credentials contain ``&``, ``=``,
         or other URL-special characters.
         """
         return self.resolve_string(template, url_encode_all=True)
 
     def resolve_value(self, value: Any) -> Any:
-        """Resolve placeholders in any value — string, dict, or list."""
+        """Resolve placeholders in any value -- string, dict, or list."""
         if isinstance(value, str):
             return self.resolve_string(value)
         if isinstance(value, dict):

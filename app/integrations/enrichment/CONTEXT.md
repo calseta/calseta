@@ -49,7 +49,7 @@ Adapter that wraps a DB row (`EnrichmentProvider` ORM model) and implements `Enr
 1. Decrypted `auth_config` from DB (encrypted at rest via Fernet)
 2. Env var fallback via `env_var_mapping` (for builtins using existing `.env` config)
 
-### GenericHttpEnrichmentEngine (`app/services/enrichment_engine.py`)
+### GenericHttpEnrichmentEngine (`app/services/enrichment_pipeline/engine.py`)
 
 Executes the HTTP steps defined in `http_config`. Supports:
 
@@ -59,7 +59,7 @@ Executes the HTTP steps defined in `http_config`. Supports:
 - **Optional steps**: `"optional": true` — step failure doesn't abort the pipeline
 - **Form body**: `form_body` for OAuth token requests
 
-### TemplateResolver (`app/services/enrichment_template.py`)
+### TemplateResolver (`app/services/enrichment_pipeline/template_resolver.py`)
 
 Simple `{{namespace.field}}` regex replacer. Whitelisted namespaces:
 
@@ -69,7 +69,7 @@ Simple `{{namespace.field}}` regex replacer. Whitelisted namespaces:
 
 One filter: `{{value | urlencode}}`. No Jinja2 — eliminates template injection risk.
 
-### MaliceRuleEvaluator (`app/services/malice_evaluator.py`)
+### MaliceRuleEvaluator (`app/services/enrichment_pipeline/malice_evaluator.py`)
 
 Evaluates ordered threshold rules from `malice_rules` JSONB. First match wins. Operators: `>`, `>=`, `<`, `<=`, `==`, `!=`, `contains`, `in`.
 
@@ -84,7 +84,7 @@ Evaluates ordered threshold rules from `malice_rules` JSONB. First match wins. O
 }
 ```
 
-### FieldExtractor (`app/services/field_extractor.py`)
+### FieldExtractor (`app/services/enrichment_pipeline/field_extractor.py`)
 
 Applies extraction rules from the `enrichment_field_extractions` table. Each rule maps a dot-notation `source_path` in the raw API response to a `target_key` in the agent-facing `extracted` dict. Type coercion supported: string, int, float, bool, list, dict, any.
 
@@ -238,10 +238,11 @@ See `docs/project/COMMUNITY_INTEGRATIONS.md` for the full contribution guide.
 | `app/integrations/enrichment/registry.py` | `EnrichmentRegistry` singleton |
 | `app/integrations/enrichment/database_provider.py` | `DatabaseDrivenProvider` adapter |
 | `app/integrations/enrichment/__init__.py` | Exports `enrichment_registry` |
-| `app/services/enrichment_engine.py` | `GenericHttpEnrichmentEngine` |
-| `app/services/enrichment_template.py` | `TemplateResolver` |
-| `app/services/malice_evaluator.py` | `MaliceRuleEvaluator` |
-| `app/services/field_extractor.py` | `FieldExtractor` |
+| `app/services/enrichment_pipeline/` | `EnrichmentPipeline` (public entry point) |
+| `app/services/enrichment_pipeline/engine.py` | `GenericHttpEnrichmentEngine` |
+| `app/services/enrichment_pipeline/template_resolver.py` | `TemplateResolver` |
+| `app/services/enrichment_pipeline/malice_evaluator.py` | `MaliceRuleEvaluator` |
+| `app/services/enrichment_pipeline/field_extractor.py` | `FieldExtractor` |
 | `app/db/models/enrichment_provider.py` | ORM model |
 | `app/schemas/enrichment_providers.py` | Pydantic request/response schemas |
 | `app/repositories/enrichment_provider_repository.py` | CRUD repository |
@@ -253,9 +254,6 @@ See `docs/project/COMMUNITY_INTEGRATIONS.md` for the full contribution guide.
 
 | Test file | Scenarios |
 |-----------|-----------|
-| `tests/test_enrichment_template.py` | Template resolution: indicator, auth, steps, urlencode filter, nested dicts/lists, missing variables |
-| `tests/test_malice_evaluator.py` | All operators, not_found handling, default verdict, empty rules, missing fields |
-| `tests/test_field_extractor.py` | Dot-path extraction, type coercion, missing paths, multi-step keyed responses |
-| `tests/test_enrichment_engine.py` | Single-step and multi-step execution, URL templates by type, optional steps, not_found handling |
+| `tests/test_enrichment_pipeline.py` | Pipeline integration: template resolution, field extraction, malice evaluation, HTTP engine execution, dot-path utilities |
 | `tests/test_enrichment_providers_api.py` | CRUD endpoints, builtin restrictions, scope enforcement, credential encryption |
 | `tests/test_enrichment_service.py` | Pipeline integration: cache hit/miss, parallel execution, malice aggregation |

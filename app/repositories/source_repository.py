@@ -5,16 +5,13 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.db.models.source_integration import SourceIntegration
+from app.repositories.base import BaseRepository
 from app.schemas.sources import SourceIntegrationCreate
 
 
-class SourceRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
+class SourceRepository(BaseRepository[SourceIntegration]):
+    model = SourceIntegration
 
     async def create(
         self,
@@ -36,31 +33,17 @@ class SourceRepository:
         await self._db.refresh(integration)
         return integration
 
-    async def get_by_uuid(self, integration_uuid: uuid.UUID) -> SourceIntegration | None:
-        result = await self._db.execute(
-            select(SourceIntegration).where(SourceIntegration.uuid == integration_uuid)
-        )
-        return result.scalar_one_or_none()
-
     async def list_all(
         self,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[SourceIntegration], int]:
         """Return (integrations, total_count) ordered by created_at descending."""
-        count_stmt = select(func.count()).select_from(SourceIntegration)
-        total_result = await self._db.execute(count_stmt)
-        total = total_result.scalar_one()
-
-        offset = (page - 1) * page_size
-        stmt = (
-            select(SourceIntegration)
-            .order_by(SourceIntegration.created_at.desc())
-            .offset(offset)
-            .limit(page_size)
+        return await self.paginate(
+            order_by=SourceIntegration.created_at.desc(),
+            page=page,
+            page_size=page_size,
         )
-        result = await self._db.execute(stmt)
-        return list(result.scalars().all()), total
 
     _UPDATABLE_FIELDS: frozenset[str] = frozenset({
         "display_name",
@@ -90,7 +73,3 @@ class SourceRepository:
         await self._db.flush()
         await self._db.refresh(integration)
         return integration
-
-    async def delete(self, integration: SourceIntegration) -> None:
-        await self._db.delete(integration)
-        await self._db.flush()

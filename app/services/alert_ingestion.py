@@ -18,7 +18,8 @@ Returns IngestResult with the alert and is_duplicate flag.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -43,6 +44,7 @@ logger = structlog.get_logger(__name__)
 class IngestResult:
     alert: Alert
     is_duplicate: bool
+    step_log: dict[str, float] | None = field(default=None)
 
 
 class AlertIngestionService:
@@ -72,10 +74,15 @@ class AlertIngestionService:
 
         Returns IngestResult with the alert and whether it was deduplicated.
         """
+        step_log: dict[str, float] = {}
+
         # Step 1: Normalize
+        t0 = time.monotonic()
         normalized = source.normalize(raw_payload)
+        step_log["normalize"] = (time.monotonic() - t0) * 1000
 
         # Step 2: Extract indicators for fingerprinting (Pass 1 + Pass 2, no persistence)
+        t0 = time.monotonic()
         cached_mappings = get_normalized_mappings(normalized.source_name)
         indicators = extract_for_fingerprint(
             source, normalized, raw_payload, cached_mappings
@@ -86,14 +93,17 @@ class AlertIngestionService:
         fingerprint = generate_fingerprint(
             normalized.title, normalized.source_name, indicator_tuples
         )
+        step_log["fingerprint"] = (time.monotonic() - t0) * 1000
 
         # Step 4: Check for duplicates within the configured time window
+        t0 = time.monotonic()
         dedup_hours = settings.ALERT_DEDUP_WINDOW_HOURS
         if dedup_hours > 0:
             window_start = datetime.now(UTC) - timedelta(hours=dedup_hours)
             existing = await self._alert_repo.find_duplicate(fingerprint, window_start)
             if existing is not None:
                 updated = await self._alert_repo.increment_duplicate(existing)
+                step_log["dedup_check"] = (time.monotonic() - t0) * 1000
                 logger.info(
                     "alert_deduplicated",
                     original_uuid=str(updated.uuid),
@@ -113,12 +123,17 @@ class AlertIngestionService:
                         "title": normalized.title,
                     },
                 )
-                return IngestResult(alert=updated, is_duplicate=True)
+                return IngestResult(
+                    alert=updated, is_duplicate=True, step_log=step_log
+                )
+        step_log["dedup_check"] = (time.monotonic() - t0) * 1000
 
         # Step 5: Persist new alert
+        t0 = time.monotonic()
         alert = await self._alert_repo.create(
             normalized, raw_payload, fingerprint=fingerprint
         )
+        step_log["persist"] = (time.monotonic() - t0) * 1000
         logger.info(
             "alert_ingested",
             alert_uuid=str(alert.uuid),
@@ -144,22 +159,36 @@ class AlertIngestionService:
                 )
 
         # Step 7: Enqueue enrichment (indicator extraction + provider enrichment)
+        t0 = time.monotonic()
         try:
             task_id = await self._queue.enqueue(
                 "enrich_alert",
                 {"alert_id": alert.id},
                 queue="enrichment",
             )
+            step_log["enqueue"] = (time.monotonic() - t0) * 1000
             logger.debug(
                 "enrichment_task_enqueued",
                 alert_uuid=str(alert.uuid),
                 task_id=task_id,
             )
         except Exception:
+            step_log["enqueue"] = (time.monotonic() - t0) * 1000
             logger.exception(
                 "enrichment_enqueue_failed",
+                alert_id=alert.id,
                 alert_uuid=str(alert.uuid),
             )
+            # Mark enrichment_status as Failed so it doesn't stay Pending forever
+            try:
+                alert.enrichment_status = "Failed"
+                await self._db.flush()
+            except Exception:
+                logger.exception(
+                    "failed_to_mark_enrichment_failed",
+                    alert_id=alert.id,
+                    alert_uuid=str(alert.uuid),
+                )
 
         # Step 8: Activity event (fire-and-forget — never raises)
         await self._activity_service.write(
@@ -174,4 +203,4 @@ class AlertIngestionService:
             },
         )
 
-        return IngestResult(alert=alert, is_duplicate=False)
+        return IngestResult(alert=alert, is_duplicate=False, step_log=step_log)

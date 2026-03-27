@@ -7,13 +7,13 @@ For single-step providers, source_path is applied directly to the response
 prefixed by step name: "user_lookup.profile.login".
 
 Value type coercion:
-  - "string" → str(value)
-  - "int" → int(value)
-  - "float" → float(value)
-  - "bool" → bool(value)
-  - "list" → value as-is (must already be list)
-  - "dict" → value as-is (must already be dict)
-  - "any" → value as-is
+  - "string" -> str(value)
+  - "int" -> int(value)
+  - "float" -> float(value)
+  - "bool" -> bool(value)
+  - "list" -> value as-is (must already be list)
+  - "dict" -> value as-is (must already be dict)
+  - "any" -> value as-is
 """
 
 from __future__ import annotations
@@ -22,33 +22,9 @@ from typing import Any
 
 import structlog
 
+from ._dot_path import MISSING, _MissingSentinel, resolve_dot_path
+
 logger = structlog.get_logger(__name__)
-
-
-def _resolve_dot_path(obj: Any, path: str) -> Any:
-    """Traverse a nested dict by dot-separated path. Returns _MISSING if not found."""
-    current = obj
-    for segment in path.split("."):
-        if isinstance(current, dict):
-            if segment not in current:
-                return _MISSING
-            current = current[segment]
-        elif isinstance(current, list):
-            try:
-                current = current[int(segment)]
-            except (ValueError, IndexError):
-                return _MISSING
-        else:
-            return _MISSING
-    return current
-
-
-class _MissingSentinel:
-    """Sentinel for missing values (distinct from None)."""
-    pass
-
-
-_MISSING = _MissingSentinel()
 
 
 def _coerce_value(value: Any, value_type: str) -> Any:
@@ -70,7 +46,7 @@ def _coerce_value(value: Any, value_type: str) -> Any:
             if isinstance(value, str):
                 return value.lower() in ("true", "1", "yes")
             return bool(value)
-        # list, dict, any — return as-is
+        # list, dict, any -- return as-is
         return value
     except (TypeError, ValueError):
         return None
@@ -102,7 +78,7 @@ class FieldExtractor:
                 response body.
 
         Returns:
-            Dict of target_key → extracted value.
+            Dict of target_key -> extracted value.
         """
         extracted: dict[str, Any] = {}
 
@@ -111,7 +87,7 @@ class FieldExtractor:
             target_key = rule["target_key"]
             value_type = rule.get("value_type", "any")
 
-            raw_value = _resolve_dot_path(raw_response, source_path)
+            raw_value = resolve_dot_path(raw_response, source_path, missing=MISSING)
             coerced = _coerce_value(raw_value, value_type)
 
             if coerced is not None:

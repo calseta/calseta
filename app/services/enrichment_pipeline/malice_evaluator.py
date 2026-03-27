@@ -22,23 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
-
-def _resolve_dot_path(obj: Any, path: str) -> Any:
-    """Traverse a nested dict by dot-separated path. Returns None if missing."""
-    current = obj
-    for segment in path.split("."):
-        if isinstance(current, dict):
-            current = current.get(segment)
-        elif isinstance(current, list):
-            try:
-                current = current[int(segment)]
-            except (ValueError, IndexError):
-                return None
-        else:
-            return None
-        if current is None:
-            return None
-    return current
+from ._dot_path import resolve_dot_path
 
 
 def _evaluate_condition(actual: Any, operator: str, expected: Any) -> bool:
@@ -124,7 +108,7 @@ class MaliceRuleEvaluator:
             expected = rule.get("value")
             verdict = rule.get("verdict", self._default_verdict)
 
-            actual = _resolve_dot_path(response_data, field)
+            actual = resolve_dot_path(response_data, field)
             if _evaluate_condition(actual, operator, expected):
                 return verdict  # type: ignore[no-any-return]
 

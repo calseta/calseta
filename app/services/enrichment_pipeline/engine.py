@@ -32,10 +32,11 @@ import structlog
 
 from app.schemas.enrichment import EnrichmentResult
 from app.schemas.enrichment_providers import HttpStepDebug
-from app.services.enrichment_template import TemplateResolver
-from app.services.field_extractor import FieldExtractor
-from app.services.malice_evaluator import MaliceRuleEvaluator
 from app.services.url_validation import validate_outbound_url
+
+from .field_extractor import FieldExtractor
+from .malice_evaluator import MaliceRuleEvaluator
+from .template_resolver import TemplateResolver
 
 logger = structlog.get_logger(__name__)
 

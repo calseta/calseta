@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 from sqlalchemy import case, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.detection_rule import DetectionRule
+from app.repositories.base import BaseRepository
 from app.schemas.detection_rules import DetectionRuleCreate, DetectionRulePatch
 
 # Whitelist of columns that can be used for sorting
@@ -30,15 +29,8 @@ _SEVERITY_ORDER = case(
 )
 
 
-class DetectionRuleRepository:
-    def __init__(self, db: AsyncSession) -> None:
-        self._db = db
-
-    async def get_by_uuid(self, rule_uuid: uuid.UUID) -> DetectionRule | None:
-        result = await self._db.execute(
-            select(DetectionRule).where(DetectionRule.uuid == rule_uuid)
-        )
-        return result.scalar_one_or_none()
+class DetectionRuleRepository(BaseRepository[DetectionRule]):
+    model = DetectionRule
 
     async def get_by_source_rule_id(
         self, source_name: str, source_rule_id: str
@@ -134,7 +126,3 @@ class DetectionRuleRepository:
         await self._db.flush()
         await self._db.refresh(rule)
         return rule
-
-    async def delete(self, rule: DetectionRule) -> None:
-        await self._db.delete(rule)
-        await self._db.flush()
