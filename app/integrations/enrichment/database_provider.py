@@ -6,7 +6,7 @@ Credential resolution priority:
   1. Decrypted auth_config from DB (encrypted at rest)
   2. Env var fallback via env_var_mapping (for builtins)
 
-This adapter delegates all HTTP execution to GenericHttpEnrichmentEngine.
+This adapter delegates all HTTP execution to EnrichmentPipeline.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import structlog
 from app.integrations.enrichment.base import EnrichmentProviderBase
 from app.schemas.enrichment import EnrichmentResult
 from app.schemas.indicators import IndicatorType
-from app.services.enrichment_engine import GenericHttpEnrichmentEngine
+from app.services.enrichment_pipeline import EnrichmentPipeline
 
 logger = structlog.get_logger(__name__)
 
@@ -189,13 +189,13 @@ class DatabaseDrivenProvider(EnrichmentProviderBase):
                 return self._get_mock_result(value, indicator_type)
 
             auth = self._resolve_auth()
-            engine = GenericHttpEnrichmentEngine(
+            pipeline = EnrichmentPipeline(
                 provider_name=self.provider_name,
                 http_config=self._http_config,
                 malice_rules=self._malice_rules,
                 field_extractions=self._field_extractions,
             )
-            return await engine.execute(value, str(indicator_type), auth)
+            return await pipeline.run(value, str(indicator_type), auth)
 
         except Exception as exc:
             logger.exception(
@@ -227,13 +227,13 @@ class DatabaseDrivenProvider(EnrichmentProviderBase):
                 return self._get_mock_result(value, indicator_type)
 
             auth = self._resolve_auth()
-            engine = GenericHttpEnrichmentEngine(
+            pipeline = EnrichmentPipeline(
                 provider_name=self.provider_name,
                 http_config=self._http_config,
                 malice_rules=self._malice_rules,
                 field_extractions=self._field_extractions,
             )
-            return await engine.execute(value, str(indicator_type), auth, capture_debug=True)
+            return await pipeline.run(value, str(indicator_type), auth, capture_debug=True)
 
         except Exception as exc:
             logger.exception(
