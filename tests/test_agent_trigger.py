@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.agent_trigger import (
+from app.queue.handlers.dispatch_webhooks import (
     _passes_jsonb_filter,
     _passes_severity_filter,
     _passes_source_filter,
@@ -223,7 +223,7 @@ async def test_get_matching_agents_returns_agent_with_all_empty_filters() -> Non
     mock_db = MagicMock()
 
     with patch(
-        "app.services.agent_trigger.AgentRepository"
+        "app.queue.handlers.dispatch_webhooks.AgentRepository"
     ) as MockRepo:
         MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
         result = await get_matching_agents(alert, mock_db)
@@ -239,7 +239,7 @@ async def test_get_matching_agents_source_filter_excludes_non_matching() -> None
     mock_db = MagicMock()
 
     with patch(
-        "app.services.agent_trigger.AgentRepository"
+        "app.queue.handlers.dispatch_webhooks.AgentRepository"
     ) as MockRepo:
         MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
         result = await get_matching_agents(alert, mock_db)
@@ -255,7 +255,7 @@ async def test_get_matching_agents_source_filter_includes_matching() -> None:
     mock_db = MagicMock()
 
     with patch(
-        "app.services.agent_trigger.AgentRepository"
+        "app.queue.handlers.dispatch_webhooks.AgentRepository"
     ) as MockRepo:
         MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
         result = await get_matching_agents(alert, mock_db)
@@ -271,7 +271,7 @@ async def test_get_matching_agents_severity_filter_excludes_non_matching() -> No
     mock_db = MagicMock()
 
     with patch(
-        "app.services.agent_trigger.AgentRepository"
+        "app.queue.handlers.dispatch_webhooks.AgentRepository"
     ) as MockRepo:
         MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
         result = await get_matching_agents(alert, mock_db)
@@ -287,7 +287,7 @@ async def test_get_matching_agents_severity_filter_includes_matching() -> None:
     mock_db = MagicMock()
 
     with patch(
-        "app.services.agent_trigger.AgentRepository"
+        "app.queue.handlers.dispatch_webhooks.AgentRepository"
     ) as MockRepo:
         MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
         result = await get_matching_agents(alert, mock_db)
@@ -307,7 +307,7 @@ async def test_get_matching_agents_jsonb_filter_excludes_non_matching() -> None:
     mock_db = MagicMock()
 
     with patch(
-        "app.services.agent_trigger.AgentRepository"
+        "app.queue.handlers.dispatch_webhooks.AgentRepository"
     ) as MockRepo:
         MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
         result = await get_matching_agents(alert, mock_db)
@@ -327,7 +327,7 @@ async def test_get_matching_agents_jsonb_filter_includes_matching() -> None:
     mock_db = MagicMock()
 
     with patch(
-        "app.services.agent_trigger.AgentRepository"
+        "app.queue.handlers.dispatch_webhooks.AgentRepository"
     ) as MockRepo:
         MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
         result = await get_matching_agents(alert, mock_db)
@@ -357,7 +357,7 @@ async def test_get_matching_agents_multiple_agents_partial_match() -> None:
     mock_db = MagicMock()
 
     with patch(
-        "app.services.agent_trigger.AgentRepository"
+        "app.queue.handlers.dispatch_webhooks.AgentRepository"
     ) as MockRepo:
         MockRepo.return_value.list_active = AsyncMock(
             return_value=[matching_agent, non_matching_source, non_matching_severity]
@@ -374,7 +374,7 @@ async def test_get_matching_agents_no_active_agents_returns_empty() -> None:
     mock_db = MagicMock()
 
     with patch(
-        "app.services.agent_trigger.AgentRepository"
+        "app.queue.handlers.dispatch_webhooks.AgentRepository"
     ) as MockRepo:
         MockRepo.return_value.list_active = AsyncMock(return_value=[])
         result = await get_matching_agents(alert, mock_db)
@@ -399,7 +399,7 @@ async def test_get_matching_agents_all_filters_combined() -> None:
     mock_db = MagicMock()
 
     with patch(
-        "app.services.agent_trigger.AgentRepository"
+        "app.queue.handlers.dispatch_webhooks.AgentRepository"
     ) as MockRepo:
         MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
 

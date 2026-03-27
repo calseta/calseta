@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.db.models.agent_registration import AgentRegistration
-from app.services.agent_trigger import (
+from app.queue.handlers.dispatch_webhooks import (
     _passes_jsonb_filter,
     _passes_severity_filter,
     _passes_source_filter,
@@ -290,7 +290,7 @@ class TestInactiveAgentExclusion:
         # get_matching_agents never sees them.
         mock_db = MagicMock()
 
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             # Simulate the repo returning only active agents
             MockRepo.return_value.list_active = AsyncMock(return_value=[active_agent])
             result = await get_matching_agents(_make_alert(), mock_db)
@@ -301,7 +301,7 @@ class TestInactiveAgentExclusion:
     async def test_no_active_agents_returns_empty(self) -> None:
         mock_db = MagicMock()
 
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(return_value=[])
             result = await get_matching_agents(_make_alert(), mock_db)
 
@@ -330,7 +330,7 @@ class TestCombinedFilters:
 
         # All pass
         alert_match = _make_alert(source_name="sentinel", severity="High", tags=["urgent"])
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
             result = await get_matching_agents(alert_match, mock_db)
         assert result == [agent]
@@ -339,7 +339,7 @@ class TestCombinedFilters:
         alert_source_fail = _make_alert(
             source_name="elastic", severity="High", tags=["urgent"]
         )
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
             result = await get_matching_agents(alert_source_fail, mock_db)
         assert result == []
@@ -348,7 +348,7 @@ class TestCombinedFilters:
         alert_sev_fail = _make_alert(
             source_name="sentinel", severity="Low", tags=["urgent"]
         )
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
             result = await get_matching_agents(alert_sev_fail, mock_db)
         assert result == []
@@ -357,7 +357,7 @@ class TestCombinedFilters:
         alert_tag_fail = _make_alert(
             source_name="sentinel", severity="High", tags=["routine"]
         )
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
             result = await get_matching_agents(alert_tag_fail, mock_db)
         assert result == []
@@ -384,7 +384,7 @@ class TestCombinedFilters:
         alert = _make_alert(source_name="sentinel", severity="High")
         mock_db = MagicMock()
 
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(
                 return_value=[agent_a, agent_b, agent_c]
             )
@@ -403,7 +403,7 @@ class TestCombinedFilters:
         )
         mock_db = MagicMock()
 
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
             result = await get_matching_agents(
                 _make_alert(source_name="generic", severity="Informational"), mock_db
@@ -619,7 +619,7 @@ class TestAgentIsolation:
         alert = _make_alert(source_name="sentinel", severity="High")
         mock_db = MagicMock()
 
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(
                 return_value=[agent_a, agent_b]
             )
@@ -644,7 +644,7 @@ class TestAgentIsolation:
         alert = _make_alert(source_name="sentinel", severity="High")
         mock_db = MagicMock()
 
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(
                 return_value=[agent_a, agent_b]
             )
@@ -908,7 +908,7 @@ class TestGetMatchingAgentsEdgeCases:
         alert = _make_alert(tags=[])
         mock_db = MagicMock()
 
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(return_value=[agent])
             result = await get_matching_agents(alert, mock_db)
 
@@ -923,7 +923,7 @@ class TestGetMatchingAgentsEdgeCases:
         alert = _make_alert()
         mock_db = MagicMock()
 
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(return_value=agents)
             result = await get_matching_agents(alert, mock_db)
 
@@ -939,7 +939,7 @@ class TestGetMatchingAgentsEdgeCases:
         alert = _make_alert(source_name="sentinel")
         mock_db = MagicMock()
 
-        with patch("app.services.agent_trigger.AgentRepository") as MockRepo:
+        with patch("app.queue.handlers.dispatch_webhooks.AgentRepository") as MockRepo:
             MockRepo.return_value.list_active = AsyncMock(return_value=agents)
             result = await get_matching_agents(alert, mock_db)
 
