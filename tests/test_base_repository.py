@@ -7,6 +7,7 @@ minimal SQLAlchemy model (so ``select()`` accepts it as a valid entity).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -74,7 +75,7 @@ def _scalar_one_result(value: object) -> MagicMock:
     return result
 
 
-def _paginate_results(rows: list[object], total: int) -> list[MagicMock]:
+def _paginate_results(rows: Sequence[object], total: int) -> list[MagicMock]:
     """Two mock results for paginate's count query + data query."""
     count_result = _scalar_one_result(total)
 

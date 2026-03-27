@@ -8,6 +8,7 @@ mocks of pipeline internals — httpx.AsyncClient is the only seam.
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -198,6 +199,7 @@ class TestMultiStepProvider:
         assert result.extracted["display_name"] == "Alice"
         assert result.extracted["status"] == "ACTIVE"
         # Multi-step raw is keyed by step name
+        assert result.raw is not None
         assert "auth_step" in result.raw
         assert "lookup" in result.raw
         assert result.raw["auth_step"]["access_token"] == "tok_abc123"
@@ -278,6 +280,7 @@ class TestFieldExtractionCoercion:
             result = await pipeline.run("test", "ip", {})
 
         assert result.success is True
+        assert result.extracted is not None
         ext = result.extracted
         assert ext["count"] == 42
         assert isinstance(ext["count"], int)
@@ -297,10 +300,10 @@ class TestFieldExtractionCoercion:
 
 class TestMaliceVerdicts:
     @pytest.fixture
-    def pipeline_factory(self):
+    def pipeline_factory(self) -> Any:
         """Factory that creates a pipeline with given malice rules."""
 
-        def _make(malice_rules):
+        def _make(malice_rules: dict[str, Any] | None) -> EnrichmentPipeline:
             return EnrichmentPipeline(
                 provider_name="test_malice",
                 http_config={
@@ -329,7 +332,7 @@ class TestMaliceVerdicts:
 
         return _make
 
-    async def test_malicious_verdict(self, pipeline_factory) -> None:
+    async def test_malicious_verdict(self, pipeline_factory: Any) -> None:
         rules = {
             "rules": [{"field": "score", "operator": ">=", "value": 80, "verdict": "Malicious"}],
             "default_verdict": "Benign",
@@ -338,9 +341,10 @@ class TestMaliceVerdicts:
         body = {"score": 95}
         with patch("httpx.AsyncClient", _mock_async_client(_mock_response(200, body))):
             result = await pipeline_factory(rules).run("1.2.3.4", "ip", {})
+        assert result.extracted is not None
         assert result.extracted["malice"] == "Malicious"
 
-    async def test_suspicious_verdict(self, pipeline_factory) -> None:
+    async def test_suspicious_verdict(self, pipeline_factory: Any) -> None:
         rules = {
             "rules": [
                 {"field": "score", "operator": ">=", "value": 80, "verdict": "Malicious"},
@@ -352,9 +356,10 @@ class TestMaliceVerdicts:
         body = {"score": 50}
         with patch("httpx.AsyncClient", _mock_async_client(_mock_response(200, body))):
             result = await pipeline_factory(rules).run("1.2.3.4", "ip", {})
+        assert result.extracted is not None
         assert result.extracted["malice"] == "Suspicious"
 
-    async def test_benign_verdict(self, pipeline_factory) -> None:
+    async def test_benign_verdict(self, pipeline_factory: Any) -> None:
         rules = {
             "rules": [
                 {"field": "score", "operator": ">=", "value": 80, "verdict": "Malicious"},
@@ -365,13 +370,15 @@ class TestMaliceVerdicts:
         body = {"score": 5}
         with patch("httpx.AsyncClient", _mock_async_client(_mock_response(200, body))):
             result = await pipeline_factory(rules).run("1.2.3.4", "ip", {})
+        assert result.extracted is not None
         assert result.extracted["malice"] == "Benign"
 
-    async def test_pending_verdict_no_rules(self, pipeline_factory) -> None:
+    async def test_pending_verdict_no_rules(self, pipeline_factory: Any) -> None:
         """No malice_rules at all -> Pending."""
         body = {"score": 50}
         with patch("httpx.AsyncClient", _mock_async_client(_mock_response(200, body))):
             result = await pipeline_factory(None).run("1.2.3.4", "ip", {})
+        assert result.extracted is not None
         assert result.extracted["malice"] == "Pending"
 
 
@@ -394,6 +401,7 @@ class TestNotFoundHandling:
         assert result.success is True
         assert result.extracted is not None
         assert result.extracted["found"] is False
+        assert result.extracted is not None
         assert result.extracted["malice"] == "Pending"  # not_found_verdict
 
 
@@ -614,6 +622,7 @@ class TestOptionalStepFailure:
             result = await pipeline.run("8.8.8.8", "ip", {})
 
         assert result.success is True
+        assert result.extracted is not None
         assert result.extracted["score"] == 77
 
 
@@ -675,6 +684,7 @@ class TestExceptionIsolation:
         assert isinstance(result, EnrichmentResult)
         assert result.success is True
         # Raw should contain the fallback text
+        assert result.raw is not None
         assert "_raw_text" in result.raw
 
 
