@@ -16,7 +16,6 @@ import pytest
 from app.schemas.enrichment import EnrichmentResult, EnrichmentStatus
 from app.services.enrichment_pipeline import EnrichmentPipeline
 
-
 # ---------------------------------------------------------------------------
 # HTTP mock helpers (match pattern from test_enrichment_providers.py but
 # adapted for engine's client.request() call path)
@@ -78,8 +77,18 @@ _SINGLE_STEP_HTTP_CONFIG = {
 
 _SINGLE_STEP_FIELD_EXTRACTIONS = [
     {"source_path": "data.score", "target_key": "score", "value_type": "int", "is_active": True},
-    {"source_path": "data.country", "target_key": "country", "value_type": "string", "is_active": True},
-    {"source_path": "data.reports", "target_key": "reports", "value_type": "int", "is_active": True},
+    {
+        "source_path": "data.country",
+        "target_key": "country",
+        "value_type": "string",
+        "is_active": True,
+    },
+    {
+        "source_path": "data.reports",
+        "target_key": "reports",
+        "value_type": "int",
+        "is_active": True,
+    },
 ]
 
 _SINGLE_STEP_MALICE_RULES = {
@@ -135,7 +144,10 @@ class TestMultiStepProvider:
                     "url": "https://login.example.com/oauth/token",
                     "method": "POST",
                     "headers": {"Content-Type": "application/json"},
-                    "json_body": {"client_id": "{{auth.client_id}}", "client_secret": "{{auth.client_secret}}"},
+                    "json_body": {
+                        "client_id": "{{auth.client_id}}",
+                        "client_secret": "{{auth.client_secret}}",
+                    },
                     "expected_status": [200],
                     "timeout_seconds": 10,
                 },
@@ -143,7 +155,9 @@ class TestMultiStepProvider:
                     "name": "lookup",
                     "url": "https://api.example.com/v1/users/{{indicator.value}}",
                     "method": "GET",
-                    "headers": {"Authorization": "Bearer {{steps.auth_step.response.access_token}}"},
+                    "headers": {
+                        "Authorization": "Bearer {{steps.auth_step.response.access_token}}"
+                    },
                     "expected_status": [200],
                     "not_found_status": [404],
                     "timeout_seconds": 10,
@@ -151,8 +165,18 @@ class TestMultiStepProvider:
             ]
         }
         field_extractions = [
-            {"source_path": "lookup.display_name", "target_key": "display_name", "value_type": "string", "is_active": True},
-            {"source_path": "lookup.status", "target_key": "status", "value_type": "string", "is_active": True},
+            {
+                "source_path": "lookup.display_name",
+                "target_key": "display_name",
+                "value_type": "string",
+                "is_active": True,
+            },
+            {
+                "source_path": "lookup.status",
+                "target_key": "status",
+                "value_type": "string",
+                "is_active": True,
+            },
         ]
         malice_rules = {"rules": [], "default_verdict": "Benign", "not_found_verdict": "Pending"}
 
@@ -160,9 +184,14 @@ class TestMultiStepProvider:
         user_resp = _mock_response(200, {"display_name": "Alice", "status": "ACTIVE"})
 
         with patch("httpx.AsyncClient", _mock_async_client(token_resp, user_resp)):
-            result = await pipeline_run(http_config, field_extractions, malice_rules,
-                                        "alice@example.com", "account",
-                                        {"client_id": "cid", "client_secret": "csec"})
+            result = await pipeline_run(
+                http_config,
+                field_extractions,
+                malice_rules,
+                "alice@example.com",
+                "account",
+                {"client_id": "cid", "client_secret": "csec"},
+            )
 
         assert result.success is True
         assert result.extracted is not None
@@ -195,21 +224,46 @@ class TestFieldExtractionCoercion:
         }
         field_extractions = [
             {"source_path": "count", "target_key": "count", "value_type": "int", "is_active": True},
-            {"source_path": "score", "target_key": "score", "value_type": "float", "is_active": True},
-            {"source_path": "is_active", "target_key": "is_active", "value_type": "bool", "is_active": True},
-            {"source_path": "label", "target_key": "label", "value_type": "string", "is_active": True},
+            {
+                "source_path": "score",
+                "target_key": "score",
+                "value_type": "float",
+                "is_active": True,
+            },
+            {
+                "source_path": "is_active",
+                "target_key": "is_active",
+                "value_type": "bool",
+                "is_active": True,
+            },
+            {
+                "source_path": "label",
+                "target_key": "label",
+                "value_type": "string",
+                "is_active": True,
+            },
             # String numeric should coerce to int
-            {"source_path": "str_num", "target_key": "str_num_as_int", "value_type": "int", "is_active": True},
+            {
+                "source_path": "str_num",
+                "target_key": "str_num_as_int",
+                "value_type": "int",
+                "is_active": True,
+            },
             # Bool from string "true"
-            {"source_path": "str_bool", "target_key": "str_bool_coerced", "value_type": "bool", "is_active": True},
+            {
+                "source_path": "str_bool",
+                "target_key": "str_bool_coerced",
+                "value_type": "bool",
+                "is_active": True,
+            },
         ]
 
         body = {
-            "count": "42",       # string -> int
-            "score": "3.14",     # string -> float
-            "is_active": 1,      # int -> bool
-            "label": 12345,      # int -> string
-            "str_num": "99",     # string -> int
+            "count": "42",  # string -> int
+            "score": "3.14",  # string -> float
+            "is_active": 1,  # int -> bool
+            "label": 12345,  # int -> string
+            "str_num": "99",  # string -> int
             "str_bool": "true",  # string -> bool
         }
 
@@ -245,25 +299,34 @@ class TestMaliceVerdicts:
     @pytest.fixture
     def pipeline_factory(self):
         """Factory that creates a pipeline with given malice rules."""
+
         def _make(malice_rules):
             return EnrichmentPipeline(
                 provider_name="test_malice",
                 http_config={
-                    "steps": [{
-                        "name": "lookup",
-                        "url": "https://api.example.com/{{indicator.value}}",
-                        "method": "GET",
-                        "headers": {},
-                        "expected_status": [200],
-                        "not_found_status": [404],
-                        "timeout_seconds": 10,
-                    }]
+                    "steps": [
+                        {
+                            "name": "lookup",
+                            "url": "https://api.example.com/{{indicator.value}}",
+                            "method": "GET",
+                            "headers": {},
+                            "expected_status": [200],
+                            "not_found_status": [404],
+                            "timeout_seconds": 10,
+                        }
+                    ]
                 },
                 malice_rules=malice_rules,
                 field_extractions=[
-                    {"source_path": "score", "target_key": "score", "value_type": "int", "is_active": True},
+                    {
+                        "source_path": "score",
+                        "target_key": "score",
+                        "value_type": "int",
+                        "is_active": True,
+                    },
                 ],
             )
+
         return _make
 
     async def test_malicious_verdict(self, pipeline_factory) -> None:
@@ -361,7 +424,7 @@ class TestSSRFRejection:
             field_extractions=[],
         )
         # Should NOT make any HTTP call — patch to verify
-        with patch("httpx.AsyncClient", _mock_async_client(_mock_response(200, {}))) as mock_cls:
+        with patch("httpx.AsyncClient", _mock_async_client(_mock_response(200, {}))):
             result = await pipeline.run("test", "ip", {})
 
         assert result.success is False
@@ -391,7 +454,10 @@ class TestSSRFRejection:
             result = await pipeline.run("test", "ip", {})
 
         assert result.success is False
-        assert "SSRF" in (result.error_message or "") or "blocked" in (result.error_message or "").lower()
+        assert (
+            "SSRF" in (result.error_message or "")
+            or "blocked" in (result.error_message or "").lower()
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -413,7 +479,10 @@ class TestTimeoutHandling:
 
         assert result.success is False
         assert result.status == EnrichmentStatus.FAILED
-        assert "timed out" in (result.error_message or "").lower() or "timeout" in (result.error_message or "").lower()
+        assert (
+            "timed out" in (result.error_message or "").lower()
+            or "timeout" in (result.error_message or "").lower()
+        )
 
     async def test_connect_timeout_returns_failure(self) -> None:
         pipeline = EnrichmentPipeline(
@@ -422,7 +491,10 @@ class TestTimeoutHandling:
             malice_rules=_SINGLE_STEP_MALICE_RULES,
             field_extractions=_SINGLE_STEP_FIELD_EXTRACTIONS,
         )
-        with patch("httpx.AsyncClient", _mock_async_client_raising(httpx.ConnectTimeout("Connect timed out"))):
+        with patch(
+            "httpx.AsyncClient",
+            _mock_async_client_raising(httpx.ConnectTimeout("Connect timed out")),
+        ):
             result = await pipeline.run("8.8.8.8", "ip", {"api_key": "k"})
 
         assert result.success is False
@@ -458,7 +530,12 @@ class TestOptionalStepFailure:
             ]
         }
         field_extractions = [
-            {"source_path": "primary.score", "target_key": "score", "value_type": "int", "is_active": True},
+            {
+                "source_path": "primary.score",
+                "target_key": "score",
+                "value_type": "int",
+                "is_active": True,
+            },
         ]
 
         primary_resp = _mock_response(200, {"score": 42})
@@ -469,7 +546,11 @@ class TestOptionalStepFailure:
             pipeline = EnrichmentPipeline(
                 provider_name="test_optional",
                 http_config=http_config,
-                malice_rules={"rules": [], "default_verdict": "Benign", "not_found_verdict": "Pending"},
+                malice_rules={
+                    "rules": [],
+                    "default_verdict": "Benign",
+                    "not_found_verdict": "Pending",
+                },
                 field_extractions=field_extractions,
             )
             result = await pipeline.run("8.8.8.8", "ip", {})
@@ -502,7 +583,12 @@ class TestOptionalStepFailure:
             ]
         }
         field_extractions = [
-            {"source_path": "primary.score", "target_key": "score", "value_type": "int", "is_active": True},
+            {
+                "source_path": "primary.score",
+                "target_key": "score",
+                "value_type": "int",
+                "is_active": True,
+            },
         ]
 
         primary_resp = _mock_response(200, {"score": 77})
@@ -518,7 +604,11 @@ class TestOptionalStepFailure:
             pipeline = EnrichmentPipeline(
                 provider_name="test_optional_exc",
                 http_config=http_config,
-                malice_rules={"rules": [], "default_verdict": "Benign", "not_found_verdict": "Pending"},
+                malice_rules={
+                    "rules": [],
+                    "default_verdict": "Benign",
+                    "not_found_verdict": "Pending",
+                },
                 field_extractions=field_extractions,
             )
             result = await pipeline.run("8.8.8.8", "ip", {})
@@ -542,7 +632,9 @@ class TestExceptionIsolation:
             field_extractions=_SINGLE_STEP_FIELD_EXTRACTIONS,
         )
         # Patch to raise an unexpected RuntimeError
-        with patch("httpx.AsyncClient", _mock_async_client_raising(RuntimeError("catastrophic failure"))):
+        with patch(
+            "httpx.AsyncClient", _mock_async_client_raising(RuntimeError("catastrophic failure"))
+        ):
             result = await pipeline.run("8.8.8.8", "ip", {"api_key": "k"})
 
         assert isinstance(result, EnrichmentResult)
