@@ -3,19 +3,20 @@
 Layer order:
   Layer 1: agent.system_prompt + per-agent instruction_files + global instruction_files
   Layer 2: agent.methodology (wrapped in <methodology> tags)
-  Layer 3: KB context — stubbed in Phase 1 (empty)
+  Layer 3: KB context — global + role-scoped + agent-specific pages, token-budget capped
   Layer 4: Alert/task context — assembled as the first user message
   Layer 5: Session state — injected into messages list
-  Layer 6: Runtime checkpoint — appended to system prompt
+  Layer 6: Runtime checkpoint + agent memory (budget-capped, sorted by staleness/relevance)
 
 Final structure:
-  system_prompt = layer1 + "\n\n" + layer2 + "\n\n" + layer6
+  system_prompt = layer1 + layer2 + layer3 + layer6(checkpoint + memory)
   messages = [layer4_user_msg, ...layer5_history...]
 """
 
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 import structlog
 
@@ -33,6 +34,34 @@ logger = structlog.get_logger(__name__)
 
 # Rough estimate: 1 token ≈ 4 chars
 _CHARS_PER_TOKEN = 4
+
+
+def _xml_escape(text: str) -> str:
+    """Escape special XML/HTML characters for use in attribute values."""
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace('"', "&quot;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def _is_memory_stale(page: object, now: datetime) -> bool:
+    """Check if a memory page is stale based on staleness_ttl_hours in metadata."""
+    metadata = getattr(page, "metadata_", None) or {}
+    ttl_hours = metadata.get("staleness_ttl_hours")
+    updated_at = getattr(page, "updated_at", None)
+    if ttl_hours and updated_at:
+        updated = updated_at.replace(tzinfo=UTC) if updated_at.tzinfo is None else updated_at
+        return bool((now - updated).total_seconds() / 3600 > float(ttl_hours))
+    return False
+
+# KB injection budget: 15% of context window by default
+_KB_BUDGET_PCT = 0.15
+
+# Memory injection budget: 5% of context window by default
+_MEMORY_BUDGET_PCT = 0.05
 
 
 def _estimate_tokens(text: str) -> int:
@@ -54,17 +83,20 @@ class PromptBuilder:
         """Build the complete prompt structure for a managed agent invocation."""
         from app.runtime.models import BuiltPrompt
 
+        context_window = getattr(agent, "max_tokens", None) or 200_000
+
         layer1 = await self._build_layer1(agent)
         layer2 = self._build_layer2(agent)
-        # Layer 3 is stubbed in Phase 1 — KB context populated in Phase 6
-        layer3 = self._build_layer3_kb()  # noqa: F841  # KB CONTEXT STUB
+        layer3, layer3_tokens = await self._build_layer3_kb(agent, context_window)
         layer4_msg = await self._build_layer4_alert_context(context)
-        layer6 = self._build_layer6_checkpoint(agent)
+        layer6 = await self._build_layer6_checkpoint(agent, context_window)
 
-        # Assemble system prompt: layers 1 + 2 + 6
+        # Assemble system prompt: layers 1 + 2 + 3 + 6
         system_parts = [layer1]
         if layer2:
             system_parts.append(layer2)
+        if layer3:
+            system_parts.append(layer3)
         system_parts.append(layer6)
         system_prompt = "\n\n".join(p for p in system_parts if p)
 
@@ -75,7 +107,7 @@ class PromptBuilder:
         layer_tokens: dict[str, int] = {
             "layer1_system": _estimate_tokens(layer1),
             "layer2_methodology": _estimate_tokens(layer2),
-            "layer3_kb": 0,  # stub
+            "layer3_kb": layer3_tokens,
             "layer4_context": _estimate_tokens(layer4_msg) if layer4_msg else 0,
             "layer6_checkpoint": _estimate_tokens(layer6),
         }
@@ -150,15 +182,51 @@ class PromptBuilder:
             return ""
         return f"<methodology>\n{agent.methodology}\n</methodology>"
 
-    def _build_layer3_kb(self) -> str:
-        """Layer 3: KB context stub.
+    async def _build_layer3_kb(
+        self, agent: AgentRegistration, context_window: int
+    ) -> tuple[str, int]:
+        """Layer 3: KB context — global + role-scoped + agent-specific pages.
 
-        # KB CONTEXT STUB
-        Phase 6 will populate this layer with relevant knowledge base pages
-        matched by inject_scope to this agent/role. The prompt construction
-        structure is ready — this method returns an empty string until then.
+        Returns (xml_block, token_count). Empty string if no injectable pages exist.
+        Budget: KB_BUDGET_PCT of context_window. Pinned pages always included.
         """
-        return ""
+        try:
+            from app.repositories.kb_repository import KBPageRepository
+
+            repo = KBPageRepository(self._db)
+            pages = await repo.get_injectable_pages(
+                agent_uuid=str(agent.uuid),
+                agent_role=agent.role,
+            )
+
+            if not pages:
+                return "", 0
+
+            budget = int(context_window * _KB_BUDGET_PCT)
+            parts: list[str] = []
+            total_tokens = 0
+
+            for page in pages:
+                tokens = page.token_count or _estimate_tokens(page.body)
+                if page.inject_pinned or total_tokens + tokens <= budget:
+                    updated = page.updated_at.strftime("%Y-%m-%d") if page.updated_at else ""
+                    parts.append(
+                        f'<context_document title="{_xml_escape(page.title)}" '
+                        f'slug="{_xml_escape(page.slug)}" updated="{updated}">\n'
+                        f"{page.body}\n"
+                        f"</context_document>"
+                    )
+                    total_tokens += tokens
+
+            if not parts:
+                return "", 0
+
+            block = "\n\n".join(parts)
+            return block, _estimate_tokens(block)
+
+        except Exception as exc:
+            logger.warning("prompt_builder.layer3_kb_failed", error=str(exc))
+            return "", 0
 
     async def _build_layer4_alert_context(
         self, context: RuntimeContext
@@ -239,8 +307,17 @@ class PromptBuilder:
             for ind in indicators
         ]
 
-    def _build_layer6_checkpoint(self, agent: AgentRegistration) -> str:
-        """Layer 6: runtime checkpoint with budget info."""
+    async def _build_layer6_checkpoint(
+        self, agent: AgentRegistration, context_window: int
+    ) -> str:
+        """Layer 6: runtime checkpoint + agent persistent memory.
+
+        Includes:
+        - Budget status
+        - Agent memory entries (budget-capped at MEMORY_BUDGET_PCT of context window)
+          Sorted: non-stale first, then by updated_at DESC.
+          Stale entries are included with a [STALE] prefix.
+        """
         budget_monthly = agent.budget_monthly_cents
         spent = agent.spent_monthly_cents
 
@@ -259,7 +336,93 @@ class PromptBuilder:
             budget_line = "Budget: unlimited (no monthly budget configured)."
             warning = ""
 
-        return f"<runtime_checkpoint>\n{budget_line}{warning}\n</runtime_checkpoint>"
+        checkpoint_text = f"{budget_line}{warning}"
+
+        # Inject agent memory entries
+        memory_block = await self._build_memory_block(agent, context_window)
+
+        parts = [f"<runtime_checkpoint>\n{checkpoint_text}\n</runtime_checkpoint>"]
+        if memory_block:
+            parts.append(memory_block)
+
+        return "\n\n".join(parts)
+
+    async def _build_memory_block(
+        self, agent: AgentRegistration, context_window: int
+    ) -> str:
+        """Load and format agent memory entries for Layer 6 injection.
+
+        Sorted: non-stale DESC, updated_at DESC.
+        Stale entries get [STALE — last updated X hours ago] prefix.
+        Budget: MEMORY_BUDGET_PCT of context_window.
+        """
+        try:
+            from sqlalchemy import and_, select
+
+            from app.db.models.kb_page import KnowledgeBasePage
+
+            agent_folder = f"/memory/agents/{agent.id}/"
+
+            result = await self._db.execute(
+                select(KnowledgeBasePage)
+                .where(
+                    and_(
+                        KnowledgeBasePage.folder == agent_folder,
+                        KnowledgeBasePage.status == "published",
+                    )
+                )
+                .order_by(KnowledgeBasePage.updated_at.desc())
+            )
+            pages = list(result.scalars().all())
+
+            if not pages:
+                return ""
+
+            now = datetime.now(UTC)
+            budget = int(context_window * _MEMORY_BUDGET_PCT)
+
+            # Annotate each page with staleness
+            annotated: list[tuple[bool, KnowledgeBasePage]] = []
+            for page in pages:
+                is_stale = _is_memory_stale(page, now)
+                annotated.append((is_stale, page))
+
+            # Sort: non-stale first, then by recency
+            annotated.sort(
+                key=lambda x: (x[0], -(x[1].updated_at.timestamp() if x[1].updated_at else 0))
+            )
+
+            parts: list[str] = []
+            total_tokens = 0
+
+            for is_stale, page in annotated:
+                tokens = page.token_count or _estimate_tokens(page.body)
+                if total_tokens + tokens > budget:
+                    break
+
+                body = page.body
+                if is_stale and page.updated_at:
+                    uat = page.updated_at
+                    if uat.tzinfo is None:
+                        uat = uat.replace(tzinfo=UTC)
+                    hours_ago = int((now - uat).total_seconds() / 3600)
+                    body = f"[STALE — last updated {hours_ago} hours ago]\n{body}"
+
+                title = page.title or page.slug
+                parts.append(
+                    f'<memory title="{_xml_escape(title)}" slug="{_xml_escape(page.slug)}"'
+                    f' stale="{str(is_stale).lower()}">\n{body}\n</memory>'
+                )
+                total_tokens += tokens
+
+            if not parts:
+                return ""
+
+            return "<agent_memory>\n" + "\n\n".join(parts) + "\n</agent_memory>"
+
+        except Exception as exc:
+            logger.warning("prompt_builder.memory_injection_failed", error=str(exc))
+            return ""
 
     def _build_messages(
         self,

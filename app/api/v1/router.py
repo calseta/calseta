@@ -27,7 +27,9 @@ from app.api.v1 import (
     ingest,
     invocations,
     issues,
+    kb,
     llm_integrations,
+    memory,
     metrics,
     routines,
     secrets,
@@ -74,3 +76,6 @@ v1_router.include_router(issues.agents_issues_router)
 v1_router.include_router(routines.router)
 v1_router.include_router(campaigns.router)
 v1_router.include_router(topology.router)
+v1_router.include_router(kb.router)
+v1_router.include_router(memory.router)
+v1_router.include_router(memory.agents_memory_router)

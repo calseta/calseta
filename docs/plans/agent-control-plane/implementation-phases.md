@@ -58,11 +58,25 @@ tests/integration/agent_control_plane/
 ├── test_phase2_actions.py              # Propose action → approval gate → execute → rollback
 ├── test_phase2_user_validation.py      # Validation rule matching, DM mock, confirm/deny/timeout flows
 ├── test_phase4_budget.py               # Soft alert, hard stop, per-alert cap, subscription vs API billing_type
+├── test_phase4_supervisor.py           # Supervisor: stuck agent detection, timeout kill, assignment release
 ├── test_phase5_orchestration.py        # Orchestrator → 2 specialists in parallel → synthesize findings
+├── test_phase5_invocation_poll.py      # Long-poll contract: completed/still-running/failed response shapes
+├── test_phase55_issues.py              # Issue CRUD, atomic checkout invariant, status transitions
+├── test_phase55_routines.py            # Cron trigger firing, webhook invocation, run history, pause/resume
+├── test_phase55_campaigns.py           # Campaign creation, item linking, auto-computed metric calculation
+├── test_phase55_topology.py            # Topology graph nodes/edges — agents, routing paths, delegation edges
+├── test_phase6_cleanup.py              # Pre-flight: approval consolidation, duplicate routes removed, path fixes
+├── test_phase6_kb.py                   # KB page CRUD, full-text search, revision history, inject_scope filtering
+├── test_phase6_kb_sync.py              # GitHub/Confluence/URL sync: hash change detection, overwrite, error handling
+├── test_phase6_memory.py               # save/recall/promote memory, staleness TTL, injection ordering
+├── test_phase6_kb_injection.py         # KB context resolver: global + role + agent scoped pages, token budget cap
+├── test_phase7_reference_agents.py     # Reference agent loads, prompt construction smoke test, tool declarations
 └── fixtures/
     ├── mock_alerts.json                # Canonical 20-alert dataset (symlink from scripts/fixtures/)
     ├── mock_llm_responses.py           # Canned LLM response sequences for managed agent tests
-    └── mock_enrichment.py              # Stubbed enrichment verdicts
+    ├── mock_enrichment.py              # Stubbed enrichment verdicts
+    ├── mock_kb_pages.json              # Sample KB pages across folders and inject_scopes for Phase 6 tests
+    └── mock_sync_responses.py          # Stubbed GitHub/Confluence/URL HTTP responses for sync tests
 ```
 
 **LLM mocking strategy:** Mock `LLMProviderAdapter.create_message()` at the interface boundary — never call real LLM APIs in CI. `mock_llm_responses.py` contains canned response sequences that exercise: tool call → result → tool call → result → text completion, tool permission denial, session compaction trigger, and budget exceeded mid-loop.
@@ -328,6 +342,152 @@ All indexes from the "Required Indexes (Part 1)" section above apply to this mig
 - Routing path computation, delegation path computation
 
 **Exit criteria:** Agent creates a remediation issue during an investigation → issue tracked with subtasks → assignee agent picks it up on next heartbeat. Scheduled routine fires daily → creates issue via normal routing → agent processes. Campaign created with MTTD target → Calseta auto-computes current MTTD from alert/assignment timestamps and updates `current_value`. Topology API returns agent fleet graph with routing + delegation paths.
+
+### Phase 6 — Pre-flight Cleanup (Technical Debt) `[All Parts]`
+
+**Goal:** Resolve known technical debt and API inconsistencies before adding KB, memory, and UI on top. Cleaning now prevents these issues from calcifying across future phases.
+
+#### `make test-full` — integration tests with real DB
+
+All phases to date have had integration tests silently skipped because `TEST_DATABASE_URL` is not set when `make test` runs. The root conftest calls `pytest.skip()` at the session level when no DB URL is present, so every DB-dependent test shows as "skipped" rather than failing. This means 33+ integration tests have never actually executed against a real PostgreSQL instance.
+
+**Cleanup tasks:**
+
+1. Add a `test-full` Makefile target that:
+   - Starts the DB container (`docker compose up -d db`)
+   - Waits for PostgreSQL to be ready (`pg_isready`)
+   - Creates a dedicated test database (`calseta_test`) if it doesn't exist
+   - Runs Alembic migrations against the test DB
+   - Runs the full test suite with `TEST_DATABASE_URL` set (unit + integration)
+   - Tears nothing down (leave DB running for subsequent runs — `make dev-down` handles cleanup)
+
+2. Update `make ci` to use `test-full` instead of `test` so CI always runs integration tests against a real DB.
+
+3. Update the `.github/workflows/ci.yml` GitHub Actions workflow to spin up a `postgres:15-alpine` service container and set `TEST_DATABASE_URL` in the test step — same pattern already used by the existing v1 CI workflow.
+
+**Target Makefile addition:**
+```makefile
+# Full test suite: unit + integration against real PostgreSQL
+test-full:
+	docker compose up -d db
+	@echo "Waiting for PostgreSQL to be ready..."
+	@until docker compose exec db pg_isready -U postgres > /dev/null 2>&1; do sleep 1; done
+	@docker compose exec db psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='calseta_test'" | grep -q 1 || \
+		docker compose exec db psql -U postgres -c "CREATE DATABASE calseta_test"
+	TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test \
+		alembic upgrade head
+	TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test \
+		pytest tests/ -v
+```
+
+**Exit criteria:** `make test-full` runs without skipping any integration tests. CI workflow runs integration tests in GitHub Actions. Unit count + integration count both non-zero in test output.
+
+---
+
+#### Approval system consolidation
+
+Two separate approval routers exist with overlapping responsibilities:
+
+- `app/api/v1/workflow_approvals.py` — v1 approval system for workflow executions (`GET/POST /v1/workflow-approvals`, `/approve`, `/reject`)
+- `app/api/v1/approvals.py` — Phase 2 addition for browser decision page (`/decide`) + Slack/Teams callbacks
+
+Both operate on `WorkflowApprovalRequest`. The PRD explicitly specifies Phase 2 actions should reuse `WorkflowApprovalRequest` — not introduce a new table. The current split is an implementation artifact, not an intentional design.
+
+**Cleanup tasks:**
+- Merge `approvals.py` into `workflow_approvals.py`
+- Consolidate all approval endpoints under `/v1/workflow-approvals` (the canonical prefix)
+- Move `/decide`, `/callback/slack`, `/callback/teams` under `/v1/workflow-approvals`
+- Delete `app/api/v1/approvals.py`
+- Update any internal references and tests
+- Add redirect or 410 for any old `/v1/approvals/*` paths if needed
+
+**Exit criteria:** Single approval router file. All approval-related endpoints under `/v1/workflow-approvals`. All tests green.
+
+---
+
+#### Duplicate `GET /v1/workflows`
+
+`workflows.py` registers `GET /v1/workflows` twice. FastAPI silently uses the first match — the second handler is dead code.
+
+**Cleanup tasks:**
+- Read both handlers and determine which is correct (likely one is the list endpoint, the other a leftover from the AI-assisted workflow generation additions)
+- Remove the duplicate registration
+- Confirm the surviving handler has correct response model and pagination
+
+**Exit criteria:** Single `GET /v1/workflows` handler. All tests green.
+
+---
+
+#### Wrong path structure on agent sub-resource routes
+
+Two routes have their prefix wrong — agent sub-resources ended up under the wrong parent:
+
+```
+GET /v1/invocations/{agent_uuid}/invocations   ← should be /v1/agents/{agent_uuid}/invocations
+GET /v1/issues/{agent_uuid}/issues             ← should be /v1/agents/{agent_uuid}/issues
+```
+
+These are registered inside `invocations.py` and `issues.py` using a secondary router without the `/agents` prefix. Any client using the canonical URL gets a 404.
+
+**Cleanup tasks:**
+- Move both routes to routers with the `/agents/{agent_uuid}` prefix (or register them in `agents.py`)
+- Update `router.py` includes accordingly
+- Update any tests that reference the old paths
+
+**Exit criteria:** `GET /v1/agents/{agent_uuid}/invocations` and `GET /v1/agents/{agent_uuid}/issues` return correct results. Old paths removed. All tests green.
+
+---
+
+#### Two agent dispatch endpoints on alerts
+
+```
+POST /v1/alerts/{alert_uuid}/trigger-agents
+POST /v1/alerts/{alert_uuid}/dispatch-agent
+```
+
+`dispatch-agent` is the v1 webhook push handler. `trigger-agents` appears to be a control plane addition. Read both handlers — if they do the same thing, consolidate to one. If they serve different purposes, add a comment in the code explaining the distinction.
+
+**Cleanup tasks:**
+- Read both handlers in `alerts.py`
+- If redundant: keep `dispatch-agent` (v1 compatibility) or `trigger-agents` (control plane semantics) — deprecate/remove the other with a comment
+- If distinct: document the difference clearly in both handler docstrings
+- Update tests to cover whichever survives
+
+**Exit criteria:** No silent duplicate dispatch paths. Clear ownership of agent triggering. All tests green.
+
+---
+
+#### Redundant enrichment provider list endpoints
+
+```
+GET /v1/enrichment-providers      ← full operator CRUD (enrichment_providers.py)
+GET /v1/enrichments/providers     ← lightweight list (enrichments.py)
+```
+
+`GET /v1/enrichments/providers` predates the full provider CRUD and is likely now redundant. Agents and operators should use `/v1/enrichment-providers`.
+
+**Cleanup tasks:**
+- Check if `GET /v1/enrichments/providers` is referenced anywhere (MCP server, tests, UI)
+- If unused: remove it and the handler
+- If used: replace callers with `/v1/enrichment-providers` then remove
+
+**Exit criteria:** Single canonical provider list endpoint. All tests green.
+
+---
+
+#### Legacy `POST /v1/alerts` in ingest router
+
+`ingest.py` registers `POST /v1/alerts` alongside the canonical `POST /v1/ingest/{source_name}`. The bare `/alerts` path looks like a legacy alias that was never removed.
+
+**Cleanup tasks:**
+- Read the `POST /v1/alerts` handler in `ingest.py` — confirm it's an alias for ingest, not a separate create-alert path
+- If alias: remove it (canonical path is `POST /v1/ingest/{source_name}`)
+- If distinct create-alert semantics: move to `alerts.py` with a clear docstring explaining the difference from ingest
+- Update any tests or MCP tools referencing the old path
+
+**Exit criteria:** No ambiguous alert creation paths. `POST /v1/ingest/{source_name}` is the single ingest entry point. All tests green.
+
+---
 
 ### Phase 6 — Knowledge Base + Agent Memory (Organizational Knowledge) `[Part 3]`
 

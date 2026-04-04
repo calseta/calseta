@@ -279,6 +279,35 @@ async def evaluate_routine_triggers_task(timestamp: int) -> None:
         log.info("evaluate_routine_triggers_task.completed", fired=fired)
 
 
+@procrastinate_app.periodic(cron="0 */6 * * *")  # every 6 hours
+@procrastinate_app.task(
+    name="sync_kb_pages_task",
+    queue="default",
+    retry=procrastinate.RetryStrategy(max_attempts=1, wait=0),
+)
+async def sync_kb_pages_task(timestamp: int) -> None:
+    """Periodic task — sync all KB pages that have an external sync_source configured."""
+    import structlog
+
+    from app.queue.handlers.base import task_session
+    from app.services.kb_service import KBService
+
+    log = structlog.get_logger()
+    async with task_session() as db:
+        svc = KBService(db)
+        results = await svc.sync_all_pages()
+        updated = sum(1 for r in results if r.outcome == "updated")
+        no_change = sum(1 for r in results if r.outcome == "no_change")
+        errors = sum(1 for r in results if r.outcome in ("fetch_failed", "config_invalid"))
+        log.info(
+            "sync_kb_pages_task.completed",
+            total=len(results),
+            updated=updated,
+            no_change=no_change,
+            errors=errors,
+        )
+
+
 if settings.SANDBOX_MODE:
 
     @procrastinate_app.periodic(cron="0 0 * * *")

@@ -123,17 +123,3 @@ class OnDemandEnrichmentResponse(BaseModel):
     results: dict[str, OnDemandEnrichmentResult]
     enriched_at: datetime
 
-
-# ---------------------------------------------------------------------------
-# Provider listing endpoint schema (GET /v1/enrichments/providers)
-# ---------------------------------------------------------------------------
-
-
-class EnrichmentProviderInfo(BaseModel):
-    """Single provider entry for GET /v1/enrichments/providers."""
-
-    provider_name: str
-    display_name: str
-    supported_types: list[IndicatorType]
-    is_configured: bool
-    cache_ttl_seconds: int
