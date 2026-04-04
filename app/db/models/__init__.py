@@ -3,6 +3,7 @@
 from app.db.models.activity_event import ActivityEvent
 from app.db.models.agent_action import AgentAction
 from app.db.models.agent_api_key import AgentAPIKey
+from app.db.models.agent_invocation import AgentInvocation
 from app.db.models.agent_instruction_file import AgentInstructionFile
 from app.db.models.agent_registration import AgentRegistration
 from app.db.models.agent_run import AgentRun
@@ -34,6 +35,7 @@ __all__ = [
     "ActivityEvent",
     "AgentAction",
     "AgentAPIKey",
+    "AgentInvocation",
     "AgentInstructionFile",
     "AgentRegistration",
     "AgentRun",

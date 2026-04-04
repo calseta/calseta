@@ -25,6 +25,7 @@ from app.api.v1 import (
     indicator_mappings,
     indicators,
     ingest,
+    invocations,
     llm_integrations,
     metrics,
     secrets,
@@ -64,3 +65,5 @@ v1_router.include_router(heartbeat.router)
 v1_router.include_router(sessions.router)
 v1_router.include_router(sessions.agents_sessions_router)
 v1_router.include_router(actions.router)
+v1_router.include_router(invocations.router)
+v1_router.include_router(invocations.agents_invocations_router)

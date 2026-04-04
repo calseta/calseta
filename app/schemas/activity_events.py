@@ -51,6 +51,12 @@ class ActivityEventType(StrEnum):
     ACTION_FAILED = "action.failed"
     ACTION_CANCELLED = "action.cancelled"
 
+    # Invocation events (Phase 5)
+    INVOCATION_CREATED = "invocation.created"
+    INVOCATION_COMPLETED = "invocation.completed"
+    INVOCATION_FAILED = "invocation.failed"
+    INVOCATION_TIMED_OUT = "invocation.timed_out"
+
 
 class ActivityEventResponse(BaseModel):
     """Activity event as returned by GET /v1/alerts/{uuid}/activity."""

@@ -39,6 +39,7 @@ from app.db.session import get_db
 from app.middleware.rate_limit import limiter
 from app.repositories.agent_api_key_repository import AgentAPIKeyRepository
 from app.repositories.agent_repository import AgentRepository
+from app.schemas.agent_invocations import AgentCatalogEntry
 from app.schemas.agents import (
     AgentBudgetUpdate,
     AgentKeyCreate,
@@ -629,6 +630,30 @@ async def revoke_agent_key(
         )
 
     await key_repo.revoke(record)
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/agents/catalog
+# ---------------------------------------------------------------------------
+
+
+@router.get("/catalog", response_model=DataResponse[list[AgentCatalogEntry]])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def get_agent_catalog(
+    request: Request,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[list[AgentCatalogEntry]]:
+    """Return all active specialist agents available for delegation.
+
+    Used by orchestrators to discover sub-agents and inject their
+    capabilities into LLM context before planning delegation.
+    """
+    from app.services.invocation_service import InvocationService
+
+    svc = InvocationService(db)
+    catalog = await svc.get_catalog()
+    return DataResponse(data=catalog)
 
 
 # ---------------------------------------------------------------------------

@@ -107,6 +107,9 @@ class AgentSupervisor:
                 )
                 report.errors.append(error_msg)
 
+        # Phase 5: scan for timed-out invocations
+        await self._scan_timed_out_invocations(now, report)
+
         logger.info(
             "supervisor.completed",
             checked=report.checked,
@@ -115,6 +118,43 @@ class AgentSupervisor:
             errors=len(report.errors),
         )
         return report
+
+    async def _scan_timed_out_invocations(
+        self,
+        now: datetime,
+        report: SupervisionReport,
+    ) -> None:
+        """Mark running invocations whose deadline has passed as timed_out."""
+        try:
+            from app.repositories.agent_invocation_repository import AgentInvocationRepository
+            from app.services.invocation_service import InvocationService
+
+            inv_repo = AgentInvocationRepository(self._db)
+            inv_svc = InvocationService(self._db)
+
+            timed_out_candidates = await inv_repo.list_timed_out_candidates(cutoff=now)
+            for invocation in timed_out_candidates:
+                try:
+                    await inv_svc.mark_timed_out(invocation)
+                    report.timed_out += 1
+                    logger.warning(
+                        "supervisor.invocation_timed_out",
+                        invocation_uuid=str(invocation.uuid),
+                        started_at=invocation.started_at.isoformat()
+                        if invocation.started_at
+                        else None,
+                        timeout_seconds=invocation.timeout_seconds,
+                    )
+                except Exception as exc:
+                    report.errors.append(
+                        f"Error marking invocation {invocation.id} timed_out: {exc}"
+                    )
+        except Exception as exc:
+            logger.error(
+                "supervisor.invocation_scan_failed",
+                error=str(exc),
+            )
+            report.errors.append(f"Invocation scan error: {exc}")
 
     async def _check_timeout(
         self,

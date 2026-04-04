@@ -247,6 +247,22 @@ async def supervise_running_agents_task(timestamp: int) -> None:
         await supervisor.supervise()
 
 
+@procrastinate_app.task(
+    name="execute_invocation_task",
+    queue="invocations",
+    retry=procrastinate.RetryStrategy(max_attempts=1, wait=0),
+)
+async def execute_invocation_task(invocation_id: int) -> None:
+    """Execute a single agent invocation (orchestrator→specialist delegation)."""
+    from app.queue.handlers.base import task_session
+    from app.queue.handlers.execute_invocation import ExecuteInvocationHandler
+    from app.queue.handlers.payloads import ExecuteInvocationPayload
+
+    payload = ExecuteInvocationPayload(invocation_id=invocation_id)
+    async with task_session() as session:
+        await ExecuteInvocationHandler().execute(payload, session)
+
+
 if settings.SANDBOX_MODE:
 
     @procrastinate_app.periodic(cron="0 0 * * *")

@@ -54,6 +54,12 @@ class ExecuteResponseActionPayload(BaseModel):
     agent_action_id: int
 
 
+class ExecuteInvocationPayload(BaseModel):
+    """Payload for the ``execute_invocation_task`` task (queue: invocations)."""
+
+    invocation_id: int
+
+
 class SandboxResetPayload(BaseModel):
     """Payload for the ``sandbox_reset`` periodic task (queue: default)."""
 

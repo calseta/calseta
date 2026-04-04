@@ -64,6 +64,7 @@ def main() -> None:
         import app.mcp.tools.alerts  # noqa: E402, F401
         import app.mcp.tools.detection_rules  # noqa: E402, F401
         import app.mcp.tools.enrichment  # noqa: E402, F401
+        import app.mcp.tools.orchestration  # noqa: E402, F401
         import app.mcp.tools.workflows  # noqa: E402, F401
 
         # Load enrichment providers from DB before starting the server
