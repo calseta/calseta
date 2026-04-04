@@ -263,6 +263,22 @@ async def execute_invocation_task(invocation_id: int) -> None:
         await ExecuteInvocationHandler().execute(payload, session)
 
 
+@procrastinate_app.periodic(cron="*/1 * * * *")
+@procrastinate_app.task(name="evaluate_routine_triggers_task", queue="routines")
+async def evaluate_routine_triggers_task(timestamp: int) -> None:
+    """Periodic task — evaluates due cron triggers every minute and creates routine_runs."""
+    import structlog
+
+    from app.queue.handlers.base import task_session
+    from app.services.routine_service import RoutineService
+
+    log = structlog.get_logger()
+    async with task_session() as db:
+        svc = RoutineService(db)
+        fired = await svc.evaluate_cron_triggers()
+        log.info("evaluate_routine_triggers_task.completed", fired=fired)
+
+
 if settings.SANDBOX_MODE:
 
     @procrastinate_app.periodic(cron="0 0 * * *")

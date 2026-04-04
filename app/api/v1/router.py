@@ -16,6 +16,7 @@ from app.api.v1 import (
     alerts,
     api_keys,
     approvals,
+    campaigns,
     context_documents,
     detection_rules,
     enrichment_field_extractions,
@@ -26,12 +27,15 @@ from app.api.v1 import (
     indicators,
     ingest,
     invocations,
+    issues,
     llm_integrations,
     metrics,
+    routines,
     secrets,
     sessions,
     settings,
     sources,
+    topology,
     workflow_approvals,
     workflows,
 )
@@ -67,3 +71,8 @@ v1_router.include_router(sessions.agents_sessions_router)
 v1_router.include_router(actions.router)
 v1_router.include_router(invocations.router)
 v1_router.include_router(invocations.agents_invocations_router)
+v1_router.include_router(issues.router)
+v1_router.include_router(issues.agents_issues_router)
+v1_router.include_router(routines.router)
+v1_router.include_router(campaigns.router)
+v1_router.include_router(topology.router)
