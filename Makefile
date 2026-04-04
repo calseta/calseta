@@ -1,4 +1,4 @@
-.PHONY: dev dev-up dev-down test lint typecheck migrate ci build help seed-sandbox lab lab-reset lab-stop docs-openapi docs-openapi-check
+.PHONY: dev dev-up dev-down test test-full lint typecheck migrate ci build help seed-sandbox lab lab-reset lab-stop docs-openapi docs-openapi-check
 
 # Inline script to apply procrastinate's schema (idempotent — ignores "already exists")
 define APPLY_PROCRASTINATE_SCHEMA
@@ -23,11 +23,12 @@ help:
 	@echo "  dev        Start all services (API + worker + MCP + DB + UI)"
 	@echo "  dev-up     Restart services without migrations (faster)"
 	@echo "  dev-down   Stop all services"
-	@echo "  test       Run pytest test suite"
+	@echo "  test       Run pytest unit tests (no DB required)"
+	@echo "  test-full  Run all tests (unit + integration) against real PostgreSQL"
 	@echo "  lint       Run ruff linter"
 	@echo "  typecheck  Run mypy type checker"
 	@echo "  migrate    Apply pending Alembic migrations (requires running db)"
-	@echo "  ci         Run lint + typecheck + test (same as GitHub Actions)"
+	@echo "  ci         Run lint + typecheck + test-full (same as GitHub Actions)"
 	@echo "  build      Build production Docker image"
 	@echo ""
 	@echo "Docs:"
@@ -73,6 +74,18 @@ dev-down:
 test:
 	pytest tests/ -v --ignore=tests/integration; STATUS=$$?; [ $$STATUS -eq 5 ] && exit 0 || exit $$STATUS
 
+# Full test suite: unit + integration against real PostgreSQL
+test-full:
+	docker compose up -d db
+	@echo "Waiting for PostgreSQL to be ready..."
+	@until docker compose exec db pg_isready -U postgres > /dev/null 2>&1; do sleep 1; done
+	@docker compose exec db psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='calseta_test'" | grep -q 1 || \
+		docker compose exec db psql -U postgres -c "CREATE DATABASE calseta_test"
+	TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test \
+		alembic upgrade head
+	TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test \
+		pytest tests/ -v
+
 # Integration tests (requires running PostgreSQL via TEST_DATABASE_URL or DATABASE_URL)
 test-integration:
 	pytest tests/integration/ -v
@@ -86,7 +99,7 @@ typecheck:
 migrate:
 	alembic upgrade head
 
-ci: lint typecheck test
+ci: lint typecheck test-full
 
 build:
 	docker build --target prod -t calseta .

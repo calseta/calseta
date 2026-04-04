@@ -60,9 +60,11 @@ jobs:
                       raise
           asyncio.run(_apply())
           " || true
-      - run: make test
+      - name: Run tests (unit + integration)
+        run: pytest tests/ -v
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test
       - name: Check OpenAPI spec is up to date
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test
