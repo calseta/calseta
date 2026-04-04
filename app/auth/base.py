@@ -31,6 +31,7 @@ class AuthContext:
     key_id: int
     key_type: str = field(default="human")
     allowed_sources: list[str] | None = field(default=None)
+    agent_registration_id: int | None = field(default=None)
 
 
 class AuthBackendBase(ABC):

@@ -36,9 +36,7 @@ from typing import Any
 
 import httpx
 import openai
-
 from naive_agent import AgentMetrics
-
 
 # ---------------------------------------------------------------------------
 # Client factory — OpenAI direct vs Azure OpenAI

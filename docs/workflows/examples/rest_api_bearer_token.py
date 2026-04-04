@@ -6,7 +6,6 @@ uses Bearer token auth) when a malicious indicator is detected. Adapt the
 payload and endpoint for Jira, PagerDuty, Opsgenie, or any similar service.
 """
 
-import json
 
 from app.workflows.context import WorkflowContext, WorkflowResult
 

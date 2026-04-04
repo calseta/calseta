@@ -1004,10 +1004,10 @@ async def dispatch_agent(
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    if not agent.is_active:
+    if agent.status != "active":
         raise CalsetaException(
             code="AGENT_INACTIVE",
-            message=f"Agent '{agent.name}' is inactive.",
+            message=f"Agent '{agent.name}' is not active (current status: {agent.status}).",
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 

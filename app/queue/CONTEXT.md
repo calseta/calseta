@@ -2,7 +2,9 @@
 
 ## What This Component Does
 
-The task queue abstraction provides a durable, asynchronous job execution layer backed by PostgreSQL via procrastinate. All async operations (alert enrichment, agent webhook dispatch, workflow execution, approval notifications) are enqueued before the originating HTTP request returns, ensuring the API responds within 200ms while heavy work runs in the worker process. The abstraction layer (`TaskQueueBase`) allows future backend swaps (Celery/Redis, SQS, Azure Service Bus) without changing any service or route code.
+The task queue abstraction provides a durable, asynchronous job execution layer backed by PostgreSQL via procrastinate. All async operations (alert enrichment, agent webhook dispatch, workflow execution, approval notifications, managed agent execution) are enqueued before the originating HTTP request returns. The abstraction layer (`TaskQueueBase`) allows future backend swaps (Celery/Redis, SQS, Azure Service Bus) without changing any service or route code.
+
+**Note on the pull model:** The alert queue for agent work (`alert_assignments` table) is a separate PostgreSQL-backed mechanism in `app/services/alert_queue_service.py` — not a task queue. Agents pull alerts via `GET /v1/queue` and atomically check them out via `POST /v1/queue/{id}/checkout`. This is a standard row-level lock pattern, not a Procrastinate job. The task queue handles _executing_ managed agents (`run_managed_agent_task`); the alert queue handles _routing_ enriched alerts to agents.
 
 ## Interfaces
 
@@ -46,6 +48,7 @@ class TaskStatus(StrEnum):
 | `enrichment` | `enrich_alert` | Indicator extraction + provider enrichment pipeline |
 | `dispatch` | `dispatch_agent_webhooks`, `send_approval_notification_task` | Agent webhook delivery + approval notifications |
 | `workflows` | `execute_workflow_run`, `execute_approved_workflow_task` | Workflow sandbox execution |
+| `agents` | `run_managed_agent_task` | Execute managed agents (LLM loop via AgentRuntimeEngine) |
 
 ### Factory (`factory.py`)
 

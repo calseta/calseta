@@ -51,7 +51,7 @@ import csv
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -62,8 +62,7 @@ CASE_STUDY_DIR = Path(__file__).parent
 sys.path.insert(0, str(CASE_STUDY_DIR))
 
 from calseta_agent import CalsetaAgent  # noqa: E402
-from naive_agent import AgentMetrics, NaiveAgent  # noqa: E402
-
+from naive_agent import NaiveAgent  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -259,7 +258,7 @@ def load_uuids(results_dir: Path) -> dict[str, str]:
                 return json.load(f)
         num -= 1
 
-    print(f"ERROR: alert_uuids.json not found in any study dir. Run with --ingest first.")
+    print("ERROR: alert_uuids.json not found in any study dir. Run with --ingest first.")
     sys.exit(1)
 
 
@@ -436,9 +435,9 @@ async def run_study(
 
     # Summarize what we're about to run
     model_names = sorted(set(model for _, _, _, model in agents))
-    print(f"\n=== Running validation study ===")
+    print("\n=== Running validation study ===")
     print(f"  Models: {', '.join(model_names)}")
-    print(f"  Approaches: naive, calseta")
+    print("  Approaches: naive, calseta")
     print(f"  Runs per scenario per agent: {runs_per}")
     print(f"  Total runs: {total_runs}")
     print()
@@ -484,7 +483,7 @@ async def run_study(
                     )
 
                     row = {
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                         "scenario": scenario["label"],
                         "source": scenario["source"],
                         "approach": approach,
@@ -523,7 +522,7 @@ async def run_study(
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"\n=== Study complete ===")
+    print("\n=== Study complete ===")
     print(f"  Results written to {csv_path}")
     print(f"  Findings written to {findings_dir}/")
     print(f"  New runs completed: {len(new_rows)}/{total_runs}")

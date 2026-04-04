@@ -136,6 +136,102 @@ async def dispatch_single_agent_webhook_task(
         await DispatchSingleWebhookHandler().execute(payload, session)
 
 
+@procrastinate_app.task(
+    name="run_managed_agent_task",
+    queue="agents",
+    retry=procrastinate.RetryStrategy(max_attempts=1),
+)
+async def run_managed_agent_task(
+    agent_registration_id: int,
+    assignment_id: int,
+    heartbeat_run_id: int,
+) -> None:
+    """Execute a managed agent for a single alert assignment."""
+    from datetime import UTC, datetime
+
+    import structlog
+
+    from app.queue.handlers.base import task_session
+    from app.repositories.agent_repository import AgentRepository
+    from app.repositories.alert_assignment_repository import AlertAssignmentRepository
+    from app.repositories.heartbeat_run_repository import HeartbeatRunRepository
+    from app.runtime.engine import AgentRuntimeEngine
+    from app.runtime.models import RuntimeContext
+
+    log = structlog.get_logger()
+    log.info(
+        "run_managed_agent_task.started",
+        agent_registration_id=agent_registration_id,
+        assignment_id=assignment_id,
+        heartbeat_run_id=heartbeat_run_id,
+    )
+
+    async with task_session() as db:
+        # Load agent
+        agent_repo = AgentRepository(db)
+        agent = await agent_repo.get_by_id(agent_registration_id)
+        if agent is None or agent.execution_mode != "managed":
+            log.warning(
+                "run_managed_agent_task.agent_not_found_or_not_managed",
+                agent_registration_id=agent_registration_id,
+            )
+            return
+
+        # Load assignment
+        assignment_repo = AlertAssignmentRepository(db)
+        assignment = await assignment_repo.get_by_id(assignment_id)
+        if assignment is None:
+            log.warning(
+                "run_managed_agent_task.assignment_not_found",
+                assignment_id=assignment_id,
+            )
+            return
+
+        context = RuntimeContext(
+            agent_id=agent.id,
+            task_key=f"alert:{assignment.alert_id}",
+            heartbeat_run_id=heartbeat_run_id,
+            alert_id=assignment.alert_id,
+            assignment_id=assignment.id,
+        )
+
+        engine = AgentRuntimeEngine(db=db)
+        result = await engine.run(agent=agent, context=context)
+
+        # Update heartbeat run status
+        hr_repo = HeartbeatRunRepository(db)
+        run = await hr_repo.get_by_id(heartbeat_run_id)
+        if run is not None:
+            run_status = "succeeded" if result.success else "failed"
+            await hr_repo.update_status(
+                run,
+                run_status,
+                finished_at=datetime.now(UTC),
+                error=result.error,
+                alerts_processed=1 if result.success else 0,
+                actions_proposed=len(result.actions_proposed),
+            )
+
+        log.info(
+            "run_managed_agent_task.completed",
+            success=result.success,
+            total_cost_cents=result.total_cost_cents,
+            agent_registration_id=agent_registration_id,
+        )
+
+
+@procrastinate_app.periodic(cron="*/1 * * * *")
+@procrastinate_app.task(name="supervise_running_agents_task", queue="agents")
+async def supervise_running_agents_task(timestamp: int) -> None:
+    """Periodic supervision — runs every minute to detect stuck/timed-out agents."""
+    from app.queue.handlers.base import task_session
+    from app.runtime.supervisor import AgentSupervisor
+
+    async with task_session() as db:
+        supervisor = AgentSupervisor(db)
+        await supervisor.supervise()
+
+
 if settings.SANDBOX_MODE:
 
     @procrastinate_app.periodic(cron="0 0 * * *")

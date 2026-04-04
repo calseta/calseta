@@ -2,7 +2,7 @@
 
 ## What This Component Does
 
-The auth component authenticates every API request using `cai_`-prefixed API keys validated against bcrypt hashes stored in the `api_keys` table. It provides a layered abstraction (`AuthBackendBase` -> `APIKeyAuthBackend`) designed for future backend swaps (e.g. BetterAuth), scope-based authorization via FastAPI dependency injection, structured audit logging for all authentication failures, and Fernet encryption utilities for at-rest secret storage.
+The auth component authenticates every API request using bcrypt-hashed API keys. Two key types coexist: `cai_*` (human operator keys, stored in `api_keys`) and `cak_*` (agent API keys, stored in `agent_api_keys`). The `dependencies.py` dispatcher routes each request to the correct backend based on key prefix, then returns a unified `AuthContext`. Both backends implement `AuthBackendBase`, enabling BetterAuth-ready swaps. The component also provides scope-based authorization, structured audit logging, and Fernet encryption utilities for at-rest secret storage.
 
 ## Interfaces
 
@@ -26,12 +26,23 @@ class AuthContext:
     key_prefix: str              # First 8 chars of the API key (for display, rate limiting, audit)
     scopes: list[str]            # e.g. ["alerts:read", "alerts:write"]
     key_id: int                  # Internal DB row ID (for last_used_at updates)
+    key_type: str                # "human" (cai_*) or "agent" (cak_*)
     allowed_sources: list[str] | None = None  # Source restriction (None = unrestricted)
+    agent_registration_id: int | None = None  # Set for cak_* keys only
 ```
+
+### Dispatcher (`dependencies.py`)
+
+`get_auth_context` routes to the correct backend by key prefix:
+```python
+# cak_* prefix → AgentAPIKeyAuthBackend
+# cai_* prefix → APIKeyAuthBackend
+```
+Route code uses `Depends(get_auth_context)` or `Depends(require_scope(...))` — never imports a backend directly.
 
 ### APIKeyAuthBackend (`api_key_backend.py`)
 
-Concrete v1 implementation. Auth flow:
+Handles `cai_*` human operator keys. Auth flow:
 
 ```
 1. Extract "Authorization: Bearer cai_xxx" header
@@ -40,8 +51,12 @@ Concrete v1 implementation. Auth flow:
 4. Verify bcrypt hash via bcrypt.checkpw()
 5. Check expiry (raises KEY_EXPIRED if past expires_at)
 6. Update last_used_at in the session (committed with the request)
-7. Return AuthContext
+7. Return AuthContext(key_type="human", ...)
 ```
+
+### AgentAPIKeyAuthBackend (`agent_api_key_backend.py`)
+
+Handles `cak_*` agent keys. Same bcrypt flow against `agent_api_keys` table. Additional check: `revoked_at IS NULL`. Returns `AuthContext(key_type="agent", agent_registration_id=<int>, ...)`. Agent endpoints use `auth.agent_registration_id` to identify the calling agent without a separate lookup.
 
 Every failure path calls `log_auth_failure()` before raising `CalsetaException`.
 
@@ -127,9 +142,11 @@ If `ENCRYPTION_KEY` is not set, the platform starts normally but `encrypt_value(
 
 ## Key Design Decisions
 
-1. **Abstract backend for BetterAuth readiness.** `AuthBackendBase` is the port; `APIKeyAuthBackend` is the adapter. When BetterAuth (session-based auth with SSO/OAuth) ships in v2, a new `BetterAuthBackend` will implement the same interface. Route code uses `Depends(get_auth_context)` and never imports a concrete backend, so the swap is a one-line change in `dependencies.py`.
+1. **Two key types, one AuthContext.** `cai_*` keys are for human operators (long-lived, scoped). `cak_*` keys are for agents calling back into Calseta (pull alerts, report costs, propose actions). Both return the same `AuthContext` shape — route code doesn't need to know which type authenticated the request, except when accessing `agent_registration_id` (set only for `cak_*`).
 
-2. **bcrypt for key hashing, not SHA-256.** bcrypt's work factor makes brute-force attacks computationally expensive even if the hash table is leaked. SHA-256 would be fast to verify but also fast to brute-force. The full API key is shown once at creation and never stored.
+2. **Abstract backend for BetterAuth readiness.** `AuthBackendBase` is the port; `APIKeyAuthBackend` and `AgentAPIKeyAuthBackend` are adapters. When BetterAuth ships in v2, a new `BetterAuthBackend` will implement the same interface. Route code uses `Depends(get_auth_context)` and never imports a concrete backend, so the swap is a one-line change in `dependencies.py`.
+
+3. **bcrypt for key hashing, not SHA-256.** bcrypt's work factor makes brute-force attacks computationally expensive even if the hash table is leaked. SHA-256 would be fast to verify but also fast to brute-force. The full API key is shown once at creation and never stored.
 
 3. **Key prefix for lookup, not the full key.** The first 8 characters of the key (`cai_xxxx`) are stored in `key_prefix` as a non-sensitive index. This allows O(1) lookup by prefix before the expensive bcrypt verification. The prefix is safe to log and display.
 
@@ -162,8 +179,10 @@ If `ENCRYPTION_KEY` is not set, the platform starts normally but `encrypt_value(
 
 | Symptom | Cause | Diagnosis |
 |---|---|---|
-| 401 "Missing or invalid Authorization header" | No `Authorization` header or not using `Bearer` prefix | Check request headers; must be `Authorization: Bearer cai_xxx` |
-| 401 "Invalid API key format" | Key doesn't start with `cai_` or is too short | Key must be at least 8 characters and start with `cai_` |
+| 401 "Missing or invalid Authorization header" | No `Authorization` header or not using `Bearer` prefix | Check request headers; must be `Authorization: Bearer cai_xxx` or `cak_xxx` |
+| 401 "Invalid API key format" | Key doesn't start with `cai_` or `cak_`, or is too short | Key must be ≥8 chars and start with `cai_` (human) or `cak_` (agent) |
+| 401 "Agent API key has been revoked" | `cak_*` key was revoked via `DELETE /v1/agents/{uuid}/keys/{key_id}` | Generate a new key via `POST /v1/agents/{uuid}/keys` |
+| 403 on agent endpoint | Using `cai_*` key on an endpoint that requires `agent_registration_id` | Agent-facing endpoints require a `cak_*` key to populate `auth.agent_registration_id` |
 | 401 "Invalid API key" | Key prefix not found in DB, or bcrypt hash mismatch | Check `api_keys` table for a row with matching `key_prefix` |
 | 401 "API key has expired" | `expires_at` is in the past | Update or recreate the key with a future expiry |
 | 403 "Insufficient scope" | Key lacks the required scope for this endpoint | Check key's `scopes` array; `admin` bypasses all checks |

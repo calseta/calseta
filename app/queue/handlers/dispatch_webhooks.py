@@ -29,7 +29,7 @@ logger = structlog.get_logger()
 # the alert as a webhook payload.
 #
 # Evaluation order (all three layers must pass):
-#   1. is_active=False → skip (agents must be active)
+#   1. status != 'active' → skip (agents must be active)
 #   2. trigger_on_sources (TEXT[]) → if non-empty, alert.source_name must be in list
 #   3. trigger_on_severities (TEXT[]) → if non-empty, alert.severity must be in list
 #   4. trigger_filter (JSONB) → evaluated using evaluate_targeting_rules()

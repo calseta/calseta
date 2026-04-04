@@ -66,6 +66,7 @@ async def _on_startup() -> None:
     """Run all startup tasks. Failures are logged but never crash the server."""
     from app.db.session import AsyncSessionLocal
     from app.integrations.enrichment.registry import enrichment_registry
+    from app.seed.builtin_tools import seed_builtin_tools
     from app.seed.builtin_workflows import seed_builtin_workflows
     from app.seed.enrichment_providers import (
         seed_builtin_field_extractions,
@@ -79,6 +80,17 @@ async def _on_startup() -> None:
             await seed_system_mappings(db)
             await seed_builtin_workflows(db, settings)
             await load_normalized_mappings(db)
+
+            # Seed built-in agent tools — isolated so a missing migration
+            # (agent_tools table) doesn't break other startup tasks.
+            try:
+                await seed_builtin_tools(db)
+            except Exception as exc:
+                logger.warning(
+                    "builtin_tools_seed_skipped",
+                    error=str(exc),
+                    hint="Run 'alembic upgrade head' to apply the agent_tools migration",
+                )
 
             # Enrichment provider seeding — isolated so a missing migration
             # (0006) doesn't break the other seed tasks that already work.

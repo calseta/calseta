@@ -1,23 +1,31 @@
 """
 Agent registration management routes.
 
-GET    /v1/agents                  — List all agent registrations
-POST   /v1/agents                  — Create an agent registration
-GET    /v1/agents/{uuid}           — Get one agent registration
-PATCH  /v1/agents/{uuid}           — Update an agent registration
-DELETE /v1/agents/{uuid}           — Delete an agent registration (204)
-POST   /v1/agents/{uuid}/test      — Test webhook delivery (stub, 501)
+GET    /v1/agents                          — List all agent registrations (filterable)
+POST   /v1/agents                          — Create an agent registration
+GET    /v1/agents/{uuid}                   — Get one agent registration
+PATCH  /v1/agents/{uuid}                   — Update an agent registration
+DELETE /v1/agents/{uuid}                   — Delete an agent registration (204)
+POST   /v1/agents/{uuid}/test              — Test webhook delivery
+POST   /v1/agents/{uuid}/pause             — Pause an agent (status → paused)
+POST   /v1/agents/{uuid}/resume            — Resume a paused agent (status → active)
+POST   /v1/agents/{uuid}/terminate         — Terminate an agent (irreversible, status → terminated)
+GET    /v1/agents/{uuid}/capabilities      — Return capabilities JSONB
+POST   /v1/agents/{uuid}/keys              — Create a new agent API key (cak_*)
+DELETE /v1/agents/{uuid}/keys/{key_id}     — Revoke an agent API key
 """
 
 from __future__ import annotations
 
+import secrets
 import time
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
+import bcrypt
 import httpx
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
@@ -29,8 +37,13 @@ from app.auth.scopes import Scope
 from app.config import settings
 from app.db.session import get_db
 from app.middleware.rate_limit import limiter
+from app.repositories.agent_api_key_repository import AgentAPIKeyRepository
 from app.repositories.agent_repository import AgentRepository
 from app.schemas.agents import (
+    AgentBudgetUpdate,
+    AgentKeyCreate,
+    AgentKeyCreatedResponse,
+    AgentPauseRequest,
     AgentRegistrationCreate,
     AgentRegistrationPatch,
     AgentRegistrationResponse,
@@ -43,6 +56,8 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 
 _Read = Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_READ))]
 _Write = Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_WRITE))]
+
+_KEY_PREFIX_LEN = 8
 
 
 def _maybe_encrypt(plaintext: str) -> str:
@@ -83,9 +98,21 @@ async def list_agents(
     auth: _Read,
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
+    status_filter: str | None = Query(None, alias="status"),
+    agent_type: str | None = Query(None),
+    role: str | None = Query(None),
 ) -> PaginatedResponse[AgentRegistrationResponse]:
     repo = AgentRepository(db)
-    agents, total = await repo.list_all(page=pagination.page, page_size=pagination.page_size)
+    if status_filter is not None or agent_type is not None or role is not None:
+        agents, total = await repo.list_filtered(
+            status=status_filter,
+            agent_type=agent_type,
+            role=role,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
+    else:
+        agents, total = await repo.list_all(page=pagination.page, page_size=pagination.page_size)
     return PaginatedResponse(
         data=[AgentRegistrationResponse.model_validate(a) for a in agents],
         meta=PaginationMeta.from_total(
@@ -111,14 +138,15 @@ async def create_agent(
     auth: _Write,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DataResponse[AgentRegistrationResponse]:
-    # SSRF protection — reject private/internal endpoint URLs at creation time
-    safe, reason = is_safe_outbound_url(body.endpoint_url)
-    if not safe:
-        raise CalsetaException(
-            code="INVALID_ENDPOINT_URL",
-            message=f"endpoint_url blocked by SSRF protection: {reason}",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+    # SSRF protection — only validate endpoint_url when provided (managed agents may omit it)
+    if body.endpoint_url is not None:
+        safe, reason = is_safe_outbound_url(body.endpoint_url)
+        if not safe:
+            raise CalsetaException(
+                code="INVALID_ENDPOINT_URL",
+                message=f"endpoint_url blocked by SSRF protection: {reason}",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
     auth_header_value_encrypted: str | None = None
     if body.auth_header_value is not None:
@@ -208,10 +236,51 @@ async def patch_agent(
         updates["timeout_seconds"] = body.timeout_seconds
     if body.retry_count is not None:
         updates["retry_count"] = body.retry_count
-    if body.is_active is not None:
-        updates["is_active"] = body.is_active
     if body.documentation is not None:
         updates["documentation"] = body.documentation
+    # --- Control plane fields ---
+    if body.execution_mode is not None:
+        updates["execution_mode"] = body.execution_mode
+    if body.agent_type is not None:
+        updates["agent_type"] = body.agent_type
+    if body.role is not None:
+        updates["role"] = body.role
+    if body.capabilities is not None:
+        updates["capabilities"] = body.capabilities
+    if body.adapter_type is not None:
+        updates["adapter_type"] = body.adapter_type
+    if body.adapter_config is not None:
+        updates["adapter_config"] = body.adapter_config
+    if body.llm_integration_id is not None:
+        updates["llm_integration_id"] = body.llm_integration_id
+    if body.system_prompt is not None:
+        updates["system_prompt"] = body.system_prompt
+    if body.methodology is not None:
+        updates["methodology"] = body.methodology
+    if body.tool_ids is not None:
+        updates["tool_ids"] = body.tool_ids
+    if body.max_tokens is not None:
+        updates["max_tokens"] = body.max_tokens
+    if body.enable_thinking is not None:
+        updates["enable_thinking"] = body.enable_thinking
+    if body.instruction_files is not None:
+        updates["instruction_files"] = body.instruction_files
+    if body.sub_agent_ids is not None:
+        updates["sub_agent_ids"] = body.sub_agent_ids
+    if body.max_sub_agent_calls is not None:
+        updates["max_sub_agent_calls"] = body.max_sub_agent_calls
+    if body.budget_monthly_cents is not None:
+        updates["budget_monthly_cents"] = body.budget_monthly_cents
+    if body.max_concurrent_alerts is not None:
+        updates["max_concurrent_alerts"] = body.max_concurrent_alerts
+    if body.max_cost_per_alert_cents is not None:
+        updates["max_cost_per_alert_cents"] = body.max_cost_per_alert_cents
+    if body.max_investigation_minutes is not None:
+        updates["max_investigation_minutes"] = body.max_investigation_minutes
+    if body.stall_threshold is not None:
+        updates["stall_threshold"] = body.stall_threshold
+    if body.memory_promotion_requires_approval is not None:
+        updates["memory_promotion_requires_approval"] = body.memory_promotion_requires_approval
 
     updated = await repo.patch(agent, **updates)
     return DataResponse(data=AgentRegistrationResponse.model_validate(updated))
@@ -261,6 +330,16 @@ async def test_agent_webhook(
             code="NOT_FOUND",
             message="Agent not found.",
             status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    if agent.endpoint_url is None:
+        raise CalsetaException(
+            code="NO_ENDPOINT_URL",
+            message=(
+                "Agent has no endpoint_url configured. "
+                "Managed agents cannot be tested via webhook."
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
     now = datetime.now(UTC)
@@ -333,3 +412,258 @@ async def test_agent_webhook(
             error=error,
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/agents/{uuid}/pause
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{agent_uuid}/pause", response_model=DataResponse[AgentRegistrationResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def pause_agent(
+    request: Request,
+    agent_uuid: UUID,
+    body: AgentPauseRequest,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[AgentRegistrationResponse]:
+    repo = AgentRepository(db)
+    agent = await repo.get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    if agent.status == "terminated":
+        raise CalsetaException(
+            code="AGENT_TERMINATED",
+            message="Terminated agents cannot be paused.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    updated = await repo.patch(agent, status="paused")
+    return DataResponse(data=AgentRegistrationResponse.model_validate(updated))
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/agents/{uuid}/resume
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{agent_uuid}/resume", response_model=DataResponse[AgentRegistrationResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def resume_agent(
+    request: Request,
+    agent_uuid: UUID,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[AgentRegistrationResponse]:
+    repo = AgentRepository(db)
+    agent = await repo.get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    if agent.status != "paused":
+        raise CalsetaException(
+            code="AGENT_NOT_PAUSED",
+            message=(
+                f"Agent is not paused (current status: {agent.status}). "
+                "Only paused agents can be resumed."
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    updated = await repo.patch(agent, status="active")
+    return DataResponse(data=AgentRegistrationResponse.model_validate(updated))
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/agents/{uuid}/terminate
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{agent_uuid}/terminate", response_model=DataResponse[AgentRegistrationResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def terminate_agent(
+    request: Request,
+    agent_uuid: UUID,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[AgentRegistrationResponse]:
+    repo = AgentRepository(db)
+    agent = await repo.get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    if agent.status == "terminated":
+        # Idempotent — already terminated
+        return DataResponse(data=AgentRegistrationResponse.model_validate(agent))
+    updated = await repo.patch(agent, status="terminated")
+    return DataResponse(data=AgentRegistrationResponse.model_validate(updated))
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/agents/{uuid}/capabilities
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{agent_uuid}/capabilities", response_model=DataResponse[dict])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def get_agent_capabilities(
+    request: Request,
+    agent_uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[dict]:
+    repo = AgentRepository(db)
+    agent = await repo.get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return DataResponse(data=agent.capabilities or {})
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/agents/{uuid}/keys
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{agent_uuid}/keys",
+    response_model=DataResponse[AgentKeyCreatedResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def create_agent_key(
+    request: Request,
+    agent_uuid: UUID,
+    body: AgentKeyCreate,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[AgentKeyCreatedResponse]:
+    repo = AgentRepository(db)
+    agent = await repo.get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Generate key with cak_ prefix (distinct from human cai_ keys)
+    plain_key = "cak_" + secrets.token_urlsafe(32)
+    key_prefix = plain_key[:_KEY_PREFIX_LEN]
+    key_hash = bcrypt.hashpw(plain_key.encode(), bcrypt.gensalt(rounds=12)).decode()
+
+    # Agents get a full scope set by default; callers can manage via PATCH if needed
+    default_scopes = [
+        Scope.ALERTS_READ,
+        Scope.ALERTS_WRITE,
+        Scope.WORKFLOWS_EXECUTE,
+        Scope.ENRICHMENTS_READ,
+        Scope.AGENTS_READ,
+    ]
+
+    key_repo = AgentAPIKeyRepository(db)
+    record = await key_repo.create(
+        agent_id=agent.id,
+        name=body.name,
+        key_prefix=key_prefix,
+        key_hash=key_hash,
+        scopes=[str(s) for s in default_scopes],
+    )
+
+    return DataResponse(
+        data=AgentKeyCreatedResponse(
+            uuid=record.uuid,
+            name=record.name,
+            key_prefix=record.key_prefix,
+            scopes=list(record.scopes),
+            last_used_at=record.last_used_at,
+            revoked_at=record.revoked_at,
+            created_at=record.created_at,
+            key=plain_key,  # shown ONCE
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# DELETE /v1/agents/{uuid}/keys/{key_id}
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/{agent_uuid}/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def revoke_agent_key(
+    request: Request,
+    agent_uuid: UUID,
+    key_id: UUID,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    agent_repo = AgentRepository(db)
+    agent = await agent_repo.get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    key_repo = AgentAPIKeyRepository(db)
+    record = await key_repo.get_by_uuid_for_agent(agent.id, key_id)
+    if record is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent API key not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    await key_repo.revoke(record)
+
+
+# ---------------------------------------------------------------------------
+# PATCH /v1/agents/{uuid}/budget
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/{agent_uuid}/budget", response_model=DataResponse[AgentRegistrationResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def patch_agent_budget(
+    request: Request,
+    agent_uuid: UUID,
+    body: AgentBudgetUpdate,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[AgentRegistrationResponse]:
+    """Update agent monthly budget. Optionally resets spent_monthly_cents and period_start."""
+    repo = AgentRepository(db)
+    agent = await repo.get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    updates: dict[str, object] = {"budget_monthly_cents": body.budget_monthly_cents}
+
+    if body.reset_spent:
+        from app.services.cost_service import CostService
+
+        svc = CostService(db)
+        await svc.reset_monthly_budget(agent)
+        # After reset, refresh agent and still apply budget_monthly_cents update
+        await db.refresh(agent)
+
+    updated = await repo.patch(agent, **updates)
+    return DataResponse(data=AgentRegistrationResponse.model_validate(updated))

@@ -34,11 +34,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
 from app.api.errors import CalsetaException
+from app.auth.agent_api_key_backend import AgentAPIKeyAuthBackend
 from app.auth.api_key_backend import APIKeyAuthBackend
 from app.auth.audit import log_auth_failure
 from app.auth.base import AuthBackendBase, AuthContext
 from app.auth.scopes import Scope
 from app.db.session import get_db
+
+_BEARER_PREFIX = "Bearer "
 
 
 async def get_auth_context(
@@ -48,13 +51,26 @@ async def get_auth_context(
     """
     FastAPI dependency — authenticates the request and returns AuthContext.
 
+    Routes `cak_*` keys to AgentAPIKeyAuthBackend and `cai_*` keys to the
+    standard APIKeyAuthBackend.
+
     Stores the result in `request.state.auth` so the rate limiter key
     function can read the key_prefix without a second DB lookup.
 
     Raises CalsetaException(UNAUTHORIZED, 401) on any auth failure.
     Routes that need only authentication use this directly.
     """
-    backend: AuthBackendBase = APIKeyAuthBackend(db)
+    authorization = request.headers.get("Authorization", "")
+    plain_key = ""
+    if authorization.startswith(_BEARER_PREFIX):
+        plain_key = authorization[len(_BEARER_PREFIX):]
+
+    backend: AuthBackendBase
+    if plain_key.startswith("cak_"):
+        backend = AgentAPIKeyAuthBackend(db)
+    else:
+        backend = APIKeyAuthBackend(db)
+
     ctx = await backend.authenticate(request)
     request.state.auth = ctx  # Store for rate limiter key function
     return ctx

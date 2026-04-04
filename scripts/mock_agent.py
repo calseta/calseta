@@ -13,9 +13,9 @@ Usage:
     PORT=8888 python3 scripts/mock_agent.py
 """
 
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import os
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class Handler(BaseHTTPRequestHandler):

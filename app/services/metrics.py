@@ -752,7 +752,7 @@ async def compute_metrics_summary(
     # ------------------------------------------------------------------
     agents_result = await db.execute(
         select(func.count(AgentRegistration.id)).where(
-            AgentRegistration.is_active.is_(True)
+            AgentRegistration.status == "active"
         )
     )
     platform_agents: int = agents_result.scalar_one() or 0

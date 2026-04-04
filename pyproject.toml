@@ -24,6 +24,7 @@ dependencies = [
     "python-multipart>=0.0.19",
     "slowapi>=0.1.9",
     "mcp>=1.0.0",
+    "anthropic>=0.40.0",
     "cryptography>=44.0.0",
 ]
 
@@ -68,6 +69,12 @@ ignore = [
 # Block Kit / Adaptive Card dicts have long string values inline
 "app/workflows/notifiers/slack_notifier.py" = ["E501"]
 "app/workflows/notifiers/teams_notifier.py" = ["E501"]
+# Test files: docstrings and assert messages are allowed to be long
+"tests/**" = ["E501"]
+# Migration: raw SQL strings can exceed line limit
+"alembic/versions/*.py" = ["E501"]
+# Examples: illustration code, not production — long lines and style exemptions acceptable
+"examples/**" = ["E501", "SIM105", "B007", "B023"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

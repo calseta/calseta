@@ -5,7 +5,6 @@ Use case: Notify your SOC team channel when a high-severity indicator is
 detected. Uses Slack's Incoming Webhook URL — no bot token or app required.
 """
 
-import json
 
 from app.workflows.context import WorkflowContext, WorkflowResult
 

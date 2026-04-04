@@ -22,7 +22,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-
 CASE_STUDY_DIR = Path(__file__).parent
 RESULTS_BASE_DIR = CASE_STUDY_DIR / "results"
 

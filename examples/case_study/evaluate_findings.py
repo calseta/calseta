@@ -43,10 +43,9 @@ import json
 import os
 import random
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -537,7 +536,7 @@ def _print_quality_summary(
     md_lines.append(f"# Quality Analysis — Judge: {judge_model_short}")
     md_lines.append("")
     md_lines.append(
-        f"Generated at {datetime.now(timezone.utc).isoformat()} "
+        f"Generated at {datetime.now(UTC).isoformat()} "
         f"using {judge_model_short} as the blind judge."
     )
     md_lines.append("")
