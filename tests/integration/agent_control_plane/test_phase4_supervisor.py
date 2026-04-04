@@ -18,8 +18,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-import pytest
-import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,14 +25,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.activity_event import ActivityEvent
 from app.db.models.agent_registration import AgentRegistration
 from app.db.models.alert_assignment import AlertAssignment
-from app.repositories.alert_assignment_repository import AlertAssignmentRepository
 from app.runtime.supervisor import AgentSupervisor
 from app.schemas.cost_events import CostEventCreate
 from app.services.cost_service import CostService
 from tests.integration.agent_control_plane.conftest import _create_agent_with_key
 from tests.integration.agent_control_plane.fixtures.mock_alerts import create_enriched_alert
-from tests.integration.conftest import auth_header
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -224,7 +219,7 @@ class TestSupervisorBudget:
         agent.timeout_seconds = 99999
         await db_session.flush()
 
-        assignment = await _checkout_alert(db_session, agent)
+        await _checkout_alert(db_session, agent)
         await db_session.flush()
 
         supervisor = AgentSupervisor(db_session)
@@ -256,7 +251,7 @@ class TestSupervisorBudget:
         agent.timeout_seconds = 99999
         await db_session.flush()
 
-        assignment = await _checkout_alert(db_session, agent)
+        await _checkout_alert(db_session, agent)
         await db_session.flush()
 
         supervisor = AgentSupervisor(db_session)
@@ -302,7 +297,7 @@ class TestCostServiceBudget:
             if e.references and e.references.get("agent_id") == agent.id
         ]
         assert len(matching) == 1, f"Expected 1 cost.budget_alert event, got {len(matching)}"
-        assert matching[0].references["threshold_pct"] == 80
+        assert (matching[0].references or {})["threshold_pct"] == 80
 
     async def test_soft_warn_not_emitted_again_if_already_past(
         self,

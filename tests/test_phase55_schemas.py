@@ -1,16 +1,15 @@
 """Smoke tests for Phase 5.5 schema imports and instantiation."""
 
 from datetime import UTC, datetime
-from decimal import Decimal
 from uuid import uuid4
 
 from app.schemas.campaigns import CampaignCategory, CampaignCreate, CampaignStatus
-from app.schemas.issues import IssueCategory, IssueCreate, IssuePriority, IssueResponse, IssueStatus
+from app.schemas.issues import IssueCategory, IssueCreate, IssuePriority, IssueStatus
 from app.schemas.routines import RoutineCreate, RoutineStatus, TriggerKind
 from app.schemas.topology import TopologyEdge, TopologyGraph, TopologyNode
 
 
-def test_all_phase55_schemas_importable():
+def test_all_phase55_schemas_importable() -> None:
     """All Phase 5.5 schemas import without error."""
     assert IssueStatus.ALL
     assert IssuePriority.ALL
@@ -21,26 +20,26 @@ def test_all_phase55_schemas_importable():
     assert CampaignCategory.ALL
 
 
-def test_issue_create_defaults():
+def test_issue_create_defaults() -> None:
     issue = IssueCreate(title="Test issue")
     assert issue.status == "backlog"
     assert issue.priority == "medium"
     assert issue.category == "investigation"
 
 
-def test_campaign_create_defaults():
+def test_campaign_create_defaults() -> None:
     campaign = CampaignCreate(name="Test campaign")
     assert campaign.status == "planned"
     assert campaign.category == "custom"
 
 
-def test_topology_graph_empty():
+def test_topology_graph_empty() -> None:
     graph = TopologyGraph(nodes=[], edges=[], computed_at=datetime.now(UTC))
     assert graph.nodes == []
     assert graph.edges == []
 
 
-def test_topology_graph_with_nodes_and_edges():
+def test_topology_graph_with_nodes_and_edges() -> None:
     """TopologyGraph with nodes and edges constructs correctly."""
     now = datetime.now(UTC)
     uuid_a = uuid4()
@@ -82,7 +81,7 @@ def test_topology_graph_with_nodes_and_edges():
     assert graph.edges[0].edge_type == "delegates_to"
 
 
-def test_routine_create_with_triggers():
+def test_routine_create_with_triggers() -> None:
     """RoutineCreate with an embedded TriggerCreate validates."""
     from app.schemas.routines import TriggerCreate
 

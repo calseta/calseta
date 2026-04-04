@@ -9,7 +9,6 @@ from httpx import AsyncClient
 
 from tests.integration.conftest import auth_header
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

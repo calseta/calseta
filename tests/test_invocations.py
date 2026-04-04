@@ -22,12 +22,11 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ===========================================================================
 # Helpers
@@ -315,7 +314,6 @@ async def test_delegate_task_creates_invocation(
 ) -> None:
     """POST /v1/invocations returns 202 with invocation_id for valid orchestrator."""
     import bcrypt
-    from httpx import AsyncClient
 
     from app.db.models.agent_api_key import AgentAPIKey
     from app.db.models.agent_registration import AgentRegistration

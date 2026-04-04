@@ -21,7 +21,6 @@ from app.schemas.routines import (
 )
 from app.services.routine_service import _verify_webhook_signature
 
-
 # ---------------------------------------------------------------------------
 # Constant tests
 # ---------------------------------------------------------------------------

@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
 from uuid import uuid4
 
-import pytest
 from httpx import AsyncClient
 
 from tests.integration.conftest import auth_header

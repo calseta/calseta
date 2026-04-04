@@ -15,6 +15,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
@@ -145,7 +146,6 @@ async def get_invocation(
 
 @router.get(
     "/{invocation_uuid}/poll",
-    response_model=DataResponse[AgentInvocationResponse],
 )
 @limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def poll_invocation(
@@ -154,10 +154,11 @@ async def poll_invocation(
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
     timeout_ms: int = Query(30_000, ge=1000, le=_MAX_POLL_MS),
-) -> DataResponse[AgentInvocationResponse]:
+) -> JSONResponse:
     """Long-poll until the invocation reaches a terminal state.
 
-    Returns immediately if the invocation is already terminal.
+    Returns 200 if terminal (completed/failed/timed_out).
+    Returns 202 if still running when timeout_ms expires.
     Polls every 500ms up to timeout_ms (max 60s).
     """
     repo = AgentInvocationRepository(db)
@@ -166,7 +167,7 @@ async def poll_invocation(
 
     while elapsed_ms <= timeout_ms:
         # Re-fetch on each iteration for a fresh DB read
-        await db.reset_transaction()  # type: ignore[attr-defined]
+        db.expire_all()
         invocation = await repo.get_by_uuid(invocation_uuid)
         if invocation is None:
             raise CalsetaException(
@@ -175,11 +176,13 @@ async def poll_invocation(
                 status_code=status.HTTP_404_NOT_FOUND,
             )
         if invocation.status in terminal_statuses:
-            return DataResponse(data=AgentInvocationResponse.model_validate(invocation))
+            data = AgentInvocationResponse.model_validate(invocation).model_dump(mode="json")
+            return JSONResponse(status_code=200, content={"data": data})
 
         if elapsed_ms + _POLL_INTERVAL_MS > timeout_ms:
-            # Final check — return current state even if not terminal
-            return DataResponse(data=AgentInvocationResponse.model_validate(invocation))
+            # Timed out waiting — return 202 with current state
+            data = AgentInvocationResponse.model_validate(invocation).model_dump(mode="json")
+            return JSONResponse(status_code=202, content={"data": data})
 
         await asyncio.sleep(_POLL_INTERVAL_MS / 1000)
         elapsed_ms += _POLL_INTERVAL_MS
@@ -192,7 +195,8 @@ async def poll_invocation(
             message="Invocation not found.",
             status_code=status.HTTP_404_NOT_FOUND,
         )
-    return DataResponse(data=AgentInvocationResponse.model_validate(invocation))
+    data = AgentInvocationResponse.model_validate(invocation).model_dump(mode="json")
+    return JSONResponse(status_code=202, content={"data": data})
 
 
 # ---------------------------------------------------------------------------

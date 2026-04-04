@@ -19,7 +19,6 @@ from app.schemas.campaigns import (
 )
 from app.schemas.topology import TopologyNode
 
-
 # ---------------------------------------------------------------------------
 # Constant tests
 # ---------------------------------------------------------------------------

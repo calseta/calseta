@@ -26,6 +26,9 @@ from app.db.models.enrichment_provider import EnrichmentProvider
 from app.db.models.heartbeat_run import HeartbeatRun
 from app.db.models.indicator import Indicator
 from app.db.models.indicator_field_mapping import IndicatorFieldMapping
+from app.db.models.kb_page import KnowledgeBasePage
+from app.db.models.kb_page_link import KBPageLink
+from app.db.models.kb_page_revision import KBPageRevision
 from app.db.models.llm_integration import LLMIntegration
 from app.db.models.routine_run import RoutineRun
 from app.db.models.routine_trigger import RoutineTrigger
@@ -77,4 +80,7 @@ __all__ = [
     "RoutineRun",
     "Campaign",
     "CampaignItem",
+    "KnowledgeBasePage",
+    "KBPageRevision",
+    "KBPageLink",
 ]
