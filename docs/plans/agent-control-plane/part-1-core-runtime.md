@@ -156,7 +156,7 @@ paused  → active     (operator resume)
 *       → terminated (operator only, irreversible)
 ```
 
-Full state machine (future phases — managed agent runtime):
+Full state machine (Phase 1 — managed agent runtime implementation):
 ```
 idle → running (heartbeat invoked or alert checked out)
 running → idle (heartbeat complete, no active work)
