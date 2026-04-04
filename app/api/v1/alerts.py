@@ -913,6 +913,12 @@ async def get_relationship_graph(
 # ---------------------------------------------------------------------------
 # POST /v1/alerts/{uuid}/trigger-agents
 # ---------------------------------------------------------------------------
+# Distinct from /v1/alerts/{uuid}/dispatch-agent:
+#   trigger-agents: broadcast — evaluate trigger rules and fan-out to ALL
+#                   matching agents (same logic as post-enrichment auto-dispatch)
+#   dispatch-agent: targeted — send to ONE specific agent (query param),
+#                   bypasses trigger rules (used for manual re-runs / testing)
+# ---------------------------------------------------------------------------
 
 
 @router.post(
@@ -928,11 +934,14 @@ async def trigger_agents(
     queue: Annotated[TaskQueueBase, Depends(get_queue)],
 ) -> DataResponse[dict]:  # type: ignore[type-arg]
     """
-    Manually re-dispatch an alert to all matching registered agents.
+    Broadcast re-dispatch: evaluate trigger criteria and fan-out to all matching agents.
 
-    Evaluates trigger criteria against the alert (same logic as post-enrichment
-    dispatch) and enqueues a dispatch_agent_webhooks task. Returns 202 with the
-    count and names of agents that will receive the webhook.
+    Runs the same trigger-rule matching as the post-enrichment auto-dispatch.
+    Enqueues dispatch_agent_webhooks and returns 202 with the count and names
+    of agents that will receive the webhook.
+
+    Use dispatch-agent instead when you want to target a single specific agent
+    regardless of its trigger criteria.
     """
     alert_repo = AlertRepository(db)
     alert = await alert_repo.get_by_uuid(alert_uuid)
@@ -980,11 +989,15 @@ async def dispatch_agent(
     queue: Annotated[TaskQueueBase, Depends(get_queue)],
 ) -> DataResponse[dict]:  # type: ignore[type-arg]
     """
-    Dispatch an alert to a specific registered agent.
+    Targeted dispatch: send this alert to one specific agent, bypassing trigger rules.
 
-    Bypasses trigger matching — sends the full enriched alert payload to
-    the specified agent regardless of its trigger criteria. Useful for
-    manual investigation or re-running an agent against a specific alert.
+    Enqueues dispatch_single_agent_webhook for the named agent regardless of
+    whether its trigger criteria match the alert. The agent must be active.
+    Useful for manual investigation, regression testing, or forcing a specific
+    agent to re-run against an alert.
+
+    Use trigger-agents instead when you want broadcast dispatch to all agents
+    whose trigger rules match the alert.
     """
     alert_repo = AlertRepository(db)
     alert = await alert_repo.get_by_uuid(alert_uuid)
