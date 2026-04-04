@@ -5,19 +5,17 @@ POST /v1/ingest/{source_name}
     Webhook endpoint. Verifies signature, validates payload, enqueues enrichment.
     Returns 202 Accepted.
 
-POST /v1/alerts
-    Generic programmatic ingest. Accepts {"source_name": "...", "payload": {...}}.
-    No webhook signature verification (trusted caller, key-auth only).
-    Returns 202 Accepted.
+For programmatic ingest without signature verification, see POST /v1/alerts
+in alerts.py.
 """
 
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import CalsetaException
@@ -43,18 +41,6 @@ class IngestResponse(BaseModel):
     status: str = "queued"
     is_duplicate: bool = False
     duplicate_count: int | None = None
-
-
-class GenericIngestBody(BaseModel):
-    source_name: str
-    payload: dict[str, Any]
-
-    @field_validator("payload")
-    @classmethod
-    def _validate_payload_size(cls, v: dict[str, Any]) -> dict[str, Any]:
-        from app.schemas.common import JSONB_SIZE_LARGE, validate_jsonb_size
-
-        return validate_jsonb_size(v, JSONB_SIZE_LARGE, "payload")  # type: ignore[return-value]
 
 
 @router.post(
@@ -148,65 +134,3 @@ async def webhook_ingest(
     )
 
 
-@router.post(
-    "/alerts",
-    status_code=status.HTTP_202_ACCEPTED,
-    response_model=DataResponse[IngestResponse],
-)
-@limiter.limit(f"{settings.RATE_LIMIT_INGEST_PER_MINUTE}/minute")
-async def generic_ingest(
-    request: Request,
-    body: GenericIngestBody,
-    auth: _AlertsWrite,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    queue: Annotated[TaskQueueBase, Depends(get_queue)],
-) -> DataResponse[IngestResponse]:
-    """
-    Programmatic alert ingest — skips webhook signature verification.
-
-    Accepts {"source_name": "sentinel", "payload": {...}}.
-    The payload must pass the source plugin's validate_payload() check.
-    """
-    source = source_registry.get(body.source_name)
-    if source is None:
-        raise CalsetaException(
-            code="UNKNOWN_SOURCE",
-            message=f"Alert source '{body.source_name}' is not registered.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
-
-    if auth.allowed_sources is not None and body.source_name not in auth.allowed_sources:
-        raise CalsetaException(
-            code="SOURCE_NOT_ALLOWED",
-            message=(
-                f"API key is not authorized to ingest from source '{body.source_name}'."
-            ),
-            status_code=status.HTTP_403_FORBIDDEN,
-        )
-
-    if not source.validate_payload(body.payload):
-        raise CalsetaException(
-            code="INVALID_PAYLOAD",
-            message=(
-                f"Payload does not match expected structure "
-                f"for source '{body.source_name}'."
-            ),
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        )
-
-    svc = AlertIngestionService(db, queue)
-    result = await svc.ingest(
-        source,
-        body.payload,
-        actor_type="api",
-        actor_key_prefix=auth.key_prefix,
-    )
-
-    return DataResponse(
-        data=IngestResponse(
-            alert_uuid=result.alert.uuid,
-            status="deduplicated" if result.is_duplicate else "queued",
-            is_duplicate=result.is_duplicate,
-            duplicate_count=result.alert.duplicate_count if result.is_duplicate else None,
-        ),
-    )

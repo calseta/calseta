@@ -1,6 +1,7 @@
 """
 Alert management routes.
 
+POST   /v1/alerts                            — Programmatic alert ingest (no sig verification)
 GET    /v1/alerts                            — List alerts with filters
 GET    /v1/alerts/{uuid}                     — Get alert detail (includes indicators + _metadata)
 PATCH  /v1/alerts/{uuid}                     — Update alert (status, severity, tags, classification)
@@ -10,16 +11,21 @@ GET    /v1/alerts/{uuid}/indicators         — List indicators for an alert
 POST   /v1/alerts/{uuid}/indicators         — Add indicators to an alert
 GET    /v1/alerts/{uuid}/activity           — List activity events for an alert
 GET    /v1/alerts/{uuid}/relationship-graph — Alert-indicator-sibling relationship graph
+
+Note on ingest paths:
+  POST /v1/ingest/{source_name}  — Webhook ingest with signature verification (external systems)
+  POST /v1/alerts                — Programmatic ingest, skips signature check (trusted API callers)
 """
 
 from __future__ import annotations
 
 import uuid as _uuid
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
@@ -162,6 +168,96 @@ def _alert_response_from_orm(alert: object) -> AlertResponse:
     attrs = {k: v for k, v in alert.__dict__.items() if not k.startswith("_")}
     attrs.pop("detection_rule", None)
     return AlertResponse.model_validate(attrs)
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/alerts — programmatic ingest (no webhook signature check)
+# ---------------------------------------------------------------------------
+
+
+class _GenericIngestBody(BaseModel):
+    source_name: str
+    payload: dict[str, Any]
+
+    @field_validator("payload")
+    @classmethod
+    def _validate_payload_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        from app.schemas.common import JSONB_SIZE_LARGE, validate_jsonb_size
+
+        return validate_jsonb_size(v, JSONB_SIZE_LARGE, "payload")  # type: ignore[return-value]
+
+
+class _IngestResponse(BaseModel):
+    alert_uuid: _uuid.UUID
+    status: str = "queued"
+    is_duplicate: bool = False
+    duplicate_count: int | None = None
+
+
+@router.post(
+    "",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=DataResponse[_IngestResponse],
+)
+@limiter.limit(f"{settings.RATE_LIMIT_INGEST_PER_MINUTE}/minute")
+async def programmatic_ingest(
+    request: Request,
+    body: _GenericIngestBody,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    queue: Annotated[TaskQueueBase, Depends(get_queue)],
+) -> DataResponse[_IngestResponse]:
+    """
+    Programmatic alert ingest — skips webhook signature verification.
+
+    Accepts {"source_name": "sentinel", "payload": {...}}.
+    The payload must pass the source plugin's validate_payload() check.
+
+    Use this path for trusted API callers (internal pipelines, tests, scripts)
+    that do not go through an external webhook. For external webhook ingest with
+    signature verification, use POST /v1/ingest/{source_name} instead.
+    """
+    from app.integrations.sources.registry import source_registry
+    from app.services.alert_ingestion import AlertIngestionService
+
+    source = source_registry.get(body.source_name)
+    if source is None:
+        raise CalsetaException(
+            code="UNKNOWN_SOURCE",
+            message=f"Alert source '{body.source_name}' is not registered.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    if auth.allowed_sources is not None and body.source_name not in auth.allowed_sources:
+        raise CalsetaException(
+            code="SOURCE_NOT_ALLOWED",
+            message=f"API key is not authorized to ingest from source '{body.source_name}'.",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    if not source.validate_payload(body.payload):
+        raise CalsetaException(
+            code="INVALID_PAYLOAD",
+            message=f"Payload does not match expected structure for source '{body.source_name}'.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    svc = AlertIngestionService(db, queue)
+    result = await svc.ingest(
+        source,
+        body.payload,
+        actor_type="api",
+        actor_key_prefix=auth.key_prefix,
+    )
+
+    return DataResponse(
+        data=_IngestResponse(
+            alert_uuid=result.alert.uuid,
+            status="deduplicated" if result.is_duplicate else "queued",
+            is_duplicate=result.is_duplicate,
+            duplicate_count=result.alert.duplicate_count if result.is_duplicate else None,
+        ),
+    )
 
 
 _ALLOWED_SORT_BY = {"title", "status", "severity", "source_name", "occurred_at", "created_at"}
