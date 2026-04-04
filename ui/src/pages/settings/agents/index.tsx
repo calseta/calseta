@@ -181,7 +181,7 @@ export function AgentsPage() {
                         <CopyableText text={agent.uuid} mono className="text-[11px] text-dim" />
                       </TableCell>
                       <TableCell>
-                        <CopyableText text={agent.endpoint_url} mono className="text-[11px] text-dim max-w-48 truncate" />
+                        {agent.endpoint_url ? <CopyableText text={agent.endpoint_url} mono className="text-[11px] text-dim max-w-48 truncate" /> : <span className="text-[11px] text-dim">—</span>}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={agent.is_active ? "text-teal bg-teal/10 border-teal/30 text-[11px]" : "text-dim bg-dim/10 border-dim/30 text-[11px]"}>

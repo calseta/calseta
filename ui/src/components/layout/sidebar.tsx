@@ -12,6 +12,14 @@ import {
   Microscope,
   LogOut,
   MapPin,
+  Inbox,
+  Cpu,
+  ListTodo,
+  RotateCcw,
+  Target,
+  GitFork,
+  Lock,
+  Database,
 } from "lucide-react";
 
 const LOGO_PATH = "/logo.png";
@@ -22,19 +30,27 @@ import { Separator } from "@/components/ui/separator";
 const mainNav = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/alerts", icon: ShieldAlert, label: "Alerts" },
+  { to: "/queue", icon: Inbox, label: "Queue" },
   { to: "/workflows", icon: Workflow, label: "Workflows" },
   { to: "/approvals", icon: CheckCircle2, label: "Approvals" },
 ];
 
 const manageNav = [
   { to: "/manage/agents", icon: Bot, label: "Agents" },
+  { to: "/manage/llm-integrations", icon: Cpu, label: "LLM Integrations" },
+  { to: "/manage/issues", icon: ListTodo, label: "Issues" },
+  { to: "/manage/routines", icon: RotateCcw, label: "Routines" },
+  { to: "/manage/campaigns", icon: Target, label: "Campaigns" },
+  { to: "/manage/topology", icon: GitFork, label: "Topology" },
   { to: "/manage/enrichment-providers", icon: Microscope, label: "Enrichments" },
   { to: "/manage/detection-rules", icon: Radar, label: "Detection Rules" },
   { to: "/manage/context-docs", icon: BookOpen, label: "Context Docs" },
+  { to: "/manage/kb", icon: Database, label: "Knowledge Base" },
 ];
 
 const settingsNav = [
   { to: "/settings/api-keys", icon: Key, label: "API Keys" },
+  { to: "/settings/secrets", icon: Lock, label: "Secrets" },
   { to: "/settings/alert-sources", icon: FileCode2, label: "Alert Sources" },
   { to: "/settings/indicator-mappings", icon: MapPin, label: "Indicator Mappings" },
 ];

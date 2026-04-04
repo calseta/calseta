@@ -327,7 +327,7 @@ export interface AgentRegistration {
   uuid: string;
   name: string;
   description: string | null;
-  endpoint_url: string;
+  endpoint_url: string | null;
   auth_header_name: string | null;
   trigger_on_sources: string[];
   trigger_on_severities: string[];
@@ -338,6 +338,31 @@ export interface AgentRegistration {
   documentation: string | null;
   created_at: string;
   updated_at: string;
+  // Control plane fields (v2)
+  status?: string;
+  execution_mode?: string;
+  agent_type?: string;
+  role?: string | null;
+  capabilities?: Record<string, unknown> | null;
+  adapter_type?: string;
+  adapter_config?: Record<string, unknown> | null;
+  llm_integration_id?: number | null;
+  system_prompt?: string | null;
+  methodology?: string | null;
+  tool_ids?: string[] | null;
+  max_tokens?: number | null;
+  enable_thinking?: boolean;
+  sub_agent_ids?: string[] | null;
+  max_sub_agent_calls?: number | null;
+  budget_monthly_cents?: number;
+  spent_monthly_cents?: number;
+  budget_period_start?: string | null;
+  last_heartbeat_at?: string | null;
+  max_concurrent_alerts?: number;
+  max_cost_per_alert_cents?: number;
+  max_investigation_minutes?: number;
+  stall_threshold?: number;
+  memory_promotion_requires_approval?: boolean;
 }
 
 // API Keys
@@ -533,4 +558,398 @@ export interface DetectionRuleMetrics {
   severity_distribution: Record<string, number>;
   top_indicators: { type: string; value: string; count: number; malice: string }[];
   alert_sources: Record<string, number>;
+}
+
+// ============================================================
+// Control Plane v2 types
+// ============================================================
+
+// LLM Integrations
+export interface LLMIntegration {
+  uuid: string;
+  name: string;
+  provider: string;
+  model: string;
+  api_key_ref_set: boolean;
+  base_url: string | null;
+  config: Record<string, unknown> | null;
+  cost_per_1k_input_tokens_cents: number;
+  cost_per_1k_output_tokens_cents: number;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LLMUsage {
+  llm_integration_uuid: string;
+  from_dt: string;
+  to_dt: string;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cost_cents: number;
+  event_count: number;
+  billing_types: Record<string, number>;
+}
+
+// Alert Assignments
+export type AssignmentStatus =
+  | "assigned"
+  | "in_progress"
+  | "pending_review"
+  | "resolved"
+  | "escalated"
+  | "released";
+
+export interface AlertAssignment {
+  uuid: string;
+  alert_id: number;
+  agent_registration_id: number;
+  status: string;
+  checked_out_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  resolution: string | null;
+  resolution_type: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Heartbeat Runs
+export interface HeartbeatRun {
+  uuid: string;
+  agent_registration_id: number;
+  source: string;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  error: string | null;
+  alerts_processed: number;
+  actions_proposed: number;
+  context_snapshot: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Cost Events
+export interface CostEvent {
+  id: number;
+  agent_registration_id: number;
+  llm_integration_id: number | null;
+  provider: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_cents: number;
+  billing_type: string;
+  occurred_at: string;
+  created_at: string;
+}
+
+export interface CostSummary {
+  total_cost_cents: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  by_billing_type: Record<string, number>;
+  period_start: string | null;
+  period_end: string | null;
+}
+
+// Agent Invocations
+export interface AgentInvocation {
+  uuid: string;
+  parent_agent_id: number;
+  child_agent_id: number | null;
+  alert_id: number;
+  assignment_id: number | null;
+  task_description: string;
+  input_context: Record<string, unknown> | null;
+  output_schema: Record<string, unknown> | null;
+  status: string;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  cost_cents: number;
+  timeout_seconds: number;
+  task_queue_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Issues
+export interface AgentIssue {
+  uuid: string;
+  identifier: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  category: string;
+  assignee_operator: string | null;
+  created_by_operator: string | null;
+  due_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  resolution: string | null;
+  created_at: string;
+  updated_at: string;
+  assignee_agent_uuid: string | null;
+  created_by_agent_uuid: string | null;
+  alert_uuid: string | null;
+  parent_uuid: string | null;
+  routine_uuid: string | null;
+}
+
+export interface IssueComment {
+  uuid: string;
+  body: string;
+  author_operator: string | null;
+  author_agent_uuid: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Routines
+export interface RoutineTrigger {
+  uuid: string;
+  kind: string;
+  cron_expression: string | null;
+  timezone: string | null;
+  webhook_public_id: string | null;
+  next_run_at: string | null;
+  last_fired_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Routine {
+  uuid: string;
+  name: string;
+  description: string | null;
+  status: string;
+  concurrency_policy: string;
+  catch_up_policy: string;
+  task_template: Record<string, unknown>;
+  max_consecutive_failures: number;
+  consecutive_failures: number;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  created_at: string;
+  updated_at: string;
+  agent_registration_uuid: string | null;
+  triggers: RoutineTrigger[];
+}
+
+export interface RoutineRun {
+  uuid: string;
+  source: string;
+  status: string;
+  trigger_payload: Record<string, unknown> | null;
+  error: string | null;
+  created_at: string;
+  completed_at: string | null;
+  trigger_uuid: string | null;
+}
+
+// Campaigns
+export interface Campaign {
+  uuid: string;
+  name: string;
+  description: string | null;
+  status: string;
+  category: string;
+  owner_operator: string | null;
+  target_metric: string | null;
+  target_value: string | null;
+  current_value: string | null;
+  target_date: string | null;
+  created_at: string;
+  updated_at: string;
+  owner_agent_uuid: string | null;
+  items: CampaignItem[];
+}
+
+export interface CampaignItem {
+  uuid: string;
+  item_type: string;
+  item_uuid: string;
+  created_at: string;
+}
+
+export interface CampaignMetrics {
+  campaign_uuid: string;
+  computed_at: string;
+  total_items: number;
+  alert_count: number;
+  issue_count: number;
+  routine_count: number;
+  issues_done: number;
+  issues_in_progress: number;
+  issues_backlog: number;
+  completion_pct: number;
+  current_value: string | null;
+  target_value: string | null;
+  target_metric: string | null;
+}
+
+// Topology
+export interface TopologyNode {
+  uuid: string;
+  name: string;
+  role: string | null;
+  agent_type: string;
+  status: string;
+  execution_mode: string;
+  capabilities: string[];
+  active_assignments: number;
+  max_concurrent_alerts: number;
+  budget_monthly_cents: number | null;
+  spent_monthly_cents: number;
+  last_heartbeat_at: string | null;
+}
+
+export interface TopologyEdge {
+  from_uuid: string;
+  to_uuid: string;
+  edge_type: string;
+  label: string | null;
+}
+
+export interface TopologyGraph {
+  nodes: TopologyNode[];
+  edges: TopologyEdge[];
+  computed_at: string;
+}
+
+// Secrets
+export interface Secret {
+  uuid: string;
+  name: string;
+  description: string | null;
+  provider: string;
+  env_var_name: string | null;
+  current_version: number;
+  is_sensitive: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Agent Actions
+export interface AgentAction {
+  uuid: string;
+  alert_id: number;
+  agent_registration_id: number;
+  assignment_id: number;
+  action_type: string;
+  action_subtype: string;
+  status: string;
+  payload: Record<string, unknown>;
+  confidence: number | null;
+  approval_request_id: number | null;
+  execution_result: Record<string, unknown> | null;
+  executed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Control Plane Dashboard
+export interface ControlPlaneDashboard {
+  agent_count: number;
+  active_agents: number;
+  paused_agents: number;
+  queue_depth: number;
+  unassigned_alerts: number;
+  assigned_alerts: number;
+  pending_actions: number;
+  total_cost_mtd_cents: number;
+  agents_over_budget_pct: number;
+}
+
+// Agent Key
+export interface AgentKey {
+  uuid: string;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface AgentKeyCreated extends AgentKey {
+  key: string;
+}
+
+// ============================================================
+// Knowledge Base types
+// ============================================================
+
+export interface KBPageSummary {
+  uuid: string;
+  slug: string;
+  title: string;
+  folder: string;
+  format: string;
+  status: string;
+  inject_scope: Record<string, unknown> | null;
+  inject_priority: number;
+  inject_pinned: boolean;
+  sync_source: Record<string, unknown> | null;
+  synced_at: string | null;
+  token_count: number | null;
+  latest_revision_number: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KBPageLink {
+  uuid: string;
+  linked_entity_type: string;
+  linked_entity_id: string;
+  link_type: string;
+  created_at: string;
+}
+
+export interface KBPageResponse extends KBPageSummary {
+  body: string;
+  sync_last_hash: string | null;
+  links: KBPageLink[];
+}
+
+export interface KBPageRevision {
+  uuid: string;
+  revision_number: number;
+  body: string;
+  change_summary: string | null;
+  author_operator: string | null;
+  sync_source_ref: string | null;
+  created_at: string;
+}
+
+export interface KBFolderNode {
+  path: string;
+  name: string;
+  page_count: number;
+  children: KBFolderNode[];
+}
+
+export interface KBSearchResult {
+  slug: string;
+  title: string;
+  folder: string;
+  summary: string;
+  inject_scope: Record<string, unknown> | null;
+  sync_source: string | null;
+  relevance_score: number | null;
+  updated_at: string;
+}
+
+export interface KBSyncResult {
+  slug: string;
+  outcome: string;
+  old_hash: string | null;
+  new_hash: string | null;
+  error_message: string | null;
+  revision_id: string | null;
 }

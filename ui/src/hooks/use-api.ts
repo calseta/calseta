@@ -26,6 +26,33 @@ import type {
   TestExtractionResult,
   ApprovalDefaults,
   DetectionRuleMetrics,
+  LLMIntegration,
+  LLMUsage,
+  AlertAssignment,
+  HeartbeatRun,
+  CostEvent,
+  CostSummary,
+  AgentInvocation,
+  AgentIssue,
+  IssueComment,
+  Routine,
+  RoutineRun,
+  Campaign,
+  CampaignItem,
+  CampaignMetrics,
+  TopologyGraph,
+  Secret,
+  AgentAction,
+  ControlPlaneDashboard,
+  AgentKey,
+  AgentKeyCreated,
+  KBPageSummary,
+  KBPageResponse,
+  KBPageRevision,
+  KBFolderNode,
+  KBSearchResult,
+  KBSyncResult,
+  KBPageLink,
 } from "@/lib/types";
 
 // Settings
@@ -765,5 +792,662 @@ export function useDeleteIndicatorMapping() {
   return useMutation({
     mutationFn: (uuid: string) => api.delete(`/indicator-mappings/${uuid}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["indicator-mappings"] }),
+  });
+}
+
+// ============================================================
+// Control Plane v2 hooks
+// ============================================================
+
+// LLM Integrations
+export function useLLMIntegrations(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["llm-integrations", qs],
+    queryFn: () => api.get<PaginatedResponse<LLMIntegration>>(`/llm-integrations${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useLLMIntegration(uuid: string) {
+  return useQuery({
+    queryKey: ["llm-integration", uuid],
+    queryFn: () => api.get<DataResponse<LLMIntegration>>(`/llm-integrations/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function useCreateLLMIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<LLMIntegration>>("/llm-integrations", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["llm-integrations"] }),
+  });
+}
+
+export function usePatchLLMIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<LLMIntegration>>(`/llm-integrations/${uuid}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["llm-integrations"] });
+      qc.invalidateQueries({ queryKey: ["llm-integration", vars.uuid] });
+    },
+  });
+}
+
+export function useDeleteLLMIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/llm-integrations/${uuid}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["llm-integrations"] }),
+  });
+}
+
+export function useLLMIntegrationUsage(uuid: string) {
+  return useQuery({
+    queryKey: ["llm-integration-usage", uuid],
+    queryFn: () => api.get<DataResponse<LLMUsage>>(`/llm-integrations/${uuid}/usage`),
+    enabled: !!uuid,
+  });
+}
+
+// Alert Queue
+export function useAlertQueue(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["alert-queue", qs],
+    queryFn: () => api.get<PaginatedResponse<AlertResponse>>(`/queue${qs ? `?${qs}` : ""}`),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useCheckoutAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (alertUuid: string) =>
+      api.post<DataResponse<AlertAssignment>>(`/queue/${alertUuid}/checkout`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["alert-queue"] }),
+  });
+}
+
+export function useReleaseAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (alertUuid: string) =>
+      api.post<DataResponse<AlertAssignment>>(`/queue/${alertUuid}/release`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["alert-queue"] }),
+  });
+}
+
+// Agent Heartbeat Runs
+export function useAgentHeartbeatRuns(agentUuid: string, params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["agent-heartbeat-runs", agentUuid, qs],
+    queryFn: () => api.get<PaginatedResponse<HeartbeatRun>>(`/agents/${agentUuid}/heartbeat-runs${qs ? `?${qs}` : ""}`),
+    enabled: !!agentUuid,
+  });
+}
+
+// Agent Invocations
+export function useAgentInvocations(agentUuid: string, params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["agent-invocations", agentUuid, qs],
+    queryFn: () => api.get<PaginatedResponse<AgentInvocation>>(`/agents/${agentUuid}/invocations${qs ? `?${qs}` : ""}`),
+    enabled: !!agentUuid,
+  });
+}
+
+// Cost Events
+export function useCostEvents(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["cost-events", qs],
+    queryFn: () => api.get<PaginatedResponse<CostEvent>>(`/cost-events${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useAgentCostEvents(agentUuid: string, params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["agent-cost-events", agentUuid, qs],
+    queryFn: () => api.get<PaginatedResponse<CostEvent>>(`/agents/${agentUuid}/cost-events${qs ? `?${qs}` : ""}`),
+    enabled: !!agentUuid,
+  });
+}
+
+export function useAgentCostSummary(agentUuid: string) {
+  return useQuery({
+    queryKey: ["agent-cost-summary", agentUuid],
+    queryFn: () => api.get<DataResponse<CostSummary>>(`/agents/${agentUuid}/cost-summary`),
+    enabled: !!agentUuid,
+  });
+}
+
+// Invocations (instance-wide)
+export function useInvocation(uuid: string) {
+  return useQuery({
+    queryKey: ["invocation", uuid],
+    queryFn: () => api.get<DataResponse<AgentInvocation>>(`/invocations/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+// Issues
+export function useIssues(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["issues", qs],
+    queryFn: () => api.get<PaginatedResponse<AgentIssue>>(`/issues${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useIssue(uuid: string) {
+  return useQuery({
+    queryKey: ["issue", uuid],
+    queryFn: () => api.get<DataResponse<AgentIssue>>(`/issues/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function useCreateIssue() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<AgentIssue>>("/issues", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["issues"] }),
+  });
+}
+
+export function usePatchIssue() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<AgentIssue>>(`/issues/${uuid}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["issues"] });
+      qc.invalidateQueries({ queryKey: ["issue", vars.uuid] });
+    },
+  });
+}
+
+export function useIssueComments(uuid: string) {
+  return useQuery({
+    queryKey: ["issue-comments", uuid],
+    queryFn: () => api.get<PaginatedResponse<IssueComment>>(`/issues/${uuid}/comments`),
+    enabled: !!uuid,
+  });
+}
+
+export function useAddIssueComment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.post<DataResponse<IssueComment>>(`/issues/${uuid}/comments`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["issue-comments", vars.uuid] });
+    },
+  });
+}
+
+// Routines
+export function useRoutines(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["routines", qs],
+    queryFn: () => api.get<PaginatedResponse<Routine>>(`/routines${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useRoutine(uuid: string) {
+  return useQuery({
+    queryKey: ["routine", uuid],
+    queryFn: () => api.get<DataResponse<Routine>>(`/routines/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function useCreateRoutine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<Routine>>("/routines", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["routines"] }),
+  });
+}
+
+export function usePatchRoutine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<Routine>>(`/routines/${uuid}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["routines"] });
+      qc.invalidateQueries({ queryKey: ["routine", vars.uuid] });
+    },
+  });
+}
+
+export function useTriggerRoutine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, payload }: { uuid: string; payload?: Record<string, unknown> }) =>
+      api.post<DataResponse<{ message: string }>>(`/routines/${uuid}/trigger`, payload ?? {}),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["routine-runs", vars.uuid] });
+      qc.invalidateQueries({ queryKey: ["routine", vars.uuid] });
+    },
+  });
+}
+
+export function useRoutineRuns(uuid: string) {
+  return useQuery({
+    queryKey: ["routine-runs", uuid],
+    queryFn: () => api.get<PaginatedResponse<RoutineRun>>(`/routines/${uuid}/runs?page_size=50`),
+    enabled: !!uuid,
+  });
+}
+
+export function useDeleteRoutine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/routines/${uuid}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["routines"] }),
+  });
+}
+
+// Campaigns
+export function useCampaigns(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["campaigns", qs],
+    queryFn: () => api.get<PaginatedResponse<Campaign>>(`/campaigns${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useCampaign(uuid: string) {
+  return useQuery({
+    queryKey: ["campaign", uuid],
+    queryFn: () => api.get<DataResponse<Campaign>>(`/campaigns/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function useCreateCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<Campaign>>("/campaigns", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns"] }),
+  });
+}
+
+export function usePatchCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<Campaign>>(`/campaigns/${uuid}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["campaigns"] });
+      qc.invalidateQueries({ queryKey: ["campaign", vars.uuid] });
+    },
+  });
+}
+
+export function useAddCampaignItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.post<DataResponse<CampaignItem>>(`/campaigns/${uuid}/items`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["campaign", vars.uuid] });
+    },
+  });
+}
+
+export function useCampaignMetrics(uuid: string) {
+  return useQuery({
+    queryKey: ["campaign-metrics", uuid],
+    queryFn: () => api.get<DataResponse<CampaignMetrics>>(`/campaigns/${uuid}/metrics`),
+    enabled: !!uuid,
+  });
+}
+
+// Topology
+export function useTopology() {
+  return useQuery({
+    queryKey: ["topology"],
+    queryFn: () => api.get<DataResponse<TopologyGraph>>("/topology"),
+    staleTime: 30_000,
+  });
+}
+
+// Secrets
+export function useSecrets(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["secrets", qs],
+    queryFn: () => api.get<PaginatedResponse<Secret>>(`/secrets${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useCreateSecret() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<Secret>>("/secrets", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["secrets"] }),
+  });
+}
+
+export function useRotateSecret() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, value }: { name: string; value: string }) =>
+      api.post<DataResponse<{ message: string }>>(`/secrets/${name}/versions`, { value }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["secrets"] }),
+  });
+}
+
+export function useDeleteSecret() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/secrets/${uuid}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["secrets"] }),
+  });
+}
+
+// Actions
+export function useActions(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["actions", qs],
+    queryFn: () => api.get<PaginatedResponse<AgentAction>>(`/actions${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useAction(uuid: string) {
+  return useQuery({
+    queryKey: ["action", uuid],
+    queryFn: () => api.get<DataResponse<AgentAction>>(`/actions/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function usePatchAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<AgentAction>>(`/actions/${uuid}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["actions"] }),
+  });
+}
+
+export function useCancelAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      api.post<DataResponse<AgentAction>>(`/actions/${uuid}/cancel`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["actions"] }),
+  });
+}
+
+// Agent lifecycle — pause / resume / terminate
+export function usePauseAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, reason }: { uuid: string; reason?: string }) =>
+      api.post<DataResponse<AgentRegistration>>(`/agents/${uuid}/pause`, { reason }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["agent", vars.uuid] });
+      qc.invalidateQueries({ queryKey: ["agents"] });
+    },
+  });
+}
+
+export function useResumeAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      api.post<DataResponse<AgentRegistration>>(`/agents/${uuid}/resume`),
+    onSuccess: (_data, uuid) => {
+      qc.invalidateQueries({ queryKey: ["agent", uuid] });
+      qc.invalidateQueries({ queryKey: ["agents"] });
+    },
+  });
+}
+
+export function useTerminateAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      api.post<DataResponse<AgentRegistration>>(`/agents/${uuid}/terminate`),
+    onSuccess: (_data, uuid) => {
+      qc.invalidateQueries({ queryKey: ["agent", uuid] });
+      qc.invalidateQueries({ queryKey: ["agents"] });
+    },
+  });
+}
+
+// Agent API keys
+export function useAgentKeys(agentUuid: string) {
+  return useQuery({
+    queryKey: ["agent-keys", agentUuid],
+    queryFn: () => api.get<PaginatedResponse<AgentKey>>(`/agents/${agentUuid}/keys`),
+    enabled: !!agentUuid,
+  });
+}
+
+export function useCreateAgentKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentUuid, name }: { agentUuid: string; name: string }) =>
+      api.post<DataResponse<AgentKeyCreated>>(`/agents/${agentUuid}/keys`, { name }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["agent-keys", vars.agentUuid] });
+    },
+  });
+}
+
+export function useRevokeAgentKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentUuid, keyId }: { agentUuid: string; keyId: string }) =>
+      api.delete(`/agents/${agentUuid}/keys/${keyId}`),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["agent-keys", vars.agentUuid] });
+    },
+  });
+}
+
+// Control Plane Dashboard
+export function useControlPlaneDashboard() {
+  return useQuery({
+    queryKey: ["control-plane-dashboard"],
+    queryFn: () => api.get<DataResponse<ControlPlaneDashboard>>("/dashboard"),
+    refetchInterval: 30_000,
+  });
+}
+
+// ============================================================
+// Knowledge Base hooks
+// ============================================================
+
+export function useKBPages(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["kb-pages", qs],
+    queryFn: () => api.get<PaginatedResponse<KBPageSummary>>(`/kb${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useKBFolders() {
+  return useQuery({
+    queryKey: ["kb-folders"],
+    queryFn: () => api.get<DataResponse<KBFolderNode[]>>("/kb/folders"),
+    staleTime: 60_000,
+  });
+}
+
+export function useKBSearch(q: string, params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams({ q });
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  return useQuery({
+    queryKey: ["kb-search", q, search.toString()],
+    queryFn: () => api.get<PaginatedResponse<KBSearchResult>>(`/kb/search?${search.toString()}`),
+    enabled: q.length >= 1,
+  });
+}
+
+export function useKBPage(slug: string) {
+  return useQuery({
+    queryKey: ["kb-page", slug],
+    queryFn: () => api.get<DataResponse<KBPageResponse>>(`/kb/${encodeURIComponent(slug)}`),
+    enabled: !!slug,
+  });
+}
+
+export function useCreateKBPage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<KBPageResponse>>("/kb", body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["kb-pages"] });
+      qc.invalidateQueries({ queryKey: ["kb-folders"] });
+    },
+  });
+}
+
+export function usePatchKBPage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, body }: { slug: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<KBPageResponse>>(`/kb/${encodeURIComponent(slug)}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["kb-page", vars.slug] });
+      qc.invalidateQueries({ queryKey: ["kb-pages"] });
+    },
+  });
+}
+
+export function useDeleteKBPage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (slug: string) => api.delete(`/kb/${encodeURIComponent(slug)}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["kb-pages"] });
+      qc.invalidateQueries({ queryKey: ["kb-folders"] });
+    },
+  });
+}
+
+export function useKBRevisions(slug: string) {
+  return useQuery({
+    queryKey: ["kb-revisions", slug],
+    queryFn: () => api.get<PaginatedResponse<KBPageRevision>>(`/kb/${encodeURIComponent(slug)}/revisions?page_size=50`),
+    enabled: !!slug,
+  });
+}
+
+export function useSyncKBPage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (slug: string) =>
+      api.post<DataResponse<KBSyncResult>>(`/kb/${encodeURIComponent(slug)}/sync`),
+    onSuccess: (_data, slug) => {
+      qc.invalidateQueries({ queryKey: ["kb-page", slug] });
+      qc.invalidateQueries({ queryKey: ["kb-pages"] });
+    },
+  });
+}
+
+export function useAddKBPageLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, body }: { slug: string; body: Record<string, unknown> }) =>
+      api.post<DataResponse<KBPageLink>>(`/kb/${encodeURIComponent(slug)}/links`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["kb-page", vars.slug] });
+    },
   });
 }

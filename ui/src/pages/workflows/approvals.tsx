@@ -21,17 +21,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TablePagination } from "@/components/table-pagination";
 import {
   useApprovals,
   useApproveWorkflow,
   useRejectWorkflow,
+  useActions,
+  usePatchAction,
 } from "@/hooks/use-api";
 import { useTableState } from "@/hooks/use-table-state";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { WorkflowApproval } from "@/lib/types";
+import type { WorkflowApproval, AgentAction } from "@/lib/types";
 import { CheckCircle, XCircle, Clock, Shield, Copy, Check, RefreshCw } from "lucide-react";
 import { useState, useCallback } from "react";
 
@@ -44,6 +47,15 @@ const APPROVAL_COLUMNS: ColumnDef[] = [
   { key: "confidence", initialWidth: 80, minWidth: 60 },
   { key: "expires", initialWidth: 130, minWidth: 100 },
   { key: "actions", initialWidth: 195, minWidth: 180 },
+];
+
+const ACTION_COLUMNS: ColumnDef[] = [
+  { key: "type", initialWidth: 140, minWidth: 100 },
+  { key: "subtype", initialWidth: 180, minWidth: 120 },
+  { key: "status", initialWidth: 120, minWidth: 80 },
+  { key: "confidence", initialWidth: 90, minWidth: 70 },
+  { key: "created", initialWidth: 160, minWidth: 120 },
+  { key: "actions", initialWidth: 180, minWidth: 160 },
 ];
 
 /** Defense-in-depth: a request is actionable only if the backend says pending
@@ -76,6 +88,41 @@ function statusBadgeClass(status: string): string {
       return "text-teal bg-teal/10 border-teal/30";
     case "rejected":
     case "expired":
+      return "text-red-threat bg-red-threat/10 border-red-threat/30";
+    default:
+      return "text-dim bg-dim/10 border-dim/30";
+  }
+}
+
+function actionTypeBadgeClass(actionType: string): string {
+  switch (actionType) {
+    case "containment":
+      return "text-red-threat bg-red-threat/10 border-red-threat/30";
+    case "remediation":
+      return "text-amber bg-amber/10 border-amber/30";
+    case "notification":
+      return "text-teal bg-teal/10 border-teal/30";
+    case "escalation":
+      return "text-amber bg-amber/10 border-amber/30";
+    case "enrichment":
+      return "text-teal bg-teal/10 border-teal/30";
+    case "investigation":
+      return "text-dim bg-dim/10 border-dim/30";
+    case "user_validation":
+      return "text-teal bg-teal/10 border-teal/30";
+    case "custom":
+    default:
+      return "text-dim bg-dim/10 border-dim/30";
+  }
+}
+
+function actionStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "pending_approval":
+      return "text-amber bg-amber/10 border-amber/30";
+    case "approved":
+      return "text-teal bg-teal/10 border-teal/30";
+    case "rejected":
       return "text-red-threat bg-red-threat/10 border-red-threat/30";
     default:
       return "text-dim bg-dim/10 border-dim/30";
@@ -160,6 +207,9 @@ function TargetCell({ tc }: { tc: Record<string, unknown> }) {
 }
 
 export function ApprovalsPage() {
+  const [activeTab, setActiveTab] = useState("workflow");
+
+  // Workflow approvals state
   const { page, setPage, pageSize, handlePageSizeChange, params } = useTableState({});
   const { data, isLoading, refetch, isFetching } = useApprovals(params);
   const approve = useApproveWorkflow();
@@ -169,231 +219,456 @@ export function ApprovalsPage() {
   const approvals = data?.data ?? [];
   const meta = data?.meta;
 
+  // Action approvals state
+  const {
+    page: actPage,
+    setPage: setActPage,
+    pageSize: actPageSize,
+    handlePageSizeChange: actHandlePageSizeChange,
+    params: actParams,
+  } = useTableState({});
+  const {
+    data: actionsData,
+    isLoading: actionsLoading,
+    refetch: refetchActions,
+    isFetching: actionsFetching,
+  } = useActions({ ...actParams, status: "pending_approval" });
+  const patchAction = usePatchAction();
+  const [rejectActionTarget, setRejectActionTarget] = useState<string | null>(null);
+
+  const actions = actionsData?.data ?? [];
+  const actionsMeta = actionsData?.meta;
+
+  // Badge counts
+  const pendingWorkflowCount = approvals.filter((a) => a.status === "pending").length;
+  const pendingActionsCount = actions.filter((a) => a.status === "pending_approval").length;
+
   return (
-    <AppLayout title="Workflow Approvals">
+    <AppLayout title="Approvals">
       <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="h-8 w-8 p-0 text-dim hover:text-teal"
-        >
-          <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-        </Button>
-        {meta && (
-          <span className="text-xs text-dim">
-            {meta.total} approval{meta.total !== 1 ? "s" : ""}
-          </span>
-        )}
-      </div>
-      <div className="rounded-lg border border-border bg-card">
-        <ResizableTable storageKey="workflow-approvals" columns={APPROVAL_COLUMNS}>
-          <TableHeader>
-            <TableRow className="border-border hover:bg-transparent">
-              <ResizableTableHead columnKey="workflow" className="text-dim text-xs">
-                Workflow
-              </ResizableTableHead>
-              <ResizableTableHead columnKey="status" className="text-dim text-xs">
-                Status
-              </ResizableTableHead>
-              <ResizableTableHead columnKey="triggered_by" className="text-dim text-xs">
-                Triggered By
-              </ResizableTableHead>
-              <ResizableTableHead columnKey="target" className="text-dim text-xs">
-                Target
-              </ResizableTableHead>
-              <ResizableTableHead columnKey="reason" className="text-dim text-xs">
-                Reason
-              </ResizableTableHead>
-              <ResizableTableHead columnKey="confidence" className="text-dim text-xs">
-                Confidence
-              </ResizableTableHead>
-              <ResizableTableHead columnKey="expires" className="text-dim text-xs">
-                Expires
-              </ResizableTableHead>
-              <ResizableTableHead columnKey="actions" className="text-dim text-xs">
-                Actions
-              </ResizableTableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading
-              ? Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i} className="border-border">
-                    {Array.from({ length: 8 }).map((_, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-5 w-20" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              : approvals.map((req) => {
-                  const shown = displayStatus(req);
-                  const actionable = isActionable(req);
-                  const tc = req.trigger_context ?? {};
-                  return (
-                    <TableRow key={req.uuid} className="border-border hover:bg-accent/50">
-                      {/* Workflow */}
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <StatusIcon status={shown} />
-                          {req.workflow_uuid ? (
-                            <Link
-                              to="/workflows/$uuid"
-                              params={{ uuid: req.workflow_uuid }}
-                              search={{ tab: "runs" }}
-                              className="text-sm font-medium text-foreground hover:text-teal-light transition-colors truncate"
-                            >
-                              {req.workflow_name ?? "—"}
-                            </Link>
-                          ) : (
-                            <span className="text-sm font-medium text-foreground truncate">
-                              {req.workflow_name ?? "—"}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
+        <div className="flex items-center gap-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="bg-surface border border-border">
+              <TabsTrigger value="workflow" className="flex items-center gap-2">
+                Workflow Approvals
+                {pendingWorkflowCount > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] h-4 px-1.5 text-amber bg-amber/10 border-amber/30"
+                  >
+                    {pendingWorkflowCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="actions" className="flex items-center gap-2">
+                Action Approvals
+                {pendingActionsCount > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] h-4 px-1.5 text-amber bg-amber/10 border-amber/30"
+                  >
+                    {pendingActionsCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
 
-                      {/* Status */}
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={cn("text-[11px]", statusBadgeClass(shown))}
-                        >
-                          {shown}
-                        </Badge>
-                      </TableCell>
+            {/* ── Workflow Approvals ── */}
+            <TabsContent value="workflow" className="mt-4">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => refetch()}
+                    disabled={isFetching}
+                    className="h-8 w-8 p-0 text-dim hover:text-teal"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+                  </Button>
+                  {meta && (
+                    <span className="text-xs text-dim">
+                      {meta.total} approval{meta.total !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+                <div className="rounded-lg border border-border bg-card">
+                  <ResizableTable storageKey="workflow-approvals" columns={APPROVAL_COLUMNS}>
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-transparent">
+                        <ResizableTableHead columnKey="workflow" className="text-dim text-xs">
+                          Workflow
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="status" className="text-dim text-xs">
+                          Status
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="triggered_by" className="text-dim text-xs">
+                          Triggered By
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="target" className="text-dim text-xs">
+                          Target
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="reason" className="text-dim text-xs">
+                          Reason
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="confidence" className="text-dim text-xs">
+                          Confidence
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="expires" className="text-dim text-xs">
+                          Expires
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="actions" className="text-dim text-xs">
+                          Actions
+                        </ResizableTableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoading
+                        ? Array.from({ length: 5 }).map((_, i) => (
+                            <TableRow key={i} className="border-border">
+                              {Array.from({ length: 8 }).map((_, j) => (
+                                <TableCell key={j}>
+                                  <Skeleton className="h-5 w-20" />
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))
+                        : approvals.map((req) => {
+                            const shown = displayStatus(req);
+                            const actionable = isActionable(req);
+                            const tc = req.trigger_context ?? {};
+                            return (
+                              <TableRow key={req.uuid} className="border-border hover:bg-accent/50">
+                                {/* Workflow */}
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <StatusIcon status={shown} />
+                                    {req.workflow_uuid ? (
+                                      <Link
+                                        to="/workflows/$uuid"
+                                        params={{ uuid: req.workflow_uuid }}
+                                        search={{ tab: "runs" }}
+                                        className="text-sm font-medium text-foreground hover:text-teal-light transition-colors truncate"
+                                      >
+                                        {req.workflow_name ?? "—"}
+                                      </Link>
+                                    ) : (
+                                      <span className="text-sm font-medium text-foreground truncate">
+                                        {req.workflow_name ?? "—"}
+                                      </span>
+                                    )}
+                                  </div>
+                                </TableCell>
 
-                      {/* Triggered By */}
-                      <TableCell>
-                        {req.trigger_agent_key_prefix ? (
-                          <Link
-                            to="/settings/api-keys"
-                            className="text-xs font-mono text-foreground hover:text-teal-light transition-colors"
+                                {/* Status */}
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={cn("text-[11px]", statusBadgeClass(shown))}
+                                  >
+                                    {shown}
+                                  </Badge>
+                                </TableCell>
+
+                                {/* Triggered By */}
+                                <TableCell>
+                                  {req.trigger_agent_key_prefix ? (
+                                    <Link
+                                      to="/settings/api-keys"
+                                      className="text-xs font-mono text-foreground hover:text-teal-light transition-colors"
+                                    >
+                                      {req.trigger_agent_key_prefix}…
+                                    </Link>
+                                  ) : (
+                                    <span className="text-xs text-dim">{req.trigger_type}</span>
+                                  )}
+                                </TableCell>
+
+                                {/* Target */}
+                                <TableCell>
+                                  <TargetCell tc={tc} />
+                                </TableCell>
+
+                                {/* Reason */}
+                                <TableCell>
+                                  {req.trigger_context &&
+                                  Object.keys(req.trigger_context).length > 0 ? (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="text-sm text-foreground truncate block cursor-default">
+                                            {req.reason}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                          side="bottom"
+                                          className="max-w-md bg-card border-border"
+                                        >
+                                          <pre className="text-[11px] text-dim font-mono whitespace-pre-wrap">
+                                            {JSON.stringify(req.trigger_context, null, 2)}
+                                          </pre>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  ) : (
+                                    <span className="text-sm text-foreground truncate block">
+                                      {req.reason}
+                                    </span>
+                                  )}
+                                </TableCell>
+
+                                {/* Confidence */}
+                                <TableCell>
+                                  <span className="flex items-center gap-1 text-xs text-dim">
+                                    <Shield className="h-3 w-3" />
+                                    {(req.confidence * 100).toFixed(0)}%
+                                  </span>
+                                </TableCell>
+
+                                {/* Expires */}
+                                <TableCell className="text-xs text-dim">
+                                  {shown === "expired" ? (
+                                    <span className="text-red-threat">Expired</span>
+                                  ) : (
+                                    formatDate(req.expires_at)
+                                  )}
+                                </TableCell>
+
+                                {/* Actions */}
+                                <TableCell>
+                                  {actionable && (
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() =>
+                                          approve.mutate(
+                                            { uuid: req.uuid },
+                                            {
+                                              onSuccess: () =>
+                                                toast.success("Workflow approved"),
+                                              onError: () =>
+                                                toast.error("Failed to approve"),
+                                            },
+                                          )
+                                        }
+                                        disabled={approve.isPending}
+                                        className="bg-teal text-white hover:bg-teal-dim h-7 text-xs"
+                                      >
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        Approve
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setRejectTarget(req.uuid)}
+                                        disabled={reject.isPending}
+                                        className="border-red-threat/30 text-red-threat hover:bg-red-threat/10 h-7 text-xs"
+                                      >
+                                        <XCircle className="h-3 w-3 mr-1" />
+                                        Reject
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      {!isLoading && approvals.length === 0 && (
+                        <TableRow>
+                          <TableCell
+                            colSpan={8}
+                            className="text-center text-sm text-dim py-20"
                           >
-                            {req.trigger_agent_key_prefix}…
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-dim">{req.trigger_type}</span>
-                        )}
-                      </TableCell>
+                            No approval requests
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </ResizableTable>
+                </div>
 
-                      {/* Target */}
-                      <TableCell>
-                        <TargetCell tc={tc} />
-                      </TableCell>
+                {meta && (
+                  <TablePagination
+                    page={page}
+                    pageSize={pageSize}
+                    totalPages={meta.total_pages}
+                    onPageChange={setPage}
+                    onPageSizeChange={handlePageSizeChange}
+                  />
+                )}
+              </div>
+            </TabsContent>
 
-                      {/* Reason */}
-                      <TableCell>
-                        {req.trigger_context &&
-                        Object.keys(req.trigger_context).length > 0 ? (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="text-sm text-foreground truncate block cursor-default">
-                                  {req.reason}
+            {/* ── Action Approvals ── */}
+            {/* NOTE: backend fix needed — PATCH /v1/actions/{uuid} does not yet exist.
+                The backend currently only has GET and a cancel endpoint for actions.
+                The patchAction hook calls PATCH /v1/actions/{uuid} which will 404 until
+                the backend implements status transitions (approved/rejected) on that endpoint. */}
+            <TabsContent value="actions" className="mt-4">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => refetchActions()}
+                    disabled={actionsFetching}
+                    className="h-8 w-8 p-0 text-dim hover:text-teal"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", actionsFetching && "animate-spin")} />
+                  </Button>
+                  {actionsMeta && (
+                    <span className="text-xs text-dim">
+                      {actionsMeta.total} action{actionsMeta.total !== 1 ? "s" : ""} pending approval
+                    </span>
+                  )}
+                </div>
+                <div className="rounded-lg border border-border bg-card">
+                  <ResizableTable storageKey="action-approvals" columns={ACTION_COLUMNS}>
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-transparent">
+                        <ResizableTableHead columnKey="type" className="text-dim text-xs">
+                          Type
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="subtype" className="text-dim text-xs">
+                          Subtype
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="status" className="text-dim text-xs">
+                          Status
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="confidence" className="text-dim text-xs">
+                          Confidence
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="created" className="text-dim text-xs">
+                          Created
+                        </ResizableTableHead>
+                        <ResizableTableHead columnKey="actions" className="text-dim text-xs">
+                          Actions
+                        </ResizableTableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {actionsLoading
+                        ? Array.from({ length: 5 }).map((_, i) => (
+                            <TableRow key={i} className="border-border">
+                              {Array.from({ length: 6 }).map((_, j) => (
+                                <TableCell key={j}>
+                                  <Skeleton className="h-5 w-20" />
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))
+                        : actions.map((action: AgentAction) => (
+                            <TableRow key={action.uuid} className="border-border hover:bg-accent/50">
+                              {/* Type */}
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={cn("text-[11px]", actionTypeBadgeClass(action.action_type))}
+                                >
+                                  {action.action_type}
+                                </Badge>
+                              </TableCell>
+
+                              {/* Subtype */}
+                              <TableCell>
+                                <span className="text-xs font-mono text-foreground">
+                                  {action.action_subtype || "—"}
                                 </span>
-                              </TooltipTrigger>
-                              <TooltipContent
-                                side="bottom"
-                                className="max-w-md bg-card border-border"
-                              >
-                                <pre className="text-[11px] text-dim font-mono whitespace-pre-wrap">
-                                  {JSON.stringify(req.trigger_context, null, 2)}
-                                </pre>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          <span className="text-sm text-foreground truncate block">
-                            {req.reason}
-                          </span>
-                        )}
-                      </TableCell>
+                              </TableCell>
 
-                      {/* Confidence */}
-                      <TableCell>
-                        <span className="flex items-center gap-1 text-xs text-dim">
-                          <Shield className="h-3 w-3" />
-                          {(req.confidence * 100).toFixed(0)}%
-                        </span>
-                      </TableCell>
+                              {/* Status */}
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={cn("text-[11px]", actionStatusBadgeClass(action.status))}
+                                >
+                                  {action.status}
+                                </Badge>
+                              </TableCell>
 
-                      {/* Expires */}
-                      <TableCell className="text-xs text-dim">
-                        {shown === "expired" ? (
-                          <span className="text-red-threat">Expired</span>
-                        ) : (
-                          formatDate(req.expires_at)
-                        )}
-                      </TableCell>
+                              {/* Confidence */}
+                              <TableCell>
+                                {action.confidence != null ? (
+                                  <span className="flex items-center gap-1 text-xs text-dim">
+                                    <Shield className="h-3 w-3" />
+                                    {(action.confidence * 100).toFixed(0)}%
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-dim">—</span>
+                                )}
+                              </TableCell>
 
-                      {/* Actions */}
-                      <TableCell>
-                        {actionable && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                approve.mutate(
-                                  { uuid: req.uuid },
-                                  {
-                                    onSuccess: () =>
-                                      toast.success("Workflow approved"),
-                                    onError: () =>
-                                      toast.error("Failed to approve"),
-                                  },
-                                )
-                              }
-                              disabled={approve.isPending}
-                              className="bg-teal text-white hover:bg-teal-dim h-7 text-xs"
-                            >
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setRejectTarget(req.uuid)}
-                              disabled={reject.isPending}
-                              className="border-red-threat/30 text-red-threat hover:bg-red-threat/10 h-7 text-xs"
-                            >
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-            {!isLoading && approvals.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="text-center text-sm text-dim py-20"
-                >
-                  No approval requests
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </ResizableTable>
+                              {/* Created */}
+                              <TableCell className="text-xs text-dim">
+                                {formatDate(action.created_at)}
+                              </TableCell>
+
+                              {/* Actions */}
+                              <TableCell>
+                                {action.status === "pending_approval" && (
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() =>
+                                        patchAction.mutate(
+                                          { uuid: action.uuid, body: { status: "approved" } },
+                                          {
+                                            onSuccess: () => toast.success("Action approved"),
+                                            onError: () => toast.error("Failed to approve"),
+                                          },
+                                        )
+                                      }
+                                      disabled={patchAction.isPending}
+                                      className="bg-teal text-white hover:bg-teal-dim h-7 text-xs"
+                                    >
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setRejectActionTarget(action.uuid)}
+                                      disabled={patchAction.isPending}
+                                      className="border-red-threat/30 text-red-threat hover:bg-red-threat/10 h-7 text-xs"
+                                    >
+                                      <XCircle className="h-3 w-3 mr-1" />
+                                      Reject
+                                    </Button>
+                                  </div>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      {!actionsLoading && actions.length === 0 && (
+                        <TableRow>
+                          <TableCell
+                            colSpan={6}
+                            className="text-center text-sm text-dim py-20"
+                          >
+                            No action approval requests
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </ResizableTable>
+                </div>
+
+                {actionsMeta && (
+                  <TablePagination
+                    page={actPage}
+                    pageSize={actPageSize}
+                    totalPages={actionsMeta.total_pages}
+                    onPageChange={setActPage}
+                    onPageSizeChange={actHandlePageSizeChange}
+                  />
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
 
-      {meta && (
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          totalPages={meta.total_pages}
-          onPageChange={setPage}
-          onPageSizeChange={handlePageSizeChange}
-        />
-      )}
-      </div>
-
+      {/* Workflow rejection confirm dialog */}
       <ConfirmDialog
         open={!!rejectTarget}
         onOpenChange={(v) => !v && setRejectTarget(null)}
@@ -408,6 +683,29 @@ export function ApprovalsPage() {
                 onSuccess: () => {
                   toast.success("Workflow rejected");
                   setRejectTarget(null);
+                },
+                onError: () => toast.error("Failed to reject"),
+              },
+            );
+          }
+        }}
+      />
+
+      {/* Action rejection confirm dialog */}
+      <ConfirmDialog
+        open={!!rejectActionTarget}
+        onOpenChange={(v) => !v && setRejectActionTarget(null)}
+        title="Reject Action"
+        description="Are you sure you want to reject this action approval request?"
+        confirmLabel="Reject"
+        onConfirm={() => {
+          if (rejectActionTarget) {
+            patchAction.mutate(
+              { uuid: rejectActionTarget!, body: { status: "rejected" } },
+              {
+                onSuccess: () => {
+                  toast.success("Action rejected");
+                  setRejectActionTarget(null);
                 },
                 onError: () => toast.error("Failed to reject"),
               },
