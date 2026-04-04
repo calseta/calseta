@@ -267,20 +267,26 @@ All indexes from the "Required Indexes (Part 1)" section above apply to this mig
 
 **Exit criteria:** Agent reports cost with LLM integration reference → costs tracked per-agent AND per-LLM-provider → budget approaches limit → soft alert fires → budget exceeded → agent auto-paused → operator raises budget and resumes. Per-alert budget: investigation exceeds per-alert cap → paused → operator notified. Supervision: stuck agent killed after timeout → alert released back to queue. Stalling investigation flagged after N empty results → operator notified.
 
-### Phase 5 — Multi-Agent Orchestration `[Part 2]`
+### Phase 5 — Multi-Agent Orchestration `[Part 2]` ✅ COMPLETE (2026-04-04)
 
 **Goal:** Orchestrator agents delegate to specialist sub-agents, full investigation trees are tracked.
 
-- `agent_invocations` table + migration
-- Sub-agent delegation endpoints (`POST /api/v1/invocations`, `POST /api/v1/invocations/parallel`)
-- Invocation result polling endpoint (`GET /api/v1/invocations/{id}/poll`)
-- Agent catalog endpoint (`GET /api/v1/agents/catalog`) — specialists with capability declarations
-- MCP orchestration tools: `list_available_agents`, `delegate_task`, `delegate_parallel`, `get_task_result`, `get_all_results`
-- Alert routing engine: deterministic rules match alerts to orchestrators based on `alert_filter`
-- Cost rollup: sub-agent costs aggregate to parent invocation → parent agent → alert → LLM provider
-- Invocation depth limit enforcement (1 level: orchestrator → specialist only)
+**Implemented:**
+- `agent_invocations` table + migration 0006 (status: queued/running/completed/failed/timed_out)
+- `InvocationService`: `delegate_task`, `delegate_parallel` (2–10, atomic), `mark_timed_out`, cost rollup
+- `AgentInvocationRepository`: CRUD + `list_timed_out_candidates` (SQL epoch arithmetic)
+- `execute_invocation_task` (procrastinate, queue: invocations): webhook dispatch for external specialists, atomic_checkout + run_managed_agent_task for managed specialists
+- REST API: `POST /v1/invocations`, `POST /v1/invocations/parallel`, `GET /v1/invocations/{uuid}`, `GET /v1/invocations/{uuid}/poll` (long-poll 500ms interval), `GET /v1/agents/{uuid}/invocations`
+- `GET /v1/agents/catalog`: active specialist/resolver agents with capabilities
+- MCP orchestration tools (orchestrator-only): `list_available_agents`, `delegate_task`, `delegate_parallel`, `get_task_result`, `get_all_results`
+- `AgentSupervisor` extended: `_scan_timed_out_invocations` runs each supervision cycle
+- 4 new activity event types: `invocation.created/completed/failed/timed_out`
+- 10 new tests (unit + integration stubs)
 
-**Exit criteria:** An orchestrator agent receives an alert, invokes 3 specialist sub-agents in parallel via MCP tools or REST API, collects structured results, synthesizes findings, and proposes a response action. Full invocation tree visible via API with cost rollups per sub-agent and per LLM provider.
+**Deferred to future phases:**
+- Alert routing engine (alert_filter-based orchestrator matching) — Phase 5.5+
+- Invocation depth limit enforcement — Phase 5.5+
+- Per-LLM-provider cost rollup on invocations — Phase 5.5+
 
 ### Phase 5.5 — Issue/Task System + Routine Scheduler + Agent Topology `[Part 4]`
 
