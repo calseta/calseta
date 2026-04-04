@@ -132,9 +132,19 @@ class CampaignRepository(BaseRepository[Campaign]):
         return result.scalar_one_or_none()  # type: ignore[return-value]
 
     async def delete_item(self, item: CampaignItem) -> None:
-        """Delete a campaign item."""
+        """Delete a campaign item and expire the parent campaign's items collection."""
+        # Load the parent campaign before deletion so we can expire it after
+        campaign_id = item.campaign_id
         await self._db.delete(item)
         await self._db.flush()
+        # Expire the parent campaign so subsequent get_by_uuid returns fresh items
+        from app.db.models.campaign import Campaign as _Campaign  # noqa: PLC0415
+        result = await self._db.execute(
+            select(_Campaign).where(_Campaign.id == campaign_id)
+        )
+        parent = result.scalar_one_or_none()
+        if parent is not None:
+            self._db.expire(parent)
 
     async def compute_metrics(self, campaign: Campaign) -> dict[str, object]:
         """Count items by type and issue status for a campaign.

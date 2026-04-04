@@ -15,7 +15,7 @@ import uuid
 from datetime import UTC, datetime
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.agent_registration import AgentRegistration
@@ -27,19 +27,24 @@ logger = structlog.get_logger(__name__)
 _OFFLINE_STATUSES = {"deactivated", "deleted"}
 
 
-async def _count_active_assignments(db: AsyncSession, agent_id: int) -> int:
-    """Count in_progress alert assignments for an agent."""
-    from sqlalchemy import func
-
+async def _batch_active_assignment_counts(
+    db: AsyncSession, agent_ids: list[int]
+) -> dict[int, int]:
+    """Batch-count in_progress alert assignments for multiple agents in one query."""
+    if not agent_ids:
+        return {}
     result = await db.execute(
-        select(func.count())
-        .select_from(AlertAssignment)
+        select(
+            AlertAssignment.agent_registration_id,
+            func.count().label("cnt"),
+        )
         .where(
-            AlertAssignment.agent_registration_id == agent_id,
+            AlertAssignment.agent_registration_id.in_(agent_ids),
             AlertAssignment.status == "in_progress",
         )
+        .group_by(AlertAssignment.agent_registration_id)
     )
-    return result.scalar_one()
+    return {row.agent_registration_id: row.cnt for row in result.all()}
 
 
 def _derive_node_status(agent: AgentRegistration) -> str:
@@ -54,12 +59,12 @@ def _derive_node_status(agent: AgentRegistration) -> str:
     return status_map.get(agent.status, "idle")
 
 
-async def _build_node(
+def _build_node(
     agent: AgentRegistration,
-    db: AsyncSession,
+    assignment_counts: dict[int, int],
 ) -> TopologyNode:
     """Build a TopologyNode from an AgentRegistration row."""
-    active_assignments = await _count_active_assignments(db, agent.id)
+    active_assignments = assignment_counts.get(agent.id, 0)
 
     # capabilities is JSONB — extract list of capability names if present
     caps: list[str] = []
@@ -132,8 +137,9 @@ class TopologyService:
         """Full topology: all nodes + delegation edges."""
         agents = await _load_agents(self._db)
         uuid_by_id: dict[int, uuid.UUID] = {a.id: a.uuid for a in agents}
+        counts = await _batch_active_assignment_counts(self._db, [a.id for a in agents])
 
-        nodes = [await _build_node(a, self._db) for a in agents]
+        nodes = [_build_node(a, counts) for a in agents]
         edges = _build_delegation_edges(agents, uuid_by_id)
 
         logger.info(
@@ -158,8 +164,11 @@ class TopologyService:
             or (a.trigger_on_severities and len(a.trigger_on_severities) > 0)
             or a.trigger_filter is not None
         ]
+        counts = await _batch_active_assignment_counts(
+            self._db, [a.id for a in routing_agents]
+        )
 
-        nodes = [await _build_node(a, self._db) for a in routing_agents]
+        nodes = [_build_node(a, counts) for a in routing_agents]
 
         # No edges for routing graph — just shows which agents receive alerts
         return TopologyGraph(
@@ -182,7 +191,10 @@ class TopologyService:
             participating_uuids.add(edge.to_uuid)
 
         involved_agents = [a for a in agents if a.uuid in participating_uuids]
-        nodes = [await _build_node(a, self._db) for a in involved_agents]
+        counts = await _batch_active_assignment_counts(
+            self._db, [a.id for a in involved_agents]
+        )
+        nodes = [_build_node(a, counts) for a in involved_agents]
 
         return TopologyGraph(
             nodes=nodes,
