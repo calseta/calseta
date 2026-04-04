@@ -323,7 +323,8 @@ class EntraIDActionIntegration(ActionIntegration):
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
                 )
             if response.status_code == 200:
-                return response.json().get("access_token")
+                token: str | None = response.json().get("access_token")
+                return token
             logger.warning(
                 "entra_id_token_error",
                 status_code=response.status_code,

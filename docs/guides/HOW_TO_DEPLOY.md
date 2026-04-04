@@ -356,7 +356,7 @@ Enrichment providers are automatically skipped when their API keys are not confi
 | Variable | Type | Default | Required | Description |
 |---|---|---|---|---|
 | `CALSETA_BASE_URL` | string | `http://localhost:8000` | No | Base URL of this Calseta instance. Used for approval callback links and Teams notifier cards |
-| `CALSETA_API_BASE_URL` | string | `http://localhost:8000` | No | Public API base URL included in agent webhook payloads so agents can make callback requests |
+| `CALSETA_API_BASE_URL` | string | `http://localhost:8000` | No | Public API base URL included in agent webhook payloads and used by agents authenticating via agent API keys (`cak_` prefix) to call back into Calseta (pull-queue, findings, cost reporting) |
 
 ### Approval Notifications
 
@@ -584,7 +584,7 @@ Review every item before going live.
 ### Deployment URLs
 
 - [ ] `CALSETA_BASE_URL` set to the externally reachable URL (e.g. `https://calseta.example.com`) -- used for approval callback links
-- [ ] `CALSETA_API_BASE_URL` set to the externally reachable API URL -- included in agent webhook payloads
+- [ ] `CALSETA_API_BASE_URL` set to the externally reachable API URL -- used in agent webhook payloads and as the base URL for agents authenticating with agent API keys (`cak_` prefix) to pull from the alert queue
 
 ### Monitoring
 

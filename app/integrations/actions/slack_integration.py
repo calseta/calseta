@@ -186,7 +186,8 @@ class SlackActionIntegration(ActionIntegration):
         async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT) as client:
             response = await client.post(url, json=body, headers=headers)
             response.raise_for_status()
-            return response.json()
+            result: dict[str, Any] = response.json()
+            return result
 
     @staticmethod
     def _format_message(message: str, alert_uuid: str | None, urgent: bool) -> str:

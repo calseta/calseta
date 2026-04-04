@@ -205,7 +205,8 @@ class CrowdStrikeIntegration(ActionIntegration):
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
                 )
             if response.status_code == 201:
-                return response.json().get("access_token")
+                token: str | None = response.json().get("access_token")
+                return token
             logger.warning(
                 "crowdstrike_token_error",
                 status_code=response.status_code,

@@ -25,9 +25,14 @@ class ExecutionResult:
     rollback_supported: bool = False
 
     @classmethod
-    def ok(cls, message: str, data: dict[str, Any] | None = None) -> ExecutionResult:
+    def ok(
+        cls,
+        message: str,
+        data: dict[str, Any] | None = None,
+        rollback_supported: bool = False,
+    ) -> ExecutionResult:
         """Return a successful result."""
-        return cls(success=True, message=message, data=data or {})
+        return cls(success=True, message=message, data=data or {}, rollback_supported=rollback_supported)
 
     @classmethod
     def fail(cls, message: str, data: dict[str, Any] | None = None) -> ExecutionResult:

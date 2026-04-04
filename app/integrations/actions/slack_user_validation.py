@@ -219,7 +219,8 @@ class SlackUserValidationIntegration(ActionIntegration):
             {"users": slack_user_id},
         )
         if result.get("ok"):
-            return result.get("channel", {}).get("id")
+            channel_id: str | None = result.get("channel", {}).get("id")
+            return channel_id
         logger.warning(
             "slack_user_validation_open_dm_failed",
             slack_user_id=slack_user_id,
@@ -235,7 +236,8 @@ class SlackUserValidationIntegration(ActionIntegration):
             params={"email": email},
         )
         if result.get("ok"):
-            return result.get("user", {}).get("id")
+            user_id: str | None = result.get("user", {}).get("id")
+            return user_id
         return None
 
     async def _api_call(
@@ -256,7 +258,8 @@ class SlackUserValidationIntegration(ActionIntegration):
             else:
                 response = await client.post(url, json=body, headers=headers)
             response.raise_for_status()
-            return response.json()
+            result: dict[str, Any] = response.json()
+            return result
 
     def supported_actions(self) -> list[str]:
         return ["validate_user_activity"]
