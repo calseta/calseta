@@ -91,7 +91,6 @@ class AgentAPIKeyAuthBackend(AuthBackendBase):
 
         # Update last_used_at — committed with the session at request end
         record.last_used_at = datetime.now(UTC)
-        await self._db.flush()
 
         return AuthContext(
             key_prefix=key_prefix,

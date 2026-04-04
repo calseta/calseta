@@ -692,7 +692,6 @@ class TestAgentSchemaValidation:
         )
         assert agent.timeout_seconds == 30
         assert agent.retry_count == 3
-        assert agent.is_active is True
         assert agent.trigger_on_sources == []
         assert agent.trigger_on_severities == []
         assert agent.trigger_filter is None
@@ -744,7 +743,6 @@ class TestAgentSchemaValidation:
         assert patch_model.name is None
         assert patch_model.description is None
         assert patch_model.endpoint_url is None
-        assert patch_model.is_active is None
 
     def test_response_schema_excludes_auth_value(self) -> None:
         from app.schemas.agents import AgentRegistrationResponse
@@ -853,7 +851,7 @@ class TestAgentRegistrationModel:
             "trigger_filter",
             "timeout_seconds",
             "retry_count",
-            "is_active",
+            "status",
             "documentation",
             "created_at",
             "updated_at",
