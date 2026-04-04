@@ -55,7 +55,7 @@ class TeamsApprovalNotifier(ApprovalNotifierBase):
         decide_url = ""
         if request.decide_token:
             decide_url = (
-                f"{base_url}/v1/approvals/{request.approval_uuid}"
+                f"{base_url}/v1/workflow-approvals/{request.approval_uuid}"
                 f"/decide?token={request.decide_token}"
             )
 

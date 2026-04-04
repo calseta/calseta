@@ -102,7 +102,7 @@ class SlackApprovalNotifier(ApprovalNotifierBase):
         if request.decide_token:
             base_url = self._base_url()
             decide_url = (
-                f"{base_url}/v1/approvals/{request.approval_uuid}"
+                f"{base_url}/v1/workflow-approvals/{request.approval_uuid}"
                 f"/decide?token={request.decide_token}"
             )
             blocks.append({

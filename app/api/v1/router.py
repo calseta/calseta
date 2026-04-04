@@ -15,7 +15,6 @@ from app.api.v1 import (
     alert_queue,
     alerts,
     api_keys,
-    approvals,
     campaigns,
     context_documents,
     detection_rules,
@@ -54,7 +53,6 @@ v1_router.include_router(context_documents.router)
 v1_router.include_router(workflows.router)
 v1_router.include_router(workflows.workflow_runs_router)
 v1_router.include_router(workflow_approvals.router)
-v1_router.include_router(approvals.router)
 v1_router.include_router(agents.router)
 v1_router.include_router(llm_integrations.router)
 v1_router.include_router(sources.router)
