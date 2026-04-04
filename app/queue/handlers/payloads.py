@@ -48,6 +48,12 @@ class DispatchSingleAgentWebhookPayload(BaseModel):
     agent_id: int
 
 
+class ExecuteResponseActionPayload(BaseModel):
+    """Payload for the ``execute_response_action_task`` task (queue: workflows)."""
+
+    agent_action_id: int
+
+
 class SandboxResetPayload(BaseModel):
     """Payload for the ``sandbox_reset`` periodic task (queue: default)."""
 

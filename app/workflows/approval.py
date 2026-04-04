@@ -137,51 +137,62 @@ async def process_approval_decision(
     request.responded_at = now
     await db.flush()
 
-    if approved:
-        queue = get_queue_backend()
-        await queue.enqueue(
-            "execute_approved_workflow_task",
-            {"approval_request_id": request.id},
-            queue="workflows",
-            delay_seconds=0,
-            priority=0,
+    if request.trigger_type == "agent_action":
+        # Agent action approval path — enqueue action execution instead of workflow
+        await _process_agent_action_decision(
+            request=request,
+            approved=approved,
+            db=db,
+            actor_key_prefix=actor_key_prefix,
+            actor_key_name=actor_key_name,
+            responder_id=responder_id,
         )
+    else:
+        if approved:
+            queue = get_queue_backend()
+            await queue.enqueue(
+                "execute_approved_workflow_task",
+                {"approval_request_id": request.id},
+                queue="workflows",
+                delay_seconds=0,
+                priority=0,
+            )
 
-    # Activity event: workflow_approval_responded
-    try:
-        from app.db.models.workflow import Workflow
-        from app.schemas.activity_events import ActivityEventType
-        from app.services.activity_event import ActivityEventService
+        # Activity event: workflow_approval_responded
+        try:
+            from app.db.models.workflow import Workflow
+            from app.schemas.activity_events import ActivityEventType
+            from app.services.activity_event import ActivityEventService
 
-        tc = request.trigger_context or {}
-        refs: dict = {
-            "approval_uuid": str(approval_uuid),
-            "decision": "approved" if approved else "rejected",
-            "responder_id": responder_id,
-            "indicator_type": tc.get("indicator_type"),
-            "indicator_value": tc.get("indicator_value"),
-            "actor_key_prefix": actor_key_prefix,
-            "actor_key_name": actor_key_name,
-        }
-        # Load workflow name/uuid for richer activity display
-        wf_result = await db.execute(
-            select(Workflow.uuid, Workflow.name).where(Workflow.id == request.workflow_id)
-        )
-        wf_row = wf_result.one_or_none()
-        if wf_row:
-            refs["workflow_uuid"] = str(wf_row.uuid)
-            refs["workflow_name"] = wf_row.name
+            tc = request.trigger_context or {}
+            refs: dict = {
+                "approval_uuid": str(approval_uuid),
+                "decision": "approved" if approved else "rejected",
+                "responder_id": responder_id,
+                "indicator_type": tc.get("indicator_type"),
+                "indicator_value": tc.get("indicator_value"),
+                "actor_key_prefix": actor_key_prefix,
+                "actor_key_name": actor_key_name,
+            }
+            # Load workflow name/uuid for richer activity display
+            wf_result = await db.execute(
+                select(Workflow.uuid, Workflow.name).where(Workflow.id == request.workflow_id)
+            )
+            wf_row = wf_result.one_or_none()
+            if wf_row:
+                refs["workflow_uuid"] = str(wf_row.uuid)
+                refs["workflow_name"] = wf_row.name
 
-        activity_svc = ActivityEventService(db)
-        await activity_svc.write(
-            ActivityEventType.WORKFLOW_APPROVAL_RESPONDED,
-            actor_type="api",
-            workflow_id=request.workflow_id,
-            alert_id=tc.get("alert_id"),
-            references=refs,
-        )
-    except Exception:
-        pass  # Never break the approval flow for audit events
+            activity_svc = ActivityEventService(db)
+            await activity_svc.write(
+                ActivityEventType.WORKFLOW_APPROVAL_RESPONDED,
+                actor_type="api",
+                workflow_id=request.workflow_id,
+                alert_id=tc.get("alert_id"),
+                references=refs,
+            )
+        except Exception:
+            pass  # Never break the approval flow for audit events
 
     logger.info(
         "approval_decision_processed",
@@ -190,3 +201,91 @@ async def process_approval_decision(
         responder_id=responder_id,
     )
     return request
+
+
+async def _process_agent_action_decision(
+    *,
+    request: WorkflowApprovalRequest,
+    approved: bool,
+    db: AsyncSession,
+    actor_key_prefix: str | None,
+    actor_key_name: str | None,
+    responder_id: str | None,
+) -> None:
+    """Handle approve/reject for an agent_action trigger type.
+
+    - Approved: set action.status = "approved", enqueue execute_response_action_task
+    - Rejected: set action.status = "rejected"
+    - Write ACTION_APPROVED or ACTION_REJECTED activity event
+    """
+    from sqlalchemy import select
+
+    from app.db.models.agent_action import AgentAction
+    from app.queue.registry import procrastinate_app
+    from app.schemas.activity_events import ActivityEventType
+    from app.services.activity_event import ActivityEventService
+
+    tc = request.trigger_context or {}
+    agent_action_id: int | None = tc.get("agent_action_id")
+    alert_id: int | None = tc.get("alert_id")
+
+    if agent_action_id is None:
+        logger.warning(
+            "agent_action_decision.missing_action_id",
+            approval_request_id=request.id,
+        )
+        return
+
+    action_result = await db.execute(
+        select(AgentAction).where(AgentAction.id == agent_action_id)
+    )
+    action = action_result.scalar_one_or_none()
+    if action is None:
+        logger.warning(
+            "agent_action_decision.action_not_found",
+            agent_action_id=agent_action_id,
+        )
+        return
+
+    if approved:
+        action.status = "approved"
+        await db.flush()
+
+        # Enqueue execution (best-effort)
+        try:
+            task = procrastinate_app.tasks.get("execute_response_action_task")
+            if task is not None:
+                await task.defer_async(agent_action_id=agent_action_id)
+        except Exception:
+            logger.warning(
+                "agent_action_decision.enqueue_failed",
+                agent_action_id=agent_action_id,
+            )
+
+        event_type = ActivityEventType.ACTION_APPROVED
+    else:
+        action.status = "rejected"
+        await db.flush()
+        event_type = ActivityEventType.ACTION_REJECTED
+
+    # Write activity event
+    try:
+        activity_svc = ActivityEventService(db)
+        await activity_svc.write(
+            event_type,
+            actor_type="api",
+            actor_key_prefix=actor_key_prefix,
+            alert_id=alert_id,
+            references={
+                "action_uuid": tc.get("agent_action_uuid"),
+                "action_type": tc.get("action_type"),
+                "action_subtype": tc.get("action_subtype"),
+                "approval_uuid": str(request.uuid),
+                "decision": "approved" if approved else "rejected",
+                "responder_id": responder_id,
+                "actor_key_prefix": actor_key_prefix,
+                "actor_key_name": actor_key_name,
+            },
+        )
+    except Exception:
+        pass

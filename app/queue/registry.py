@@ -103,6 +103,21 @@ async def execute_approved_workflow_task(approval_request_id: int) -> None:
 
 
 @procrastinate_app.task(
+    name="execute_response_action_task",
+    queue="workflows",
+    retry=procrastinate.RetryStrategy(max_attempts=1, wait=0),
+)
+async def execute_response_action_task(agent_action_id: int) -> None:
+    from app.queue.handlers.base import task_session
+    from app.queue.handlers.execute_action import ExecuteResponseActionHandler
+    from app.queue.handlers.payloads import ExecuteResponseActionPayload
+
+    payload = ExecuteResponseActionPayload(agent_action_id=agent_action_id)
+    async with task_session() as session:
+        await ExecuteResponseActionHandler().execute(payload, session)
+
+
+@procrastinate_app.task(
     name="dispatch_agent_webhooks",
     queue="dispatch",
     retry=procrastinate.RetryStrategy(max_attempts=3, wait=30),

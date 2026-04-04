@@ -1,6 +1,7 @@
 """Import all models to ensure they are registered with SQLAlchemy metadata."""
 
 from app.db.models.activity_event import ActivityEvent
+from app.db.models.agent_action import AgentAction
 from app.db.models.agent_api_key import AgentAPIKey
 from app.db.models.agent_instruction_file import AgentInstructionFile
 from app.db.models.agent_registration import AgentRegistration
@@ -22,6 +23,8 @@ from app.db.models.indicator_field_mapping import IndicatorFieldMapping
 from app.db.models.llm_integration import LLMIntegration
 from app.db.models.secret import Secret, SecretVersion
 from app.db.models.source_integration import SourceIntegration
+from app.db.models.user_validation_rule import UserValidationRule
+from app.db.models.user_validation_template import UserValidationTemplate
 from app.db.models.workflow import Workflow
 from app.db.models.workflow_approval_request import WorkflowApprovalRequest
 from app.db.models.workflow_code_version import WorkflowCodeVersion
@@ -29,6 +32,7 @@ from app.db.models.workflow_run import WorkflowRun
 
 __all__ = [
     "ActivityEvent",
+    "AgentAction",
     "AgentAPIKey",
     "AgentInstructionFile",
     "AgentRegistration",
@@ -51,6 +55,8 @@ __all__ = [
     "Secret",
     "SecretVersion",
     "SourceIntegration",
+    "UserValidationRule",
+    "UserValidationTemplate",
     "Workflow",
     "WorkflowApprovalRequest",
     "WorkflowCodeVersion",

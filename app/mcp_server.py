@@ -60,6 +60,7 @@ def main() -> None:
         import app.mcp.resources.workflows  # noqa: E402, F401
 
         # Import tool modules so @mcp_server.tool decorators register
+        import app.mcp.tools.actions  # noqa: E402, F401
         import app.mcp.tools.alerts  # noqa: E402, F401
         import app.mcp.tools.detection_rules  # noqa: E402, F401
         import app.mcp.tools.enrichment  # noqa: E402, F401

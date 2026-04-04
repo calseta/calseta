@@ -292,3 +292,28 @@ When the approval gate fires, the execution is paused and an approval request is
 If a Slack or Teams notifier is configured (`APPROVAL_NOTIFIER=slack` or `teams`), the approver receives a notification with action buttons (Slack) or REST API links (Teams).
 
 Agent-triggered execute requests must include `reason` and `confidence` fields explaining why the workflow should run.
+
+---
+
+## Proposing Response Actions from Agents
+
+Workflows execute arbitrary HTTP automation scripts. For pre-defined, auditable containment and response operations (block an IP in a firewall, disable a user in Entra ID, isolate a host in CrowdStrike), agents use the **actions system** instead.
+
+Actions are proposed via `POST /v1/actions` (or the MCP tool `propose_action`) with an `action_type`, `action_subtype`, structured `payload`, `confidence` score, and `reasoning`. The platform routes the action to the correct integration, applies the approval gate, and executes it. No custom Python code is required.
+
+```bash
+curl -X POST http://localhost:8000/v1/actions \
+  -H "Authorization: Bearer cai_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action_type": "containment",
+    "action_subtype": "isolate_host",
+    "payload": {"device_id": "abc123", "comment": "Suspected C2 beacon"},
+    "confidence": 0.91,
+    "reasoning": "Process tree shows injected svchost.exe contacting known C2 IP"
+  }'
+```
+
+- **Integration setup guides** — `docs/integrations/crowdstrike/SETUP.md`, `docs/integrations/entra-id-actions/SETUP.md`, `docs/integrations/slack-actions/SETUP.md`
+- **Adding a new integration** — see `app/integrations/actions/CONTEXT.md` for the extension pattern
+- **Approval routing** — containment/remediation require human approval by default; see `HOW_TO_SETUP_SLACK_APPROVALS.md` for the confidence-override thresholds

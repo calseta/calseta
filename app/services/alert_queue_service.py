@@ -7,6 +7,7 @@ from uuid import UUID
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import CalsetaException
@@ -50,7 +51,7 @@ class AlertQueueService:
             .scalar_subquery()
         )
 
-        stmt = select(Alert).where(
+        stmt = select(Alert).options(selectinload(Alert.detection_rule)).where(
             Alert.enrichment_status == "Enriched",
             Alert.status.in_(["Open", "Triaging"]),
             Alert.id.not_in(active_assignment_alert_ids),

@@ -43,6 +43,14 @@ class ActivityEventType(StrEnum):
     DETECTION_RULE_CREATED = "detection_rule_created"
     DETECTION_RULE_UPDATED = "detection_rule_updated"
 
+    # Action events (Phase 2)
+    ACTION_PROPOSED = "action.proposed"
+    ACTION_APPROVED = "action.approved"
+    ACTION_REJECTED = "action.rejected"
+    ACTION_EXECUTED = "action.executed"
+    ACTION_FAILED = "action.failed"
+    ACTION_CANCELLED = "action.cancelled"
+
 
 class ActivityEventResponse(BaseModel):
     """Activity event as returned by GET /v1/alerts/{uuid}/activity."""

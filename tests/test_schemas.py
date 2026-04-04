@@ -194,8 +194,8 @@ def test_error_response_serializes_correctly() -> None:
 # ---------------------------------------------------------------------------
 
 def test_activity_event_type_all_twelve_values() -> None:
-    """ActivityEventType has exactly 17 values (12 original + 5 added)."""
-    assert len(ActivityEventType) == 17
+    """ActivityEventType has exactly 23 values (17 original + 6 action event types)."""
+    assert len(ActivityEventType) == 23
     # Spot-check key values
     assert ActivityEventType.ALERT_INGESTED.value == "alert_ingested"
     assert ActivityEventType.WORKFLOW_APPROVAL_REQUESTED.value == "workflow_approval_requested"

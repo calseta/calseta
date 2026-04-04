@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    actions,
     agent_tools,
     agents,
     alert_queue,
@@ -62,3 +63,4 @@ v1_router.include_router(alert_queue.dashboard_router)
 v1_router.include_router(heartbeat.router)
 v1_router.include_router(sessions.router)
 v1_router.include_router(sessions.agents_sessions_router)
+v1_router.include_router(actions.router)

@@ -259,6 +259,13 @@ class Settings(BaseSettings):
     TEAMS_WEBHOOK_URL: str = ""
 
     # ------------------------------------------------------------------
+    # Action Integrations
+    # ------------------------------------------------------------------
+    CROWDSTRIKE_CLIENT_ID: str = ""
+    CROWDSTRIKE_CLIENT_SECRET: str = ""
+    CROWDSTRIKE_BASE_URL: str = ""  # defaults to https://api.crowdstrike.com if empty
+
+    # ------------------------------------------------------------------
     # Workflow Resource Limits
     # ------------------------------------------------------------------
     WORKFLOW_MAX_MEMORY_MB: int = 256  # Max virtual memory per workflow execution

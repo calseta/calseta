@@ -296,3 +296,32 @@ Per-workflow overrides:
 - Requests older than 5 minutes are rejected to prevent replay attacks.
 - The Slack user ID of the person who clicked the button is recorded as `responder_id` on the approval request.
 - Bot tokens and signing secrets should be treated as secrets — never commit them to version control.
+
+---
+
+## Using Slack for Agent Action Approvals
+
+Agent actions (block IP, disable user, isolate host, etc.) use the same approval system as workflows. No additional Slack app setup is required — the same `APPROVAL_NOTIFIER=slack`, `SLACK_BOT_TOKEN`, and `APPROVAL_DEFAULT_CHANNEL` settings apply.
+
+When an agent proposes an action via `POST /v1/actions`, the approval gate evaluates two factors:
+
+**Action type → base approval mode** (configured per integration):
+
+| Action type | Default mode |
+|---|---|
+| `containment`, `remediation` | `always` (requires approval) |
+| `notification`, `escalation`, `investigation` | `never` (auto-executes) |
+| `custom` | `always` (requires approval) |
+
+**Confidence score override** (unless `bypass_confidence_override=true` for the integration):
+
+| Agent confidence | Effective behavior |
+|---|---|
+| `>= 0.95` | Auto-approves even for `always` mode |
+| `0.85–0.95` | Quick review — approval request sent with short timeout |
+| `0.70–0.85` | Full human review — approval request sent |
+| `< 0.70` | Blocked — action cannot be proposed |
+
+The Slack message for action approvals includes the `action_type`, `action_subtype`, payload summary, agent confidence score, and the agent's reasoning. Clicking **Approve** or **Reject** works identically to workflow approvals.
+
+Note: `EntraIDActionIntegration` always requires approval regardless of confidence (`bypass_confidence_override=true` — disabling accounts is never auto-approved).
