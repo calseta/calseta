@@ -64,7 +64,7 @@ class TestOnDemandEnrichment:
 
 
 class TestProviderList:
-    """GET /v1/enrichments/providers."""
+    """GET /v1/enrichment-providers."""
 
     async def test_list_providers_200(
         self,
@@ -72,7 +72,7 @@ class TestProviderList:
         enrichments_read_key: str,
     ) -> None:
         resp = await test_client.get(
-            "/v1/enrichments/providers",
+            "/v1/enrichment-providers",
             headers=auth_header(enrichments_read_key),
         )
         assert resp.status_code == 200
@@ -84,7 +84,7 @@ class TestProviderList:
         enrichments_read_key: str,
     ) -> None:
         resp = await test_client.get(
-            "/v1/enrichments/providers",
+            "/v1/enrichment-providers",
             headers=auth_header(enrichments_read_key),
         )
         providers = resp.json()["data"]
@@ -92,9 +92,9 @@ class TestProviderList:
             p = providers[0]
             assert "provider_name" in p
             assert "display_name" in p
-            assert "supported_types" in p
+            assert "supported_indicator_types" in p
             assert "is_configured" in p
-            assert "cache_ttl_seconds" in p
+            assert "default_cache_ttl_seconds" in p
 
 
 class TestEnrichmentScope:

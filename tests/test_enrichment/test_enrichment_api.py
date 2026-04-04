@@ -3,7 +3,7 @@ Integration tests for the enrichment API endpoints.
 
 Tests:
   1. POST /v1/enrichments — on-demand enrichment endpoint
-  2. GET /v1/enrichments/providers — list all providers with configuration status
+  2. GET /v1/enrichment-providers — list all providers with configuration status
   3. Auth enforcement on enrichment endpoints
 
 These tests use the FastAPI test client with mocked enrichment providers
@@ -318,12 +318,12 @@ class TestOnDemandEnrichment:
 
 
 # ===================================================================
-# GET /v1/enrichments/providers — Provider Listing
+# GET /v1/enrichment-providers — Provider Listing
 # ===================================================================
 
 
 class TestProviderList:
-    """GET /v1/enrichments/providers."""
+    """GET /v1/enrichment-providers."""
 
     async def test_list_returns_200(
         self,
@@ -331,7 +331,7 @@ class TestProviderList:
         enrichments_read_key: str,
     ) -> None:
         resp = await test_client.get(
-            "/v1/enrichments/providers",
+            "/v1/enrichment-providers",
             headers=auth_header(enrichments_read_key),
         )
         assert resp.status_code == 200
@@ -344,22 +344,22 @@ class TestProviderList:
     ) -> None:
         """Each provider entry has the expected schema fields."""
         resp = await test_client.get(
-            "/v1/enrichments/providers",
+            "/v1/enrichment-providers",
             headers=auth_header(enrichments_read_key),
         )
         providers = resp.json()["data"]
-        # The global registry should have at least the 4 built-in providers
+        # The DB should have at least the 4 built-in providers (seeded at startup)
         assert len(providers) >= 4
 
         for p in providers:
             assert "provider_name" in p
             assert "display_name" in p
-            assert "supported_types" in p
+            assert "supported_indicator_types" in p
             assert "is_configured" in p
-            assert "cache_ttl_seconds" in p
-            assert isinstance(p["supported_types"], list)
+            assert "default_cache_ttl_seconds" in p
+            assert isinstance(p["supported_indicator_types"], list)
             assert isinstance(p["is_configured"], bool)
-            assert isinstance(p["cache_ttl_seconds"], int)
+            assert isinstance(p["default_cache_ttl_seconds"], int)
 
     async def test_all_four_builtin_providers_listed(
         self,
@@ -368,7 +368,7 @@ class TestProviderList:
     ) -> None:
         """All 4 built-in providers are present in the listing."""
         resp = await test_client.get(
-            "/v1/enrichments/providers",
+            "/v1/enrichment-providers",
             headers=auth_header(enrichments_read_key),
         )
         names = [p["provider_name"] for p in resp.json()["data"]]
@@ -383,7 +383,7 @@ class TestProviderList:
         enrichments_read_key: str,
     ) -> None:
         resp = await test_client.get(
-            "/v1/enrichments/providers",
+            "/v1/enrichment-providers",
             headers=auth_header(enrichments_read_key),
         )
         providers = {p["provider_name"]: p for p in resp.json()["data"]}
@@ -398,21 +398,21 @@ class TestProviderList:
         enrichments_read_key: str,
     ) -> None:
         resp = await test_client.get(
-            "/v1/enrichments/providers",
+            "/v1/enrichment-providers",
             headers=auth_header(enrichments_read_key),
         )
         providers = {p["provider_name"]: p for p in resp.json()["data"]}
 
-        vt_types = set(providers["virustotal"]["supported_types"])
+        vt_types = set(providers["virustotal"]["supported_indicator_types"])
         assert vt_types == {"ip", "domain", "hash_md5", "hash_sha1", "hash_sha256"}
 
-        abuse_types = set(providers["abuseipdb"]["supported_types"])
+        abuse_types = set(providers["abuseipdb"]["supported_indicator_types"])
         assert abuse_types == {"ip"}
 
-        okta_types = set(providers["okta"]["supported_types"])
+        okta_types = set(providers["okta"]["supported_indicator_types"])
         assert okta_types == {"account"}
 
-        entra_types = set(providers["entra"]["supported_types"])
+        entra_types = set(providers["entra"]["supported_indicator_types"])
         assert entra_types == {"account"}
 
     async def test_response_wrapped_in_data_envelope(
@@ -421,7 +421,7 @@ class TestProviderList:
         enrichments_read_key: str,
     ) -> None:
         resp = await test_client.get(
-            "/v1/enrichments/providers",
+            "/v1/enrichment-providers",
             headers=auth_header(enrichments_read_key),
         )
         body = resp.json()
@@ -480,7 +480,7 @@ class TestEnrichmentAuth:
     ) -> None:
         """alerts:read scope cannot access provider listing."""
         resp = await test_client.get(
-            "/v1/enrichments/providers",
+            "/v1/enrichment-providers",
             headers=auth_header(alerts_read_key),
         )
         assert resp.status_code == 403
@@ -503,7 +503,7 @@ class TestEnrichmentAuth:
         assert resp1.status_code == 200
 
         resp2 = await test_client.get(
-            "/v1/enrichments/providers",
+            "/v1/enrichment-providers",
             headers=auth_header(enrichments_read_key),
         )
         assert resp2.status_code == 200
@@ -530,7 +530,7 @@ class TestEnrichmentAuth:
         test_client: AsyncClient,
     ) -> None:
         """Provider list without auth returns 401."""
-        resp = await test_client.get("/v1/enrichments/providers")
+        resp = await test_client.get("/v1/enrichment-providers")
         assert resp.status_code in (401, 403)
 
 

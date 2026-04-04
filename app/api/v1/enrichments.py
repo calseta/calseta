@@ -2,8 +2,9 @@
 Enrichment API routes.
 
 Endpoints:
-  POST /v1/enrichments        — on-demand synchronous enrichment (cache-first)
-  GET  /v1/enrichments/providers — list all registered providers + config status
+  POST /v1/enrichments  — on-demand synchronous enrichment (cache-first)
+
+Provider listing is available at GET /v1/enrichment-providers (full CRUD).
 """
 
 from __future__ import annotations
@@ -27,7 +28,6 @@ from app.integrations.enrichment.registry import enrichment_registry
 from app.middleware.rate_limit import limiter
 from app.schemas.common import DataResponse
 from app.schemas.enrichment import (
-    EnrichmentProviderInfo,
     OnDemandEnrichmentRequest,
     OnDemandEnrichmentResponse,
     OnDemandEnrichmentResult,
@@ -113,36 +113,3 @@ async def enrich_on_demand(
     return DataResponse(data=payload)
 
 
-# ---------------------------------------------------------------------------
-# GET /v1/enrichments/providers — provider listing
-# ---------------------------------------------------------------------------
-
-
-@router.get(
-    "/enrichments/providers",
-    response_model=DataResponse[list[EnrichmentProviderInfo]],
-    summary="List all registered enrichment providers",
-)
-@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
-async def list_providers(
-    request: Request,
-    auth: Annotated[object, Depends(require_scope(Scope.ENRICHMENTS_READ))],
-) -> DataResponse[list[EnrichmentProviderInfo]]:
-    """
-    Return all registered enrichment providers with their configuration status.
-
-    `is_configured` is `true` when the provider's API key or credentials are
-    set in the environment. No secrets are included in the response.
-    """
-    providers = enrichment_registry.list_all()
-    items = [
-        EnrichmentProviderInfo(
-            provider_name=p.provider_name,
-            display_name=p.display_name,
-            supported_types=p.supported_types,
-            is_configured=p.is_configured(),
-            cache_ttl_seconds=p.cache_ttl_seconds,
-        )
-        for p in providers
-    ]
-    return DataResponse(data=items)
