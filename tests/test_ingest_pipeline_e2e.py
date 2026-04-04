@@ -72,7 +72,7 @@ async def registered_agent(db_session: AsyncSession) -> AgentRegistration:
         trigger_filter=None,
         timeout_seconds=10,
         retry_count=0,
-        is_active=True,
+        status="active",
     )
     db_session.add(agent)
     await db_session.flush()

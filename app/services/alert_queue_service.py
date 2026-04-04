@@ -7,8 +7,8 @@ from uuid import UUID
 
 import structlog
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.errors import CalsetaException
 from app.db.models.agent_registration import AgentRegistration
@@ -266,7 +266,7 @@ class AlertQueueService:
             ).group_by(AgentRegistration.status)
         )
         agent_counts: dict[str, int] = {
-            row.status: row.count for row in agent_status_result
+            row.status: row._mapping["count"] for row in agent_status_result  # type: ignore[misc]
         }
 
         # Queue depth: alerts available (enriched, open/triaging, unassigned)
@@ -294,7 +294,7 @@ class AlertQueueService:
             .group_by(AlertAssignment.status)
         )
         assignment_counts: dict[str, int] = {
-            row.status: row.count for row in assignment_status_result
+            row.status: row._mapping["count"] for row in assignment_status_result  # type: ignore[misc]
         }
 
         # Costs MTD

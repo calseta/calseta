@@ -87,6 +87,15 @@ class AgentSupervisor:
                 )
                 if timed_out:
                     report.timed_out += 1
+                    continue  # Don't also check budget if already timed out
+
+                budget_stopped = await self._check_budget(
+                    assignment=assignment,
+                    agent=agent,
+                    assign_repo=assign_repo,
+                )
+                if budget_stopped:
+                    report.budget_stopped += 1
             except Exception as exc:
                 error_msg = (
                     f"Error supervising assignment {assignment.id}: {exc}"
@@ -102,6 +111,7 @@ class AgentSupervisor:
             "supervisor.completed",
             checked=report.checked,
             timed_out=report.timed_out,
+            budget_stopped=report.budget_stopped,
             errors=len(report.errors),
         )
         return report
@@ -151,6 +161,84 @@ class AgentSupervisor:
             )
 
         return True
+
+    async def _check_budget(
+        self,
+        assignment: AlertAssignment,  # type: ignore[name-defined]  # noqa: F821
+        agent: AgentRegistration,  # type: ignore[name-defined]  # noqa: F821
+        assign_repo: AlertAssignmentRepository,  # type: ignore[name-defined]  # noqa: F821
+    ) -> bool:
+        """Check if this agent has exceeded its monthly budget. Returns True if stopped."""
+        budget = agent.budget_monthly_cents
+        if budget <= 0:
+            return False
+
+        spent = agent.spent_monthly_cents or 0
+        if spent < budget:
+            return False
+
+        # Agent is over budget — pause if not already
+        if agent.status in ("paused", "terminated"):
+            return False
+
+        logger.warning(
+            "supervisor.budget_hard_stop",
+            agent_id=agent.id,
+            budget_monthly_cents=budget,
+            spent_monthly_cents=spent,
+            assignment_id=assignment.id,
+        )
+
+        agent.status = "paused"
+        await self._db.flush()
+
+        await assign_repo.release(assignment)
+
+        # Log activity events
+        try:
+            await self._log_budget_stop_events(
+                assignment=assignment,
+                agent=agent,
+                budget=budget,
+                spent=spent,
+            )
+        except Exception as exc:
+            logger.warning(
+                "supervisor.budget_event_failed",
+                assignment_id=assignment.id,
+                error=str(exc),
+            )
+
+        return True
+
+    async def _log_budget_stop_events(
+        self,
+        assignment: AlertAssignment,  # type: ignore[name-defined]  # noqa: F821
+        agent: AgentRegistration,  # type: ignore[name-defined]  # noqa: F821
+        budget: int,
+        spent: int,
+    ) -> None:
+        """Emit cost.hard_stop and agent.budget_exceeded activity events."""
+        import uuid as uuid_module
+
+        from app.db.models.activity_event import ActivityEvent
+
+        refs = {
+            "agent_id": agent.id,
+            "assignment_id": assignment.id,
+            "budget_monthly_cents": budget,
+            "spent_monthly_cents": spent,
+        }
+        for event_type in ("cost.hard_stop", "agent.budget_exceeded"):
+            self._db.add(ActivityEvent(
+                uuid=uuid_module.uuid4(),
+                event_type=event_type,
+                actor_type="system",
+                actor_key_prefix=None,
+                alert_id=assignment.alert_id,
+                references=refs,
+            ))
+        await self._db.flush()
 
     async def _log_timeout_event(
         self,

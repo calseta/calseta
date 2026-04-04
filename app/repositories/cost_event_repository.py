@@ -151,7 +151,9 @@ class CostEventRepository(BaseRepository[CostEvent]):
         result = await self._db.execute(stmt)
         row = result.one()
 
-        filters: list[object] = []
+        from sqlalchemy.sql.elements import ColumnElement
+
+        filters: list[ColumnElement[bool]] = []
         if from_dt is not None:
             filters.append(CostEvent.occurred_at >= from_dt)
         if to_dt is not None:

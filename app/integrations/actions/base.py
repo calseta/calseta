@@ -32,7 +32,9 @@ class ExecutionResult:
         rollback_supported: bool = False,
     ) -> ExecutionResult:
         """Return a successful result."""
-        return cls(success=True, message=message, data=data or {}, rollback_supported=rollback_supported)
+        return cls(
+            success=True, message=message, data=data or {}, rollback_supported=rollback_supported
+        )
 
     @classmethod
     def fail(cls, message: str, data: dict[str, Any] | None = None) -> ExecutionResult:

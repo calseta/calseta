@@ -39,4 +39,5 @@ class BuiltPrompt:
 class SupervisionReport:
     checked: int = 0
     timed_out: int = 0
+    budget_stopped: int = 0
     errors: list[str] = field(default_factory=list)

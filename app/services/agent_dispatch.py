@@ -279,7 +279,7 @@ async def dispatch_to_agent(
 
     # SSRF protection — validate endpoint URL before any HTTP calls
     try:
-        validate_outbound_url(agent.endpoint_url)
+        validate_outbound_url(agent.endpoint_url or "")
     except ValueError as exc:
         logger.error(
             "agent_webhook_ssrf_blocked",
@@ -311,7 +311,7 @@ async def dispatch_to_agent(
 
             try:
                 response = await client.post(
-                    agent.endpoint_url,
+                    agent.endpoint_url or "",
                     json=payload,
                     headers=headers,
                 )

@@ -2,11 +2,26 @@
 
 from __future__ import annotations
 
+import json
+from unittest.mock import patch
+
+import pytest
 from httpx import AsyncClient
 
 
 class TestSlackCallback:
-    """POST /v1/approvals/callback/slack — no auth required."""
+    """POST /v1/approvals/callback/slack — no auth required.
+
+    Tests run with SLACK_SIGNING_SECRET disabled so they are not gated behind
+    signature validation (which is tested separately via the real secret path).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _disable_slack_signing(self) -> None:
+        """Disable Slack signature validation for these tests."""
+        with patch("app.api.v1.approvals.settings") as mock_settings:
+            mock_settings.SLACK_SIGNING_SECRET = None
+            yield
 
     async def test_missing_payload_400(self, test_client: AsyncClient) -> None:
         resp = await test_client.post(
@@ -24,8 +39,6 @@ class TestSlackCallback:
 
     async def test_no_actions_returns_ok(self, test_client: AsyncClient) -> None:
         """Payload with no actions should return 200 ok."""
-        import json
-
         resp = await test_client.post(
             "/v1/approvals/callback/slack",
             data={"payload": json.dumps({"actions": []})},
@@ -34,13 +47,11 @@ class TestSlackCallback:
 
     async def test_no_auth_required(self, test_client: AsyncClient) -> None:
         """Callback endpoints must not require Authorization header."""
-        import json
-
         resp = await test_client.post(
             "/v1/approvals/callback/slack",
             data={"payload": json.dumps({"actions": []})},
         )
-        # Should not be 401 or 403
+        # Should not be 401 or 403 (no standard auth required — Slack signature only)
         assert resp.status_code not in (401, 403)
 
 

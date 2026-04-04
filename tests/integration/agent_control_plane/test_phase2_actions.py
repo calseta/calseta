@@ -46,7 +46,7 @@ async def _checkout_alert_for_agent(
         headers=agent_headers,
     )
     assert resp.status_code == 201, resp.text
-    return resp.json()["data"]
+    return dict(resp.json()["data"])
 
 
 async def _propose_action(

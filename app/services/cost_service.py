@@ -21,6 +21,9 @@ class CostService:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
+    # Soft-warning threshold: emit cost.budget_alert when spend crosses this fraction.
+    SOFT_WARN_THRESHOLD = 0.80
+
     async def record_cost(
         self,
         agent: AgentRegistration,
@@ -33,10 +36,10 @@ class CostService:
         Steps:
           1. Create cost_event row.
           2. Update agent.spent_monthly_cents.
-          3. If budget_monthly_cents > 0 and spent >= budget → set status='paused',
-             log a structlog warning (activity event written separately by the route handler
-             or a future post-MVP enhancement).
-          4. Return (cost_event, budget_status).
+          3. Soft-warn at 80%: emit cost.budget_alert activity event once per crossing.
+          4. Hard stop at 100%: set status='paused', emit cost.hard_stop +
+             agent.budget_exceeded activity events.
+          5. Return (cost_event, budget_status).
 
         budget_status.hard_stop_triggered=True if the monthly limit was just breached.
         """
@@ -58,15 +61,42 @@ class CostService:
             billing_type=data.billing_type,
         )
 
+        prev_spent = agent.spent_monthly_cents or 0
+
         # Update agent's running total
-        agent.spent_monthly_cents = (agent.spent_monthly_cents or 0) + data.cost_cents
+        agent.spent_monthly_cents = prev_spent + data.cost_cents
         await self._db.flush()
 
+        budget = agent.budget_monthly_cents
+
+        # Soft-warning: fire once when spend crosses the 80% threshold
+        if budget > 0:
+            warn_threshold = int(budget * self.SOFT_WARN_THRESHOLD)
+            crossed_soft_warn = prev_spent < warn_threshold <= agent.spent_monthly_cents
+            if crossed_soft_warn and agent.spent_monthly_cents < budget:
+                try:
+                    await self._emit_activity_event(
+                        event_type="cost.budget_alert",
+                        alert_id=db_alert_id,
+                        references={
+                            "agent_id": agent.id,
+                            "budget_monthly_cents": budget,
+                            "spent_monthly_cents": agent.spent_monthly_cents,
+                            "threshold_pct": int(self.SOFT_WARN_THRESHOLD * 100),
+                        },
+                    )
+                except Exception as exc:
+                    logger.warning("cost_service.soft_warn_event_failed", error=str(exc))
+                logger.warning(
+                    "agent_budget_soft_warn",
+                    agent_id=agent.id,
+                    budget_monthly_cents=budget,
+                    spent_monthly_cents=agent.spent_monthly_cents,
+                    threshold_pct=int(self.SOFT_WARN_THRESHOLD * 100),
+                )
+
         # Evaluate hard stop
-        hard_stop = (
-            agent.budget_monthly_cents > 0
-            and agent.spent_monthly_cents >= agent.budget_monthly_cents
-        )
+        hard_stop = budget > 0 and agent.spent_monthly_cents >= budget
 
         if hard_stop and agent.status not in ("paused", "terminated"):
             agent.status = "paused"
@@ -74,16 +104,35 @@ class CostService:
             logger.warning(
                 "agent_budget_hard_stop",
                 agent_id=agent.id,
-                budget_monthly_cents=agent.budget_monthly_cents,
+                budget_monthly_cents=budget,
                 spent_monthly_cents=agent.spent_monthly_cents,
             )
+            try:
+                await self._emit_activity_event(
+                    event_type="cost.hard_stop",
+                    alert_id=db_alert_id,
+                    references={
+                        "agent_id": agent.id,
+                        "budget_monthly_cents": budget,
+                        "spent_monthly_cents": agent.spent_monthly_cents,
+                    },
+                )
+                await self._emit_activity_event(
+                    event_type="agent.budget_exceeded",
+                    alert_id=db_alert_id,
+                    references={
+                        "agent_id": agent.id,
+                        "budget_monthly_cents": budget,
+                        "spent_monthly_cents": agent.spent_monthly_cents,
+                    },
+                )
+            except Exception as exc:
+                logger.warning("cost_service.hard_stop_event_failed", error=str(exc))
 
-        remaining = max(
-            0, agent.budget_monthly_cents - agent.spent_monthly_cents
-        ) if agent.budget_monthly_cents > 0 else 0
+        remaining = max(0, budget - agent.spent_monthly_cents) if budget > 0 else 0
 
         budget_status = AgentBudgetStatus(
-            monthly_cents=agent.budget_monthly_cents,
+            monthly_cents=budget,
             spent_cents=agent.spent_monthly_cents,
             remaining_cents=remaining,
             hard_stop_triggered=hard_stop,
@@ -103,6 +152,28 @@ class CostService:
         )
 
         return cost_event, budget_status
+
+    async def _emit_activity_event(
+        self,
+        event_type: str,
+        alert_id: int | None,
+        references: dict,
+    ) -> None:
+        """Append an activity event for budget enforcement."""
+        import uuid as uuid_module
+
+        from app.db.models.activity_event import ActivityEvent
+
+        event = ActivityEvent(
+            uuid=uuid_module.uuid4(),
+            event_type=event_type,
+            actor_type="system",
+            actor_key_prefix=None,
+            alert_id=alert_id,
+            references=references,
+        )
+        self._db.add(event)
+        await self._db.flush()
 
     async def reset_monthly_budget(self, agent: AgentRegistration) -> None:
         """Reset spent_monthly_cents=0 and budget_period_start=now()."""
