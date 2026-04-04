@@ -354,7 +354,6 @@ async def test_delegate_task_creates_invocation(
         key_prefix=plain_key[:8],
         key_hash=key_hash,
         scopes=["agents:read", "agents:write"],
-        is_active=True,
     )
     db_session.add(agent_key)
 
@@ -386,7 +385,6 @@ async def test_delegate_task_creates_invocation(
         uuid=uuid.uuid4(),
         title="Test Alert",
         severity="High",
-        severity_id=4,
         status="Open",
         source_name="test",
         enrichment_status="Pending",
