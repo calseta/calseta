@@ -387,10 +387,26 @@ export function DetectionRuleDetailPage() {
           ]}
         />
 
-        <DetailPageLayout
-          sidebar={
-            <DetailPageSidebar>
-              <SidebarSection title="Details">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="bg-surface border border-border">
+            <TabsTrigger value="documentation" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              Documentation
+            </TabsTrigger>
+            <TabsTrigger value="alerts" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Bell className="h-3.5 w-3.5 mr-1" />
+              Alerts
+            </TabsTrigger>
+            <TabsTrigger value="metrics" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <BarChart3 className="h-3.5 w-3.5 mr-1" />
+              Metrics
+            </TabsTrigger>
+          </TabsList>
+
+          <DetailPageLayout
+            sidebar={
+              <DetailPageSidebar>
+                <SidebarSection title="Details">
                 <DetailPageField label="UUID" value={<CopyableText text={rule.uuid} mono className="text-xs" />} />
                 {rule.source_rule_id && (
                   <DetailPageField label="Rule ID" value={<CopyableText text={rule.source_rule_id} mono className="text-xs" />} />
@@ -461,22 +477,6 @@ export function DetectionRuleDetailPage() {
             </DetailPageSidebar>
           }
         >
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="bg-surface border border-border">
-              <TabsTrigger value="documentation" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                Documentation
-              </TabsTrigger>
-              <TabsTrigger value="alerts" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Bell className="h-3.5 w-3.5 mr-1" />
-                Alerts
-              </TabsTrigger>
-              <TabsTrigger value="metrics" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <BarChart3 className="h-3.5 w-3.5 mr-1" />
-                Metrics
-              </TabsTrigger>
-            </TabsList>
-
             <TabsContent value="documentation" className="mt-4">
               <DocumentationEditor
                 content={rule.documentation ?? ""}
@@ -493,8 +493,8 @@ export function DetectionRuleDetailPage() {
             <TabsContent value="metrics" className="mt-4">
               <DetectionRuleMetricsTab uuid={uuid} />
             </TabsContent>
-          </Tabs>
         </DetailPageLayout>
+        </Tabs>
       </div>
 
       {/* Edit Detection Rule Dialog */}

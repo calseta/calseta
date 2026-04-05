@@ -384,11 +384,47 @@ export function AlertDetailPage() {
           ]}
         />
 
-        <DetailPageLayout
-          sidebar={
-            <DetailPageSidebar>
-              <SidebarSection title="Details">
-                <DetailPageField label="UUID" value={<CopyableText text={alert.uuid} mono className="text-xs" />} />
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="bg-surface border border-border">
+            <TabsTrigger value="indicators" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Shield className="h-3.5 w-3.5 mr-1" />
+              Indicators ({alert.indicators?.length ?? 0})
+            </TabsTrigger>
+            <TabsTrigger value="findings" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Zap className="h-3.5 w-3.5 mr-1" />
+              Findings ({alert.agent_findings?.length ?? 0})
+            </TabsTrigger>
+            <TabsTrigger value="context" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              Context ({contextDocs.length})
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Activity className="h-3.5 w-3.5 mr-1" />
+              Activity ({activities.length})
+            </TabsTrigger>
+            <TabsTrigger value="ads" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              ADS
+            </TabsTrigger>
+            <TabsTrigger value="graph" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <GitFork className="h-3.5 w-3.5 mr-1" />
+              Graph
+            </TabsTrigger>
+            <TabsTrigger value="agent-payload" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Zap className="h-3.5 w-3.5 mr-1" />
+              Agent Payload
+            </TabsTrigger>
+            <TabsTrigger value="raw" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Code className="h-3.5 w-3.5 mr-1" />
+              Raw Data
+            </TabsTrigger>
+          </TabsList>
+
+          <DetailPageLayout
+            sidebar={
+              <DetailPageSidebar>
+                <SidebarSection title="Details">
+                  <DetailPageField label="UUID" value={<CopyableText text={alert.uuid} mono className="text-xs" />} />
                 <DetailPageField label="Source" value={alert.source_name} />
                 {alert.fingerprint && (
                   <DetailPageField label="Fingerprint" value={<CopyableText text={alert.fingerprint} mono className="text-xs" />} />
@@ -469,42 +505,6 @@ export function AlertDetailPage() {
             </DetailPageSidebar>
           }
         >
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="bg-surface border border-border">
-              <TabsTrigger value="indicators" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Shield className="h-3.5 w-3.5 mr-1" />
-                Indicators ({alert.indicators?.length ?? 0})
-              </TabsTrigger>
-              <TabsTrigger value="findings" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Zap className="h-3.5 w-3.5 mr-1" />
-                Findings ({alert.agent_findings?.length ?? 0})
-              </TabsTrigger>
-              <TabsTrigger value="context" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                Context ({contextDocs.length})
-              </TabsTrigger>
-              <TabsTrigger value="activity" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Activity className="h-3.5 w-3.5 mr-1" />
-                Activity ({activities.length})
-              </TabsTrigger>
-              <TabsTrigger value="ads" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                ADS
-              </TabsTrigger>
-              <TabsTrigger value="graph" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <GitFork className="h-3.5 w-3.5 mr-1" />
-                Graph
-              </TabsTrigger>
-              <TabsTrigger value="agent-payload" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Zap className="h-3.5 w-3.5 mr-1" />
-                Agent Payload
-              </TabsTrigger>
-              <TabsTrigger value="raw" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Code className="h-3.5 w-3.5 mr-1" />
-                Raw Data
-              </TabsTrigger>
-            </TabsList>
-
             {/* Indicators */}
             <TabsContent value="indicators" className="mt-4">
               <div className="space-y-4">
@@ -796,8 +796,8 @@ export function AlertDetailPage() {
                 <Empty text="No raw payload data available" />
               )}
             </TabsContent>
-          </Tabs>
         </DetailPageLayout>
+        </Tabs>
       </div>
     </AppLayout>
   );

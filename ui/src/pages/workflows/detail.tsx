@@ -701,10 +701,30 @@ export function WorkflowDetailPage() {
           ]}
         />
 
-        <DetailPageLayout
-          sidebar={
-            <DetailPageSidebar>
-              <SidebarSection title="Identity">
+        <Tabs defaultValue={initialTab}>
+          <TabsList className="bg-surface border border-border">
+            <TabsTrigger value="code" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileCode className="h-3.5 w-3.5 mr-1" />
+              Code
+            </TabsTrigger>
+            <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FlaskConical className="h-3.5 w-3.5 mr-1" />
+              Test
+            </TabsTrigger>
+            <TabsTrigger value="runs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Play className="h-3.5 w-3.5 mr-1" />
+              Runs ({runs.length})
+            </TabsTrigger>
+            <TabsTrigger value="docs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              Documentation
+            </TabsTrigger>
+          </TabsList>
+
+          <DetailPageLayout
+            sidebar={
+              <DetailPageSidebar>
+                <SidebarSection title="Identity">
                 <div>
                   <span className="text-xs text-muted-foreground">UUID</span>
                   <div className="mt-1">
@@ -747,25 +767,6 @@ export function WorkflowDetailPage() {
             </DetailPageSidebar>
           }
         >
-          <Tabs defaultValue={initialTab}>
-            <TabsList className="bg-surface border border-border">
-              <TabsTrigger value="code" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <FileCode className="h-3.5 w-3.5 mr-1" />
-                Code
-              </TabsTrigger>
-              <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <FlaskConical className="h-3.5 w-3.5 mr-1" />
-                Test
-              </TabsTrigger>
-              <TabsTrigger value="runs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Play className="h-3.5 w-3.5 mr-1" />
-                Runs ({runs.length})
-              </TabsTrigger>
-              <TabsTrigger value="docs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                Documentation
-              </TabsTrigger>
-            </TabsList>
 
             {/* Code Editor */}
             <TabsContent value="code" className="mt-4 space-y-3">
@@ -1001,8 +1002,8 @@ export function WorkflowDetailPage() {
                 isSaving={patchWorkflow.isPending}
               />
             </TabsContent>
-          </Tabs>
         </DetailPageLayout>
+        </Tabs>
       </div>
 
       {/* Edit Workflow Dialog */}
