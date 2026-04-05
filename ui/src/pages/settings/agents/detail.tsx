@@ -226,14 +226,22 @@ export function AgentDetailPage() {
 
   // --- Status toggle (inline in status card) ---
   function handleStatusChange(value: string) {
-    const isActive = value === "active";
-    patchAgent.mutate(
-      { uuid, body: { is_active: isActive } },
-      {
-        onSuccess: () => toast.success(isActive ? "Agent activated" : "Agent deactivated"),
-        onError: () => toast.error("Failed to update agent status"),
-      },
-    );
+    if (value === "active") {
+      resumeAgent.mutate(uuid, {
+        onSuccess: () => toast.success("Agent resumed"),
+        onError: () => toast.error("Failed to resume agent"),
+      });
+    } else if (value === "paused") {
+      pauseAgent.mutate(
+        { uuid },
+        {
+          onSuccess: () => toast.success("Agent paused"),
+          onError: () => toast.error("Failed to pause agent"),
+        },
+      );
+    } else if (value === "terminated") {
+      setShowTerminateConfirm(true);
+    }
   }
 
   // --- Endpoint (inline edit in status card) ---
@@ -457,12 +465,16 @@ export function AgentDetailPage() {
                 variant="outline"
                 className={cn(
                   "text-xs",
-                  agent.is_active
+                  agentStatus === "active"
                     ? "text-teal bg-teal/10 border-teal/30"
-                    : "text-dim bg-dim/10 border-dim/30",
+                    : agentStatus === "paused"
+                      ? "text-amber bg-amber/10 border-amber/30"
+                      : agentStatus === "terminated"
+                        ? "text-red-threat bg-red-threat/10 border-red-threat/30"
+                        : "text-dim bg-dim/10 border-dim/30",
                 )}
               >
-                {agent.is_active ? "active" : "inactive"}
+                {agentStatus}
               </Badge>
             </>
           }
@@ -481,22 +493,28 @@ export function AgentDetailPage() {
               icon: Shield,
               value: (
                 <Select
-                  value={agent.is_active ? "active" : "inactive"}
+                  value={agentStatus}
                   onValueChange={handleStatusChange}
+                  disabled={agentStatus === "terminated"}
                 >
                   <SelectTrigger
                     className={cn(
                       "h-7 w-full text-xs border",
-                      agent.is_active
+                      agentStatus === "active"
                         ? "text-teal bg-teal/10 border-teal/30"
-                        : "text-dim bg-dim/10 border-dim/30",
+                        : agentStatus === "paused"
+                          ? "text-amber bg-amber/10 border-amber/30"
+                          : agentStatus === "terminated"
+                            ? "text-red-threat bg-red-threat/10 border-red-threat/30"
+                            : "text-dim bg-dim/10 border-dim/30",
                     )}
                   >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
                     <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                    <SelectItem value="terminated" className="text-red-threat">Terminated</SelectItem>
                   </SelectContent>
                 </Select>
               ),
