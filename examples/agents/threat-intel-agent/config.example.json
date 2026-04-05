@@ -1,0 +1,9 @@
+{
+  "name": "threat-intel-agent",
+  "execution_mode": "external",
+  "agent_type": "specialist",
+  "role": "threat_intel",
+  "adapter_type": "http",
+  "endpoint_url": "http://your-agent-host:8102",
+  "trigger_on_severities": ["Medium", "High", "Critical"]
+}

@@ -1,0 +1,7 @@
+{
+  "agent_type": "specialist",
+  "role": "identity",
+  "tools": ["get_alert", "get_enrichment", "post_invocation_result"],
+  "alert_types": ["*"],
+  "description": "Assesses account compromise risk from identity indicators using Calseta enrichment and identity provider context"
+}

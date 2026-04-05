@@ -1,0 +1,7 @@
+{
+  "agent_type": "specialist",
+  "role": "siem_query",
+  "tools": ["get_alert", "post_invocation_result"],
+  "alert_types": ["*"],
+  "description": "Generates SIEM queries (KQL/SPL/EQL) to find related events and build investigation timelines"
+}

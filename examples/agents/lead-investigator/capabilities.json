@@ -1,0 +1,8 @@
+{
+  "agent_type": "orchestrator",
+  "role": "investigation",
+  "can_invoke": ["threat-intel-agent", "identity-agent", "endpoint-agent", "historical-context-agent", "response-agent"],
+  "tools": ["get_alert", "search_alerts", "post_finding", "propose_action", "delegate_task", "delegate_parallel"],
+  "alert_types": ["*"],
+  "description": "Orchestrates specialist sub-agents to produce comprehensive investigation findings"
+}

@@ -1,0 +1,7 @@
+{
+  "agent_type": "specialist",
+  "role": "threat_intel",
+  "tools": ["get_alert", "get_enrichment", "post_invocation_result"],
+  "alert_types": ["*"],
+  "description": "Analyzes threat intelligence for IP, domain, hash, and URL indicators using Calseta enrichment and external TI sources"
+}

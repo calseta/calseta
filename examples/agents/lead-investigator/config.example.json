@@ -1,0 +1,11 @@
+{
+  "name": "lead-investigator",
+  "execution_mode": "external",
+  "agent_type": "orchestrator",
+  "role": "investigation",
+  "adapter_type": "http",
+  "endpoint_url": "http://your-agent-host:8100",
+  "sub_agent_ids": ["<threat-intel-uuid>", "<identity-uuid>", "<endpoint-uuid>", "<historical-uuid>"],
+  "max_sub_agent_calls": 10,
+  "trigger_on_severities": ["High", "Critical"]
+}

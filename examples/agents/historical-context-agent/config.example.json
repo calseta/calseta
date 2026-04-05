@@ -1,0 +1,9 @@
+{
+  "name": "historical-context-agent",
+  "execution_mode": "external",
+  "agent_type": "specialist",
+  "role": "historical_context",
+  "adapter_type": "http",
+  "endpoint_url": "http://your-agent-host:8105",
+  "trigger_on_severities": ["Low", "Medium", "High", "Critical"]
+}

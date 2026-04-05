@@ -1,0 +1,7 @@
+{
+  "agent_type": "specialist",
+  "role": "response",
+  "tools": ["get_alert", "get_findings", "post_action", "post_invocation_result"],
+  "alert_types": ["*"],
+  "description": "Generates prioritized response actions with confidence scores and submits high-confidence actions to the approval gate"
+}

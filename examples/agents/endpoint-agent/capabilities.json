@@ -1,0 +1,7 @@
+{
+  "agent_type": "specialist",
+  "role": "endpoint",
+  "tools": ["get_alert", "get_enrichment", "post_invocation_result"],
+  "alert_types": ["*"],
+  "description": "Investigates endpoint artifacts including host context, process trees, file hashes, and recommends isolation if warranted"
+}

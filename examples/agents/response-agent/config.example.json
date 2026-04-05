@@ -1,0 +1,10 @@
+{
+  "name": "response-agent",
+  "execution_mode": "external",
+  "agent_type": "specialist",
+  "role": "response",
+  "adapter_type": "http",
+  "endpoint_url": "http://your-agent-host:8106",
+  "action_confidence_threshold": 0.85,
+  "trigger_on_severities": ["High", "Critical"]
+}

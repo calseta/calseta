@@ -1,0 +1,9 @@
+{
+  "name": "identity-agent",
+  "execution_mode": "external",
+  "agent_type": "specialist",
+  "role": "identity",
+  "adapter_type": "http",
+  "endpoint_url": "http://your-agent-host:8103",
+  "trigger_on_severities": ["Medium", "High", "Critical"]
+}

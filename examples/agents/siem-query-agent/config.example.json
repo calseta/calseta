@@ -1,0 +1,9 @@
+{
+  "name": "siem-query-agent",
+  "execution_mode": "external",
+  "agent_type": "specialist",
+  "role": "siem_query",
+  "adapter_type": "http",
+  "endpoint_url": "http://your-agent-host:8101",
+  "trigger_on_severities": ["Medium", "High", "Critical"]
+}

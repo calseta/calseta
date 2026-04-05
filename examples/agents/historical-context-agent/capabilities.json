@@ -1,0 +1,7 @@
+{
+  "agent_type": "specialist",
+  "role": "historical_context",
+  "tools": ["get_alert", "search_alerts", "get_findings", "post_invocation_result"],
+  "alert_types": ["*"],
+  "description": "Retrieves historical alert context, identifies recurrence patterns, and surfaces prior investigation verdicts"
+}
