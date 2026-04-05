@@ -135,4 +135,8 @@ async def seed_sandbox(db: AsyncSession) -> None:
     await _seed_sandbox_api_key(db)
     await _seed_lab_api_key(db)
 
+    from app.seed.sandbox_control_plane import seed_control_plane
+
+    await seed_control_plane(db)
+
     logger.info("sandbox_seed_complete")
