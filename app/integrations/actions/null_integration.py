@@ -32,8 +32,8 @@ class NullActionIntegration(ActionIntegration):
             action_type=action.action_type,
             action_subtype=action.action_subtype,
         )
-        return ExecutionResult.ok(
-            f"[null] Action {action.action_subtype} acknowledged (no integration configured)",
+        return ExecutionResult.fail(
+            f"No integration configured for action subtype '{action.action_subtype}'",
             {"action_id": str(action.uuid), "action_type": action.action_type},
         )
 
