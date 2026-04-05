@@ -1,4 +1,4 @@
-.PHONY: dev dev-up dev-down test test-full lint typecheck migrate ci build help seed-sandbox lab lab-reset lab-stop dev-agents docs-openapi docs-openapi-check
+.PHONY: dev dev-up dev-down test test-full lint typecheck migrate ci build help lab lab-reset lab-stop docs-openapi docs-openapi-check
 
 # Inline script to apply procrastinate's schema (idempotent — ignores "already exists")
 define APPLY_PROCRASTINATE_SCHEMA
@@ -36,7 +36,7 @@ help:
 	@echo "  docs-openapi-check Verify openapi.json matches current API surface"
 	@echo ""
 	@echo "Lab:"
-	@echo "  lab        Start fully seeded lab (5 alerts, enriched, full-access key)"
+	@echo "  lab        Start fully seeded lab — alerts, agents, KB, issues, routines, LLM integration"
 	@echo "  lab-reset  Wipe DB and re-seed lab from scratch"
 	@echo "  lab-stop   Stop lab services"
 
@@ -86,10 +86,6 @@ test-full:
 	TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/calseta_test \
 		pytest tests/ -v
 
-# Integration tests (requires running PostgreSQL via TEST_DATABASE_URL or DATABASE_URL)
-test-integration:
-	pytest tests/integration/ -v
-
 lint:
 	ruff check app/ tests/
 
@@ -103,9 +99,6 @@ ci: lint typecheck test-full
 
 build:
 	docker build --target prod -t calseta .
-
-seed-sandbox:
-	python -m app.cli.seed_sandbox
 
 # ---------------------------------------------------------------------------
 # OpenAPI spec — generate from FastAPI app and sync to docs repo
@@ -165,20 +158,3 @@ lab-reset:
 lab-stop:
 	docker compose down
 	@-pkill -f "vite" 2>/dev/null || true
-
-# Full agent control plane lab — alias for make lab
-dev-agents: lab
-	@echo ""
-	@echo "=== Agent Control Plane Lab ==="
-	@echo "  LLM Integration: claude-code-local (default)"
-	@echo "  Agents seeded:   lead-investigator, threat-intel-analyst, identity-analyst, historical-context-analyst"
-	@echo "  Issues seeded:   8"
-	@echo "  Routines seeded: 3 (1 paused)"
-	@echo "  KB pages seeded: 6 pages across /playbooks, /runbooks, /detection-guidance, /memory"
-	@echo ""
-	@echo "  Agent API Keys:"
-	@echo "    lead-investigator:           cak_lab_lead_investigator_key"
-	@echo "    threat-intel-analyst:        cak_lab_threat_intel_analyst_key"
-	@echo "    identity-analyst:            cak_lab_identity_analyst_key"
-	@echo "    historical-context-analyst:  cak_lab_historical_context_analyst_key"
-	@echo ""
