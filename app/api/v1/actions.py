@@ -26,6 +26,7 @@ from app.db.session import get_db
 from app.middleware.rate_limit import limiter
 from app.repositories.agent_repository import AgentRepository
 from app.schemas.actions import (
+    ActionStatusUpdate,
     AgentActionResponse,
     ProposeActionRequest,
     ProposeActionResponse,
@@ -143,6 +144,41 @@ async def get_action(
     """Get details for a specific action."""
     svc = ActionService(db)
     action = await svc.get_action(action_uuid)
+    return DataResponse(data=AgentActionResponse.model_validate(action))
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/actions/{action_uuid}/cancel
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# PATCH /v1/actions/{action_uuid}
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/{action_uuid}", response_model=DataResponse[AgentActionResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def update_action_status(
+    request: Request,
+    action_uuid: UUID,
+    body: ActionStatusUpdate,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[AgentActionResponse]:
+    """Approve or reject a pending_approval action.
+
+    Operators use this endpoint — no agent API key required.
+    Returns 409 if the action is not in pending_approval status.
+    """
+    svc = ActionService(db)
+    action = await svc.approve_or_reject_action(
+        action_uuid=action_uuid,
+        status=body.status,
+        reason=body.reason,
+        actor_key_prefix=auth.key_prefix,
+    )
+    await db.commit()
     return DataResponse(data=AgentActionResponse.model_validate(action))
 
 

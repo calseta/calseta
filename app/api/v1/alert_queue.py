@@ -40,13 +40,23 @@ _Read = Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_READ))]
 _Write = Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_WRITE))]
 
 
-async def _get_agent(auth: AuthContext, db: AsyncSession) -> AgentRegistration:
+async def _get_agent(
+    auth: AuthContext,
+    db: AsyncSession,
+    *,
+    allow_operator: bool = False,
+) -> AgentRegistration | None:
     """Resolve the AgentRegistration for the current auth context.
 
     Works for both agent API keys (cak_* with agent_registration_id set) and
     human API keys with agents:write scope (admin/operator use).
 
-    Raises CalsetaException(403) if no agent context is available.
+    When ``allow_operator=True`` and the caller has no agent_registration_id
+    (i.e. is an operator/admin using a human API key), returns ``None`` instead
+    of raising. Callers must handle the ``None`` case appropriately.
+
+    Raises CalsetaException(403) if no agent context is available and
+    ``allow_operator=False``.
     """
 
     if auth.agent_registration_id is not None:
@@ -59,6 +69,9 @@ async def _get_agent(auth: AuthContext, db: AsyncSession) -> AgentRegistration:
                 status_code=status.HTTP_404_NOT_FOUND,
             )
         return agent
+
+    if allow_operator:
+        return None
 
     raise CalsetaException(
         code="FORBIDDEN",
@@ -83,8 +96,12 @@ async def get_queue(
     pagination: Annotated[PaginationParams, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> PaginatedResponse[AlertResponse]:
-    """Get available (unassigned, enriched) alerts for this agent."""
-    agent = await _get_agent(auth, db)
+    """Get available (unassigned, enriched) alerts.
+
+    Agent API keys receive only alerts matching their trigger filters.
+    Operator/admin API keys receive the full unfiltered queue.
+    """
+    agent = await _get_agent(auth, db, allow_operator=True)
     svc = AlertQueueService(db)
     alerts, total = await svc.get_queue(
         agent=agent,
@@ -118,6 +135,7 @@ async def checkout_alert(
 ) -> DataResponse[AlertAssignmentResponse]:
     """Atomically check out an alert. Returns 409 if already assigned."""
     agent = await _get_agent(auth, db)
+    assert agent is not None  # _get_agent raises 403 when allow_operator=False
     svc = AlertQueueService(db)
     assignment = await svc.checkout(alert_uuid=alert_uuid, agent=agent)
     return DataResponse(data=AlertAssignmentResponse.model_validate(assignment))
@@ -141,6 +159,7 @@ async def release_alert(
 ) -> DataResponse[AlertAssignmentResponse]:
     """Release an assignment back to the queue."""
     agent = await _get_agent(auth, db)
+    assert agent is not None  # _get_agent raises 403 when allow_operator=False
     svc = AlertQueueService(db)
     assignment = await svc.release(alert_uuid=alert_uuid, agent=agent)
     return DataResponse(data=AlertAssignmentResponse.model_validate(assignment))
@@ -162,6 +181,7 @@ async def get_my_assignments(
 ) -> PaginatedResponse[AlertAssignmentResponse]:
     """Get all assignments for the authenticated agent."""
     agent = await _get_agent(auth, db)
+    assert agent is not None  # _get_agent raises 403 when allow_operator=False
     svc = AlertQueueService(db)
     assignments, total = await svc.get_my_assignments(
         agent=agent,
@@ -196,6 +216,7 @@ async def update_assignment(
 ) -> DataResponse[AlertAssignmentResponse]:
     """Update assignment status, resolution, or investigation state."""
     agent = await _get_agent(auth, db)
+    assert agent is not None  # _get_agent raises 403 when allow_operator=False
     svc = AlertQueueService(db)
     assignment = await svc.update_assignment(
         assignment_uuid=assignment_uuid,

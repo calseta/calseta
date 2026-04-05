@@ -299,6 +299,88 @@ class ActionService:
         await self._db.refresh(action)
         return action
 
+    async def approve_or_reject_action(
+        self,
+        action_uuid: UUID,
+        status: str,
+        reason: str | None = None,
+        actor_key_prefix: str | None = None,
+    ) -> AgentAction:
+        """Approve or reject a pending_approval action.
+
+        Only ``pending_approval`` actions can be approved or rejected.
+        Raises CalsetaException(404) if not found.
+        Raises CalsetaException(409) if the action is not in pending_approval status.
+
+        For "approved": transitions action to executing and enqueues execution.
+        For "rejected": transitions action to rejected.
+
+        In both cases, the linked WorkflowApprovalRequest (if any) is updated
+        to match the new status.
+        """
+        action = await self.get_action(action_uuid)
+
+        if action.status != ActionStatus.PENDING_APPROVAL.value:
+            raise CalsetaException(
+                code="CONFLICT",
+                message=(
+                    f"Action {action_uuid} cannot be approved/rejected "
+                    f"(current status: {action.status}). "
+                    "Only pending_approval actions can be approved or rejected."
+                ),
+                status_code=409,
+            )
+
+        if status == "approved":
+            action.status = ActionStatus.EXECUTING.value
+            await self._db.flush()
+            await self._enqueue_execute_action(action.id)
+            final_status = ActionStatus.EXECUTING
+            approval_status = "approved"
+            event_type = ActivityEventType.ACTION_APPROVED
+        else:
+            action.status = ActionStatus.REJECTED.value
+            await self._db.flush()
+            final_status = ActionStatus.REJECTED
+            approval_status = "rejected"
+            event_type = ActivityEventType.ACTION_REJECTED
+
+        # Update linked WorkflowApprovalRequest if present
+        if action.approval_request_id is not None:
+            ar_result = await self._db.execute(
+                select(WorkflowApprovalRequest).where(
+                    WorkflowApprovalRequest.id == action.approval_request_id
+                )
+            )
+            approval = ar_result.scalar_one_or_none()
+            if approval is not None and approval.status == "pending":
+                approval.status = approval_status
+                if reason:
+                    approval.reason = reason
+                await self._db.flush()
+
+        # Write activity event
+        try:
+            activity_svc = ActivityEventService(self._db)
+            await activity_svc.write(
+                event_type,
+                actor_type="api",
+                actor_key_prefix=actor_key_prefix,
+                alert_id=action.alert_id,
+                references={
+                    "action_uuid": str(action.uuid),
+                    "action_type": action.action_type,
+                    "action_subtype": action.action_subtype,
+                    "status": final_status.value,
+                    "reason": reason,
+                },
+            )
+        except Exception:
+            pass
+
+        await self._db.refresh(action)
+        return action
+
     # ---------------------------------------------------------------------------
     # Private helpers
     # ---------------------------------------------------------------------------

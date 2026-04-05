@@ -504,3 +504,136 @@ class TestCancelAction:
         )
         assert resp.status_code == 409, resp.text
         assert resp.json()["error"]["code"] == "CONFLICT"
+
+
+# ---------------------------------------------------------------------------
+# TestOperatorQueue
+# ---------------------------------------------------------------------------
+
+
+class TestOperatorQueue:
+    async def test_operator_api_key_can_get_queue(
+        self,
+        test_client: AsyncClient,
+        admin_auth_headers: dict[str, str],
+        enriched_alert: Alert,
+    ) -> None:
+        """Operator (human) API key can call GET /v1/queue and get 200, not 403."""
+        resp = await test_client.get("/v1/queue", headers=admin_auth_headers)
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert "data" in body
+        assert "meta" in body
+        # The enriched alert should appear in the queue
+        uuids = [item["uuid"] for item in body["data"]]
+        assert str(enriched_alert.uuid) in uuids
+
+
+# ---------------------------------------------------------------------------
+# TestApproveRejectAction
+# ---------------------------------------------------------------------------
+
+
+class TestApproveRejectAction:
+    async def test_approve_pending_action_transitions_to_executing(
+        self,
+        test_client: AsyncClient,
+        agent_and_auth: tuple[Any, dict[str, str]],
+        admin_auth_headers: dict[str, str],
+        enriched_alert: Alert,
+    ) -> None:
+        """PATCH /v1/actions/{uuid} with status='approved' transitions pending_approval → executing."""
+        agent, headers = agent_and_auth
+        assignment = await _checkout_alert_for_agent(test_client, enriched_alert, headers)
+
+        # containment → pending_approval
+        propose_resp = await _propose_action(
+            test_client,
+            enriched_alert,
+            assignment["uuid"],
+            headers,
+            action_type="containment",
+            action_subtype="block_ip",
+            payload={"ip": "10.0.0.1"},
+        )
+        assert propose_resp.status_code == 202, propose_resp.text
+        action_uuid = propose_resp.json()["data"]["action_id"]
+        assert propose_resp.json()["data"]["status"] == "pending_approval"
+
+        # Operator approves
+        resp = await test_client.patch(
+            f"/v1/actions/{action_uuid}",
+            json={"status": "approved"},
+            headers=admin_auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()["data"]
+        assert data["status"] == "executing", data
+
+    async def test_reject_pending_action_transitions_to_rejected(
+        self,
+        test_client: AsyncClient,
+        agent_and_auth: tuple[Any, dict[str, str]],
+        admin_auth_headers: dict[str, str],
+        enriched_alert: Alert,
+    ) -> None:
+        """PATCH /v1/actions/{uuid} with status='rejected' transitions pending_approval → rejected."""
+        agent, headers = agent_and_auth
+        assignment = await _checkout_alert_for_agent(test_client, enriched_alert, headers)
+
+        propose_resp = await _propose_action(
+            test_client,
+            enriched_alert,
+            assignment["uuid"],
+            headers,
+            action_type="containment",
+            action_subtype="block_ip",
+            payload={"ip": "10.0.0.2"},
+        )
+        assert propose_resp.status_code == 202, propose_resp.text
+        action_uuid = propose_resp.json()["data"]["action_id"]
+
+        resp = await test_client.patch(
+            f"/v1/actions/{action_uuid}",
+            json={"status": "rejected", "reason": "Not authorized by policy"},
+            headers=admin_auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()["data"]
+        assert data["status"] == "rejected", data
+
+    async def test_approve_non_pending_action_returns_409(
+        self,
+        test_client: AsyncClient,
+        agent_and_auth: tuple[Any, dict[str, str]],
+        admin_auth_headers: dict[str, str],
+        db_session: AsyncSession,
+        enriched_alert: Alert,
+    ) -> None:
+        """PATCH /v1/actions/{uuid} on a non-pending_approval action returns 409."""
+        agent, headers = agent_and_auth
+        assignment_data = await _checkout_alert_for_agent(test_client, enriched_alert, headers)
+
+        assignment_result = await db_session.execute(
+            __import__("sqlalchemy", fromlist=["select"]).select(
+                AlertAssignment
+            ).where(AlertAssignment.uuid == assignment_data["uuid"])
+        )
+        assignment = assignment_result.scalar_one()
+
+        # Create action in "proposed" status (not pending_approval)
+        action = await _create_action_directly(
+            db_session,
+            enriched_alert,
+            assignment,
+            agent_registration_id=agent.id,
+            status="proposed",
+        )
+
+        resp = await test_client.patch(
+            f"/v1/actions/{action.uuid}",
+            json={"status": "approved"},
+            headers=admin_auth_headers,
+        )
+        assert resp.status_code == 409, resp.text
+        assert resp.json()["error"]["code"] == "CONFLICT"

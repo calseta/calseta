@@ -29,18 +29,23 @@ class AlertQueueService:
 
     async def get_queue(
         self,
-        agent: AgentRegistration,
+        agent: AgentRegistration | None,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[Alert], int]:
-        """Get pending alerts matching agent's trigger filters.
+        """Get pending alerts from the queue.
+
+        When ``agent`` is provided, filters by the agent's trigger_on_sources
+        and trigger_on_severities settings.
+
+        When ``agent`` is None (operator/admin caller), returns the full
+        unfiltered queue — all enriched, unassigned alerts regardless of source
+        or severity.
 
         Returns only:
           - Enriched alerts (enrichment_status='Enriched')
           - Alerts with status 'Open' or 'Triaging'
           - Alerts with no active assignment (no non-released/resolved assignment)
-
-        Filters on agent.trigger_on_sources and agent.trigger_on_severities if set.
         """
         from sqlalchemy import func
 
@@ -62,17 +67,18 @@ class AlertQueueService:
             Alert.id.not_in(active_assignment_alert_ids),
         )
 
-        # Apply source filter if agent has trigger_on_sources configured
-        sources = agent.trigger_on_sources or []
-        if sources:
-            stmt = stmt.where(Alert.source_name.in_(sources))
-            count_stmt = count_stmt.where(Alert.source_name.in_(sources))
+        if agent is not None:
+            # Apply source filter if agent has trigger_on_sources configured
+            sources = agent.trigger_on_sources or []
+            if sources:
+                stmt = stmt.where(Alert.source_name.in_(sources))
+                count_stmt = count_stmt.where(Alert.source_name.in_(sources))
 
-        # Apply severity filter if agent has trigger_on_severities configured
-        severities = agent.trigger_on_severities or []
-        if severities:
-            stmt = stmt.where(Alert.severity.in_(severities))
-            count_stmt = count_stmt.where(Alert.severity.in_(severities))
+            # Apply severity filter if agent has trigger_on_severities configured
+            severities = agent.trigger_on_severities or []
+            if severities:
+                stmt = stmt.where(Alert.severity.in_(severities))
+                count_stmt = count_stmt.where(Alert.severity.in_(severities))
 
         total_result = await self._db.execute(count_stmt)
         total: int = total_result.scalar_one()

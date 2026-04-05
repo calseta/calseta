@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -47,6 +47,11 @@ class ProposeActionResponse(BaseModel):
     status: ActionStatus
     approval_request_uuid: UUID | None = None  # set when approval required
     expires_at: datetime | None = None  # set when approval required
+
+
+class ActionStatusUpdate(BaseModel):
+    status: Literal["approved", "rejected"]
+    reason: str | None = None
 
 
 class AgentActionResponse(BaseModel):
