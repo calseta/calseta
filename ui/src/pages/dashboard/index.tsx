@@ -2,7 +2,7 @@ import { type ReactNode, useMemo, useState, useRef, useEffect, useCallback } fro
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMetricsSummary, useApprovals } from "@/hooks/use-api";
+import { useMetricsSummary, useApprovals, useControlPlaneDashboard, useActions } from "@/hooks/use-api";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { formatSeconds, formatPercent } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,9 @@ import {
   Activity,
   RotateCcw,
   Layers,
+  Inbox,
+  DollarSign,
+  ShieldCheck,
 } from "lucide-react";
 import {
   BarChart,
@@ -115,11 +118,15 @@ const tooltipCursor = {
 export function DashboardPage() {
   const { data: metricsResp, isLoading: metricsLoading, refetch, isFetching } = useMetricsSummary();
   const { data: approvalsResp } = useApprovals({ status: "pending" });
+  const { data: cpDashResp } = useControlPlaneDashboard();
+  const { data: pendingActionsResp } = useActions({ status: "pending" });
   const { layout, handleLayoutChange, resetLayout } = useDashboardLayout();
   const { ref: containerRef, width } = useResizeWidth();
 
   const metrics = metricsResp?.data;
   const pendingApprovals = approvalsResp?.data?.length ?? 0;
+  const cpDash = cpDashResp?.data;
+  const pendingActionsCount = pendingActionsResp?.meta?.total ?? 0;
 
   const severityData = useMemo(
     () =>
@@ -424,6 +431,45 @@ export function DashboardPage() {
         label="MTTE"
         value={formatSeconds(metrics?.alerts.mean_time_to_enrich_seconds ?? null)}
         sub="Mean Time to Enrich"
+      />
+    ),
+
+    // Control plane widgets
+    "cp-queue-depth": (
+      <KpiCard
+        icon={Inbox}
+        label="Alert Queue"
+        value={cpDash?.queue.available ?? 0}
+        sub={`${Object.values(cpDash?.queue.active_by_status ?? {}).reduce((a, b) => a + b, 0)} assigned`}
+        highlight={(cpDash?.queue.available ?? 0) > 10}
+      />
+    ),
+    "cp-agent-fleet": (
+      <KpiCard
+        icon={Bot}
+        label="Agent Fleet"
+        value={cpDash?.agents.by_status["active"] ?? 0}
+        sub={(() => {
+          const paused = cpDash?.agents.by_status["paused"] ?? 0;
+          return paused > 0 ? `${paused} paused` : "All agents active";
+        })()}
+      />
+    ),
+    "cp-costs-mtd": (
+      <KpiCard
+        icon={DollarSign}
+        label="Spend MTD"
+        value={cpDash ? `$${cpDash.costs_mtd.total_usd.toFixed(2)}` : "--"}
+        sub="Month to date"
+      />
+    ),
+    "cp-pending-actions": (
+      <KpiCard
+        icon={ShieldCheck}
+        label="Pending Actions"
+        value={pendingActionsCount}
+        sub={pendingActionsCount > 0 ? "Requires review" : "No pending actions"}
+        highlight={pendingActionsCount > 0}
       />
     ),
   };

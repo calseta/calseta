@@ -855,15 +855,19 @@ export interface AgentAction {
 
 // Control Plane Dashboard
 export interface ControlPlaneDashboard {
-  agent_count: number;
-  active_agents: number;
-  paused_agents: number;
-  queue_depth: number;
-  unassigned_alerts: number;
-  assigned_alerts: number;
-  pending_actions: number;
-  total_cost_mtd_cents: number;
-  agents_over_budget_pct: number;
+  agents: {
+    by_status: Record<string, number>;
+    total: number;
+  };
+  queue: {
+    available: number;
+    active_by_status: Record<string, number>;
+  };
+  costs_mtd: {
+    total_cents: number;
+    total_usd: number;
+    period_start: string;
+  };
 }
 
 // Agent Key
