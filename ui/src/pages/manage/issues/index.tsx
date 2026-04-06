@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -114,6 +113,44 @@ function IssueCard({ issue }: { issue: AgentIssue }) {
   );
 }
 
+function KanbanCard({ issue }: { issue: AgentIssue }) {
+  const navigate = useNavigate();
+
+  return (
+    <div
+      className="bg-card border border-border rounded-md shadow-sm cursor-pointer hover:shadow-md transition-shadow p-3 space-y-2"
+      onClick={() => navigate({ to: "/manage/issues/$uuid", params: { uuid: issue.uuid }, search: { tab: "details" } })}
+    >
+      <p className="text-sm font-semibold text-foreground leading-snug line-clamp-1">
+        {issue.title}
+      </p>
+      {issue.description && (
+        <p className="text-xs text-dim leading-snug line-clamp-2">{issue.description}</p>
+      )}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Badge variant="outline" className="text-[10px] font-mono text-dim border-dim/30">
+            {issue.identifier}
+          </Badge>
+          {issue.priority && (
+            <Badge variant="outline" className={cn("text-[10px]", priorityColor(issue.priority))}>
+              {issue.priority}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {(issue.assignee_operator ?? issue.assignee_agent_uuid) && (
+            <span className="text-[10px] text-dim truncate max-w-[80px]">
+              {issue.assignee_operator ?? issue.assignee_agent_uuid}
+            </span>
+          )}
+          <span className="text-[10px] text-dim">{relativeTime(issue.created_at)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function IssueCardSkeleton() {
   return (
     <Card>
@@ -155,10 +192,17 @@ export function IssuesPage() {
     return issues.filter((i) => statuses.includes(i.status));
   }
 
-  const openIssues = filterIssues(["backlog", "todo"]);
-  const inProgressIssues = filterIssues(["in_progress", "in_review"]);
-  const doneIssues = filterIssues(["done"]);
-  const blockedIssues = filterIssues(["blocked", "cancelled"]);
+  const KANBAN_COLUMNS = [
+    { key: "open", label: "Open", statuses: ["backlog", "todo"] },
+    { key: "in_progress", label: "In Progress", statuses: ["in_progress", "in_review"] },
+    { key: "done", label: "Done", statuses: ["done"] },
+    { key: "blocked", label: "Blocked", statuses: ["blocked", "cancelled"] },
+  ] as const;
+
+  const columnIssues = KANBAN_COLUMNS.map((col) => ({
+    ...col,
+    issues: filterIssues([...col.statuses]),
+  }));
 
   function handleCreateIssue() {
     if (!formTitle.trim()) {
@@ -244,87 +288,44 @@ export function IssuesPage() {
           </Button>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="open">
-          <TabsList>
-            <TabsTrigger value="open">
-              Open
-              {!isLoading && (
-                <span className="ml-1.5 text-[10px] bg-muted px-1.5 py-0.5 rounded-full">
-                  {openIssues.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="in_progress">
-              In Progress
-              {!isLoading && (
-                <span className="ml-1.5 text-[10px] bg-muted px-1.5 py-0.5 rounded-full">
-                  {inProgressIssues.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="done">
-              Done
-              {!isLoading && (
-                <span className="ml-1.5 text-[10px] bg-muted px-1.5 py-0.5 rounded-full">
-                  {doneIssues.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="blocked">
-              Blocked / Cancelled
-              {!isLoading && (
-                <span className="ml-1.5 text-[10px] bg-muted px-1.5 py-0.5 rounded-full">
-                  {blockedIssues.length}
-                </span>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
-          {isLoading ? (
-            <div className="mt-4 space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <IssueCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : (
-            <>
-              <TabsContent value="open" className="mt-4 space-y-3">
-                {openIssues.length === 0 ? (
-                  <div className="text-center text-sm text-dim py-20">No open issues</div>
-                ) : (
-                  openIssues.map((issue) => <IssueCard key={issue.uuid} issue={issue} />)
-                )}
-              </TabsContent>
-
-              <TabsContent value="in_progress" className="mt-4 space-y-3">
-                {inProgressIssues.length === 0 ? (
-                  <div className="text-center text-sm text-dim py-20">No in-progress issues</div>
-                ) : (
-                  inProgressIssues.map((issue) => <IssueCard key={issue.uuid} issue={issue} />)
-                )}
-              </TabsContent>
-
-              <TabsContent value="done" className="mt-4 space-y-3">
-                {doneIssues.length === 0 ? (
-                  <div className="text-center text-sm text-dim py-20">No completed issues</div>
-                ) : (
-                  doneIssues.map((issue) => <IssueCard key={issue.uuid} issue={issue} />)
-                )}
-              </TabsContent>
-
-              <TabsContent value="blocked" className="mt-4 space-y-3">
-                {blockedIssues.length === 0 ? (
-                  <div className="text-center text-sm text-dim py-20">
-                    No blocked or cancelled issues
-                  </div>
-                ) : (
-                  blockedIssues.map((issue) => <IssueCard key={issue.uuid} issue={issue} />)
-                )}
-              </TabsContent>
-            </>
-          )}
-        </Tabs>
+        {/* Kanban board */}
+        {isLoading ? (
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {Array.from({ length: 4 }).map((_, ci) => (
+              <div key={ci} className="shrink-0 w-[280px] bg-muted/5 rounded-lg border border-border p-3 space-y-3">
+                <Skeleton className="h-5 w-24" />
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <IssueCardSkeleton key={i} />
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex gap-4 overflow-x-auto pb-2 items-start">
+            {columnIssues.map((col) => (
+              <div
+                key={col.key}
+                className="shrink-0 w-[280px] flex flex-col rounded-lg border border-border bg-muted/5"
+              >
+                {/* Column header */}
+                <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+                  <span className="text-xs font-semibold text-foreground">{col.label}</span>
+                  <span className="text-[10px] bg-muted text-dim px-1.5 py-0.5 rounded-full">
+                    {col.issues.length}
+                  </span>
+                </div>
+                {/* Scrollable card list */}
+                <div className="flex flex-col gap-2 p-2 overflow-y-auto max-h-[calc(100vh-260px)]">
+                  {col.issues.length === 0 ? (
+                    <div className="text-center text-xs text-dim py-8">No issues</div>
+                  ) : (
+                    col.issues.map((issue) => <KanbanCard key={issue.uuid} issue={issue} />)
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* New Issue Dialog */}

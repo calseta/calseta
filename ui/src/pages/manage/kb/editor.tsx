@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useSearch, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -15,7 +15,13 @@ import {
   usePatchKBPage,
 } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Eye, Save } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ArrowLeft, Eye, Save, Bold, Italic, Heading2, List, Code2, Link2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 /* -------------------------------------------------------------------------- */
@@ -92,6 +98,38 @@ export function KBEditorPage() {
   const [changeSummary, setChangeSummary] = useState("");
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function wrapSelection(before: string, after: string) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = body.slice(start, end);
+    const newBody = body.slice(0, start) + before + selected + after + body.slice(end);
+    setBody(newBody);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + before.length, start + before.length + selected.length);
+    });
+  }
+
+  function prependToLines(prefix: string) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const beforeSelection = body.slice(0, start);
+    const selection = body.slice(start, end) || "";
+    const lineStart = beforeSelection.lastIndexOf("\n") + 1;
+    const lines = body.slice(lineStart, end === start ? end : end).split("\n");
+    const newLines = lines.map((l) => prefix + l);
+    const newBody = body.slice(0, lineStart) + newLines.join("\n") + body.slice(end === start ? end : end);
+    setBody(newBody);
+    requestAnimationFrame(() => {
+      el.focus();
+    });
+  }
 
   // Prefill when editing
   useEffect(() => {
@@ -376,13 +414,40 @@ export function KBEditorPage() {
                   >
                     Content (Markdown)
                   </Label>
+                  {/* Formatting toolbar */}
+                  <TooltipProvider>
+                    <div className="flex items-center gap-0.5 px-1 py-1 border border-b-0 border-border bg-muted/20 rounded-t-md">
+                      {[
+                        { icon: <Bold className="h-3.5 w-3.5" />, label: "Bold", action: () => wrapSelection("**", "**") },
+                        { icon: <Italic className="h-3.5 w-3.5" />, label: "Italic", action: () => wrapSelection("*", "*") },
+                        { icon: <Heading2 className="h-3.5 w-3.5" />, label: "Heading", action: () => prependToLines("## ") },
+                        { icon: <List className="h-3.5 w-3.5" />, label: "Bullet list", action: () => prependToLines("- ") },
+                        { icon: <Code2 className="h-3.5 w-3.5" />, label: "Code block", action: () => wrapSelection("```\n", "\n```") },
+                        { icon: <Link2 className="h-3.5 w-3.5" />, label: "Link", action: () => wrapSelection("[", "](url)") },
+                      ].map(({ icon, label, action }) => (
+                        <Tooltip key={label}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => { e.preventDefault(); action(); }}
+                              className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            >
+                              {icon}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">{label}</TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  </TooltipProvider>
                   <Textarea
+                    ref={textareaRef}
                     id="editor-body"
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
                     placeholder="Write your markdown content here..."
-                    className="w-full min-h-[400px] resize-none font-mono text-xs leading-relaxed"
-                    style={{ height: "calc(100vh - 440px)", minHeight: "300px" }}
+                    className="w-full min-h-[400px] resize-none font-mono text-xs leading-relaxed rounded-t-none"
+                    style={{ height: "calc(100vh - 460px)", minHeight: "300px" }}
                   />
                 </div>
               </div>

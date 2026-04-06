@@ -194,17 +194,17 @@ export function LLMIntegrationDetailPage() {
         />
 
         <Tabs defaultValue="configuration">
-          <TabsList className="border-b border-border bg-transparent w-full justify-start rounded-none h-auto p-0 gap-0">
+          <TabsList className="bg-surface border border-border">
             <TabsTrigger
               value="configuration"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-teal data-[state=active]:text-foreground text-dim pb-2 px-4 text-sm"
+              className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm"
             >
               <Settings className="h-3.5 w-3.5 mr-1.5" />
               Configuration
             </TabsTrigger>
             <TabsTrigger
               value="usage"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-teal data-[state=active]:text-foreground text-dim pb-2 px-4 text-sm"
+              className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm"
             >
               <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
               Usage

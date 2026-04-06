@@ -22,7 +22,7 @@ import "@xyflow/react/dist/style.css";
 import { useTopology } from "@/hooks/use-api";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Info } from "lucide-react";
 import type { TopologyNode } from "@/lib/types";
 
 const AGENT_TYPE_STYLES: Record<string, { background: string; border: string }> = {
@@ -77,13 +77,41 @@ function getEdgeStyle(edgeType: string): Partial<Edge> {
   }
 }
 
+function statusDotColor(status: string): string {
+  switch (status) {
+    case "active":
+      return "#1a7a5e";
+    case "paused":
+      return "#d97706";
+    case "terminated":
+    case "error":
+      return "#ef4444";
+    default:
+      return "#6b7280";
+  }
+}
+
 function NodeLabel({ node }: { node: TopologyNode }) {
   return (
-    <div className="space-y-1">
-      <p className="font-medium text-sm leading-tight">{node.name}</p>
-      <p className="text-[10px] opacity-70">
-        {node.role ?? node.agent_type} · {node.status}
-      </p>
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <span
+          className="inline-block h-2 w-2 rounded-full shrink-0"
+          style={{ background: statusDotColor(node.status) }}
+        />
+        <p className="font-medium text-sm leading-tight">{node.name}</p>
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span
+          className="text-[9px] px-1.5 py-0.5 rounded border capitalize"
+          style={{ borderColor: AGENT_TYPE_STYLES[node.agent_type]?.border ?? "#4b5563", color: "#9ca3af" }}
+        >
+          {node.agent_type}
+        </span>
+        {node.role && (
+          <span className="text-[10px] opacity-60">{node.role}</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -292,6 +320,12 @@ export function TopologyPage() {
           </Card>
         ) : (
           <div className="relative h-[600px] w-full rounded-lg border border-border overflow-hidden bg-card">
+            {rfEdges.length === 0 && rfNodes.length > 0 && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-card border border-border rounded-md px-3 py-2 shadow-sm text-xs text-dim">
+                <Info className="h-3.5 w-3.5 shrink-0" />
+                No agent relationships configured. Add <code className="font-mono">sub_agent_ids</code> to orchestrator agents to see delegation edges.
+              </div>
+            )}
             <ReactFlow
               nodes={rfNodes}
               edges={rfEdges}
