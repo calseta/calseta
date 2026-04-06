@@ -72,6 +72,22 @@ const PROVIDER_DISPLAY: Record<Provider, string> = {
   ollama: "Ollama",
 };
 
+// base_url requirement per provider
+const BASE_URL_REQUIRED = new Set<Provider>(["azure_openai", "ollama"]);
+const BASE_URL_OPTIONAL = new Set<Provider>(["openai"]);
+
+function baseUrlBehavior(p: string): "required" | "optional" | "none" {
+  if (BASE_URL_REQUIRED.has(p as Provider)) return "required";
+  if (BASE_URL_OPTIONAL.has(p as Provider)) return "optional";
+  return "none";
+}
+
+const BASE_URL_PLACEHOLDER: Partial<Record<Provider, string>> = {
+  azure_openai: "https://{resource}.openai.azure.com/",
+  ollama: "http://localhost:11434",
+  openai: "https://api.openai.com/v1",
+};
+
 function providerLabel(p: string): string {
   return PROVIDER_DISPLAY[p as Provider] ?? p;
 }
@@ -142,8 +158,8 @@ export function LLMIntegrationsPage() {
       toast.error("Name and model are required");
       return;
     }
-    if (form.provider === "azure_openai" && !form.base_url.trim()) {
-      toast.error("Base URL is required for Azure OpenAI");
+    if (baseUrlBehavior(form.provider) === "required" && !form.base_url.trim()) {
+      toast.error(`Base URL is required for ${PROVIDER_DISPLAY[form.provider as Provider]}`);
       return;
     }
 
@@ -327,7 +343,12 @@ export function LLMIntegrationsPage() {
               <Label htmlFor="llm-provider">Provider</Label>
               <Select
                 value={form.provider}
-                onValueChange={(v) => setForm((f) => ({ ...f, provider: v as Provider }))}
+                onValueChange={(v) => setForm((f) => ({
+                  ...f,
+                  provider: v as Provider,
+                  // clear base_url when switching to a provider that doesn't use it
+                  base_url: baseUrlBehavior(v) === "none" ? "" : f.base_url,
+                }))}
               >
                 <SelectTrigger id="llm-provider">
                   <SelectValue placeholder="Select provider" />
@@ -353,15 +374,20 @@ export function LLMIntegrationsPage() {
               />
             </div>
 
-            {form.provider === "azure_openai" && (
+            {baseUrlBehavior(form.provider) !== "none" && (
               <div className="space-y-1.5">
-                <Label htmlFor="llm-base-url">Base URL</Label>
+                <Label htmlFor="llm-base-url">
+                  Base URL{" "}
+                  {baseUrlBehavior(form.provider) === "optional" && (
+                    <span className="text-dim font-normal">(optional)</span>
+                  )}
+                </Label>
                 <Input
                   id="llm-base-url"
-                  placeholder="https://{resource}.openai.azure.com/"
+                  placeholder={BASE_URL_PLACEHOLDER[form.provider as Provider] ?? "https://"}
                   value={form.base_url}
                   onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))}
-                  required
+                  required={baseUrlBehavior(form.provider) === "required"}
                 />
               </div>
             )}

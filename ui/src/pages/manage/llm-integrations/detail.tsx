@@ -53,10 +53,27 @@ function formatCostDollars(cents: number): string {
   return `$${(cents / 100).toFixed(4)}`;
 }
 
+// base_url requirement per provider (mirrors create form)
+const BASE_URL_REQUIRED = new Set(["azure_openai", "ollama"]);
+const BASE_URL_OPTIONAL = new Set(["openai"]);
+
+function baseUrlBehavior(p: string): "required" | "optional" | "none" {
+  if (BASE_URL_REQUIRED.has(p)) return "required";
+  if (BASE_URL_OPTIONAL.has(p)) return "optional";
+  return "none";
+}
+
+const BASE_URL_PLACEHOLDER: Record<string, string> = {
+  azure_openai: "https://{resource}.openai.azure.com/",
+  ollama: "http://localhost:11434",
+  openai: "https://api.openai.com/v1",
+};
+
 interface EditFormState {
   name: string;
   model: string;
   api_key_ref: string;
+  base_url: string;
   is_default: boolean;
 }
 
@@ -78,6 +95,7 @@ export function LLMIntegrationDetailPage() {
       name: integration.name,
       model: integration.model,
       api_key_ref: "",
+      base_url: integration.base_url ?? "",
       is_default: integration.is_default,
     });
     setEditing(true);
@@ -90,12 +108,26 @@ export function LLMIntegrationDetailPage() {
 
   function handleSave() {
     if (!draft || !integration) return;
+
+    // Validate required base_url before sending
+    if (
+      baseUrlBehavior(integration.provider) === "required" &&
+      !draft.base_url.trim()
+    ) {
+      toast.error(`Base URL is required for ${PROVIDER_DISPLAY[integration.provider] ?? integration.provider}`);
+      return;
+    }
+
     const body: Record<string, unknown> = {};
 
     if (draft.name.trim() !== integration.name) body.name = draft.name.trim();
     if (draft.model.trim() !== integration.model) body.model = draft.model.trim();
     if (draft.is_default !== integration.is_default) body.is_default = draft.is_default;
     if (draft.api_key_ref.trim()) body.api_key_ref = draft.api_key_ref.trim();
+    // Include base_url if it changed (empty string clears it on the backend)
+    if (draft.base_url.trim() !== (integration.base_url ?? "")) {
+      body.base_url = draft.base_url.trim() || null;
+    }
 
     if (Object.keys(body).length === 0) {
       cancelEditing();
@@ -294,11 +326,30 @@ export function LLMIntegrationDetailPage() {
                   )}
                 </div>
 
-                {/* Base URL */}
-                {integration.base_url && (
+                {/* Base URL — shown when provider uses it */}
+                {baseUrlBehavior(integration.provider) !== "none" && (
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-dim uppercase tracking-wide">Base URL</Label>
-                    <p className="text-sm text-foreground font-mono">{integration.base_url}</p>
+                    <Label className="text-xs text-dim uppercase tracking-wide">
+                      Base URL
+                      {baseUrlBehavior(integration.provider) === "optional" && (
+                        <span className="font-normal normal-case ml-1 text-dim">(optional)</span>
+                      )}
+                    </Label>
+                    {editing && draft ? (
+                      <div className="space-y-1">
+                        <Input
+                          value={draft.base_url}
+                          onChange={(e) => setDraft((d) => d ? { ...d, base_url: e.target.value } : d)}
+                          placeholder={BASE_URL_PLACEHOLDER[integration.provider] ?? "https://"}
+                          className="max-w-sm font-mono"
+                          required={baseUrlBehavior(integration.provider) === "required"}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-sm text-foreground font-mono">
+                        {integration.base_url ?? <span className="text-dim">Not set</span>}
+                      </p>
+                    )}
                   </div>
                 )}
 
