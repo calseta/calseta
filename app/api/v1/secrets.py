@@ -15,6 +15,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
@@ -76,7 +77,20 @@ async def create_secret(
         )
 
     svc = SecretService(db)
-    secret, _ = await svc.create(body)
+    try:
+        secret, _ = await svc.create(body)
+    except ValueError as exc:
+        raise CalsetaException(
+            code="ENCRYPTION_ERROR",
+            message=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        ) from exc
+    except IntegrityError:
+        raise CalsetaException(
+            code="CONFLICT",
+            message=f"A secret with name '{body.name}' already exists.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
     return DataResponse(data=SecretResponse.model_validate(secret))
 
 

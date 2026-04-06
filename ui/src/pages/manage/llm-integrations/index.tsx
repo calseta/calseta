@@ -100,6 +100,7 @@ interface CreateFormState {
   provider: Provider | "";
   model: string;
   api_key_ref: string;
+  base_url: string;
   is_default: boolean;
 }
 
@@ -108,6 +109,7 @@ const EMPTY_FORM: CreateFormState = {
   provider: "",
   model: "",
   api_key_ref: "",
+  base_url: "",
   is_default: false,
 };
 
@@ -140,6 +142,10 @@ export function LLMIntegrationsPage() {
       toast.error("Name and model are required");
       return;
     }
+    if (form.provider === "azure_openai" && !form.base_url.trim()) {
+      toast.error("Base URL is required for Azure OpenAI");
+      return;
+    }
 
     const body: Record<string, unknown> = {
       name: form.name.trim(),
@@ -149,6 +155,9 @@ export function LLMIntegrationsPage() {
     };
     if (form.api_key_ref.trim()) {
       body.api_key_ref = form.api_key_ref.trim();
+    }
+    if (form.base_url.trim()) {
+      body.base_url = form.base_url.trim();
     }
 
     createIntegration.mutate(body, {
@@ -343,6 +352,19 @@ export function LLMIntegrationsPage() {
                 required
               />
             </div>
+
+            {form.provider === "azure_openai" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="llm-base-url">Base URL</Label>
+                <Input
+                  id="llm-base-url"
+                  placeholder="https://{resource}.openai.azure.com/"
+                  value={form.base_url}
+                  onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))}
+                  required
+                />
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label htmlFor="llm-api-key-ref">

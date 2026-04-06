@@ -272,6 +272,14 @@ class RoutineService:
             updates["name"] = patch.name
         if patch.description is not None:
             updates["description"] = patch.description
+        if patch.status is not None:
+            if patch.status not in RoutineStatus.ALL:
+                raise CalsetaException(
+                    code="INVALID_STATUS",
+                    message=f"Invalid status '{patch.status}'. Must be one of: {', '.join(RoutineStatus.ALL)}.",
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+            updates["status"] = patch.status
         if patch.concurrency_policy is not None:
             _validate_concurrency_policy(patch.concurrency_policy)
             updates["concurrency_policy"] = patch.concurrency_policy

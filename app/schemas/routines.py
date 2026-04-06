@@ -89,6 +89,7 @@ class RoutineCreate(BaseModel):
 class RoutinePatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=500)
     description: str | None = None
+    status: str | None = None
     concurrency_policy: str | None = None
     catch_up_policy: str | None = None
     task_template: dict[str, Any] | None = None
