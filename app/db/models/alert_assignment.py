@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,6 +37,9 @@ class AlertAssignment(TimestampMixin, UUIDMixin, Base):
     resolution: Mapped[str | None] = mapped_column(Text)
     resolution_type: Mapped[str | None] = mapped_column(Text)
     investigation_state: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    stall_detected: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false"), default=False
+    )
 
     alert: Mapped[Alert] = relationship(
         "Alert", foreign_keys=[alert_id]

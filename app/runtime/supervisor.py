@@ -96,6 +96,12 @@ class AgentSupervisor:
                 )
                 if budget_stopped:
                     report.budget_stopped += 1
+                    continue
+
+                await self._check_stall(
+                    assignment=assignment,
+                    agent=agent,
+                )
             except Exception as exc:
                 error_msg = (
                     f"Error supervising assignment {assignment.id}: {exc}"
@@ -250,6 +256,93 @@ class AgentSupervisor:
             )
 
         return True
+
+    async def _check_stall(
+        self,
+        assignment: AlertAssignment,  # type: ignore[name-defined]  # noqa: F821
+        agent: AgentRegistration,  # type: ignore[name-defined]  # noqa: F821
+    ) -> bool:
+        """Check if this agent is stalled (N consecutive empty invocation results).
+
+        Returns True if a stall was detected and flagged.
+        """
+        threshold = getattr(agent, "stall_threshold", 0)
+        if not threshold or threshold <= 0:
+            return False
+
+        # Already flagged — skip re-checking
+        if getattr(assignment, "stall_detected", False):
+            return False
+
+        from sqlalchemy import desc, select
+
+        from app.db.models.agent_invocation import AgentInvocation
+
+        # Fetch last N invocations for this agent (by parent_agent_id)
+        result = await self._db.execute(
+            select(AgentInvocation)
+            .where(AgentInvocation.parent_agent_id == agent.id)
+            .where(AgentInvocation.status == "completed")
+            .order_by(desc(AgentInvocation.id))
+            .limit(threshold)
+        )
+        recent = list(result.scalars().all())
+
+        if len(recent) < threshold:
+            return False
+
+        # All N must have empty/null results
+        def _is_empty(result: dict | None) -> bool:
+            return result is None or result == {}
+
+        if not all(_is_empty(inv.result) for inv in recent):
+            return False
+
+        # Stall detected
+        assignment.stall_detected = True
+        await self._db.flush()
+
+        logger.warning(
+            "supervisor.stall_detected",
+            agent_id=agent.id,
+            assignment_id=assignment.id,
+            stall_threshold=threshold,
+        )
+
+        try:
+            await self._log_stall_event(assignment=assignment, agent=agent)
+        except Exception as exc:
+            logger.warning(
+                "supervisor.stall_event_failed",
+                assignment_id=assignment.id,
+                error=str(exc),
+            )
+
+        return True
+
+    async def _log_stall_event(
+        self,
+        assignment: AlertAssignment,  # type: ignore[name-defined]  # noqa: F821
+        agent: AgentRegistration,  # type: ignore[name-defined]  # noqa: F821
+    ) -> None:
+        """Emit agent.stalled activity event."""
+        import uuid as uuid_module
+
+        from app.db.models.activity_event import ActivityEvent
+
+        self._db.add(ActivityEvent(
+            uuid=uuid_module.uuid4(),
+            event_type="agent.stalled",
+            actor_type="system",
+            actor_key_prefix=None,
+            alert_id=assignment.alert_id,
+            references={
+                "agent_id": agent.id,
+                "assignment_id": assignment.id,
+                "stall_threshold": agent.stall_threshold,
+            },
+        ))
+        await self._db.flush()
 
     async def _log_budget_stop_events(
         self,

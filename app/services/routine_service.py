@@ -363,6 +363,18 @@ class RoutineService:
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        # Auto-pause if consecutive failures have reached the threshold
+        max_failures = routine.max_consecutive_failures or 0
+        if max_failures > 0 and routine.consecutive_failures >= max_failures:
+            routine.status = RoutineStatus.PAUSED
+            await self._db.flush()
+            logger.warning(
+                "routine.auto_paused",
+                routine_uuid=str(routine_uuid),
+                consecutive_failures=routine.consecutive_failures,
+                max_consecutive_failures=max_failures,
+            )
+
         # Find or create a manual trigger
         manual_trigger: RoutineTrigger | None = next(
             (t for t in routine.triggers if t.kind == TriggerKind.MANUAL), None
