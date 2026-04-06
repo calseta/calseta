@@ -752,47 +752,6 @@ export interface RoutineRun {
   trigger_uuid: string | null;
 }
 
-// Campaigns
-export interface Campaign {
-  uuid: string;
-  name: string;
-  description: string | null;
-  status: string;
-  category: string;
-  owner_operator: string | null;
-  target_metric: string | null;
-  target_value: string | null;
-  current_value: string | null;
-  target_date: string | null;
-  created_at: string;
-  updated_at: string;
-  owner_agent_uuid: string | null;
-  items: CampaignItem[];
-}
-
-export interface CampaignItem {
-  uuid: string;
-  item_type: string;
-  item_uuid: string;
-  created_at: string;
-}
-
-export interface CampaignMetrics {
-  campaign_uuid: string;
-  computed_at: string;
-  total_items: number;
-  alert_count: number;
-  issue_count: number;
-  routine_count: number;
-  issues_done: number;
-  issues_in_progress: number;
-  issues_backlog: number;
-  completion_pct: number;
-  current_value: string | null;
-  target_value: string | null;
-  target_metric: string | null;
-}
-
 // Topology
 export interface TopologyNode {
   uuid: string;

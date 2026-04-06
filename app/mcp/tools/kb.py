@@ -255,7 +255,7 @@ async def link_kb_page(
 
     Args:
         slug: The KB page slug.
-        linked_entity_type: One of: alert, issue, page, agent, campaign.
+        linked_entity_type: One of: alert, issue, page, agent.
         linked_entity_id: UUID of the linked entity.
         link_type: One of: reference, source, generated_from, related.
 

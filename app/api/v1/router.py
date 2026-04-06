@@ -15,7 +15,6 @@ from app.api.v1 import (
     alert_queue,
     alerts,
     api_keys,
-    campaigns,
     context_documents,
     detection_rules,
     enrichment_field_extractions,
@@ -74,7 +73,6 @@ v1_router.include_router(invocations.agents_invocations_router)
 v1_router.include_router(issues.router)
 v1_router.include_router(issues.agents_issues_router)
 v1_router.include_router(routines.router)
-v1_router.include_router(campaigns.router)
 v1_router.include_router(topology.router)
 v1_router.include_router(kb.router)
 v1_router.include_router(memory.router)

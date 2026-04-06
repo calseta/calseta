@@ -1,5 +1,5 @@
 """
-Control plane lab seeder — LLM integrations, agents, issues, routines, campaigns, KB pages.
+Control plane lab seeder — LLM integrations, agents, issues, routines, KB pages.
 
 Called from seed_sandbox() when SANDBOX_MODE=true.
 Idempotent: every sub-seeder checks before inserting.
@@ -8,7 +8,7 @@ Idempotent: every sub-seeder checks before inserting.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import bcrypt
 import structlog
@@ -19,7 +19,6 @@ from app.db.models.agent_api_key import AgentAPIKey
 from app.db.models.agent_issue import AgentIssue
 from app.db.models.agent_registration import AgentRegistration
 from app.db.models.agent_routine import AgentRoutine
-from app.db.models.campaign import Campaign
 from app.db.models.kb_page import KnowledgeBasePage
 from app.db.models.llm_integration import LLMIntegration
 from app.db.models.routine_trigger import RoutineTrigger
@@ -486,67 +485,6 @@ async def _seed_routines(
 
 
 # ---------------------------------------------------------------------------
-# Campaigns
-# ---------------------------------------------------------------------------
-
-_TODAY = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-
-_CAMPAIGN_SPECS = [
-    {
-        "name": "Q2 MTTD Reduction",
-        "description": (
-            "Reduce mean time to detect from 4h to under 90 minutes "
-            "by deploying automated triage agents on High/Critical alerts"
-        ),
-        "target_metric": "mttd_minutes",
-        "target_value": 90.0,
-        "status": "active",
-        "target_date": _TODAY + timedelta(days=90),
-    },
-    {
-        "name": "False Positive Rate Improvement",
-        "description": (
-            "Tune detection rules to bring FP rate below 15% "
-            "without missing true positives"
-        ),
-        "target_metric": "false_positive_rate_pct",
-        "target_value": 15.0,
-        "status": "active",
-        "target_date": _TODAY + timedelta(days=60),
-    },
-]
-
-
-async def _seed_campaigns(db: AsyncSession) -> None:
-    """Seed 2 lab campaigns. Idempotent — checks by name."""
-    created = 0
-
-    for spec in _CAMPAIGN_SPECS:
-        existing = await db.execute(
-            select(Campaign).where(Campaign.name == spec["name"])
-        )
-        if existing.scalar_one_or_none() is not None:
-            continue
-
-        campaign = Campaign(
-            name=spec["name"],
-            description=spec.get("description"),
-            status=spec["status"],
-            target_metric=spec.get("target_metric"),
-            target_value=spec.get("target_value"),
-            current_value=None,
-            target_date=spec.get("target_date"),
-            owner_operator="system",
-        )
-        db.add(campaign)
-        await db.flush()
-        created += 1
-
-    if created:
-        logger.info("lab_campaigns_seeded", count=created)
-
-
-# ---------------------------------------------------------------------------
 # KB Pages
 # ---------------------------------------------------------------------------
 
@@ -760,6 +698,5 @@ async def seed_control_plane(db: AsyncSession) -> None:
     agents = await _seed_agents(db, llm_integration)
     await _seed_issues(db)
     await _seed_routines(db, agents)
-    await _seed_campaigns(db)
     await _seed_kb(db)
     logger.info("lab_control_plane_seeded")

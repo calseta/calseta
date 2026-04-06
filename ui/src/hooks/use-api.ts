@@ -37,9 +37,6 @@ import type {
   IssueComment,
   Routine,
   RoutineRun,
-  Campaign,
-  CampaignItem,
-  CampaignMetrics,
   TopologyGraph,
   Secret,
   AgentAction,
@@ -1104,69 +1101,6 @@ export function useDeleteRoutine() {
   return useMutation({
     mutationFn: (uuid: string) => api.delete(`/routines/${uuid}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["routines"] }),
-  });
-}
-
-// Campaigns
-export function useCampaigns(params?: Record<string, string | number | boolean | undefined>) {
-  const search = new URLSearchParams();
-  if (params) {
-    for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined && v !== "") search.set(k, String(v));
-    }
-  }
-  const qs = search.toString();
-  return useQuery({
-    queryKey: ["campaigns", qs],
-    queryFn: () => api.get<PaginatedResponse<Campaign>>(`/campaigns${qs ? `?${qs}` : ""}`),
-  });
-}
-
-export function useCampaign(uuid: string) {
-  return useQuery({
-    queryKey: ["campaign", uuid],
-    queryFn: () => api.get<DataResponse<Campaign>>(`/campaigns/${uuid}`),
-    enabled: !!uuid,
-  });
-}
-
-export function useCreateCampaign() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: Record<string, unknown>) =>
-      api.post<DataResponse<Campaign>>("/campaigns", body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns"] }),
-  });
-}
-
-export function usePatchCampaign() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
-      api.patch<DataResponse<Campaign>>(`/campaigns/${uuid}`, body),
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["campaigns"] });
-      qc.invalidateQueries({ queryKey: ["campaign", vars.uuid] });
-    },
-  });
-}
-
-export function useAddCampaignItem() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
-      api.post<DataResponse<CampaignItem>>(`/campaigns/${uuid}/items`, body),
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["campaign", vars.uuid] });
-    },
-  });
-}
-
-export function useCampaignMetrics(uuid: string) {
-  return useQuery({
-    queryKey: ["campaign-metrics", uuid],
-    queryFn: () => api.get<DataResponse<CampaignMetrics>>(`/campaigns/${uuid}/metrics`),
-    enabled: !!uuid,
   });
 }
 

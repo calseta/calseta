@@ -16,8 +16,6 @@ from app.db.models.alert import Alert
 from app.db.models.alert_assignment import AlertAssignment
 from app.db.models.alert_indicator import AlertIndicator
 from app.db.models.api_key import APIKey
-from app.db.models.campaign import Campaign
-from app.db.models.campaign_item import CampaignItem
 from app.db.models.context_document import ContextDocument
 from app.db.models.cost_event import CostEvent
 from app.db.models.detection_rule import DetectionRule
@@ -78,8 +76,6 @@ __all__ = [
     "AgentRoutine",
     "RoutineTrigger",
     "RoutineRun",
-    "Campaign",
-    "CampaignItem",
     "KnowledgeBasePage",
     "KBPageRevision",
     "KBPageLink",

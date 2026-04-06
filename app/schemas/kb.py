@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 KBPageStatus = Literal["published", "draft", "archived"]
 KBLinkType = Literal["reference", "source", "generated_from", "related"]
-KBLinkedEntityType = Literal["alert", "issue", "page", "agent", "campaign"]
+KBLinkedEntityType = Literal["alert", "issue", "page", "agent"]
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-/]*[a-z0-9]$|^[a-z0-9]$")
 

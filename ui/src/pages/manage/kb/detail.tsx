@@ -82,8 +82,6 @@ function entityTypeBadgeColor(type: string): string {
       return "text-teal bg-teal/10 border-teal/30";
     case "agent":
       return "text-muted-foreground bg-muted/10 border-muted/30";
-    case "campaign":
-      return "text-teal bg-teal/10 border-teal/30";
     default:
       return "text-muted-foreground bg-muted/10 border-muted/30";
   }
@@ -148,7 +146,7 @@ interface AddLinkDialogProps {
   slug: string;
 }
 
-const ENTITY_TYPES = ["alert", "issue", "page", "agent", "campaign"] as const;
+const ENTITY_TYPES = ["alert", "issue", "page", "agent"] as const;
 const LINK_TYPES = ["reference", "source", "generated_from", "related"] as const;
 
 function AddLinkDialog({ open, onClose, slug }: AddLinkDialogProps) {
