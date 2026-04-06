@@ -8,7 +8,6 @@ Idempotent: every sub-seeder checks before inserting.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
 
 import bcrypt
 import structlog
@@ -73,7 +72,9 @@ _AGENT_SCOPES = [
 _AGENT_SPECS = [
     {
         "name": "lead-investigator",
-        "description": "Orchestrates specialist sub-agents to produce comprehensive investigation findings",
+        "description": (
+            "Orchestrates specialist sub-agents to produce comprehensive investigation findings"
+        ),
         "execution_mode": "managed",
         "agent_type": "orchestrator",
         "role": "investigation",
@@ -144,8 +145,8 @@ _AGENT_SPECS = [
         "adapter_type": "http",
         "system_prompt": (
             "You are an identity security specialist. "
-            "You investigate account activity, MFA status, impossible travel, and session anomalies "
-            "to determine whether an account has been compromised."
+            "You investigate account activity, MFA status, impossible travel, "
+            "and session anomalies to determine whether an account has been compromised."
         ),
         "capabilities": {
             "indicator_types": ["account", "email"],

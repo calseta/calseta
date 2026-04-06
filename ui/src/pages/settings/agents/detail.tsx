@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -16,6 +17,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   TableBody,
   TableCell,
@@ -51,29 +71,20 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   useAgent,
   usePatchAgent,
-  useTestAgent,
   useAgentHeartbeatRuns,
   useAgentCostEvents,
   useAgentInvocations,
   usePauseAgent,
   useResumeAgent,
   useTerminateAgent,
-  useTools,
-  useAgentActivity,
-  useAgentCostSummary,
+  usePostHeartbeat,
+  useCreateIssue,
+  useLLMIntegrations,
 } from "@/hooks/use-api";
-import type { HeartbeatRun, CostEvent, AgentInvocation, AgentTool } from "@/lib/types";
+import type { HeartbeatRun, CostEvent, AgentInvocation } from "@/lib/types";
 import { formatDate, relativeTime } from "@/lib/format";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Globe,
-  Clock,
-  RefreshCw,
   Pencil,
   Save,
   X,
@@ -82,9 +93,6 @@ import {
   Lock,
   Shield,
   Zap,
-  CheckCircle2,
-  XCircle,
-  Check,
   FileText,
   Settings,
   Activity,
@@ -93,16 +101,12 @@ import {
   Pause,
   Play,
   StopCircle,
-  Trash2,
-  Plus,
-  Wrench,
-  LayoutDashboard,
+  MoreHorizontal,
+  Heart,
 } from "lucide-react";
 
 const ALL_SEVERITIES = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
 const ALL_SOURCES = ["sentinel", "elastic", "splunk", "generic"];
-const TIMEOUT_OPTIONS = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300];
-const RETRY_OPTIONS = [0, 1, 2, 3, 4, 5];
 
 function heartbeatStatusClass(status: string): string {
   switch (status) {
@@ -135,14 +139,6 @@ function formatDuration(startedAt: string | null, finishedAt: string | null): st
   return `${Math.round(ms / 60000)}m`;
 }
 
-const HEARTBEAT_COLUMNS: ColumnDef[] = [
-  { key: "status", initialWidth: 110 },
-  { key: "started_at", initialWidth: 160 },
-  { key: "duration", initialWidth: 100 },
-  { key: "alerts_processed", initialWidth: 130 },
-  { key: "actions_proposed", initialWidth: 140 },
-];
-
 const COST_COLUMNS: ColumnDef[] = [
   { key: "provider", initialWidth: 120 },
   { key: "model", initialWidth: 180 },
@@ -167,12 +163,15 @@ export function AgentDetailPage() {
   const navigate = useNavigate({ from: "/manage/agents/$uuid" });
   const { data, isLoading, refetch, isFetching } = useAgent(uuid);
   const patchAgent = usePatchAgent();
-  const testAgent = useTestAgent();
   const pauseAgent = usePauseAgent();
   const resumeAgent = useResumeAgent();
   const terminateAgent = useTerminateAgent();
+  const postHeartbeat = usePostHeartbeat();
+  const createIssue = useCreateIssue();
+  const { data: llmData } = useLLMIntegrations();
+  const llmIntegrations = llmData?.data ?? [];
 
-  // Trigger editing state (sources/severities: null = clean, non-null = dirty)
+  // Trigger editing state
   const [sourcesDraft, setSourcesDraft] = useState<string[] | null>(null);
   const [severitiesDraft, setSeveritiesDraft] = useState<string[] | null>(null);
   const [editingFilter, setEditingFilter] = useState(false);
@@ -183,27 +182,34 @@ export function AgentDetailPage() {
   const [authHeaderName, setAuthHeaderName] = useState("");
   const [authHeaderValue, setAuthHeaderValue] = useState("");
 
-  // Endpoint editing state
-  const [editingEndpoint, setEditingEndpoint] = useState(false);
-  const [endpointDraft, setEndpointDraft] = useState("");
+  // Inline config editing
+  const [configEditMode, setConfigEditMode] = useState(false);
+  const [configDraft, setConfigDraft] = useState({
+    description: "",
+    endpoint_url: "",
+    system_prompt: "",
+    methodology: "",
+    llm_integration_uuid: "",
+    max_concurrent_alerts: "",
+    max_cost_per_alert_dollars: "",
+    max_investigation_minutes: "",
+  });
 
   // Terminate confirm
   const [showTerminateConfirm, setShowTerminateConfirm] = useState(false);
 
-  // Heartbeat expand state
-  const [expandedHeartbeat, setExpandedHeartbeat] = useState<string | null>(null);
+  // Selected run for split-pane
+  const [selectedRunUuid, setSelectedRunUuid] = useState<string | null>(null);
 
-  // Test result
-  const [testResult, setTestResult] = useState<{
-    delivered: boolean;
-    status_code: number | null;
-    duration_ms: number;
-    error: string | null;
-  } | null>(null);
+  // Assign task modal
+  const [assignTaskOpen, setAssignTaskOpen] = useState(false);
+  const [taskDescription, setTaskDescription] = useState("");
+
+  // Budget input
+  const [budgetInput, setBudgetInput] = useState("");
 
   const agent = data?.data;
 
-  // Data for existing tabs
   const { data: heartbeatData } = useAgentHeartbeatRuns(uuid);
   const { data: costData } = useAgentCostEvents(uuid);
   const { data: invocationData } = useAgentInvocations(uuid);
@@ -211,20 +217,6 @@ export function AgentDetailPage() {
   const heartbeatRuns: HeartbeatRun[] = heartbeatData?.data ?? [];
   const costEvents: CostEvent[] = costData?.data ?? [];
   const invocations: AgentInvocation[] = invocationData?.data ?? [];
-
-  // Instructions tab state
-  const [selectedInstructionFile, setSelectedInstructionFile] = useState<string | null>(null);
-  const [showNewFileInput, setShowNewFileInput] = useState(false);
-  const [newFileName, setNewFileName] = useState("");
-
-  // Skills tab state
-  const [showAddToolDialog, setShowAddToolDialog] = useState(false);
-  const { data: allToolsData } = useTools();
-  const allTools: AgentTool[] = allToolsData?.data ?? [];
-
-  // Dashboard tab
-  const { data: costSummaryData } = useAgentCostSummary(uuid);
-  const { data: activityData, isError: activityError } = useAgentActivity(uuid);
 
   const totalCostCents = costEvents.reduce((sum, e) => sum + e.cost_cents, 0);
 
@@ -251,7 +243,7 @@ export function AgentDetailPage() {
     );
   }
 
-  // --- Status toggle (inline in status card) ---
+  // --- Status toggle ---
   function handleStatusChange(value: string) {
     if (value === "active") {
       resumeAgent.mutate(uuid, {
@@ -271,73 +263,18 @@ export function AgentDetailPage() {
     }
   }
 
-  // --- Endpoint (inline edit in status card) ---
-  function startEditingEndpoint() {
-    setEndpointDraft(agent!.endpoint_url ?? "");
-    setEditingEndpoint(true);
-  }
-
-  function handleSaveEndpoint() {
-    const trimmed = endpointDraft.trim();
-    if (!trimmed || trimmed === agent!.endpoint_url) {
-      setEditingEndpoint(false);
-      return;
-    }
-    patchAgent.mutate(
-      { uuid, body: { endpoint_url: trimmed } },
-      {
-        onSuccess: () => {
-          toast.success("Endpoint updated");
-          setEditingEndpoint(false);
-        },
-        onError: () => toast.error("Failed to update endpoint"),
-      },
-    );
-  }
-
-  function handleEndpointKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") handleSaveEndpoint();
-    if (e.key === "Escape") setEditingEndpoint(false);
-  }
-
-  // --- Timeout (inline select in status card) ---
-  function handleTimeoutChange(value: string) {
-    patchAgent.mutate(
-      { uuid, body: { timeout_seconds: Number(value) } },
-      {
-        onSuccess: () => toast.success(`Timeout set to ${value}s`),
-        onError: () => toast.error("Failed to update timeout"),
-      },
-    );
-  }
-
-  // --- Retries (inline select in status card) ---
-  function handleRetryChange(value: string) {
-    patchAgent.mutate(
-      { uuid, body: { retry_count: Number(value) } },
-      {
-        onSuccess: () => toast.success(`Retry count set to ${value}`),
-        onError: () => toast.error("Failed to update retry count"),
-      },
-    );
-  }
-
-  // --- Sources & Severities (always-interactive chips, dirty-state pattern) ---
+  // --- Triggers ---
   const triggersDirty = sourcesDraft !== null || severitiesDraft !== null;
 
   function toggleSource(source: string) {
     const current = sourcesDraft ?? [...agent!.trigger_on_sources];
-    const next = current.includes(source)
-      ? current.filter((s) => s !== source)
-      : [...current, source];
+    const next = current.includes(source) ? current.filter((s) => s !== source) : [...current, source];
     setSourcesDraft(next);
   }
 
   function toggleSeverity(sev: string) {
     const current = severitiesDraft ?? [...agent!.trigger_on_severities];
-    const next = current.includes(sev)
-      ? current.filter((s) => s !== sev)
-      : [...current, sev];
+    const next = current.includes(sev) ? current.filter((s) => s !== sev) : [...current, sev];
     setSeveritiesDraft(next);
   }
 
@@ -392,14 +329,8 @@ export function AgentDetailPage() {
 
   function handleSaveAuth() {
     const body: Record<string, unknown> = {};
-    if (authHeaderName.trim()) {
-      body.auth_header_name = authHeaderName.trim();
-    } else {
-      body.auth_header_name = null;
-    }
-    if (authHeaderValue.trim()) {
-      body.auth_header_value = authHeaderValue.trim();
-    }
+    body.auth_header_name = authHeaderName.trim() || null;
+    if (authHeaderValue.trim()) body.auth_header_value = authHeaderValue.trim();
     patchAgent.mutate(
       { uuid, body },
       {
@@ -412,13 +343,51 @@ export function AgentDetailPage() {
     );
   }
 
-  // --- Test webhook ---
-  function handleTest() {
-    setTestResult(null);
-    testAgent.mutate(uuid, {
-      onSuccess: (res) => setTestResult(res.data),
-      onError: () => toast.error("Failed to send test webhook"),
+  // --- Inline config edit ---
+  function startConfigEdit() {
+    const a = agent!;
+    setConfigDraft({
+      description: a.description ?? "",
+      endpoint_url: a.endpoint_url ?? "",
+      system_prompt: a.system_prompt ?? "",
+      methodology: a.methodology ?? "",
+      llm_integration_uuid: "",
+      max_concurrent_alerts: a.max_concurrent_alerts ? String(a.max_concurrent_alerts) : "",
+      max_cost_per_alert_dollars: a.max_cost_per_alert_cents ? (a.max_cost_per_alert_cents / 100).toFixed(2) : "",
+      max_investigation_minutes: a.max_investigation_minutes ? String(a.max_investigation_minutes) : "",
     });
+    setConfigEditMode(true);
+  }
+
+  function handleSaveConfig() {
+    const body: Record<string, unknown> = {};
+    body.description = configDraft.description || null;
+    const isManaged = agent!.execution_mode === "claude_code" || agent!.execution_mode === "managed";
+    if (!isManaged) {
+      body.endpoint_url = configDraft.endpoint_url || null;
+    }
+    if (isManaged) {
+      body.system_prompt = configDraft.system_prompt || null;
+      body.methodology = configDraft.methodology || null;
+      if (configDraft.llm_integration_uuid) body.llm_integration_uuid = configDraft.llm_integration_uuid;
+    }
+    body.max_concurrent_alerts = configDraft.max_concurrent_alerts ? Number(configDraft.max_concurrent_alerts) : null;
+    body.max_cost_per_alert_cents = configDraft.max_cost_per_alert_dollars
+      ? Math.round(parseFloat(configDraft.max_cost_per_alert_dollars) * 100)
+      : null;
+    body.max_investigation_minutes = configDraft.max_investigation_minutes
+      ? Number(configDraft.max_investigation_minutes)
+      : null;
+    patchAgent.mutate(
+      { uuid, body },
+      {
+        onSuccess: () => {
+          toast.success("Configuration saved");
+          setConfigEditMode(false);
+        },
+        onError: () => toast.error("Failed to save configuration"),
+      },
+    );
   }
 
   // --- Documentation ---
@@ -463,20 +432,63 @@ export function AgentDetailPage() {
     });
   }
 
+  // --- Run Heartbeat ---
+  function handleRunHeartbeat() {
+    postHeartbeat.mutate(uuid, {
+      onSuccess: () => toast.success("Heartbeat triggered"),
+      onError: () => toast.error("Failed to trigger heartbeat"),
+    });
+  }
+
+  // --- Assign Task ---
+  function handleAssignTask() {
+    if (!taskDescription.trim()) return;
+    createIssue.mutate(
+      { title: taskDescription.trim(), preferred_agent_id: uuid },
+      {
+        onSuccess: () => {
+          toast.success("Task assigned");
+          setAssignTaskOpen(false);
+          setTaskDescription("");
+        },
+        onError: () => toast.error("Failed to assign task"),
+      },
+    );
+  }
+
+  // --- Set monthly budget ---
+  function handleSetBudget() {
+    const val = parseFloat(budgetInput);
+    if (isNaN(val) || val < 0) {
+      toast.error("Enter a valid dollar amount");
+      return;
+    }
+    patchAgent.mutate(
+      { uuid, body: { budget_monthly_cents: Math.round(val * 100) } },
+      {
+        onSuccess: () => {
+          toast.success("Budget updated");
+          setBudgetInput("");
+        },
+        onError: () => toast.error("Failed to update budget"),
+      },
+    );
+  }
+
   // --- Budget progress ---
   const budgetMonthly = agent.budget_monthly_cents ?? 0;
   const spentMonthly = agent.spent_monthly_cents ?? 0;
-  const budgetProgressPercent = budgetMonthly > 0
-    ? Math.min(100, (spentMonthly / budgetMonthly) * 100)
-    : 0;
+  const budgetProgressPercent = budgetMonthly > 0 ? Math.min(100, (spentMonthly / budgetMonthly) * 100) : 0;
   const budgetProgressColor =
-    budgetProgressPercent >= 90
+    budgetProgressPercent >= 100
       ? "bg-red-threat"
-      : budgetProgressPercent >= 70
+      : budgetProgressPercent >= 80
         ? "bg-amber"
         : "bg-teal";
 
   const agentStatus = agent.status ?? (agent.is_active ? "active" : "inactive");
+  const isManaged = agent.execution_mode === "claude_code" || agent.execution_mode === "managed";
+  const selectedRun = selectedRunUuid ? heartbeatRuns.find((r) => r.uuid === selectedRunUuid) : null;
 
   return (
     <AppLayout title="Agent Detail">
@@ -487,32 +499,87 @@ export function AgentDetailPage() {
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
           badges={
-            <>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-xs",
-                  agentStatus === "active"
-                    ? "text-teal bg-teal/10 border-teal/30"
-                    : agentStatus === "paused"
-                      ? "text-amber bg-amber/10 border-amber/30"
-                      : agentStatus === "terminated"
-                        ? "text-red-threat bg-red-threat/10 border-red-threat/30"
-                        : "text-dim bg-dim/10 border-dim/30",
-                )}
-              >
-                {agentStatus}
-              </Badge>
-            </>
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-xs",
+                agentStatus === "active"
+                  ? "text-teal bg-teal/10 border-teal/30"
+                  : agentStatus === "paused"
+                    ? "text-amber bg-amber/10 border-amber/30"
+                    : agentStatus === "terminated"
+                      ? "text-red-threat bg-red-threat/10 border-red-threat/30"
+                      : "text-dim bg-dim/10 border-dim/30",
+              )}
+            >
+              {agentStatus}
+            </Badge>
           }
           subtitle={
             agent.description ? (
               <p className="text-sm text-muted-foreground">{agent.description}</p>
             ) : undefined
           }
+          actions={
+            agentStatus !== "terminated" ? (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunHeartbeat}
+                  disabled={postHeartbeat.isPending}
+                  className="h-8 text-xs border-border text-dim hover:text-foreground"
+                >
+                  {postHeartbeat.isPending ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <Heart className="h-3 w-3 mr-1" />
+                  )}
+                  Run Heartbeat
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAssignTaskOpen(true)}
+                  className="h-8 text-xs border-border text-dim hover:text-foreground"
+                >
+                  <Send className="h-3 w-3 mr-1" />
+                  Assign Task
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-dim hover:text-foreground">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-card border-border">
+                    {agentStatus === "paused" ? (
+                      <DropdownMenuItem onClick={handleResume} className="text-sm cursor-pointer">
+                        <Play className="h-3.5 w-3.5 mr-2" />
+                        Resume Agent
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onClick={handlePause} className="text-sm cursor-pointer">
+                        <Pause className="h-3.5 w-3.5 mr-2" />
+                        Pause Agent
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator className="bg-border" />
+                    <DropdownMenuItem
+                      onClick={() => setShowTerminateConfirm(true)}
+                      className="text-sm text-red-threat cursor-pointer focus:text-red-threat focus:bg-red-threat/10"
+                    >
+                      <StopCircle className="h-3.5 w-3.5 mr-2" />
+                      Terminate Agent
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : undefined
+          }
         />
 
-        {/* Inline-editable status cards */}
+        {/* Status cards */}
         <DetailPageStatusCards
           items={[
             {
@@ -549,77 +616,21 @@ export function AgentDetailPage() {
             {
               label: "Endpoint",
               icon: Globe,
-              value: editingEndpoint ? (
-                <div className="flex items-center gap-1">
-                  <Input
-                    value={endpointDraft}
-                    onChange={(e) => setEndpointDraft(e.target.value)}
-                    onKeyDown={handleEndpointKeyDown}
-                    onBlur={handleSaveEndpoint}
-                    autoFocus
-                    className="h-7 text-xs font-mono bg-surface border-border"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSaveEndpoint}
-                    className="h-7 w-7 p-0 text-teal shrink-0"
-                  >
-                    <Check className="h-3 w-3" />
-                  </Button>
-                </div>
+              value: agent.endpoint_url ? (
+                <span className="font-mono text-xs truncate">{agent.endpoint_url}</span>
               ) : (
-                <button
-                  onClick={startEditingEndpoint}
-                  className="group flex items-center gap-1.5 w-full text-left"
-                >
-                  <span className="font-mono text-xs truncate">
-                    {agent.endpoint_url}
-                  </span>
-                  <Pencil className="h-3 w-3 text-dim opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                </button>
+                <span className="text-dim text-xs">Not set</span>
               ),
             },
             {
-              label: "Timeout",
-              icon: Clock,
-              value: (
-                <Select
-                  value={String(agent.timeout_seconds)}
-                  onValueChange={handleTimeoutChange}
-                >
-                  <SelectTrigger className="h-7 w-full text-xs border border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    {TIMEOUT_OPTIONS.map((t) => (
-                      <SelectItem key={t} value={String(t)}>
-                        {t}s
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ),
-            },
-            {
-              label: "Retries",
-              icon: RefreshCw,
-              value: (
-                <Select
-                  value={String(agent.retry_count)}
-                  onValueChange={handleRetryChange}
-                >
-                  <SelectTrigger className="h-7 w-full text-xs border border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    {RETRY_OPTIONS.map((r) => (
-                      <SelectItem key={r} value={String(r)}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              label: "Monthly Budget",
+              icon: DollarSign,
+              value: budgetMonthly > 0 ? (
+                <span className="text-xs text-foreground font-mono">
+                  {formatCents(spentMonthly)} / {formatCents(budgetMonthly)}
+                </span>
+              ) : (
+                <span className="text-xs text-dim">No budget</span>
               ),
             },
           ]}
@@ -631,37 +642,21 @@ export function AgentDetailPage() {
               <Settings className="h-3.5 w-3.5 mr-1" />
               Configuration
             </TabsTrigger>
-            <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-              <Send className="h-3.5 w-3.5 mr-1" />
-              Test
-            </TabsTrigger>
             <TabsTrigger value="documentation" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
               <FileText className="h-3.5 w-3.5 mr-1" />
               Documentation
             </TabsTrigger>
-            <TabsTrigger value="heartbeats" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+            <TabsTrigger value="runs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
               <Activity className="h-3.5 w-3.5 mr-1" />
-              Heartbeats
+              Runs
             </TabsTrigger>
             <TabsTrigger value="cost" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
               <DollarSign className="h-3.5 w-3.5 mr-1" />
               Cost
             </TabsTrigger>
-            <TabsTrigger value="work" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+            <TabsTrigger value="assignments" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
               <Layers className="h-3.5 w-3.5 mr-1" />
-              Work
-            </TabsTrigger>
-            <TabsTrigger value="instructions" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-              <FileText className="h-3.5 w-3.5 mr-1" />
-              Instructions
-            </TabsTrigger>
-            <TabsTrigger value="skills" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-              <Wrench className="h-3.5 w-3.5 mr-1" />
-              Skills
-            </TabsTrigger>
-            <TabsTrigger value="dashboard" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-              <LayoutDashboard className="h-3.5 w-3.5 mr-1" />
-              Dashboard
+              Assignments
             </TabsTrigger>
           </TabsList>
           <DetailPageLayout
@@ -675,15 +670,19 @@ export function AgentDetailPage() {
                   <DetailPageField label="Name" value={agent.name} />
                   <DetailPageField
                     label="Endpoint"
-                    value={agent.endpoint_url ? <CopyableText text={agent.endpoint_url} mono className="text-xs" /> : <span className="text-dim text-xs">Not set</span>}
+                    value={
+                      agent.endpoint_url
+                        ? <CopyableText text={agent.endpoint_url} mono className="text-xs" />
+                        : <span className="text-dim text-xs">Not set</span>
+                    }
                   />
                   <DetailPageField
                     label="Auth Header"
-                    value={agent.auth_header_name ? (
-                      <span className="font-mono text-xs">{agent.auth_header_name}</span>
-                    ) : (
-                      <span className="text-dim">Not set</span>
-                    )}
+                    value={
+                      agent.auth_header_name
+                        ? <span className="font-mono text-xs">{agent.auth_header_name}</span>
+                        : <span className="text-dim">Not set</span>
+                    }
                   />
                   <DetailPageField label="Created" value={formatDate(agent.created_at)} />
                   <DetailPageField label="Updated" value={formatDate(agent.updated_at)} />
@@ -691,27 +690,296 @@ export function AgentDetailPage() {
                 <SidebarSection title="Triggers">
                   <DetailPageField
                     label="Sources"
-                    value={
-                      agent.trigger_on_sources.length > 0
-                        ? agent.trigger_on_sources.join(", ")
-                        : "All"
-                    }
+                    value={agent.trigger_on_sources.length > 0 ? agent.trigger_on_sources.join(", ") : "All"}
                   />
                   <DetailPageField
                     label="Severities"
-                    value={
-                      agent.trigger_on_severities.length > 0
-                        ? agent.trigger_on_severities.join(", ")
-                        : "All"
-                    }
+                    value={agent.trigger_on_severities.length > 0 ? agent.trigger_on_severities.join(", ") : "All"}
                   />
                 </SidebarSection>
               </DetailPageSidebar>
             }
           >
-
             {/* Configuration Tab */}
             <TabsContent value="configuration" className="mt-4 space-y-6">
+
+              {/* Agent Configuration (inline editable) */}
+              <Card className="bg-card border-border">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-3.5 w-3.5 text-teal" />
+                      Agent Configuration
+                    </div>
+                  </CardTitle>
+                  {!configEditMode ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={startConfigEdit}
+                      className="h-7 text-xs text-dim hover:text-teal"
+                    >
+                      <Pencil className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
+                  ) : (
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfigEditMode(false)}
+                        className="h-7 text-xs text-dim"
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveConfig}
+                        disabled={patchAgent.isPending}
+                        className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                      >
+                        {patchAgent.isPending ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Save className="h-3 w-3 mr-1" />
+                        )}
+                        Save
+                      </Button>
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Description */}
+                  {configEditMode ? (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Description</Label>
+                      <Textarea
+                        value={configDraft.description}
+                        onChange={(e) => setConfigDraft({ ...configDraft, description: e.target.value })}
+                        placeholder="Describe this agent..."
+                        className="bg-surface border-border text-sm min-h-16 resize-none"
+                        rows={3}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs text-muted-foreground shrink-0">Description</span>
+                      <span className="text-xs text-foreground text-right max-w-xs">
+                        {agent.description ?? <span className="text-dim">Not set</span>}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Endpoint URL (external only) */}
+                  {!isManaged && (
+                    configEditMode ? (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Endpoint URL</Label>
+                        <Input
+                          value={configDraft.endpoint_url}
+                          onChange={(e) => setConfigDraft({ ...configDraft, endpoint_url: e.target.value })}
+                          placeholder="https://..."
+                          className="bg-surface border-border text-sm font-mono"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Endpoint URL</span>
+                        <span className="text-xs text-foreground font-mono truncate max-w-xs">
+                          {agent.endpoint_url ?? <span className="text-dim">Not set</span>}
+                        </span>
+                      </div>
+                    )
+                  )}
+
+                  {/* System Prompt (managed only) */}
+                  {isManaged && (
+                    configEditMode ? (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">System Prompt</Label>
+                        <Textarea
+                          value={configDraft.system_prompt}
+                          onChange={(e) => setConfigDraft({ ...configDraft, system_prompt: e.target.value })}
+                          placeholder="System prompt..."
+                          className="bg-surface border-border text-sm min-h-20 resize-none font-mono text-xs"
+                          rows={4}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs text-muted-foreground shrink-0">System Prompt</span>
+                        <span className="text-xs text-foreground text-right max-w-xs">
+                          {agent.system_prompt
+                            ? `${agent.system_prompt.slice(0, 80)}${agent.system_prompt.length > 80 ? "…" : ""}`
+                            : <span className="text-dim">Not set</span>}
+                        </span>
+                      </div>
+                    )
+                  )}
+
+                  {/* Methodology (managed only) */}
+                  {isManaged && (
+                    configEditMode ? (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Methodology</Label>
+                        <Textarea
+                          value={configDraft.methodology}
+                          onChange={(e) => setConfigDraft({ ...configDraft, methodology: e.target.value })}
+                          placeholder="Investigation methodology..."
+                          className="bg-surface border-border text-sm min-h-16 resize-none"
+                          rows={3}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs text-muted-foreground shrink-0">Methodology</span>
+                        <span className="text-xs text-foreground text-right max-w-xs truncate">
+                          {agent.methodology ?? <span className="text-dim">Not set</span>}
+                        </span>
+                      </div>
+                    )
+                  )}
+
+                  {/* LLM Integration (managed only) */}
+                  {isManaged && (
+                    configEditMode ? (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">LLM Integration</Label>
+                        <Select
+                          value={configDraft.llm_integration_uuid}
+                          onValueChange={(v) => setConfigDraft({ ...configDraft, llm_integration_uuid: v })}
+                        >
+                          <SelectTrigger className="bg-surface border-border text-sm">
+                            <SelectValue placeholder="Select integration..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border">
+                            <SelectItem value="">None</SelectItem>
+                            {llmIntegrations.map((llm) => (
+                              <SelectItem key={llm.uuid} value={llm.uuid}>
+                                {llm.name} ({llm.provider}/{llm.model})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">LLM Integration</span>
+                        <span className="text-xs text-foreground">
+                          {agent.llm_integration_id
+                            ? (llmIntegrations.find((l: any) => l.id === agent.llm_integration_id)?.name ?? `ID: ${agent.llm_integration_id}`)
+                            : <span className="text-dim">Not set</span>}
+                        </span>
+                      </div>
+                    )
+                  )}
+
+                  <div className="border-t border-border" />
+
+                  {/* Max Concurrent Alerts */}
+                  {configEditMode ? (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Max Concurrent Alerts</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={configDraft.max_concurrent_alerts}
+                        onChange={(e) => setConfigDraft({ ...configDraft, max_concurrent_alerts: e.target.value })}
+                        placeholder="No limit"
+                        className="bg-surface border-border text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Max Concurrent Alerts</span>
+                      <span className="text-xs text-foreground font-mono">
+                        {agent.max_concurrent_alerts ?? <span className="text-dim">No limit</span>}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Max Cost per Alert */}
+                  {configEditMode ? (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Max Cost per Alert ($)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={configDraft.max_cost_per_alert_dollars}
+                        onChange={(e) => setConfigDraft({ ...configDraft, max_cost_per_alert_dollars: e.target.value })}
+                        placeholder="No limit"
+                        className="bg-surface border-border text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Max Cost per Alert</span>
+                      <span className="text-xs text-foreground font-mono">
+                        {agent.max_cost_per_alert_cents ? formatCents(agent.max_cost_per_alert_cents) : <span className="text-dim">No limit</span>}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Max Investigation Minutes */}
+                  {configEditMode ? (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Max Investigation Minutes</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={configDraft.max_investigation_minutes}
+                        onChange={(e) => setConfigDraft({ ...configDraft, max_investigation_minutes: e.target.value })}
+                        placeholder="No limit"
+                        className="bg-surface border-border text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Max Investigation Time</span>
+                      <span className="text-xs text-foreground font-mono">
+                        {agent.max_investigation_minutes ? `${agent.max_investigation_minutes}m` : <span className="text-dim">No limit</span>}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="border-t border-border" />
+
+                  {/* Run Policy */}
+                  <div>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Run Policy</span>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Heartbeat Interval</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1.5 opacity-50 cursor-not-allowed">
+                              <Input
+                                disabled
+                                placeholder="—"
+                                className="h-7 w-16 bg-surface border-border text-xs"
+                              />
+                              <Select disabled>
+                                <SelectTrigger className="h-7 w-24 bg-surface border-border text-xs">
+                                  <SelectValue placeholder="minutes" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-card border-border">
+                                  <SelectItem value="minutes">minutes</SelectItem>
+                                  <SelectItem value="hours">hours</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-card border-border text-xs">
+                            Coming soon
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Agent Profile */}
               <Card className="bg-card border-border">
@@ -724,7 +992,6 @@ export function AgentDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {/* Execution mode */}
                   {agent.execution_mode && (
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Execution Mode</span>
@@ -743,8 +1010,6 @@ export function AgentDetailPage() {
                       </Badge>
                     </div>
                   )}
-
-                  {/* Agent type */}
                   {agent.agent_type && (
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Agent Type</span>
@@ -753,149 +1018,30 @@ export function AgentDetailPage() {
                       </Badge>
                     </div>
                   )}
-
-                  {/* Role */}
                   {agent.role && (
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Role</span>
                       <span className="text-xs text-foreground">{agent.role}</span>
                     </div>
                   )}
-
-                  {/* Status + lifecycle actions */}
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Lifecycle Status</span>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs",
-                          agentStatus === "active"
-                            ? "text-teal bg-teal/10 border-teal/30"
-                            : agentStatus === "paused"
-                              ? "text-amber bg-amber/10 border-amber/30"
-                              : agentStatus === "terminated"
-                                ? "text-red-threat bg-red-threat/10 border-red-threat/30"
-                                : "text-dim bg-dim/10 border-dim/30",
-                        )}
-                      >
-                        {agentStatus}
-                      </Badge>
-                      {agentStatus !== "terminated" && (
-                        <div className="flex items-center gap-1">
-                          {agentStatus === "paused" ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={handleResume}
-                              disabled={resumeAgent.isPending}
-                              className="h-6 text-xs text-teal hover:text-teal px-2"
-                            >
-                              {resumeAgent.isPending ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Play className="h-3 w-3 mr-1" />
-                              )}
-                              Resume
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={handlePause}
-                              disabled={pauseAgent.isPending}
-                              className="h-6 text-xs text-dim hover:text-amber px-2"
-                            >
-                              {pauseAgent.isPending ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Pause className="h-3 w-3 mr-1" />
-                              )}
-                              Pause
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowTerminateConfirm(true)}
-                            className="h-6 text-xs text-dim hover:text-red-threat px-2"
-                          >
-                            <StopCircle className="h-3 w-3 mr-1" />
-                            Terminate
-                          </Button>
-                        </div>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs",
+                        agentStatus === "active"
+                          ? "text-teal bg-teal/10 border-teal/30"
+                          : agentStatus === "paused"
+                            ? "text-amber bg-amber/10 border-amber/30"
+                            : agentStatus === "terminated"
+                              ? "text-red-threat bg-red-threat/10 border-red-threat/30"
+                              : "text-dim bg-dim/10 border-dim/30",
                       )}
-                    </div>
+                    >
+                      {agentStatus}
+                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Budget & Limits */}
-              <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-foreground">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-3.5 w-3.5 text-dim" />
-                      Budget &amp; Limits
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {/* Monthly budget progress */}
-                  {budgetMonthly > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Monthly Budget</span>
-                        <span className="text-xs text-foreground">
-                          {formatCents(spentMonthly)} spent of {formatCents(budgetMonthly)}
-                        </span>
-                      </div>
-                      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className={cn("h-full transition-all duration-300 rounded-full", budgetProgressColor)}
-                          style={{ width: `${budgetProgressPercent}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Max concurrent alerts */}
-                  {(agent.max_concurrent_alerts ?? 0) > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Max Concurrent Alerts</span>
-                      <span className="text-xs text-foreground font-mono">
-                        {agent.max_concurrent_alerts}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Max cost per alert */}
-                  {(agent.max_cost_per_alert_cents ?? 0) > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Max Cost per Alert</span>
-                      <span className="text-xs text-foreground font-mono">
-                        {formatCents(agent.max_cost_per_alert_cents!)}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Max investigation minutes */}
-                  {(agent.max_investigation_minutes ?? 0) > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Max Investigation Time</span>
-                      <span className="text-xs text-foreground font-mono">
-                        {agent.max_investigation_minutes}m
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Fallback if nothing to show */}
-                  {budgetMonthly === 0 &&
-                    !(agent.max_concurrent_alerts ?? 0) &&
-                    !(agent.max_cost_per_alert_cents ?? 0) &&
-                    !(agent.max_investigation_minutes ?? 0) && (
-                      <p className="text-xs text-dim">No limits configured</p>
-                    )}
                 </CardContent>
               </Card>
 
@@ -910,12 +1056,7 @@ export function AgentDetailPage() {
                   </CardTitle>
                   {triggersDirty && (
                     <div className="flex gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleCancelTriggers}
-                        className="h-7 text-xs text-dim"
-                      >
+                      <Button variant="ghost" size="sm" onClick={handleCancelTriggers} className="h-7 text-xs text-dim">
                         <X className="h-3 w-3 mr-1" />
                         Cancel
                       </Button>
@@ -925,18 +1066,13 @@ export function AgentDetailPage() {
                         disabled={patchAgent.isPending}
                         className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
                       >
-                        {patchAgent.isPending ? (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                          <Save className="h-3 w-3 mr-1" />
-                        )}
+                        {patchAgent.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
                         Save
                       </Button>
                     </div>
                   )}
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {/* Sources */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Sources</span>
@@ -953,9 +1089,7 @@ export function AgentDetailPage() {
                             onClick={() => toggleSource(source)}
                             className={cn(
                               "px-3 py-1.5 rounded-md text-xs border transition-colors",
-                              selected
-                                ? "bg-teal/15 border-teal/40 text-teal-light"
-                                : "bg-surface border-border text-dim hover:border-teal/30",
+                              selected ? "bg-teal/15 border-teal/40 text-teal-light" : "bg-surface border-border text-dim hover:border-teal/30",
                             )}
                           >
                             {source}
@@ -964,10 +1098,7 @@ export function AgentDetailPage() {
                       })}
                     </div>
                   </div>
-
                   <div className="border-t border-border" />
-
-                  {/* Severities */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Severities</span>
@@ -984,9 +1115,7 @@ export function AgentDetailPage() {
                             onClick={() => toggleSeverity(sev)}
                             className={cn(
                               "px-3 py-1.5 rounded-md text-xs border transition-colors",
-                              selected
-                                ? "bg-teal/15 border-teal/40 text-teal-light"
-                                : "bg-surface border-border text-dim hover:border-teal/30",
+                              selected ? "bg-teal/15 border-teal/40 text-teal-light" : "bg-surface border-border text-dim hover:border-teal/30",
                             )}
                           >
                             {sev}
@@ -995,45 +1124,25 @@ export function AgentDetailPage() {
                       })}
                     </div>
                   </div>
-
                   <div className="border-t border-border" />
-
-                  {/* Advanced Rules */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Advanced Rules</span>
-                        <p className="text-[11px] text-dim mt-0.5">
-                          Match_any (OR) and match_all (AND) conditions against alert fields.
-                        </p>
+                        <p className="text-[11px] text-dim mt-0.5">Match_any (OR) and match_all (AND) conditions against alert fields.</p>
                       </div>
                       {!editingFilter ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={startEditingFilter}
-                          className="h-7 text-xs text-dim hover:text-teal"
-                        >
+                        <Button variant="ghost" size="sm" onClick={startEditingFilter} className="h-7 text-xs text-dim hover:text-teal">
                           <Pencil className="h-3 w-3 mr-1" />
                           Edit
                         </Button>
                       ) : (
                         <div className="flex gap-1.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingFilter(false)}
-                            className="h-7 text-xs text-dim"
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => setEditingFilter(false)} className="h-7 text-xs text-dim">
                             <X className="h-3 w-3 mr-1" />
                             Cancel
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={handleSaveFilter}
-                            disabled={patchAgent.isPending}
-                            className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                          >
+                          <Button size="sm" onClick={handleSaveFilter} disabled={patchAgent.isPending} className="h-7 text-xs bg-teal text-white hover:bg-teal-dim">
                             <Save className="h-3 w-3 mr-1" />
                             Save
                           </Button>
@@ -1050,161 +1159,91 @@ export function AgentDetailPage() {
               </Card>
 
               {/* Authentication */}
-              <Card className="bg-card border-border">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-foreground">
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-3.5 w-3.5 text-dim" />
-                      Authentication
-                    </div>
-                  </CardTitle>
-                  {!editingAuth ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={startEditingAuth}
-                      className="h-7 text-xs text-dim hover:text-teal"
-                    >
-                      <Pencil className="h-3 w-3 mr-1" />
-                      Edit
-                    </Button>
-                  ) : (
-                    <div className="flex gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingAuth(false)}
-                        className="h-7 text-xs text-dim"
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Cancel
+              {isManaged ? (
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-3.5 w-3.5 text-dim" />
+                        Authentication
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-dim">Managed by adapter config.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="bg-card border-border">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-3.5 w-3.5 text-dim" />
+                        Authentication
+                      </div>
+                    </CardTitle>
+                    {!editingAuth ? (
+                      <Button variant="ghost" size="sm" onClick={startEditingAuth} className="h-7 text-xs text-dim hover:text-teal">
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveAuth}
-                        disabled={patchAgent.isPending}
-                        className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                      >
-                        <Save className="h-3 w-3 mr-1" />
-                        Save
-                      </Button>
-                    </div>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  {editingAuth ? (
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Header Name</Label>
-                        <Input
-                          value={authHeaderName}
-                          onChange={(e) => setAuthHeaderName(e.target.value)}
-                          placeholder="e.g. Authorization, X-API-Key"
-                          className="mt-1 bg-surface border-border text-sm font-mono"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Header Value</Label>
-                        <Input
-                          type="password"
-                          value={authHeaderValue}
-                          onChange={(e) => setAuthHeaderValue(e.target.value)}
-                          placeholder="Leave empty to keep current value"
-                          className="mt-1 bg-surface border-border text-sm"
-                        />
-                        <p className="text-[11px] text-dim mt-1">
-                          The value is encrypted at rest. Leave empty to keep the existing value.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Header Name</span>
-                        <span className="text-xs text-foreground font-mono">
-                          {agent.auth_header_name || "Not set"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Header Value</span>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[11px]",
-                            agent.auth_header_name
-                              ? "text-teal border-teal/30"
-                              : "text-dim border-border",
-                          )}
-                        >
-                          {agent.auth_header_name ? "configured" : "not set"}
-                        </Badge>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Test Tab */}
-            <TabsContent value="test" className="mt-4">
-              <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-foreground">
-                    <div className="flex items-center gap-2">
-                      <Send className="h-3.5 w-3.5 text-dim" />
-                      Test Webhook
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-dim mb-3">
-                    Send a test payload to the agent endpoint to verify connectivity and authentication.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      size="sm"
-                      onClick={handleTest}
-                      disabled={testAgent.isPending}
-                      className="bg-teal text-white hover:bg-teal-dim text-xs"
-                    >
-                      {testAgent.isPending ? (
-                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      ) : (
-                        <Send className="h-3 w-3 mr-1" />
-                      )}
-                      Send Test
-                    </Button>
-                    {testResult && (
-                      <div className="flex items-center gap-3">
-                        {testResult.delivered ? (
-                          <Badge variant="outline" className="text-xs text-teal border-teal/30 bg-teal/10">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Delivered
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs text-red-threat border-red-threat/30 bg-red-threat/10">
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Failed
-                          </Badge>
-                        )}
-                        {testResult.status_code !== null && (
-                          <span className="text-xs text-dim font-mono">
-                            HTTP {testResult.status_code}
-                          </span>
-                        )}
-                        <span className="text-xs text-dim">
-                          {testResult.duration_ms}ms
-                        </span>
+                    ) : (
+                      <div className="flex gap-1.5">
+                        <Button variant="ghost" size="sm" onClick={() => setEditingAuth(false)} className="h-7 text-xs text-dim">
+                          <X className="h-3 w-3 mr-1" />
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleSaveAuth} disabled={patchAgent.isPending} className="h-7 text-xs bg-teal text-white hover:bg-teal-dim">
+                          <Save className="h-3 w-3 mr-1" />
+                          Save
+                        </Button>
                       </div>
                     )}
-                  </div>
-                  {testResult?.error && (
-                    <div className="mt-3 rounded-md bg-red-threat/5 border border-red-threat/20 p-3">
-                      <p className="text-xs text-red-threat font-mono">{testResult.error}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardHeader>
+                  <CardContent>
+                    {editingAuth ? (
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Header Name</Label>
+                          <Input
+                            value={authHeaderName}
+                            onChange={(e) => setAuthHeaderName(e.target.value)}
+                            placeholder="e.g. Authorization, X-API-Key"
+                            className="mt-1 bg-surface border-border text-sm font-mono"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Header Value</Label>
+                          <Input
+                            type="password"
+                            value={authHeaderValue}
+                            onChange={(e) => setAuthHeaderValue(e.target.value)}
+                            placeholder="Leave empty to keep current value"
+                            className="mt-1 bg-surface border-border text-sm"
+                          />
+                          <p className="text-[11px] text-dim mt-1">The value is encrypted at rest. Leave empty to keep the existing value.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Header Name</span>
+                          <span className="text-xs text-foreground font-mono">{agent.auth_header_name || "Not set"}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Header Value</span>
+                          <Badge
+                            variant="outline"
+                            className={cn("text-[11px]", agent.auth_header_name ? "text-teal border-teal/30" : "text-dim border-border")}
+                          >
+                            {agent.auth_header_name ? "configured" : "not set"}
+                          </Badge>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             {/* Documentation Tab */}
@@ -1216,87 +1255,113 @@ export function AgentDetailPage() {
               />
             </TabsContent>
 
-            {/* Heartbeats Tab */}
-            <TabsContent value="heartbeats" className="mt-4">
-              <Card className="bg-card border-border">
+            {/* Runs Tab — split pane */}
+            <TabsContent value="runs" className="mt-4">
+              <Card className="bg-card border-border overflow-hidden">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
                       <Activity className="h-3.5 w-3.5 text-teal" />
-                      Heartbeat Runs
+                      Runs
                     </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   {heartbeatRuns.length === 0 ? (
-                    <div className="py-12 text-center text-sm text-dim">No heartbeat runs</div>
+                    <div className="py-12 text-center text-sm text-dim">No runs yet.</div>
                   ) : (
-                    <ResizableTable storageKey="agent-heartbeats" columns={HEARTBEAT_COLUMNS}>
-                      <TableHeader>
-                        <TableRow className="border-border hover:bg-transparent">
-                          <ResizableTableHead columnKey="status" className="text-xs text-muted-foreground px-3">Status</ResizableTableHead>
-                          <ResizableTableHead columnKey="started_at" className="text-xs text-muted-foreground px-3">Started</ResizableTableHead>
-                          <ResizableTableHead columnKey="duration" className="text-xs text-muted-foreground px-3">Duration</ResizableTableHead>
-                          <ResizableTableHead columnKey="alerts_processed" className="text-xs text-muted-foreground px-3">Alerts</ResizableTableHead>
-                          <ResizableTableHead columnKey="actions_proposed" className="text-xs text-muted-foreground px-3">Actions</ResizableTableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {heartbeatRuns.map((run) => (
-                          <>
-                            <TableRow
+                    <div className="flex h-[480px]">
+                      {/* Left: run list */}
+                      <div className="w-[35%] border-r border-border overflow-y-auto shrink-0">
+                        {heartbeatRuns.map((run) => {
+                          const isSelected = selectedRunUuid === run.uuid;
+                          return (
+                            <button
                               key={run.uuid}
-                              className="border-border cursor-pointer hover:bg-surface/50"
-                              onClick={() =>
-                                setExpandedHeartbeat(
-                                  expandedHeartbeat === run.uuid ? null : run.uuid,
-                                )
-                              }
+                              type="button"
+                              onClick={() => setSelectedRunUuid(isSelected ? null : run.uuid)}
+                              className={cn(
+                                "w-full text-left px-3 py-2.5 border-b border-border transition-colors",
+                                isSelected ? "bg-teal/10" : "hover:bg-surface/50",
+                              )}
                             >
-                              <TableCell className="px-3 py-2">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className="font-mono text-[11px] text-dim">#{run.uuid.slice(-6)}</span>
                                 <Badge
                                   variant="outline"
-                                  className={cn("text-xs", heartbeatStatusClass(run.status))}
+                                  className={cn("text-[10px] px-1.5 py-0", heartbeatStatusClass(run.status))}
                                 >
                                   {run.status}
                                 </Badge>
-                              </TableCell>
-                              <TableCell className="px-3 py-2 text-xs text-muted-foreground">
-                                {run.started_at ? relativeTime(run.started_at) : "--"}
-                              </TableCell>
-                              <TableCell className="px-3 py-2 text-xs font-mono text-foreground">
-                                {formatDuration(run.started_at, run.finished_at)}
-                              </TableCell>
-                              <TableCell className="px-3 py-2 text-xs font-mono text-foreground">
-                                {run.alerts_processed}
-                              </TableCell>
-                              <TableCell className="px-3 py-2 text-xs font-mono text-foreground">
-                                {run.actions_proposed}
-                              </TableCell>
-                            </TableRow>
-                            {expandedHeartbeat === run.uuid && (
-                              <TableRow key={`${run.uuid}-expanded`} className="border-border bg-surface/30">
-                                <TableCell colSpan={5} className="px-3 py-3">
-                                  {run.error && (
-                                    <div className="mb-2 rounded-md bg-red-threat/5 border border-red-threat/20 p-2">
-                                      <p className="text-xs text-red-threat font-mono">{run.error}</p>
-                                    </div>
-                                  )}
-                                  {run.context_snapshot && (
-                                    <pre className="text-xs font-mono text-muted-foreground bg-surface border border-border rounded-md p-2 overflow-x-auto max-h-48">
-                                      {JSON.stringify(run.context_snapshot, null, 2)}
-                                    </pre>
-                                  )}
-                                  {!run.error && !run.context_snapshot && (
-                                    <p className="text-xs text-dim">No additional details</p>
-                                  )}
-                                </TableCell>
-                              </TableRow>
+                              </div>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[11px] text-muted-foreground">
+                                  {run.started_at ? relativeTime(run.started_at) : "—"}
+                                </span>
+                                <span className="font-mono text-[11px] text-dim">
+                                  {formatDuration(run.started_at, run.finished_at)}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Right: run detail */}
+                      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {!selectedRun ? (
+                          <div className="h-full flex items-center justify-center">
+                            <p className="text-sm text-dim">Select a run to view details.</p>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <Badge
+                                variant="outline"
+                                className={cn("text-xs", heartbeatStatusClass(selectedRun.status))}
+                              >
+                                {selectedRun.status}
+                              </Badge>
+                              <span className="font-mono text-[11px] text-dim">#{selectedRun.uuid.slice(-6)}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <p className="text-[11px] text-muted-foreground mb-0.5">Started</p>
+                                <p className="text-xs text-foreground">{selectedRun.started_at ? formatDate(selectedRun.started_at) : "—"}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] text-muted-foreground mb-0.5">Completed</p>
+                                <p className="text-xs text-foreground">{selectedRun.finished_at ? formatDate(selectedRun.finished_at) : "—"}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] text-muted-foreground mb-0.5">Duration</p>
+                                <p className="text-xs text-foreground font-mono">{formatDuration(selectedRun.started_at, selectedRun.finished_at)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] text-muted-foreground mb-0.5">Alerts / Actions</p>
+                                <p className="text-xs text-foreground font-mono">{selectedRun.alerts_processed} / {selectedRun.actions_proposed}</p>
+                              </div>
+                            </div>
+                            {selectedRun.error && (
+                              <div className="rounded-md bg-red-threat/5 border border-red-threat/20 p-3">
+                                <p className="text-xs text-red-threat font-mono">{selectedRun.error}</p>
+                              </div>
+                            )}
+                            {selectedRun.context_snapshot && (
+                              <div>
+                                <p className="text-[11px] text-muted-foreground mb-1.5">Log Output</p>
+                                <pre className="text-xs font-mono text-white bg-zinc-950 border border-border rounded-md p-3 overflow-y-auto max-h-96 overflow-x-auto leading-relaxed">
+                                  {JSON.stringify(selectedRun.context_snapshot, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                            {!selectedRun.error && !selectedRun.context_snapshot && (
+                              <p className="text-xs text-dim">No additional details.</p>
                             )}
                           </>
-                        ))}
-                      </TableBody>
-                    </ResizableTable>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -1304,21 +1369,71 @@ export function AgentDetailPage() {
 
             {/* Cost Tab */}
             <TabsContent value="cost" className="mt-4 space-y-4">
-              {/* Summary */}
-              <div className="grid grid-cols-1 gap-3">
-                <Card className="bg-card border-border">
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Total Cost (this period)</span>
-                      <span className="text-lg font-mono font-semibold text-foreground">
-                        {formatCents(totalCostCents)}
-                      </span>
+              {/* Budget Controls */}
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-3.5 w-3.5 text-teal" />
+                      Monthly Budget
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {budgetMonthly > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          Spent: <span className="text-foreground font-mono">{formatCents(spentMonthly)}</span>
+                          {" / "}
+                          <span className="text-foreground font-mono">{formatCents(budgetMonthly)}</span>
+                        </span>
+                        <span className="text-xs text-dim font-mono">{budgetProgressPercent.toFixed(0)}% used</span>
+                      </div>
+                      <div className="relative h-2 w-full overflow-hidden rounded-full bg-surface border border-border">
+                        <div
+                          className={cn("h-full transition-all duration-300 rounded-full", budgetProgressColor)}
+                          style={{ width: `${budgetProgressPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-dim">No budget set.</p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground shrink-0">Set monthly budget ($)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={budgetInput}
+                      onChange={(e) => setBudgetInput(e.target.value)}
+                      placeholder="0.00"
+                      className="h-8 bg-surface border-border text-sm w-28"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSetBudget}
+                      disabled={patchAgent.isPending || !budgetInput}
+                      className="h-8 text-xs bg-teal text-white hover:bg-teal-dim"
+                    >
+                      {patchAgent.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Set Budget"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
-              {/* Table */}
+              {/* Summary */}
+              <Card className="bg-card border-border">
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Total Cost (this period)</span>
+                    <span className="text-lg font-mono font-semibold text-foreground">{formatCents(totalCostCents)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cost Events Table */}
               <Card className="bg-card border-border">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
@@ -1347,29 +1462,15 @@ export function AgentDetailPage() {
                       <TableBody>
                         {costEvents.map((event) => (
                           <TableRow key={event.id} className="border-border hover:bg-surface/50">
-                            <TableCell className="px-3 py-2 text-xs font-mono text-foreground">
-                              {event.provider}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-xs font-mono text-muted-foreground truncate">
-                              {event.model}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-xs font-mono text-foreground">
-                              {event.input_tokens.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-xs font-mono text-foreground">
-                              {event.output_tokens.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-xs font-mono text-foreground">
-                              {formatCents(event.cost_cents)}
-                            </TableCell>
+                            <TableCell className="px-3 py-2 text-xs font-mono text-foreground">{event.provider}</TableCell>
+                            <TableCell className="px-3 py-2 text-xs font-mono text-muted-foreground truncate">{event.model}</TableCell>
+                            <TableCell className="px-3 py-2 text-xs font-mono text-foreground">{event.input_tokens.toLocaleString()}</TableCell>
+                            <TableCell className="px-3 py-2 text-xs font-mono text-foreground">{event.output_tokens.toLocaleString()}</TableCell>
+                            <TableCell className="px-3 py-2 text-xs font-mono text-foreground">{formatCents(event.cost_cents)}</TableCell>
                             <TableCell className="px-3 py-2">
-                              <Badge variant="outline" className="text-xs text-dim bg-dim/10 border-dim/30">
-                                {event.billing_type}
-                              </Badge>
+                              <Badge variant="outline" className="text-xs text-dim bg-dim/10 border-dim/30">{event.billing_type}</Badge>
                             </TableCell>
-                            <TableCell className="px-3 py-2 text-xs text-muted-foreground">
-                              {relativeTime(event.occurred_at)}
-                            </TableCell>
+                            <TableCell className="px-3 py-2 text-xs text-muted-foreground">{relativeTime(event.occurred_at)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1379,14 +1480,14 @@ export function AgentDetailPage() {
               </Card>
             </TabsContent>
 
-            {/* Work Tab */}
-            <TabsContent value="work" className="mt-4">
+            {/* Assignments Tab */}
+            <TabsContent value="assignments" className="mt-4">
               <Card className="bg-card border-border">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
                       <Layers className="h-3.5 w-3.5 text-teal" />
-                      Invocations
+                      Assignments
                     </div>
                   </CardTitle>
                 </CardHeader>
@@ -1408,27 +1509,16 @@ export function AgentDetailPage() {
                         {invocations.map((inv) => (
                           <TableRow key={inv.uuid} className="border-border hover:bg-surface/50">
                             <TableCell className="px-3 py-2 text-xs text-foreground truncate">
-                              {inv.task_description.length > 60
-                                ? `${inv.task_description.slice(0, 60)}…`
-                                : inv.task_description}
+                              {inv.task_description.length > 60 ? `${inv.task_description.slice(0, 60)}…` : inv.task_description}
                             </TableCell>
                             <TableCell className="px-3 py-2">
-                              <Badge
-                                variant="outline"
-                                className={cn("text-xs", invocationStatusClass(inv.status))}
-                              >
+                              <Badge variant="outline" className={cn("text-xs", invocationStatusClass(inv.status))}>
                                 {inv.status}
                               </Badge>
                             </TableCell>
-                            <TableCell className="px-3 py-2 text-xs font-mono text-foreground">
-                              {formatCents(inv.cost_cents)}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-xs text-muted-foreground">
-                              {inv.started_at ? relativeTime(inv.started_at) : "--"}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-xs text-muted-foreground">
-                              {inv.completed_at ? relativeTime(inv.completed_at) : "pending"}
-                            </TableCell>
+                            <TableCell className="px-3 py-2 text-xs font-mono text-foreground">{formatCents(inv.cost_cents)}</TableCell>
+                            <TableCell className="px-3 py-2 text-xs text-muted-foreground">{inv.started_at ? relativeTime(inv.started_at) : "--"}</TableCell>
+                            <TableCell className="px-3 py-2 text-xs text-muted-foreground">{inv.completed_at ? relativeTime(inv.completed_at) : "pending"}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1436,415 +1526,6 @@ export function AgentDetailPage() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
-            {/* Instructions Tab */}
-            <TabsContent value="instructions" className="mt-4">
-              <div className="flex border border-border rounded-lg overflow-hidden bg-card" style={{ minHeight: "400px" }}>
-                {/* Left panel — file list */}
-                <div className="w-1/3 border-r border-border flex flex-col">
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-                    <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Files</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setShowNewFileInput(true); setNewFileName(""); }}
-                      className="h-6 w-6 p-0 text-dim hover:text-teal"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-
-                  {/* New file inline input */}
-                  {showNewFileInput && (
-                    <div className="px-3 py-2 border-b border-border space-y-1.5">
-                      <Input
-                        value={newFileName}
-                        onChange={(e) => setNewFileName(e.target.value)}
-                        placeholder="filename.md"
-                        autoFocus
-                        className="h-7 text-xs bg-surface border-border font-mono"
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") { setShowNewFileInput(false); setNewFileName(""); }
-                        }}
-                      />
-                      <div className="flex gap-1.5">
-                        <Button
-                          size="sm"
-                          disabled={!newFileName.trim() || patchAgent.isPending}
-                          className="h-6 text-xs bg-teal text-white hover:bg-teal-dim flex-1"
-                          onClick={() => {
-                            const name = newFileName.trim();
-                            if (!name) return;
-                            const existing = agent.instruction_files ?? [];
-                            const updated = [...existing, { name, content: "" }];
-                            patchAgent.mutate(
-                              { uuid, body: { instruction_files: updated } },
-                              {
-                                onSuccess: () => {
-                                  toast.success("File created");
-                                  setShowNewFileInput(false);
-                                  setNewFileName("");
-                                  setSelectedInstructionFile(name);
-                                },
-                                onError: () => toast.error("Failed to create file"),
-                              },
-                            );
-                          }}
-                        >
-                          Create
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-xs text-dim flex-1"
-                          onClick={() => { setShowNewFileInput(false); setNewFileName(""); }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* File list */}
-                  <div className="flex-1 overflow-y-auto">
-                    {(!agent.instruction_files || agent.instruction_files.length === 0) && !showNewFileInput ? (
-                      <div className="py-12 text-center text-xs text-dim px-3">No instruction files yet.</div>
-                    ) : (
-                      (agent.instruction_files ?? []).map((file) => (
-                        <div
-                          key={file.name}
-                          className={cn(
-                            "group flex items-center justify-between px-3 py-2 cursor-pointer border-b border-border transition-colors",
-                            selectedInstructionFile === file.name
-                              ? "bg-teal/10"
-                              : "hover:bg-surface/50",
-                          )}
-                          onClick={() => setSelectedInstructionFile(file.name)}
-                        >
-                          <span className="text-xs font-mono text-foreground truncate flex-1">{file.name}</span>
-                          <button
-                            className="h-5 w-5 p-0 text-dim opacity-0 group-hover:opacity-100 hover:text-red-threat transition-opacity ml-2 shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const updated = (agent.instruction_files ?? []).filter((f) => f.name !== file.name);
-                              patchAgent.mutate(
-                                { uuid, body: { instruction_files: updated } },
-                                {
-                                  onSuccess: () => {
-                                    toast.success("File removed");
-                                    if (selectedInstructionFile === file.name) setSelectedInstructionFile(null);
-                                  },
-                                  onError: () => toast.error("Failed to remove file"),
-                                },
-                              );
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Right panel — file editor */}
-                <div className="flex-1 flex flex-col">
-                  {selectedInstructionFile ? (
-                    <>
-                      <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-                        <span className="text-xs font-mono text-muted-foreground">{selectedInstructionFile}</span>
-                      </div>
-                      <div className="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center">
-                        <FileText className="h-8 w-8 text-dim" />
-                        <p className="text-sm text-dim">File API coming soon</p>
-                        <p className="text-xs text-dim">
-                          Direct file editing will be available once <span className="font-mono">GET/PUT /v1/agents/&#123;uuid&#125;/files/&#123;path&#125;</span> is deployed.
-                        </p>
-                        <Button
-                          size="sm"
-                          disabled
-                          className="mt-2 bg-teal text-white hover:bg-teal-dim disabled:opacity-40 text-xs"
-                        >
-                          <Save className="h-3 w-3 mr-1" />
-                          Save
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center text-sm text-dim">
-                      Select a file to edit.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Skills Tab */}
-            <TabsContent value="skills" className="mt-4">
-              <Card className="bg-card border-border">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-foreground">
-                    <div className="flex items-center gap-2">
-                      <Wrench className="h-3.5 w-3.5 text-teal" />
-                      Assigned Tools
-                    </div>
-                  </CardTitle>
-                  <Button
-                    size="sm"
-                    onClick={() => setShowAddToolDialog(true)}
-                    className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Tool
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {(() => {
-                    const assignedIds = new Set(agent.tool_ids ?? []);
-                    const assignedTools = allTools.filter((t) => assignedIds.has(t.id));
-
-                    function tierBadgeClass(tier: string): string {
-                      switch (tier) {
-                        case "safe": return "text-teal bg-teal/10 border-teal/30";
-                        case "managed": return "text-teal-light bg-teal-light/10 border-teal-light/30";
-                        case "requires_approval": return "text-amber bg-amber/10 border-amber/30";
-                        case "forbidden": return "text-red-threat bg-red-threat/10 border-red-threat/30";
-                        default: return "text-dim bg-dim/10 border-dim/30";
-                      }
-                    }
-
-                    if (assignedTools.length === 0) {
-                      return (
-                        <div className="py-12 text-center text-sm text-dim">
-                          No tools assigned. Click &lsquo;Add Tool&rsquo; to get started.
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {assignedTools.map((tool) => (
-                          <div
-                            key={tool.id}
-                            className="flex items-start gap-3 p-3 rounded-md border border-border bg-surface hover:border-teal/20 transition-colors"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-medium text-foreground font-mono">{tool.display_name}</span>
-                                <Badge
-                                  variant="outline"
-                                  className={cn("text-[11px]", tierBadgeClass(tool.tier))}
-                                >
-                                  {tool.tier.replace("_", " ")}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-dim line-clamp-2">{tool.description}</p>
-                            </div>
-                            <button
-                              className="text-dim hover:text-red-threat transition-colors shrink-0 mt-0.5"
-                              onClick={() => {
-                                const updated = (agent.tool_ids ?? []).filter((id) => id !== tool.id);
-                                patchAgent.mutate(
-                                  { uuid, body: { tool_ids: updated } },
-                                  {
-                                    onSuccess: () => toast.success("Tool removed"),
-                                    onError: () => toast.error("Failed to remove tool"),
-                                  },
-                                );
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-
-              {/* Add Tool Dialog */}
-              <Dialog open={showAddToolDialog} onOpenChange={setShowAddToolDialog}>
-                <DialogContent className="bg-card border-border max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Add Tool</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                    {(() => {
-                      const assignedIds = new Set(agent.tool_ids ?? []);
-                      const available = allTools.filter((t) => !assignedIds.has(t.id) && t.is_active);
-
-                      function tierBadgeClass(tier: string): string {
-                        switch (tier) {
-                          case "safe": return "text-teal bg-teal/10 border-teal/30";
-                          case "managed": return "text-teal-light bg-teal-light/10 border-teal-light/30";
-                          case "requires_approval": return "text-amber bg-amber/10 border-amber/30";
-                          case "forbidden": return "text-red-threat bg-red-threat/10 border-red-threat/30";
-                          default: return "text-dim bg-dim/10 border-dim/30";
-                        }
-                      }
-
-                      if (available.length === 0) {
-                        return <p className="text-sm text-dim text-center py-6">No available tools to add.</p>;
-                      }
-                      return available.map((tool) => (
-                        <button
-                          key={tool.id}
-                          className="w-full flex items-start gap-3 p-3 rounded-md border border-border bg-surface hover:border-teal/30 transition-colors text-left"
-                          onClick={() => {
-                            const updated = [...(agent.tool_ids ?? []), tool.id];
-                            patchAgent.mutate(
-                              { uuid, body: { tool_ids: updated } },
-                              {
-                                onSuccess: () => {
-                                  toast.success("Tool added");
-                                  setShowAddToolDialog(false);
-                                },
-                                onError: () => toast.error("Failed to add tool"),
-                              },
-                            );
-                          }}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-xs font-medium text-foreground font-mono">{tool.display_name}</span>
-                              <Badge
-                                variant="outline"
-                                className={cn("text-[11px]", tierBadgeClass(tool.tier))}
-                              >
-                                {tool.tier.replace("_", " ")}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-dim line-clamp-2">{tool.description}</p>
-                          </div>
-                        </button>
-                      ));
-                    })()}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </TabsContent>
-
-            {/* Dashboard Tab */}
-            <TabsContent value="dashboard" className="mt-4 space-y-4">
-              {/* Stat cards row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Card className="bg-card border-border">
-                  <CardContent className="p-4">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-dim mb-1">Total Runs</div>
-                    <div className="text-lg font-mono font-semibold text-foreground">
-                      {heartbeatData?.meta?.total ?? 0}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card border-border">
-                  <CardContent className="p-4">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-dim mb-1">Cost This Month</div>
-                    <div className="text-lg font-mono font-semibold text-foreground">
-                      {costSummaryData?.data
-                        ? formatCents(costSummaryData.data.total_cost_cents)
-                        : <span className="text-sm text-dim">—</span>}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card border-border">
-                  <CardContent className="p-4">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-dim mb-1">Active Assignments</div>
-                    <div className="text-sm text-dim mt-1">Data not available</div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card border-border">
-                  <CardContent className="p-4">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-dim mb-1">Avg Run Duration</div>
-                    <div className="text-lg font-mono font-semibold text-foreground">
-                      {(() => {
-                        const completed = heartbeatRuns.filter((r) => r.started_at && r.finished_at);
-                        if (completed.length === 0) return <span className="text-sm text-dim">—</span>;
-                        const avgMs = completed.reduce((sum, r) => {
-                          return sum + (new Date(r.finished_at!).getTime() - new Date(r.started_at!).getTime());
-                        }, 0) / completed.length;
-                        if (avgMs < 1000) return `${Math.round(avgMs)}ms`;
-                        if (avgMs < 60000) return `${(avgMs / 1000).toFixed(1)}s`;
-                        return `${Math.round(avgMs / 60000)}m`;
-                      })()}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Row 2 — Last runs + Activity */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Last 5 runs */}
-                <Card className="bg-card border-border">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-foreground">
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-3.5 w-3.5 text-teal" />
-                        Recent Runs
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {heartbeatRuns.length === 0 ? (
-                      <div className="py-8 text-center text-sm text-dim">No runs yet</div>
-                    ) : (
-                      <div className="divide-y divide-border">
-                        {heartbeatRuns.slice(0, 5).map((run) => (
-                          <div key={run.uuid} className="flex items-center justify-between px-4 py-2">
-                            <div className="flex items-center gap-2">
-                              <Badge
-                                variant="outline"
-                                className={cn("text-[11px]", heartbeatStatusClass(run.status))}
-                              >
-                                {run.status}
-                              </Badge>
-                              <span className="text-xs text-dim">
-                                {run.started_at ? relativeTime(run.started_at) : "--"}
-                              </span>
-                            </div>
-                            <span className="text-xs font-mono text-muted-foreground">
-                              {formatDuration(run.started_at, run.finished_at)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Recent Activity */}
-                <Card className="bg-card border-border">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-foreground">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-3.5 w-3.5 text-dim" />
-                        Recent Activity
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {activityError ? (
-                      <div className="py-8 text-center text-sm text-dim">Activity feed coming soon</div>
-                    ) : !activityData ? (
-                      <div className="py-8 text-center text-sm text-dim">Loading...</div>
-                    ) : activityData.data.length === 0 ? (
-                      <div className="py-8 text-center text-sm text-dim">No activity</div>
-                    ) : (
-                      <div className="space-y-2">
-                        {activityData.data.map((event) => (
-                          <div key={event.uuid} className="flex items-start gap-2">
-                            <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-teal shrink-0" />
-                            <div>
-                              <span className="text-xs text-foreground">{event.event_type.replace(/_/g, " ")}</span>
-                              <span className="text-xs text-dim ml-2">{relativeTime(event.created_at)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
             </TabsContent>
           </DetailPageLayout>
         </Tabs>
@@ -1855,11 +1536,44 @@ export function AgentDetailPage() {
         open={showTerminateConfirm}
         onOpenChange={setShowTerminateConfirm}
         title="Terminate Agent"
-        description="This will permanently terminate the agent. It cannot be restarted. Are you sure?"
+        description="This will permanently terminate the agent. This cannot be undone."
         confirmLabel="Terminate"
         variant="destructive"
         onConfirm={handleTerminate}
       />
+
+      {/* Assign Task modal */}
+      <Dialog open={assignTaskOpen} onOpenChange={setAssignTaskOpen}>
+        <DialogContent className="bg-card border-border max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Assign Task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm text-muted-foreground">Task description</Label>
+              <Textarea
+                value={taskDescription}
+                onChange={(e) => setTaskDescription(e.target.value)}
+                placeholder="Describe the task for this agent..."
+                className="bg-surface border-border text-sm min-h-24"
+                rows={4}
+              />
+            </div>
+            <Button
+              onClick={handleAssignTask}
+              disabled={createIssue.isPending || !taskDescription.trim()}
+              className="w-full bg-teal text-white hover:bg-teal-dim"
+            >
+              {createIssue.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+              ) : (
+                <Send className="h-3.5 w-3.5 mr-1" />
+              )}
+              Submit
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

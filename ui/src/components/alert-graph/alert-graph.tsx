@@ -3,6 +3,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  MiniMap,
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -96,6 +97,15 @@ export function AlertGraph({ alertUuid }: AlertGraphProps) {
         <Controls
           showInteractive={false}
           className="!bg-card !border-border !shadow-none [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-dim [&>button:hover]:!text-teal"
+        />
+        <MiniMap
+          nodeStrokeWidth={2}
+          className="!bg-card !border-border"
+          nodeColor={(node) => {
+            if (node.type === "alertCurrent") return "#1a7a5e";
+            if (node.type === "alertSibling") return "#374151";
+            return "#1a3a2a";
+          }}
         />
       </ReactFlow>
       {tooltip && (

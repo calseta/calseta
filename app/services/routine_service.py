@@ -276,7 +276,10 @@ class RoutineService:
             if patch.status not in RoutineStatus.ALL:
                 raise CalsetaException(
                     code="INVALID_STATUS",
-                    message=f"Invalid status '{patch.status}'. Must be one of: {', '.join(RoutineStatus.ALL)}.",
+                    message=(
+                        f"Invalid status '{patch.status}'. "
+                        f"Must be one of: {', '.join(RoutineStatus.ALL)}."
+                    ),
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 )
             updates["status"] = patch.status

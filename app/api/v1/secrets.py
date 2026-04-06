@@ -85,12 +85,12 @@ async def create_secret(
             message=str(exc),
             status_code=status.HTTP_400_BAD_REQUEST,
         ) from exc
-    except IntegrityError:
+    except IntegrityError as exc:
         raise CalsetaException(
             code="CONFLICT",
             message=f"A secret with name '{body.name}' already exists.",
             status_code=status.HTTP_409_CONFLICT,
-        )
+        ) from exc
     return DataResponse(data=SecretResponse.model_validate(secret))
 
 
