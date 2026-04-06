@@ -598,78 +598,78 @@ export function AgentDetailPage() {
           ]}
         />
 
-        <DetailPageLayout
-          sidebar={
-            <DetailPageSidebar>
-              <SidebarSection title="Details">
-                <DetailPageField
-                  label="UUID"
-                  value={<CopyableText text={agent.uuid} mono className="text-xs" />}
-                />
-                <DetailPageField label="Name" value={agent.name} />
-                <DetailPageField
-                  label="Endpoint"
-                  value={agent.endpoint_url ? <CopyableText text={agent.endpoint_url} mono className="text-xs" /> : <span className="text-dim text-xs">Not set</span>}
-                />
-                <DetailPageField
-                  label="Auth Header"
-                  value={agent.auth_header_name ? (
-                    <span className="font-mono text-xs">{agent.auth_header_name}</span>
-                  ) : (
-                    <span className="text-dim">Not set</span>
-                  )}
-                />
-                <DetailPageField label="Created" value={formatDate(agent.created_at)} />
-                <DetailPageField label="Updated" value={formatDate(agent.updated_at)} />
-              </SidebarSection>
-              <SidebarSection title="Triggers">
-                <DetailPageField
-                  label="Sources"
-                  value={
-                    agent.trigger_on_sources.length > 0
-                      ? agent.trigger_on_sources.join(", ")
-                      : "All"
-                  }
-                />
-                <DetailPageField
-                  label="Severities"
-                  value={
-                    agent.trigger_on_severities.length > 0
-                      ? agent.trigger_on_severities.join(", ")
-                      : "All"
-                  }
-                />
-              </SidebarSection>
-            </DetailPageSidebar>
-          }
-        >
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="bg-surface border border-border">
-              <TabsTrigger value="configuration" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Settings className="h-3.5 w-3.5 mr-1" />
-                Configuration
-              </TabsTrigger>
-              <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Send className="h-3.5 w-3.5 mr-1" />
-                Test
-              </TabsTrigger>
-              <TabsTrigger value="documentation" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                Documentation
-              </TabsTrigger>
-              <TabsTrigger value="heartbeats" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Activity className="h-3.5 w-3.5 mr-1" />
-                Heartbeats
-              </TabsTrigger>
-              <TabsTrigger value="cost" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <DollarSign className="h-3.5 w-3.5 mr-1" />
-                Cost
-              </TabsTrigger>
-              <TabsTrigger value="work" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Layers className="h-3.5 w-3.5 mr-1" />
-                Work
-              </TabsTrigger>
-            </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="bg-surface border border-border">
+            <TabsTrigger value="configuration" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Settings className="h-3.5 w-3.5 mr-1" />
+              Configuration
+            </TabsTrigger>
+            <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Send className="h-3.5 w-3.5 mr-1" />
+              Test
+            </TabsTrigger>
+            <TabsTrigger value="documentation" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              Documentation
+            </TabsTrigger>
+            <TabsTrigger value="heartbeats" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Activity className="h-3.5 w-3.5 mr-1" />
+              Heartbeats
+            </TabsTrigger>
+            <TabsTrigger value="cost" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <DollarSign className="h-3.5 w-3.5 mr-1" />
+              Cost
+            </TabsTrigger>
+            <TabsTrigger value="work" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Layers className="h-3.5 w-3.5 mr-1" />
+              Work
+            </TabsTrigger>
+          </TabsList>
+          <DetailPageLayout
+            sidebar={
+              <DetailPageSidebar>
+                <SidebarSection title="Details">
+                  <DetailPageField
+                    label="UUID"
+                    value={<CopyableText text={agent.uuid} mono className="text-xs" />}
+                  />
+                  <DetailPageField label="Name" value={agent.name} />
+                  <DetailPageField
+                    label="Endpoint"
+                    value={agent.endpoint_url ? <CopyableText text={agent.endpoint_url} mono className="text-xs" /> : <span className="text-dim text-xs">Not set</span>}
+                  />
+                  <DetailPageField
+                    label="Auth Header"
+                    value={agent.auth_header_name ? (
+                      <span className="font-mono text-xs">{agent.auth_header_name}</span>
+                    ) : (
+                      <span className="text-dim">Not set</span>
+                    )}
+                  />
+                  <DetailPageField label="Created" value={formatDate(agent.created_at)} />
+                  <DetailPageField label="Updated" value={formatDate(agent.updated_at)} />
+                </SidebarSection>
+                <SidebarSection title="Triggers">
+                  <DetailPageField
+                    label="Sources"
+                    value={
+                      agent.trigger_on_sources.length > 0
+                        ? agent.trigger_on_sources.join(", ")
+                        : "All"
+                    }
+                  />
+                  <DetailPageField
+                    label="Severities"
+                    value={
+                      agent.trigger_on_severities.length > 0
+                        ? agent.trigger_on_severities.join(", ")
+                        : "All"
+                    }
+                  />
+                </SidebarSection>
+              </DetailPageSidebar>
+            }
+          >
 
             {/* Configuration Tab */}
             <TabsContent value="configuration" className="mt-4 space-y-6">
@@ -1398,8 +1398,8 @@ export function AgentDetailPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-          </Tabs>
-        </DetailPageLayout>
+          </DetailPageLayout>
+        </Tabs>
       </div>
 
       {/* Terminate confirm dialog */}

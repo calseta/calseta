@@ -55,6 +55,13 @@ export function statusColor(status: string): string {
       return "text-red-threat bg-red-threat/10 border-red-threat/30";
     case "Closed":
       return "text-dim bg-dim/10 border-dim/30";
+    // Agent status values
+    case "active":
+      return "text-teal bg-teal/10 border-teal/30";
+    case "paused":
+      return "text-amber bg-amber/10 border-amber/30";
+    case "terminated":
+      return "text-red-threat bg-red-threat/10 border-red-threat/30";
     default:
       return "text-muted-foreground bg-muted/50 border-muted";
   }

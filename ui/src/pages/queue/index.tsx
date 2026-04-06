@@ -16,13 +16,19 @@ import {
   type ColumnDef,
 } from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { TablePagination } from "@/components/table-pagination";
 import { ColumnFilterPopover } from "@/components/column-filter-popover";
 import { useAlertQueue, useCheckoutAlert } from "@/hooks/use-api";
 import { useTableState } from "@/hooks/use-table-state";
 import { severityColor, enrichmentStatusColor, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { RefreshCw, X, ShoppingCart } from "lucide-react";
+import { RefreshCw, X, ClipboardList } from "lucide-react";
 
 const COLUMNS: ColumnDef[] = [
   { key: "severity", initialWidth: 100, minWidth: 80 },
@@ -64,6 +70,10 @@ export function QueuePage() {
 
   const alerts = data?.data ?? [];
   const meta = data?.meta;
+
+  const apiKey = typeof localStorage !== "undefined" ? (localStorage.getItem("calseta_api_key") ?? "") : "";
+  const isOperatorKey = apiKey.startsWith("cai_");
+  const canCheckout = !isOperatorKey;
 
   function handleCheckout(alertUuid: string) {
     setCheckingOut(alertUuid);
@@ -194,16 +204,39 @@ export function QueuePage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2 text-xs gap-1"
-                          disabled={checkingOut === alert.uuid || checkoutAlert.isPending}
-                          onClick={() => handleCheckout(alert.uuid)}
-                        >
-                          <ShoppingCart className="h-3 w-3" />
-                          Checkout
-                        </Button>
+                        {canCheckout ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs gap-1"
+                            disabled={checkingOut === alert.uuid || checkoutAlert.isPending}
+                            onClick={() => handleCheckout(alert.uuid)}
+                          >
+                            <ClipboardList className="h-3 w-3" />
+                            Checkout
+                          </Button>
+                        ) : (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs gap-1"
+                                    disabled
+                                  >
+                                    <ClipboardList className="h-3 w-3" />
+                                    Checkout
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Checkout requires an agent API key (cak_*)
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

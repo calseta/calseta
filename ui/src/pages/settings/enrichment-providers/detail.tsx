@@ -636,64 +636,63 @@ export function EnrichmentProviderDetailPage() {
           ]}
         />
 
-        <DetailPageLayout
-          sidebar={
-            <DetailPageSidebar>
-              <SidebarSection title="Details">
-                <DetailPageField
-                  label="UUID"
-                  value={<CopyableText text={provider.uuid} mono className="text-xs" />}
-                />
-                <DetailPageField
-                  label="Provider Name"
-                  value={<span className="font-mono text-xs">{provider.provider_name}</span>}
-                />
-                <DetailPageField
-                  label="Cache TTL"
-                  value={`${provider.default_cache_ttl_seconds}s`}
-                />
-                <DetailPageField label="Created" value={formatDate(provider.created_at)} />
-                <DetailPageField label="Updated" value={formatDate(provider.updated_at)} />
-              </SidebarSection>
-
-              {provider.env_var_mapping && Object.keys(provider.env_var_mapping).length > 0 && (
-                <SidebarSection title="Env Variables">
-                  {Object.entries(provider.env_var_mapping).map(([key, envVar]) => (
-                    <DetailPageField key={key} label={key} value={<span className="font-mono text-xs">{envVar}</span>} />
-                  ))}
+        <Tabs defaultValue="configuration" className="w-full">
+          <TabsList className="bg-surface border border-border">
+            <TabsTrigger value="configuration" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Settings className="h-3.5 w-3.5 mr-1" />
+              Configuration
+            </TabsTrigger>
+            <TabsTrigger value="extractions" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileCode2 className="h-3.5 w-3.5 mr-1" />
+              Field Extractions
+            </TabsTrigger>
+            <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Beaker className="h-3.5 w-3.5 mr-1" />
+              Test
+            </TabsTrigger>
+            <TabsTrigger value="docs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              Documentation
+            </TabsTrigger>
+          </TabsList>
+          <DetailPageLayout
+            sidebar={
+              <DetailPageSidebar>
+                <SidebarSection title="Details">
+                  <DetailPageField
+                    label="UUID"
+                    value={<CopyableText text={provider.uuid} mono className="text-xs" />}
+                  />
+                  <DetailPageField
+                    label="Provider Name"
+                    value={<span className="font-mono text-xs">{provider.provider_name}</span>}
+                  />
+                  <DetailPageField
+                    label="Cache TTL"
+                    value={`${provider.default_cache_ttl_seconds}s`}
+                  />
+                  <DetailPageField label="Created" value={formatDate(provider.created_at)} />
+                  <DetailPageField label="Updated" value={formatDate(provider.updated_at)} />
                 </SidebarSection>
-              )}
 
-              {provider.cache_ttl_by_type && Object.keys(provider.cache_ttl_by_type).length > 0 && (
-                <SidebarSection title="Cache TTL by Type">
-                  {Object.entries(provider.cache_ttl_by_type).map(([type, ttl]) => (
-                    <DetailPageField key={type} label={type} value={`${ttl}s`} />
-                  ))}
-                </SidebarSection>
-              )}
-            </DetailPageSidebar>
-          }
-        >
-          <Tabs defaultValue="configuration" className="w-full">
-            <TabsList className="bg-surface border border-border">
-              <TabsTrigger value="configuration" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Settings className="h-3.5 w-3.5 mr-1" />
-                Configuration
-              </TabsTrigger>
-              <TabsTrigger value="extractions" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <FileCode2 className="h-3.5 w-3.5 mr-1" />
-                Field Extractions
-              </TabsTrigger>
-              <TabsTrigger value="test" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <Beaker className="h-3.5 w-3.5 mr-1" />
-                Test
-              </TabsTrigger>
-              <TabsTrigger value="docs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                Documentation
-              </TabsTrigger>
-            </TabsList>
+                {provider.env_var_mapping && Object.keys(provider.env_var_mapping).length > 0 && (
+                  <SidebarSection title="Env Variables">
+                    {Object.entries(provider.env_var_mapping).map(([key, envVar]) => (
+                      <DetailPageField key={key} label={key} value={<span className="font-mono text-xs">{envVar}</span>} />
+                    ))}
+                  </SidebarSection>
+                )}
 
+                {provider.cache_ttl_by_type && Object.keys(provider.cache_ttl_by_type).length > 0 && (
+                  <SidebarSection title="Cache TTL by Type">
+                    {Object.entries(provider.cache_ttl_by_type).map(([type, ttl]) => (
+                      <DetailPageField key={type} label={type} value={`${ttl}s`} />
+                    ))}
+                  </SidebarSection>
+                )}
+              </DetailPageSidebar>
+            }
+          >
             {/* Configuration Tab */}
             <TabsContent value="configuration" className="space-y-6 mt-4">
               {/* Supported Indicator Types */}
@@ -974,8 +973,8 @@ export function EnrichmentProviderDetailPage() {
                 isSaving={patchProvider.isPending}
               />
             </TabsContent>
-          </Tabs>
-        </DetailPageLayout>
+          </DetailPageLayout>
+        </Tabs>
       </div>
 
       <ConfirmDialog

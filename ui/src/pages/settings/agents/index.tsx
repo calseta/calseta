@@ -30,7 +30,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TablePagination } from "@/components/table-pagination";
 import { useAgents, useCreateAgent, useDeleteAgent } from "@/hooks/use-api";
 import { useTableState } from "@/hooks/use-table-state";
-import { formatDate } from "@/lib/format";
+import { formatDate, statusColor } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
 import { Plus, Trash2, Bot, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -184,8 +184,8 @@ export function AgentsPage() {
                         {agent.endpoint_url ? <CopyableText text={agent.endpoint_url} mono className="text-[11px] text-dim max-w-48 truncate" /> : <span className="text-[11px] text-dim">—</span>}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={agent.is_active ? "text-teal bg-teal/10 border-teal/30 text-[11px]" : "text-dim bg-dim/10 border-dim/30 text-[11px]"}>
-                          {agent.is_active ? "active" : "inactive"}
+                        <Badge variant="outline" className={cn("text-[11px]", statusColor(agent.status ?? (agent.is_active ? "active" : "terminated")))}>
+                          {agent.status ?? (agent.is_active ? "active" : "inactive")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-dim">

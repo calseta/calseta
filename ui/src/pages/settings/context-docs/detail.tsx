@@ -177,44 +177,44 @@ export function ContextDocDetailPage() {
           ]}
         />
 
-        <DetailPageLayout
-          sidebar={
-            <DetailPageSidebar>
-              <SidebarSection title="Details">
-                <DetailPageField label="UUID" value={<CopyableText text={doc.uuid} mono className="text-xs" />} />
-                <DetailPageField label="Type" value={doc.document_type} />
-                <DetailPageField label="Scope" value={doc.is_global ? "Global" : "Targeted"} />
-                <DetailPageField label="Version" value={`v${doc.version}`} />
-                <DetailPageField label="Created" value={formatDate(doc.created_at)} />
-                <DetailPageField label="Updated" value={formatDate(doc.updated_at)} />
-              </SidebarSection>
-              {doc.tags?.length > 0 && (
-                <SidebarSection title="Tags">
-                  <div className="flex flex-wrap gap-1">
-                    {doc.tags.map((t) => (
-                      <Badge key={t} variant="outline" className="text-[11px] text-foreground border-border">
-                        {t}
-                      </Badge>
-                    ))}
-                  </div>
-                </SidebarSection>
-              )}
-            </DetailPageSidebar>
-          }
-        >
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="bg-surface border border-border">
-              <TabsTrigger value="content" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                Content
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="bg-surface border border-border">
+            <TabsTrigger value="content" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              Content
+            </TabsTrigger>
+            {!doc.is_global && (
+              <TabsTrigger value="targeting" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+                <Target className="h-3.5 w-3.5 mr-1" />
+                Targeting Rules
               </TabsTrigger>
-              {!doc.is_global && (
-                <TabsTrigger value="targeting" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-                  <Target className="h-3.5 w-3.5 mr-1" />
-                  Targeting Rules
-                </TabsTrigger>
-              )}
-            </TabsList>
+            )}
+          </TabsList>
+          <DetailPageLayout
+            sidebar={
+              <DetailPageSidebar>
+                <SidebarSection title="Details">
+                  <DetailPageField label="UUID" value={<CopyableText text={doc.uuid} mono className="text-xs" />} />
+                  <DetailPageField label="Type" value={doc.document_type} />
+                  <DetailPageField label="Scope" value={doc.is_global ? "Global" : "Targeted"} />
+                  <DetailPageField label="Version" value={`v${doc.version}`} />
+                  <DetailPageField label="Created" value={formatDate(doc.created_at)} />
+                  <DetailPageField label="Updated" value={formatDate(doc.updated_at)} />
+                </SidebarSection>
+                {doc.tags?.length > 0 && (
+                  <SidebarSection title="Tags">
+                    <div className="flex flex-wrap gap-1">
+                      {doc.tags.map((t) => (
+                        <Badge key={t} variant="outline" className="text-[11px] text-foreground border-border">
+                          {t}
+                        </Badge>
+                      ))}
+                    </div>
+                  </SidebarSection>
+                )}
+              </DetailPageSidebar>
+            }
+          >
 
             <TabsContent value="content" className="mt-4">
               <DocumentationEditor
@@ -277,8 +277,8 @@ export function ContextDocDetailPage() {
                 </Card>
               </TabsContent>
             )}
-          </Tabs>
-        </DetailPageLayout>
+          </DetailPageLayout>
+        </Tabs>
       </div>
     </AppLayout>
   );
