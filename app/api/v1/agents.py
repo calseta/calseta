@@ -17,6 +17,7 @@ DELETE /v1/agents/{uuid}/keys/{key_id}     — Revoke an agent API key
 
 from __future__ import annotations
 
+import os
 import secrets
 import time
 from datetime import UTC, datetime
@@ -155,6 +156,11 @@ async def create_agent(
 
     repo = AgentRepository(db)
     agent = await repo.create(body, auth_header_value_encrypted)
+
+    # Create agent home directory: $CALSETA_DATA_DIR/agents/{agent.uuid}/
+    agent_home = os.path.join(settings.CALSETA_DATA_DIR, "agents", str(agent.uuid))
+    os.makedirs(agent_home, exist_ok=True)
+
     return DataResponse(data=AgentRegistrationResponse.model_validate(agent))
 
 

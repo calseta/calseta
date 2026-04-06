@@ -324,14 +324,6 @@ class TestAgentHomeDirectory:
     marked xfail so the gap is visible in CI output without blocking the suite.
     """
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "Agent home directory filesystem creation ($CALSETA_DATA_DIR/agents/{id}/) "
-            "is not yet implemented.  The current implementation only uses the KB folder "
-            "path convention (/memory/agents/{id}/) stored in the database."
-        ),
-    )
     async def test_agent_home_directory_created_on_registration(
         self,
         test_client: AsyncClient,

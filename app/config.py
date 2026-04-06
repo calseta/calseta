@@ -271,6 +271,11 @@ class Settings(BaseSettings):
     WORKFLOW_MAX_MEMORY_MB: int = 256  # Max virtual memory per workflow execution
 
     # ------------------------------------------------------------------
+    # Agent Home Directories
+    # ------------------------------------------------------------------
+    CALSETA_DATA_DIR: str = "/tmp/calseta"
+
+    # ------------------------------------------------------------------
     # Sandbox
     # ------------------------------------------------------------------
     ENRICHMENT_MOCK_MODE: bool = False

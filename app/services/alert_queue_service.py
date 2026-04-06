@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -110,6 +110,27 @@ class AlertQueueService:
             )
 
         assignment_repo = AlertAssignmentRepository(self._db)
+
+        # Enforce max_concurrent_alerts before attempting checkout
+        if agent.max_concurrent_alerts is not None and agent.max_concurrent_alerts > 0:
+            count_result = await self._db.execute(
+                select(func.count()).select_from(AlertAssignment).where(
+                    AlertAssignment.agent_registration_id == agent.id,
+                    AlertAssignment.status.not_in(["released", "resolved"]),
+                )
+            )
+            active_count: int = count_result.scalar_one()
+            if active_count >= agent.max_concurrent_alerts:
+                raise CalsetaException(
+                    code="CAPACITY_EXCEEDED",
+                    message=(
+                        f"Agent has reached its max_concurrent_alerts limit "
+                        f"({agent.max_concurrent_alerts}). Release an active assignment "
+                        "before checking out another alert."
+                    ),
+                    status_code=409,
+                )
+
         assignment = await assignment_repo.atomic_checkout(
             alert_id=alert.id,
             agent_registration_id=agent.id,

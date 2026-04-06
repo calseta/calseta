@@ -767,15 +767,6 @@ class TestConcurrencyEnforcement:
         )
         assert resp_b.json()["error"]["code"] == "CONFLICT"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "max_concurrent_alerts enforcement not yet implemented.  "
-            "agent_registrations.max_concurrent_alerts column exists (default 1) "
-            "but AlertQueueService.checkout() does not check the agent's current "
-            "assignment count before allowing a checkout of a DIFFERENT alert."
-        ),
-    )
     async def test_agent_cannot_checkout_second_different_alert_when_at_capacity(
         self,
         test_client: AsyncClient,

@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from app.schemas.common import JSONB_SIZE_SMALL, validate_jsonb_size
 
@@ -78,6 +78,12 @@ class AgentRegistrationResponse(BaseModel):
 
     uuid: uuid.UUID
     name: str
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def id(self) -> uuid.UUID:
+        """Expose uuid as 'id' — the canonical external identifier for this agent."""
+        return self.uuid
     description: str | None
     endpoint_url: str | None
     auth_header_name: str | None
