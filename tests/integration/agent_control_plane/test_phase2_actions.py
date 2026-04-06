@@ -19,6 +19,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -637,3 +638,114 @@ class TestApproveRejectAction:
         )
         assert resp.status_code == 409, resp.text
         assert resp.json()["error"]["code"] == "CONFLICT"
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 exit-criteria gap: Rollback — state transitions + endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestRollbackStateTransitions:
+    """Phase 2 exit criterion: rollback endpoint transitions a completed
+    rollback_supported=True action back to a rolled_back status.
+
+    The approve→executing state transition IS implemented and tested here.
+    The dedicated rollback API endpoint (PATCH /v1/actions/{uuid} with
+    status='rollback' or POST /v1/actions/{uuid}/rollback) is not yet
+    implemented — that part is marked xfail.
+    """
+
+    async def test_approve_pending_action_transitions_to_executing(
+        self,
+        test_client: AsyncClient,
+        agent_and_auth: tuple[Any, dict[str, str]],
+        db_session: AsyncSession,
+        admin_auth_headers: dict[str, str],
+        enriched_alert: Alert,
+    ) -> None:
+        """PATCH /v1/actions/{uuid} approve→executing state transition is correct."""
+        agent, headers = agent_and_auth
+        assignment_data = await _checkout_alert_for_agent(test_client, enriched_alert, headers)
+
+        import sqlalchemy as _sa
+
+        assignment_result = await db_session.execute(
+            _sa.select(AlertAssignment).where(
+                AlertAssignment.uuid == assignment_data["uuid"]
+            )
+        )
+        assignment = assignment_result.scalar_one()
+
+        # Create a containment action in pending_approval state (rollback-capable subtype)
+        action = await _create_action_directly(
+            db_session,
+            enriched_alert,
+            assignment,
+            agent_registration_id=agent.id,
+            status="pending_approval",
+            action_type="containment",
+            action_subtype="isolate_host",
+        )
+        await db_session.commit()
+
+        resp = await test_client.patch(
+            f"/v1/actions/{action.uuid}",
+            json={"status": "approved"},
+            headers=admin_auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()["data"]
+        # After approval the action transitions to executing (queued for execution)
+        assert data["status"] == "executing", (
+            f"Expected status=executing after approve, got {data['status']!r}"
+        )
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason=(
+            "Rollback endpoint not yet implemented.  No PATCH /v1/actions/{uuid} "
+            "with status='rollback' or POST /v1/actions/{uuid}/rollback exists.  "
+            "The ActionStatusUpdate schema only accepts 'approved' | 'rejected'."
+        ),
+    )
+    async def test_rollback_endpoint_transitions_completed_action(
+        self,
+        test_client: AsyncClient,
+        agent_and_auth: tuple[Any, dict[str, str]],
+        db_session: AsyncSession,
+        admin_auth_headers: dict[str, str],
+        enriched_alert: Alert,
+    ) -> None:
+        """POST /v1/actions/{uuid}/rollback on a completed rollback_supported action
+        should transition status to rolled_back and call integration.rollback()."""
+        agent, headers = agent_and_auth
+        assignment_data = await _checkout_alert_for_agent(test_client, enriched_alert, headers)
+
+        import sqlalchemy as _sa
+
+        assignment_result = await db_session.execute(
+            _sa.select(AlertAssignment).where(
+                AlertAssignment.uuid == assignment_data["uuid"]
+            )
+        )
+        assignment = assignment_result.scalar_one()
+
+        action = await _create_action_directly(
+            db_session,
+            enriched_alert,
+            assignment,
+            agent_registration_id=agent.id,
+            status="completed",
+            action_type="containment",
+            action_subtype="isolate_host",
+        )
+        # Mark as rollback_supported in execution_result
+        action.execution_result = {"rollback_supported": True, "device_id": "abc123"}
+        await db_session.commit()
+
+        resp = await test_client.post(
+            f"/v1/actions/{action.uuid}/rollback",
+            headers=admin_auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["status"] == "rolled_back"

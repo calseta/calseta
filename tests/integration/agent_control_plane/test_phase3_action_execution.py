@@ -26,6 +26,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx as httpx_module
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -579,3 +580,146 @@ class TestFullExecutionPipeline:
         assert action.execution_result["success"] is False
         assert "unknown_integration_xyz" in action.execution_result["message"]
         assert action.status == "failed"  # null = success=False → "failed"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 exit-criteria gap: SlackUserValidationIntegration
+# ---------------------------------------------------------------------------
+
+
+class TestSlackUserValidationIntegration:
+    """Phase 3 exit criterion: SlackUserValidationIntegration sends DM, confirm/deny paths.
+
+    DM sending is tested here with mocked HTTP.
+    The confirm/deny callback paths (Slack button responses via webhook) are not
+    yet wired to alert-status transitions; those tests are marked xfail.
+    """
+
+    def _make_integration(self) -> Any:
+        from app.integrations.actions.slack_user_validation import (
+            SlackUserValidationIntegration,
+        )
+
+        return SlackUserValidationIntegration(
+            bot_token="xoxb-test-token-for-validation",
+            db=MagicMock(),
+        )
+
+    def _make_action(
+        self,
+        slack_user_id: str = "U0TESTUSER",
+        template_name: str | None = None,
+        alert_context: dict[str, Any] | None = None,
+        assignment_id: str | None = "assign-001",
+    ) -> MagicMock:
+        action = MagicMock(spec=AgentAction)
+        action.uuid = uuid_module.uuid4()
+        action.payload = {
+            "slack_user_id": slack_user_id,
+            "template_name": template_name,
+            "alert_context": alert_context or {"title": "Suspicious login", "severity": "High"},
+            "assignment_id": assignment_id,
+        }
+        return action
+
+    async def test_dm_sent_returns_success_with_channel_and_ts(self) -> None:
+        """execute() opens DM + posts message → ExecutionResult.ok with channel_id and ts."""
+        integration = self._make_integration()
+        action = self._make_action()
+
+        open_dm_response = {"ok": True, "channel": {"id": "D0DMCHANNEL"}}
+        post_msg_response = {"ok": True, "ts": "1700000000.123456"}
+
+        # Patch _api_call to return sequential responses
+        call_counter = {"n": 0}
+        responses = [open_dm_response, post_msg_response]
+
+        async def _fake_api_call(method: str, body: dict, **kwargs: Any) -> dict:
+            r = responses[call_counter["n"]]
+            call_counter["n"] += 1
+            return r
+
+        integration._api_call = _fake_api_call  # type: ignore[method-assign]
+
+        result = await integration.execute(action)
+
+        assert result.success is True, f"Expected success=True, got: {result.message}"
+        assert result.data["channel_id"] == "D0DMCHANNEL"
+        assert result.data["ts"] == "1700000000.123456"
+        assert result.data["slack_user_id"] == "U0TESTUSER"
+
+    async def test_execute_returns_fail_when_dm_channel_open_fails(self) -> None:
+        """If conversations.open returns ok=False, execute() returns ExecutionResult.fail."""
+        integration = self._make_integration()
+        action = self._make_action()
+
+        async def _fail_open(method: str, body: dict, **kwargs: Any) -> dict:
+            return {"ok": False, "error": "user_not_found"}
+
+        integration._api_call = _fail_open  # type: ignore[method-assign]
+
+        result = await integration.execute(action)
+
+        assert result.success is False, "Expected fail when DM channel cannot be opened"
+        assert "DM channel" in result.message or "Slack" in result.message
+
+    async def test_execute_returns_fail_when_post_message_fails(self) -> None:
+        """If chat.postMessage returns ok=False, execute() returns ExecutionResult.fail."""
+        integration = self._make_integration()
+        action = self._make_action()
+
+        call_counter = {"n": 0}
+        responses = [
+            {"ok": True, "channel": {"id": "D0TESTCHAN"}},  # conversations.open OK
+            {"ok": False, "error": "channel_not_found"},    # chat.postMessage fails
+        ]
+
+        async def _partial_fail(method: str, body: dict, **kwargs: Any) -> dict:
+            r = responses[call_counter["n"]]
+            call_counter["n"] += 1
+            return r
+
+        integration._api_call = _partial_fail  # type: ignore[method-assign]
+
+        result = await integration.execute(action)
+
+        assert result.success is False
+        assert "channel_not_found" in result.message or "Slack API error" in result.message
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason=(
+            "Slack confirm/deny callback → alert status transition not yet implemented.  "
+            "The SlackUserValidationIntegration sends the DM but the webhook callback "
+            "handler that transitions alert status on user confirm/deny is Phase 3+ work."
+        ),
+    )
+    async def test_confirm_callback_transitions_alert_status(
+        self,
+        db_session: AsyncSession,
+    ) -> None:
+        """Slack confirm button callback should transition the alert to 'Closed' status."""
+        # This test documents the expected confirm-path behavior.
+        # When a Slack user clicks the confirm button Calseta should:
+        #   1. Receive the Slack interaction payload via a callback endpoint
+        #   2. Locate the alert_assignment by assignment_id in the payload
+        #   3. Transition the alert status to 'Closed' (or execute on_confirm action)
+        raise AssertionError(
+            "Confirm callback → alert status transition not yet implemented."
+        )
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason=(
+            "Slack deny callback → denial audit log not yet implemented.  "
+            "The deny path should log an activity event recording the user denial."
+        ),
+    )
+    async def test_deny_callback_logs_denial(
+        self,
+        db_session: AsyncSession,
+    ) -> None:
+        """Slack deny button callback should emit an activity event recording the denial."""
+        raise AssertionError(
+            "Deny callback activity event logging not yet implemented."
+        )

@@ -297,6 +297,95 @@ class TestXmlEscape:
 
         assert _xml_escape("a & b") == "a &amp; b"
 
+
+# ---------------------------------------------------------------------------
+# Phase 6 exit-criteria gap: Stale memory STALE prefix injection
+# ---------------------------------------------------------------------------
+
+
+class TestStaleMemoryInjection:
+    """Phase 6 exit criterion: a memory entry past staleness_ttl_hours is injected
+    with a [STALE — last updated X hours ago] prefix rather than being skipped.
+
+    This tests the full DB-backed flow: create a published KB page in the agent
+    memory folder with staleness_ttl_hours set in metadata and old updated_at,
+    then call PromptBuilder._build_memory_block() and verify the STALE prefix
+    is present in the output.
+    """
+
+    async def test_stale_memory_page_injected_with_stale_prefix(
+        self,
+        db_session: AsyncSession,
+        scoped_api_key: Any,
+    ) -> None:
+        """Memory page past TTL is included in the block with [STALE] prefix."""
+        from app.db.models.kb_page import KnowledgeBasePage
+        from app.runtime.prompt_builder import PromptBuilder
+
+        agent, _ = await _create_agent_with_key(db_session, name="stale-prefix-agent")
+        await db_session.flush()
+
+        stale_body = "This is an old investigation note that should be marked stale."
+        # Create a memory page that is 72 hours old with a 24-hour TTL
+        stale_time = datetime.now(UTC) - timedelta(hours=72)
+        page = KnowledgeBasePage(
+            slug=f"stale-mem-{agent.id}",
+            title="Old Investigation Note",
+            body=stale_body,
+            folder=f"/memory/agents/{agent.id}/",
+            status="published",
+            metadata_={"staleness_ttl_hours": 24},
+        )
+        db_session.add(page)
+        await db_session.flush()
+        # Backdate updated_at to simulate staleness
+        page.updated_at = stale_time
+        await db_session.flush()
+
+        builder = PromptBuilder(db_session)
+        block = await builder._build_memory_block(agent, context_window=200_000)
+
+        assert block, "Expected a non-empty memory block"
+        assert "[STALE" in block, (
+            f"Expected [STALE prefix in memory block for a {72}-hour-old page "
+            f"with 24-hour TTL.\nGot block:\n{block}"
+        )
+        assert stale_body in block, "Expected page body to appear in memory block"
+
+    async def test_fresh_memory_page_has_no_stale_prefix(
+        self,
+        db_session: AsyncSession,
+        scoped_api_key: Any,
+    ) -> None:
+        """Memory page within TTL is included without [STALE] prefix."""
+        from app.db.models.kb_page import KnowledgeBasePage
+        from app.runtime.prompt_builder import PromptBuilder
+
+        agent, _ = await _create_agent_with_key(db_session, name="fresh-prefix-agent")
+        await db_session.flush()
+
+        fresh_body = "Recent investigation note — still valid."
+        page = KnowledgeBasePage(
+            slug=f"fresh-mem-{agent.id}",
+            title="Recent Note",
+            body=fresh_body,
+            folder=f"/memory/agents/{agent.id}/",
+            status="published",
+            metadata_={"staleness_ttl_hours": 48},
+        )
+        db_session.add(page)
+        await db_session.flush()
+        # Leave updated_at at current time (default / recent)
+
+        builder = PromptBuilder(db_session)
+        block = await builder._build_memory_block(agent, context_window=200_000)
+
+        assert block, "Expected a non-empty memory block"
+        assert "[STALE" not in block, (
+            f"Did not expect [STALE prefix for a fresh page within TTL.\nGot:\n{block}"
+        )
+        assert fresh_body in block
+
     def test_escapes_quotes(self) -> None:
         from app.runtime.prompt_builder import _xml_escape
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -644,3 +645,168 @@ class TestCostReportingEndpoints:
         assert "spent_cents" in budget
         assert "remaining_cents" in budget
         assert budget["hard_stop_triggered"] is False
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 exit-criteria gap: Stall detection
+# ---------------------------------------------------------------------------
+
+
+class TestStallDetection:
+    """Phase 4 exit criterion: N consecutive sub-agent invocations returning empty
+    results triggers a stall flag on the assignment.
+
+    The stall_threshold field exists on AgentRegistration but is not yet enforced
+    by AgentSupervisor.  This test is xfail until the logic is implemented.
+    """
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason=(
+            "Stall detection not yet implemented in AgentSupervisor.  "
+            "agent_registrations.stall_threshold column exists but supervise() "
+            "does not check it.  Expected: after N invocations returning empty "
+            "results, assignment.stall_detected is set to True."
+        ),
+    )
+    async def test_stall_flag_set_after_n_empty_invocations(
+        self,
+        db_session: AsyncSession,
+    ) -> None:
+        """Supervisor sets stall flag after stall_threshold consecutive empty results."""
+        from app.db.models.agent_invocation import AgentInvocation
+        from tests.integration.agent_control_plane.fixtures.mock_alerts import (
+            create_enriched_alert,
+        )
+
+        agent, _ = await _create_agent_with_key(
+            db_session, name="stall-test-agent", status="active"
+        )
+        agent.execution_mode = "managed"
+        agent.stall_threshold = 3
+        agent.timeout_seconds = 99999
+        await db_session.flush()
+
+        assignment = await _checkout_alert(db_session, agent)
+        alert = await create_enriched_alert(db_session)
+
+        # Create 3 invocations with empty results (stall_threshold = 3)
+        specialist, _ = await _create_agent_with_key(
+            db_session, name="stall-specialist"
+        )
+        for _ in range(3):
+            inv = AgentInvocation(
+                parent_agent_id=agent.id,
+                child_agent_id=specialist.id,
+                alert_id=alert.id,
+                task_description="investigate",
+                status="completed",
+                result={},  # empty result
+                timeout_seconds=300,
+            )
+            db_session.add(inv)
+        await db_session.flush()
+
+        supervisor = AgentSupervisor(db_session)
+        await supervisor.supervise()
+
+        await db_session.refresh(assignment)
+        # Expect the supervisor to have flagged the assignment as stalled
+        assert getattr(assignment, "stall_detected", None) is True, (
+            "Expected assignment.stall_detected=True after N empty invocations"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 exit-criteria gap: Concurrency enforcement (max_concurrent_alerts)
+# ---------------------------------------------------------------------------
+
+
+class TestConcurrencyEnforcement:
+    """Phase 4 exit criterion: agent with max_concurrent_alerts=1 cannot check out
+    a second alert while one is assigned — expect 409.
+
+    The same-alert checkout 409 IS implemented and tested here.
+    The max_concurrent_alerts enforcement for DIFFERENT alerts is not yet
+    implemented (marked xfail).
+    """
+
+    async def test_second_checkout_of_same_alert_returns_409(
+        self,
+        test_client: AsyncClient,
+        db_session: AsyncSession,
+    ) -> None:
+        """Two different agents trying to check out the same alert: only one wins (409 for loser)."""
+        from tests.integration.agent_control_plane.fixtures.mock_alerts import (
+            create_enriched_alert,
+        )
+        from tests.integration.conftest import auth_header as _ah
+
+        alert = await create_enriched_alert(db_session, title="Concurrency Test Alert")
+        await db_session.flush()
+
+        agent_a, key_a = await _create_agent_with_key(db_session, name="conc-agent-a")
+        agent_b, key_b = await _create_agent_with_key(db_session, name="conc-agent-b")
+        await db_session.flush()
+
+        # Agent A checks out the alert — should succeed
+        resp_a = await test_client.post(
+            f"/v1/queue/{alert.uuid}/checkout",
+            headers=_ah(key_a),
+        )
+        assert resp_a.status_code == 201, resp_a.text
+
+        # Agent B tries to check out the SAME alert — should get 409
+        resp_b = await test_client.post(
+            f"/v1/queue/{alert.uuid}/checkout",
+            headers=_ah(key_b),
+        )
+        assert resp_b.status_code == 409, (
+            f"Expected 409 when a second agent tries to check out an already-assigned alert, "
+            f"got {resp_b.status_code}: {resp_b.text}"
+        )
+        assert resp_b.json()["error"]["code"] == "CONFLICT"
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason=(
+            "max_concurrent_alerts enforcement not yet implemented.  "
+            "agent_registrations.max_concurrent_alerts column exists (default 1) "
+            "but AlertQueueService.checkout() does not check the agent's current "
+            "assignment count before allowing a checkout of a DIFFERENT alert."
+        ),
+    )
+    async def test_agent_cannot_checkout_second_different_alert_when_at_capacity(
+        self,
+        test_client: AsyncClient,
+        db_session: AsyncSession,
+    ) -> None:
+        """Agent with max_concurrent_alerts=1 gets 409 on checkout of a second distinct alert."""
+        from tests.integration.agent_control_plane.fixtures.mock_alerts import (
+            create_enriched_alert,
+        )
+        from tests.integration.conftest import auth_header as _ah
+
+        alert_1 = await create_enriched_alert(db_session, title="Capacity Alert 1")
+        alert_2 = await create_enriched_alert(db_session, title="Capacity Alert 2")
+
+        agent, key = await _create_agent_with_key(db_session, name="capacity-agent")
+        agent.max_concurrent_alerts = 1
+        await db_session.flush()
+
+        # First checkout succeeds
+        r1 = await test_client.post(
+            f"/v1/queue/{alert_1.uuid}/checkout",
+            headers=_ah(key),
+        )
+        assert r1.status_code == 201, r1.text
+
+        # Second checkout (different alert) should be rejected while one is active
+        r2 = await test_client.post(
+            f"/v1/queue/{alert_2.uuid}/checkout",
+            headers=_ah(key),
+        )
+        assert r2.status_code == 409, (
+            f"Expected 409 from max_concurrent_alerts=1 enforcement, "
+            f"got {r2.status_code}: {r2.text}"
+        )

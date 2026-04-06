@@ -18,6 +18,7 @@ import time
 from typing import Any
 from uuid import uuid4
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -530,3 +531,82 @@ class TestRoutinePauseResume:
             headers=admin_auth_headers,
         )
         assert resp.status_code == 409, resp.text
+
+
+# ---------------------------------------------------------------------------
+# Phase 5.5 exit-criteria gap: Routine auto-pause after N consecutive failures
+# ---------------------------------------------------------------------------
+
+
+class TestRoutineAutoPause:
+    """Phase 5.5 exit criterion: a routine that fails N consecutive times
+    transitions to paused status automatically.
+
+    The consecutive_failures and max_consecutive_failures fields exist on the
+    AgentRoutine model, but the auto-pause trigger is not yet wired in the
+    service layer (noted as Phase 6+ in the CONTEXT.md).  Marked xfail.
+    """
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason=(
+            "Routine auto-pause on consecutive failures is not yet implemented.  "
+            "agent_routines.consecutive_failures column exists but the evaluator "
+            "task (evaluate_routine_triggers_task) does not increment it or check "
+            "it against max_consecutive_failures to trigger auto-pause.  "
+            "Tracked as Phase 6+ work in app/services/routines_CONTEXT.md."
+        ),
+    )
+    async def test_routine_auto_pauses_after_consecutive_failures(
+        self,
+        test_client: AsyncClient,
+        db_session: AsyncSession,
+        admin_auth_headers: dict[str, str],
+    ) -> None:
+        """Routine with max_consecutive_failures=2 auto-pauses after 2 failed runs."""
+        from app.db.models.agent_routine import AgentRoutine
+
+        agent, _ = await _create_agent_with_key(db_session, name="auto-pause-agent")
+        await db_session.flush()
+
+        # Create a routine with a low failure threshold
+        routine_data = await _create_routine(
+            test_client,
+            admin_auth_headers,
+            str(agent.uuid),
+            name="Auto-Pause Test Routine",
+        )
+        routine_uuid = routine_data["uuid"]
+
+        # Manually set consecutive_failures to threshold - 1 (so next failure triggers pause)
+        result = await db_session.execute(
+            __import__("sqlalchemy").select(AgentRoutine).where(
+                AgentRoutine.uuid == routine_uuid
+            )
+        )
+        routine = result.scalar_one()
+        routine.consecutive_failures = 2
+        routine.max_consecutive_failures = 2
+        await db_session.flush()
+        await db_session.commit()
+
+        # Simulate a failed run by incrementing consecutive_failures beyond threshold.
+        # The evaluator task is supposed to detect this and auto-pause.
+        # Since the evaluator is not yet implemented, trigger via a manual run endpoint
+        # and observe if the routine transitions to paused.
+        resp = await test_client.post(
+            f"/v1/routines/{routine_uuid}/invoke",
+            json={"reason": "Simulated failure trigger"},
+            headers=admin_auth_headers,
+        )
+        # Whether this triggers auto-pause depends on the evaluator being hooked in
+        assert resp.status_code in (200, 202), resp.text
+
+        status_resp = await test_client.get(
+            f"/v1/routines/{routine_uuid}",
+            headers=admin_auth_headers,
+        )
+        assert status_resp.status_code == 200, status_resp.text
+        assert status_resp.json()["data"]["status"] == "paused", (
+            "Expected routine to auto-pause after max_consecutive_failures exceeded"
+        )

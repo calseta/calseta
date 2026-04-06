@@ -357,3 +357,135 @@ class TestCostTracking:
         """Human keys with agents:read can list heartbeat runs (read-only endpoint)."""
         resp = await test_client.get("/v1/heartbeat-runs", headers=admin_auth_headers)
         assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 exit-criteria gap: Secret redaction from heartbeat run context
+# ---------------------------------------------------------------------------
+
+
+class TestSecretRedaction:
+    """Phase 1 exit criterion: secret values never appear in heartbeat run logs.
+
+    HeartbeatRun.context_snapshot is currently always None (the heartbeat
+    service does not persist resolved secret values).  This test verifies
+    that a raw secret value (stored as an env_var secret) does NOT appear
+    anywhere in the heartbeat API response or in the persisted context_snapshot.
+    """
+
+    async def test_heartbeat_response_does_not_expose_secret_value(
+        self,
+        test_client: AsyncClient,
+        agent_with_key: tuple[AgentRegistration, str],
+        agent_auth_headers: dict[str, str],
+        db_session: AsyncSession,
+    ) -> None:
+        """Secret resolved at runtime must never appear in the heartbeat response body."""
+        import json
+        import os
+
+        # Inject a recognisable secret value as an env var
+        secret_sentinel = "SUPER_SECRET_xyzzy_42"
+        env_var_name = "TEST_HEARTBEAT_SECRET"
+        os.environ[env_var_name] = secret_sentinel
+
+        try:
+            # Send a heartbeat — the agent does NOT reference the secret here,
+            # but if the service were to inadvertently log env state it could leak.
+            resp = await test_client.post(
+                "/v1/heartbeat",
+                json={
+                    "status": "running",
+                    "findings_count": 0,
+                    "actions_proposed": 0,
+                    "progress_note": "Checking environment",
+                },
+                headers=agent_auth_headers,
+            )
+            assert resp.status_code == 200, resp.text
+
+            # The entire response body must not contain the raw secret value
+            response_text = resp.text
+            assert secret_sentinel not in response_text, (
+                f"Raw secret sentinel {secret_sentinel!r} found in heartbeat response"
+            )
+
+            # The persisted HeartbeatRun.context_snapshot must also be clean
+            run_uuid = resp.json()["data"]["heartbeat_run_id"]
+            result = await db_session.execute(
+                __import__("sqlalchemy").select(HeartbeatRun).where(
+                    HeartbeatRun.uuid == run_uuid
+                )
+            )
+            run = result.scalar_one()
+            snapshot_text = json.dumps(run.context_snapshot) if run.context_snapshot else ""
+            assert secret_sentinel not in snapshot_text, (
+                "Raw secret sentinel found in HeartbeatRun.context_snapshot"
+            )
+        finally:
+            os.environ.pop(env_var_name, None)
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 exit-criteria gap: Session compaction handoff injection
+# ---------------------------------------------------------------------------
+
+
+class TestSessionCompactionHandoff:
+    """Phase 1 exit criterion: when compaction is flagged on a session the next
+    heartbeat prompt receives the session_handoff_markdown instead of raw history.
+
+    This is a unit test against PromptBuilder._build_messages() which is
+    the exact layer where handoff injection happens.
+    """
+
+    def test_handoff_summary_injected_when_session_compacted(self) -> None:
+        """_build_messages injects handoff markdown when needs_compaction was set."""
+        from unittest.mock import MagicMock
+
+        from app.runtime.prompt_builder import PromptBuilder
+
+        handoff_text = "## Investigation Handoff\nFound 3 malicious IPs. Next step: block them."
+        layer4_msg = "Current alert context: ransomware beachhead detected."
+
+        # Build a minimal AgentTaskSession mock with session_handoff_markdown set
+        session = MagicMock()
+        session.session_params = {
+            "session_handoff_markdown": handoff_text,
+            # needs_compaction is already acted upon — handoff was generated
+        }
+
+        db_mock = MagicMock()
+        builder = PromptBuilder(db_mock)
+        messages = builder._build_messages(layer4_msg, session)
+
+        assert len(messages) == 1, f"Expected 1 message, got {len(messages)}: {messages}"
+        content = messages[0]["content"]
+        assert handoff_text in content, (
+            f"Handoff summary not found in message content.\n"
+            f"Expected to contain: {handoff_text!r}\n"
+            f"Got: {content!r}"
+        )
+        # Layer-4 context (current alert) must also be present
+        assert layer4_msg in content, (
+            f"Layer-4 alert context not found in message content.\n"
+            f"Got: {content!r}"
+        )
+
+    def test_full_history_used_when_no_compaction(self) -> None:
+        """Without compaction, _build_messages returns the stored message history."""
+        from unittest.mock import MagicMock
+
+        from app.runtime.prompt_builder import PromptBuilder
+
+        prior_messages = [
+            {"role": "user", "content": "Investigate this alert."},
+            {"role": "assistant", "content": "Starting investigation."},
+        ]
+        session = MagicMock()
+        session.session_params = {"messages": prior_messages}
+
+        builder = PromptBuilder(MagicMock())
+        messages = builder._build_messages(None, session)
+
+        assert messages == prior_messages
