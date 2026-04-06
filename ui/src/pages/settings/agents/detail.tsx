@@ -58,9 +58,18 @@ import {
   usePauseAgent,
   useResumeAgent,
   useTerminateAgent,
+  useTools,
+  useAgentActivity,
+  useAgentCostSummary,
 } from "@/hooks/use-api";
-import type { HeartbeatRun, CostEvent, AgentInvocation } from "@/lib/types";
+import type { HeartbeatRun, CostEvent, AgentInvocation, AgentTool } from "@/lib/types";
 import { formatDate, relativeTime } from "@/lib/format";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Globe,
   Clock,
@@ -84,6 +93,10 @@ import {
   Pause,
   Play,
   StopCircle,
+  Trash2,
+  Plus,
+  Wrench,
+  LayoutDashboard,
 } from "lucide-react";
 
 const ALL_SEVERITIES = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
@@ -190,7 +203,7 @@ export function AgentDetailPage() {
 
   const agent = data?.data;
 
-  // Data for new tabs
+  // Data for existing tabs
   const { data: heartbeatData } = useAgentHeartbeatRuns(uuid);
   const { data: costData } = useAgentCostEvents(uuid);
   const { data: invocationData } = useAgentInvocations(uuid);
@@ -198,6 +211,20 @@ export function AgentDetailPage() {
   const heartbeatRuns: HeartbeatRun[] = heartbeatData?.data ?? [];
   const costEvents: CostEvent[] = costData?.data ?? [];
   const invocations: AgentInvocation[] = invocationData?.data ?? [];
+
+  // Instructions tab state
+  const [selectedInstructionFile, setSelectedInstructionFile] = useState<string | null>(null);
+  const [showNewFileInput, setShowNewFileInput] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
+
+  // Skills tab state
+  const [showAddToolDialog, setShowAddToolDialog] = useState(false);
+  const { data: allToolsData } = useTools();
+  const allTools: AgentTool[] = allToolsData?.data ?? [];
+
+  // Dashboard tab
+  const { data: costSummaryData } = useAgentCostSummary(uuid);
+  const { data: activityData, isError: activityError } = useAgentActivity(uuid);
 
   const totalCostCents = costEvents.reduce((sum, e) => sum + e.cost_cents, 0);
 
@@ -623,6 +650,18 @@ export function AgentDetailPage() {
             <TabsTrigger value="work" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
               <Layers className="h-3.5 w-3.5 mr-1" />
               Work
+            </TabsTrigger>
+            <TabsTrigger value="instructions" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              Instructions
+            </TabsTrigger>
+            <TabsTrigger value="skills" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Wrench className="h-3.5 w-3.5 mr-1" />
+              Skills
+            </TabsTrigger>
+            <TabsTrigger value="dashboard" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <LayoutDashboard className="h-3.5 w-3.5 mr-1" />
+              Dashboard
             </TabsTrigger>
           </TabsList>
           <DetailPageLayout
@@ -1397,6 +1436,415 @@ export function AgentDetailPage() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+            {/* Instructions Tab */}
+            <TabsContent value="instructions" className="mt-4">
+              <div className="flex border border-border rounded-lg overflow-hidden bg-card" style={{ minHeight: "400px" }}>
+                {/* Left panel — file list */}
+                <div className="w-1/3 border-r border-border flex flex-col">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                    <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Files</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setShowNewFileInput(true); setNewFileName(""); }}
+                      className="h-6 w-6 p-0 text-dim hover:text-teal"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+
+                  {/* New file inline input */}
+                  {showNewFileInput && (
+                    <div className="px-3 py-2 border-b border-border space-y-1.5">
+                      <Input
+                        value={newFileName}
+                        onChange={(e) => setNewFileName(e.target.value)}
+                        placeholder="filename.md"
+                        autoFocus
+                        className="h-7 text-xs bg-surface border-border font-mono"
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") { setShowNewFileInput(false); setNewFileName(""); }
+                        }}
+                      />
+                      <div className="flex gap-1.5">
+                        <Button
+                          size="sm"
+                          disabled={!newFileName.trim() || patchAgent.isPending}
+                          className="h-6 text-xs bg-teal text-white hover:bg-teal-dim flex-1"
+                          onClick={() => {
+                            const name = newFileName.trim();
+                            if (!name) return;
+                            const existing = agent.instruction_files ?? [];
+                            const updated = [...existing, { name, content: "" }];
+                            patchAgent.mutate(
+                              { uuid, body: { instruction_files: updated } },
+                              {
+                                onSuccess: () => {
+                                  toast.success("File created");
+                                  setShowNewFileInput(false);
+                                  setNewFileName("");
+                                  setSelectedInstructionFile(name);
+                                },
+                                onError: () => toast.error("Failed to create file"),
+                              },
+                            );
+                          }}
+                        >
+                          Create
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs text-dim flex-1"
+                          onClick={() => { setShowNewFileInput(false); setNewFileName(""); }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* File list */}
+                  <div className="flex-1 overflow-y-auto">
+                    {(!agent.instruction_files || agent.instruction_files.length === 0) && !showNewFileInput ? (
+                      <div className="py-12 text-center text-xs text-dim px-3">No instruction files yet.</div>
+                    ) : (
+                      (agent.instruction_files ?? []).map((file) => (
+                        <div
+                          key={file.name}
+                          className={cn(
+                            "group flex items-center justify-between px-3 py-2 cursor-pointer border-b border-border transition-colors",
+                            selectedInstructionFile === file.name
+                              ? "bg-teal/10"
+                              : "hover:bg-surface/50",
+                          )}
+                          onClick={() => setSelectedInstructionFile(file.name)}
+                        >
+                          <span className="text-xs font-mono text-foreground truncate flex-1">{file.name}</span>
+                          <button
+                            className="h-5 w-5 p-0 text-dim opacity-0 group-hover:opacity-100 hover:text-red-threat transition-opacity ml-2 shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const updated = (agent.instruction_files ?? []).filter((f) => f.name !== file.name);
+                              patchAgent.mutate(
+                                { uuid, body: { instruction_files: updated } },
+                                {
+                                  onSuccess: () => {
+                                    toast.success("File removed");
+                                    if (selectedInstructionFile === file.name) setSelectedInstructionFile(null);
+                                  },
+                                  onError: () => toast.error("Failed to remove file"),
+                                },
+                              );
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Right panel — file editor */}
+                <div className="flex-1 flex flex-col">
+                  {selectedInstructionFile ? (
+                    <>
+                      <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                        <span className="text-xs font-mono text-muted-foreground">{selectedInstructionFile}</span>
+                      </div>
+                      <div className="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center">
+                        <FileText className="h-8 w-8 text-dim" />
+                        <p className="text-sm text-dim">File API coming soon</p>
+                        <p className="text-xs text-dim">
+                          Direct file editing will be available once <span className="font-mono">GET/PUT /v1/agents/&#123;uuid&#125;/files/&#123;path&#125;</span> is deployed.
+                        </p>
+                        <Button
+                          size="sm"
+                          disabled
+                          className="mt-2 bg-teal text-white hover:bg-teal-dim disabled:opacity-40 text-xs"
+                        >
+                          <Save className="h-3 w-3 mr-1" />
+                          Save
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-sm text-dim">
+                      Select a file to edit.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Skills Tab */}
+            <TabsContent value="skills" className="mt-4">
+              <Card className="bg-card border-border">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-2">
+                      <Wrench className="h-3.5 w-3.5 text-teal" />
+                      Assigned Tools
+                    </div>
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    onClick={() => setShowAddToolDialog(true)}
+                    className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Tool
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const assignedIds = new Set(agent.tool_ids ?? []);
+                    const assignedTools = allTools.filter((t) => assignedIds.has(t.id));
+
+                    function tierBadgeClass(tier: string): string {
+                      switch (tier) {
+                        case "safe": return "text-teal bg-teal/10 border-teal/30";
+                        case "managed": return "text-teal-light bg-teal-light/10 border-teal-light/30";
+                        case "requires_approval": return "text-amber bg-amber/10 border-amber/30";
+                        case "forbidden": return "text-red-threat bg-red-threat/10 border-red-threat/30";
+                        default: return "text-dim bg-dim/10 border-dim/30";
+                      }
+                    }
+
+                    if (assignedTools.length === 0) {
+                      return (
+                        <div className="py-12 text-center text-sm text-dim">
+                          No tools assigned. Click &lsquo;Add Tool&rsquo; to get started.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {assignedTools.map((tool) => (
+                          <div
+                            key={tool.id}
+                            className="flex items-start gap-3 p-3 rounded-md border border-border bg-surface hover:border-teal/20 transition-colors"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-medium text-foreground font-mono">{tool.display_name}</span>
+                                <Badge
+                                  variant="outline"
+                                  className={cn("text-[11px]", tierBadgeClass(tool.tier))}
+                                >
+                                  {tool.tier.replace("_", " ")}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-dim line-clamp-2">{tool.description}</p>
+                            </div>
+                            <button
+                              className="text-dim hover:text-red-threat transition-colors shrink-0 mt-0.5"
+                              onClick={() => {
+                                const updated = (agent.tool_ids ?? []).filter((id) => id !== tool.id);
+                                patchAgent.mutate(
+                                  { uuid, body: { tool_ids: updated } },
+                                  {
+                                    onSuccess: () => toast.success("Tool removed"),
+                                    onError: () => toast.error("Failed to remove tool"),
+                                  },
+                                );
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
+              {/* Add Tool Dialog */}
+              <Dialog open={showAddToolDialog} onOpenChange={setShowAddToolDialog}>
+                <DialogContent className="bg-card border-border max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Add Tool</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                    {(() => {
+                      const assignedIds = new Set(agent.tool_ids ?? []);
+                      const available = allTools.filter((t) => !assignedIds.has(t.id) && t.is_active);
+
+                      function tierBadgeClass(tier: string): string {
+                        switch (tier) {
+                          case "safe": return "text-teal bg-teal/10 border-teal/30";
+                          case "managed": return "text-teal-light bg-teal-light/10 border-teal-light/30";
+                          case "requires_approval": return "text-amber bg-amber/10 border-amber/30";
+                          case "forbidden": return "text-red-threat bg-red-threat/10 border-red-threat/30";
+                          default: return "text-dim bg-dim/10 border-dim/30";
+                        }
+                      }
+
+                      if (available.length === 0) {
+                        return <p className="text-sm text-dim text-center py-6">No available tools to add.</p>;
+                      }
+                      return available.map((tool) => (
+                        <button
+                          key={tool.id}
+                          className="w-full flex items-start gap-3 p-3 rounded-md border border-border bg-surface hover:border-teal/30 transition-colors text-left"
+                          onClick={() => {
+                            const updated = [...(agent.tool_ids ?? []), tool.id];
+                            patchAgent.mutate(
+                              { uuid, body: { tool_ids: updated } },
+                              {
+                                onSuccess: () => {
+                                  toast.success("Tool added");
+                                  setShowAddToolDialog(false);
+                                },
+                                onError: () => toast.error("Failed to add tool"),
+                              },
+                            );
+                          }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs font-medium text-foreground font-mono">{tool.display_name}</span>
+                              <Badge
+                                variant="outline"
+                                className={cn("text-[11px]", tierBadgeClass(tool.tier))}
+                              >
+                                {tool.tier.replace("_", " ")}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-dim line-clamp-2">{tool.description}</p>
+                          </div>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </TabsContent>
+
+            {/* Dashboard Tab */}
+            <TabsContent value="dashboard" className="mt-4 space-y-4">
+              {/* Stat cards row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card className="bg-card border-border">
+                  <CardContent className="p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-dim mb-1">Total Runs</div>
+                    <div className="text-lg font-mono font-semibold text-foreground">
+                      {heartbeatData?.meta?.total ?? 0}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-border">
+                  <CardContent className="p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-dim mb-1">Cost This Month</div>
+                    <div className="text-lg font-mono font-semibold text-foreground">
+                      {costSummaryData?.data
+                        ? formatCents(costSummaryData.data.total_cost_cents)
+                        : <span className="text-sm text-dim">—</span>}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-border">
+                  <CardContent className="p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-dim mb-1">Active Assignments</div>
+                    <div className="text-sm text-dim mt-1">Data not available</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-border">
+                  <CardContent className="p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-dim mb-1">Avg Run Duration</div>
+                    <div className="text-lg font-mono font-semibold text-foreground">
+                      {(() => {
+                        const completed = heartbeatRuns.filter((r) => r.started_at && r.finished_at);
+                        if (completed.length === 0) return <span className="text-sm text-dim">—</span>;
+                        const avgMs = completed.reduce((sum, r) => {
+                          return sum + (new Date(r.finished_at!).getTime() - new Date(r.started_at!).getTime());
+                        }, 0) / completed.length;
+                        if (avgMs < 1000) return `${Math.round(avgMs)}ms`;
+                        if (avgMs < 60000) return `${(avgMs / 1000).toFixed(1)}s`;
+                        return `${Math.round(avgMs / 60000)}m`;
+                      })()}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Row 2 — Last runs + Activity */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Last 5 runs */}
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-3.5 w-3.5 text-teal" />
+                        Recent Runs
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {heartbeatRuns.length === 0 ? (
+                      <div className="py-8 text-center text-sm text-dim">No runs yet</div>
+                    ) : (
+                      <div className="divide-y divide-border">
+                        {heartbeatRuns.slice(0, 5).map((run) => (
+                          <div key={run.uuid} className="flex items-center justify-between px-4 py-2">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className={cn("text-[11px]", heartbeatStatusClass(run.status))}
+                              >
+                                {run.status}
+                              </Badge>
+                              <span className="text-xs text-dim">
+                                {run.started_at ? relativeTime(run.started_at) : "--"}
+                              </span>
+                            </div>
+                            <span className="text-xs font-mono text-muted-foreground">
+                              {formatDuration(run.started_at, run.finished_at)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Recent Activity */}
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-foreground">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-3.5 w-3.5 text-dim" />
+                        Recent Activity
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {activityError ? (
+                      <div className="py-8 text-center text-sm text-dim">Activity feed coming soon</div>
+                    ) : !activityData ? (
+                      <div className="py-8 text-center text-sm text-dim">Loading...</div>
+                    ) : activityData.data.length === 0 ? (
+                      <div className="py-8 text-center text-sm text-dim">No activity</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {activityData.data.map((event) => (
+                          <div key={event.uuid} className="flex items-start gap-2">
+                            <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-teal shrink-0" />
+                            <div>
+                              <span className="text-xs text-foreground">{event.event_type.replace(/_/g, " ")}</span>
+                              <span className="text-xs text-dim ml-2">{relativeTime(event.created_at)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </DetailPageLayout>
         </Tabs>

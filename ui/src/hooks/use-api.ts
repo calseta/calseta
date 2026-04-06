@@ -51,6 +51,7 @@ import type {
   KBSearchResult,
   KBSyncResult,
   KBPageLink,
+  AgentTool,
 } from "@/lib/types";
 
 // Settings
@@ -891,6 +892,14 @@ export function useReleaseAlert() {
   });
 }
 
+// Post heartbeat (trigger for an agent by operator)
+export function usePostHeartbeat() {
+  return useMutation({
+    mutationFn: (agentUuid: string) =>
+      api.post<DataResponse<{ status: string }>>("/heartbeat", { agent_id: agentUuid }),
+  });
+}
+
 // Agent Heartbeat Runs
 export function useAgentHeartbeatRuns(agentUuid: string, params?: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams();
@@ -1407,5 +1416,34 @@ export function useAddKBPageLink() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["kb-page", vars.slug] });
     },
+  });
+}
+
+// ============================================================
+// Agent Tools
+// ============================================================
+
+export function useTools(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  search.set("page_size", "500");
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["tools", qs],
+    queryFn: () => api.get<PaginatedResponse<AgentTool>>(`/tools?${qs}`),
+  });
+}
+
+// Agent activity (404 if endpoint not yet deployed)
+export function useAgentActivity(agentUuid: string) {
+  return useQuery({
+    queryKey: ["agent-activity", agentUuid],
+    queryFn: () => api.get<PaginatedResponse<ActivityEvent>>(`/agents/${agentUuid}/activity?page_size=10`),
+    enabled: !!agentUuid,
+    retry: false,
   });
 }

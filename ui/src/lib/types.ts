@@ -363,6 +363,23 @@ export interface AgentRegistration {
   max_investigation_minutes?: number;
   stall_threshold?: number;
   memory_promotion_requires_approval?: boolean;
+  instruction_files?: Array<{ name: string; content: string }> | null;
+}
+
+// Agent Tools
+export interface AgentTool {
+  id: string;
+  display_name: string;
+  description: string;
+  documentation: string | null;
+  tier: string;
+  category: string;
+  input_schema: Record<string, unknown>;
+  output_schema: Record<string, unknown> | null;
+  handler_ref: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // API Keys
