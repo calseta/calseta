@@ -5,6 +5,16 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -33,12 +43,13 @@ import {
   useRoutine,
   useRoutineRuns,
   usePatchRoutine,
+  usePatchTrigger,
   useTriggerRoutine,
   useDeleteRoutine,
 } from "@/hooks/use-api";
 import { formatDate, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Play, Pause, RotateCcw, Trash2 } from "lucide-react";
+import { Play, Pause, RotateCcw, Trash2, Pencil, X, Check } from "lucide-react";
 import type { RoutineRun } from "@/lib/types";
 
 function routineStatusColor(status: string): string {
@@ -79,16 +90,27 @@ function runDuration(run: RoutineRun): string {
   return `${(diffSec / 3600).toFixed(1)}h`;
 }
 
+interface EditForm {
+  name: string;
+  description: string;
+  concurrency_policy: string;
+  max_consecutive_failures: string;
+  cron_expression: string;
+}
+
 export function RoutineDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
   const navigate = useNavigate();
   const { data: routineResp, isLoading, refetch, isFetching } = useRoutine(uuid);
   const { data: runsResp, refetch: refetchRuns } = useRoutineRuns(uuid);
   const patchRoutine = usePatchRoutine();
+  const patchTrigger = usePatchTrigger();
   const triggerRoutine = useTriggerRoutine();
   const deleteRoutine = useDeleteRoutine();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
 
   const routine = routineResp?.data;
   const runs = runsResp?.data ?? [];
@@ -146,6 +168,80 @@ export function RoutineDetailPage() {
       },
       onError: () => toast.error("Failed to delete routine"),
     });
+  }
+
+  function handleEditStart() {
+    if (!routine) return;
+    const firstCronTrigger = routine.triggers.find((t) => t.kind === "cron");
+    setEditForm({
+      name: routine.name,
+      description: routine.description ?? "",
+      concurrency_policy: routine.concurrency_policy,
+      max_consecutive_failures: String(routine.max_consecutive_failures),
+      cron_expression: firstCronTrigger?.cron_expression ?? "",
+    });
+    setIsEditing(true);
+  }
+
+  function handleEditCancel() {
+    setIsEditing(false);
+    setEditForm(null);
+  }
+
+  async function handleEditSave() {
+    if (!editForm || !routine) return;
+
+    const routineBody: Record<string, unknown> = {
+      name: editForm.name.trim() || routine.name,
+      description: editForm.description.trim() || null,
+      concurrency_policy: editForm.concurrency_policy,
+      max_consecutive_failures: parseInt(editForm.max_consecutive_failures) || routine.max_consecutive_failures,
+    };
+
+    const firstCronTrigger = routine.triggers.find((t) => t.kind === "cron");
+    const cronChanged =
+      firstCronTrigger && editForm.cron_expression !== (firstCronTrigger.cron_expression ?? "");
+
+    let hasError = false;
+
+    await new Promise<void>((resolve) => {
+      patchRoutine.mutate(
+        { uuid, body: routineBody },
+        {
+          onSuccess: () => resolve(),
+          onError: () => {
+            toast.error("Failed to save routine");
+            hasError = true;
+            resolve();
+          },
+        },
+      );
+    });
+
+    if (!hasError && cronChanged && firstCronTrigger) {
+      await new Promise<void>((resolve) => {
+        patchTrigger.mutate(
+          {
+            routineUuid: uuid,
+            triggerUuid: String(firstCronTrigger.uuid),
+            body: { cron_expression: editForm.cron_expression },
+          },
+          {
+            onSuccess: () => resolve(),
+            onError: () => {
+              toast.error("Failed to update cron expression");
+              resolve();
+            },
+          },
+        );
+      });
+    }
+
+    if (!hasError) {
+      toast.success("Routine saved");
+      setIsEditing(false);
+      setEditForm(null);
+    }
   }
 
   return (
@@ -222,52 +318,139 @@ export function RoutineDetailPage() {
 
           {/* Configuration tab */}
           <TabsContent value="configuration" className="mt-4">
+            <div className="flex justify-end mb-3">
+              {!isEditing ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleEditStart}
+                  className="h-8 gap-1.5 text-xs text-dim hover:text-foreground"
+                >
+                  <Pencil className="h-3 w-3" />
+                  Edit
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleEditCancel}
+                    className="h-8 gap-1.5 text-xs"
+                  >
+                    <X className="h-3 w-3" />
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleEditSave}
+                    disabled={patchRoutine.isPending || patchTrigger.isPending}
+                    className="h-8 gap-1.5 text-xs bg-teal text-white hover:bg-teal-dim"
+                  >
+                    <Check className="h-3 w-3" />
+                    Save
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <DetailPageLayout
               sidebar={
                 <DetailPageSidebar>
                   <SidebarSection title="Settings">
-                    <DetailPageField label="Status" value={routine.status} />
-                    <DetailPageField label="Concurrency Policy" value={routine.concurrency_policy} />
-                    <DetailPageField label="Catch-up Policy" value={routine.catch_up_policy} />
-                    <DetailPageField
-                      label="Max Consecutive Failures"
-                      value={String(routine.max_consecutive_failures)}
-                    />
-                    <DetailPageField
-                      label="Consecutive Failures"
-                      value={
-                        <span
-                          className={cn(
-                            "text-xs",
-                            routine.consecutive_failures > 0 ? "text-red-threat" : "text-dim",
-                          )}
-                        >
-                          {routine.consecutive_failures}
-                        </span>
-                      }
-                    />
-                    <DetailPageField
-                      label="Agent Registration"
-                      value={
-                        routine.agent_registration_uuid ? (
-                          <span className="font-mono text-[11px]">
-                            {routine.agent_registration_uuid.slice(0, 8)}...
-                          </span>
-                        ) : (
-                          "—"
-                        )
-                      }
-                    />
-                    <DetailPageField
-                      label="Last Run"
-                      value={routine.last_run_at ? relativeTime(routine.last_run_at) : "—"}
-                    />
-                    <DetailPageField
-                      label="Next Run"
-                      value={routine.next_run_at ? relativeTime(routine.next_run_at) : "—"}
-                    />
-                    <DetailPageField label="Created" value={formatDate(routine.created_at)} />
-                    <DetailPageField label="Updated" value={formatDate(routine.updated_at)} />
+                    {isEditing && editForm ? (
+                      <div className="space-y-3 px-1">
+                        <div>
+                          <Label className="text-[10px] text-dim uppercase tracking-wide">Name</Label>
+                          <Input
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            className="mt-1 h-7 text-xs bg-surface border-border"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-dim uppercase tracking-wide">Concurrency Policy</Label>
+                          <Select
+                            value={editForm.concurrency_policy}
+                            onValueChange={(v) => setEditForm({ ...editForm, concurrency_policy: v })}
+                          >
+                            <SelectTrigger className="mt-1 h-7 text-xs bg-surface border-border">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="skip_if_active" className="text-xs">skip_if_active</SelectItem>
+                              <SelectItem value="coalesce_if_active" className="text-xs">coalesce_if_active</SelectItem>
+                              <SelectItem value="always_run" className="text-xs">always_run</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-dim uppercase tracking-wide">Failure Threshold</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={editForm.max_consecutive_failures}
+                            onChange={(e) => setEditForm({ ...editForm, max_consecutive_failures: e.target.value })}
+                            className="mt-1 h-7 text-xs bg-surface border-border"
+                          />
+                        </div>
+                        {routine.triggers.some((t) => t.kind === "cron") && (
+                          <div>
+                            <Label className="text-[10px] text-dim uppercase tracking-wide">Cron Expression</Label>
+                            <Input
+                              value={editForm.cron_expression}
+                              onChange={(e) => setEditForm({ ...editForm, cron_expression: e.target.value })}
+                              placeholder="e.g. 0 * * * *"
+                              className="mt-1 h-7 text-xs font-mono bg-surface border-border"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <DetailPageField label="Status" value={routine.status} />
+                        <DetailPageField label="Concurrency Policy" value={routine.concurrency_policy} />
+                        <DetailPageField label="Catch-up Policy" value={routine.catch_up_policy} />
+                        <DetailPageField
+                          label="Max Consecutive Failures"
+                          value={String(routine.max_consecutive_failures)}
+                        />
+                        <DetailPageField
+                          label="Consecutive Failures"
+                          value={
+                            <span
+                              className={cn(
+                                "text-xs",
+                                routine.consecutive_failures > 0 ? "text-red-threat" : "text-dim",
+                              )}
+                            >
+                              {routine.consecutive_failures}
+                            </span>
+                          }
+                        />
+                        <DetailPageField
+                          label="Agent Registration"
+                          value={
+                            routine.agent_registration_uuid ? (
+                              <span className="font-mono text-[11px]">
+                                {routine.agent_registration_uuid.slice(0, 8)}...
+                              </span>
+                            ) : (
+                              "—"
+                            )
+                          }
+                        />
+                        <DetailPageField
+                          label="Last Run"
+                          value={routine.last_run_at ? relativeTime(routine.last_run_at) : "—"}
+                        />
+                        <DetailPageField
+                          label="Next Run"
+                          value={routine.next_run_at ? relativeTime(routine.next_run_at) : "—"}
+                        />
+                        <DetailPageField label="Created" value={formatDate(routine.created_at)} />
+                        <DetailPageField label="Updated" value={formatDate(routine.updated_at)} />
+                      </>
+                    )}
                   </SidebarSection>
                 </DetailPageSidebar>
               }
@@ -277,11 +460,21 @@ export function RoutineDetailPage() {
                   <CardTitle className="text-sm font-medium">About</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-foreground">
-                    {routine.description ?? (
-                      <span className="text-dim">No description provided.</span>
-                    )}
-                  </p>
+                  {isEditing && editForm ? (
+                    <Textarea
+                      value={editForm.description}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      rows={4}
+                      placeholder="Describe what this routine does..."
+                      className="text-sm bg-surface border-border"
+                    />
+                  ) : (
+                    <p className="text-sm text-foreground">
+                      {routine.description ?? (
+                        <span className="text-dim">No description provided.</span>
+                      )}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 

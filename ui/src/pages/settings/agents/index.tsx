@@ -9,11 +9,17 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   TableBody,
   TableCell,
@@ -28,11 +34,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TablePagination } from "@/components/table-pagination";
-import { useAgents, useCreateAgent, useDeleteAgent } from "@/hooks/use-api";
+import { useAgents, useCreateAgent, useDeleteAgent, useLLMIntegrations } from "@/hooks/use-api";
 import { useTableState } from "@/hooks/use-table-state";
-import { formatDate, statusColor } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { CopyableText } from "@/components/copyable-text";
-import { Plus, Trash2, Bot, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Bot, RefreshCw, X, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const AGENT_COLUMNS: ColumnDef[] = [
@@ -45,38 +51,126 @@ const AGENT_COLUMNS: ColumnDef[] = [
   { key: "actions", initialWidth: 44, minWidth: 44, maxWidth: 44 },
 ];
 
+interface AgentForm {
+  name: string;
+  description: string;
+  agent_type: string;
+  role: string;
+  execution_mode: string;
+  endpoint_url: string;
+  adapter_type: string;
+  llm_integration_id: string;
+  capabilities: string[];
+  max_concurrent_alerts: string;
+  max_cost_per_alert: string;
+  max_investigation_minutes: string;
+}
+
+const defaultForm: AgentForm = {
+  name: "",
+  description: "",
+  agent_type: "standalone",
+  role: "",
+  execution_mode: "external",
+  endpoint_url: "",
+  adapter_type: "webhook",
+  llm_integration_id: "",
+  capabilities: [],
+  max_concurrent_alerts: "",
+  max_cost_per_alert: "",
+  max_investigation_minutes: "",
+};
+
 export function AgentsPage() {
   const { page, setPage, pageSize, handlePageSizeChange, params } = useTableState({});
   const { data, isLoading, refetch, isFetching } = useAgents(params);
   const createAgent = useCreateAgent();
   const deleteAgent = useDeleteAgent();
+  const { data: llmData } = useLLMIntegrations();
+  const llmIntegrations = llmData?.data ?? [];
+
   const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<AgentForm>(defaultForm);
+  const [capInput, setCapInput] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<{ uuid: string; name: string } | null>(null);
 
   const agents = data?.data ?? [];
   const meta = data?.meta;
 
-  function handleCreate(e: React.FormEvent<HTMLFormElement>) {
+  function handleOpen() {
+    setForm(defaultForm);
+    setCapInput("");
+    setShowAdvanced(false);
+    setErrors({});
+    setOpen(true);
+  }
+
+  function validate(): boolean {
+    const errs: Record<string, string> = {};
+    if (!form.name.trim()) errs.name = "Name is required";
+    if (!form.agent_type) errs.agent_type = "Agent type is required";
+    if (!form.execution_mode) errs.execution_mode = "Execution mode is required";
+    if (form.execution_mode === "external" && !form.endpoint_url.trim()) {
+      errs.endpoint_url = "Endpoint URL is required for external agents";
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
+
+  function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const description = (fd.get("description") as string)?.trim() || undefined;
-    createAgent.mutate(
-      {
-        name: fd.get("name") as string,
-        endpoint_url: fd.get("endpoint_url") as string,
-        description,
-        is_active: true,
-        trigger_on_sources: [],
-        trigger_on_severities: [],
+    if (!validate()) return;
+
+    const body: Record<string, unknown> = {
+      name: form.name.trim(),
+      description: form.description.trim() || undefined,
+      agent_type: form.agent_type,
+      role: form.role.trim() || undefined,
+      execution_mode: form.execution_mode,
+      capabilities: form.capabilities.length > 0 ? form.capabilities : undefined,
+      is_active: true,
+      trigger_on_sources: [],
+      trigger_on_severities: [],
+    };
+
+    if (form.execution_mode === "external") {
+      body.endpoint_url = form.endpoint_url.trim();
+      body.adapter_type = form.adapter_type;
+    } else if (form.execution_mode === "managed" && form.llm_integration_id) {
+      body.llm_integration_id = parseInt(form.llm_integration_id);
+    }
+
+    if (form.max_concurrent_alerts) {
+      body.max_concurrent_alerts = parseInt(form.max_concurrent_alerts);
+    }
+    if (form.max_cost_per_alert) {
+      body.max_cost_per_alert_cents = Math.round(parseFloat(form.max_cost_per_alert) * 100);
+    }
+    if (form.max_investigation_minutes) {
+      body.max_investigation_minutes = parseInt(form.max_investigation_minutes);
+    }
+
+    createAgent.mutate(body, {
+      onSuccess: () => {
+        setOpen(false);
+        toast.success("Agent registered");
       },
-      {
-        onSuccess: () => {
-          setOpen(false);
-          toast.success("Agent registered");
-        },
-        onError: () => toast.error("Failed to register agent"),
-      },
-    );
+      onError: () => toast.error("Failed to register agent"),
+    });
+  }
+
+  function addCapability(value: string) {
+    const trimmed = value.trim();
+    if (trimmed && !form.capabilities.includes(trimmed)) {
+      setForm({ ...form, capabilities: [...form.capabilities, trimmed] });
+    }
+    setCapInput("");
+  }
+
+  function removeCapability(cap: string) {
+    setForm({ ...form, capabilities: form.capabilities.filter((c) => c !== cap) });
   }
 
   function handleDelete() {
@@ -106,41 +200,10 @@ export function AgentsPage() {
             </Button>
             <span className="text-xs text-dim">{meta?.total ?? agents.length} agents</span>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="bg-teal text-white hover:bg-teal-dim">
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Register Agent
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-card border-border">
-              <DialogHeader>
-                <DialogTitle>Register Agent</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Name</Label>
-                  <Input name="name" required className="mt-1 bg-surface border-border text-sm" />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Endpoint URL</Label>
-                  <Input name="endpoint_url" required type="url" className="mt-1 bg-surface border-border text-sm" />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Description (optional)</Label>
-                  <Textarea
-                    name="description"
-                    rows={2}
-                    className="mt-1 bg-surface border-border text-sm"
-                    placeholder="What does this agent do?"
-                  />
-                </div>
-                <Button type="submit" disabled={createAgent.isPending} className="w-full bg-teal text-white hover:bg-teal-dim">
-                  Register
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" className="bg-teal text-white hover:bg-teal-dim" onClick={handleOpen}>
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Register Agent
+          </Button>
         </div>
 
         <div className="rounded-lg border border-border bg-card">
@@ -184,8 +247,8 @@ export function AgentsPage() {
                         {agent.endpoint_url ? <CopyableText text={agent.endpoint_url} mono className="text-[11px] text-dim max-w-48 truncate" /> : <span className="text-[11px] text-dim">—</span>}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={cn("text-[11px]", statusColor(agent.status ?? (agent.is_active ? "active" : "terminated")))}>
-                          {agent.status ?? (agent.is_active ? "active" : "inactive")}
+                        <Badge variant="outline" className={agent.is_active ? "text-teal bg-teal/10 border-teal/30 text-[11px]" : "text-dim bg-dim/10 border-dim/30 text-[11px]"}>
+                          {agent.is_active ? "active" : "inactive"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-dim">
@@ -228,6 +291,257 @@ export function AgentsPage() {
           />
         )}
       </div>
+
+      {/* Register Agent Modal */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="bg-card border-border max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Register Agent</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-5">
+
+            {/* Section 1 — Identity */}
+            <div className="space-y-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-dim">Identity</p>
+              <div>
+                <Label className="text-xs text-muted-foreground">
+                  Name <span className="text-red-threat">*</span>
+                </Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className={cn("mt-1 bg-surface border-border text-sm", errors.name && "border-red-threat")}
+                  placeholder="e.g. Triage Specialist"
+                />
+                {errors.name && <p className="text-[11px] text-red-threat mt-1">{errors.name}</p>}
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Description</Label>
+                <Textarea
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  rows={2}
+                  className="mt-1 bg-surface border-border text-sm"
+                  placeholder="What does this agent do?"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">
+                    Agent Type <span className="text-red-threat">*</span>
+                  </Label>
+                  <Select
+                    value={form.agent_type}
+                    onValueChange={(v) => setForm({ ...form, agent_type: v })}
+                  >
+                    <SelectTrigger className={cn("mt-1 bg-surface border-border text-sm", errors.agent_type && "border-red-threat")}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="orchestrator">orchestrator</SelectItem>
+                      <SelectItem value="specialist">specialist</SelectItem>
+                      <SelectItem value="resolver">resolver</SelectItem>
+                      <SelectItem value="standalone">standalone</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Role</Label>
+                  <Input
+                    value={form.role}
+                    onChange={(e) => setForm({ ...form, role: e.target.value })}
+                    className="mt-1 bg-surface border-border text-sm"
+                    placeholder="e.g. Threat Hunter"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Section 2 — Execution */}
+            <div className="space-y-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-dim">Execution</p>
+              <div>
+                <Label className="text-xs text-muted-foreground">
+                  Execution Mode <span className="text-red-threat">*</span>
+                </Label>
+                <Select
+                  value={form.execution_mode}
+                  onValueChange={(v) => setForm({ ...form, execution_mode: v })}
+                >
+                  <SelectTrigger className="mt-1 bg-surface border-border text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="external">external</SelectItem>
+                    <SelectItem value="managed">managed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {form.execution_mode === "external" && (
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">
+                      Endpoint URL <span className="text-red-threat">*</span>
+                    </Label>
+                    <Input
+                      value={form.endpoint_url}
+                      onChange={(e) => setForm({ ...form, endpoint_url: e.target.value })}
+                      type="url"
+                      className={cn("mt-1 bg-surface border-border text-sm", errors.endpoint_url && "border-red-threat")}
+                      placeholder="https://your-agent.example.com/webhook"
+                    />
+                    {errors.endpoint_url && <p className="text-[11px] text-red-threat mt-1">{errors.endpoint_url}</p>}
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Adapter</Label>
+                    <Select
+                      value={form.adapter_type}
+                      onValueChange={(v) => setForm({ ...form, adapter_type: v })}
+                    >
+                      <SelectTrigger className="mt-1 bg-surface border-border text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="http">http</SelectItem>
+                        <SelectItem value="webhook">webhook</SelectItem>
+                        <SelectItem value="mcp">mcp</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              {form.execution_mode === "managed" && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">LLM Integration</Label>
+                  <Select
+                    value={form.llm_integration_id}
+                    onValueChange={(v) => setForm({ ...form, llm_integration_id: v })}
+                  >
+                    <SelectTrigger className="mt-1 bg-surface border-border text-sm">
+                      <SelectValue placeholder="Select LLM integration..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {llmIntegrations.map((llm) => (
+                        <SelectItem key={llm.uuid} value={String(llm.uuid)}>
+                          {llm.name} — {llm.provider}/{llm.model}
+                        </SelectItem>
+                      ))}
+                      {llmIntegrations.length === 0 && (
+                        <SelectItem value="_none" disabled>No integrations configured</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Section 3 — Capabilities */}
+            <div className="space-y-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-dim">Capabilities</p>
+              <div>
+                <Label className="text-xs text-muted-foreground">Add capabilities (press Enter)</Label>
+                <Input
+                  value={capInput}
+                  onChange={(e) => setCapInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCapability(capInput);
+                    }
+                  }}
+                  className="mt-1 bg-surface border-border text-sm"
+                  placeholder="e.g. triage, enrich, escalate"
+                />
+              </div>
+              {form.capabilities.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {form.capabilities.map((cap) => (
+                    <span
+                      key={cap}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-teal/10 text-teal border border-teal/30"
+                    >
+                      {cap}
+                      <button
+                        type="button"
+                        onClick={() => removeCapability(cap)}
+                        className="hover:text-red-threat transition-colors"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Section 4 — Advanced (collapsible) */}
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-dim hover:text-foreground transition-colors"
+              >
+                {showAdvanced ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                Advanced
+              </button>
+              {showAdvanced && (
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Max Concurrent Alerts</Label>
+                    <Input
+                      value={form.max_concurrent_alerts}
+                      onChange={(e) => setForm({ ...form, max_concurrent_alerts: e.target.value })}
+                      type="number"
+                      min={1}
+                      className="mt-1 bg-surface border-border text-sm"
+                      placeholder="1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Max Cost / Alert ($)</Label>
+                    <Input
+                      value={form.max_cost_per_alert}
+                      onChange={(e) => setForm({ ...form, max_cost_per_alert: e.target.value })}
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      className="mt-1 bg-surface border-border text-sm"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Max Investigation (min)</Label>
+                    <Input
+                      value={form.max_investigation_minutes}
+                      onChange={(e) => setForm({ ...form, max_investigation_minutes: e.target.value })}
+                      type="number"
+                      min={0}
+                      className="mt-1 bg-surface border-border text-sm"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              disabled={createAgent.isPending}
+              className="w-full bg-teal text-white hover:bg-teal-dim"
+            >
+              {createAgent.isPending ? "Registering..." : "Register Agent"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={!!deleteTarget}

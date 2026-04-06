@@ -36,6 +36,7 @@ import type {
   AgentIssue,
   IssueComment,
   Routine,
+  RoutineTrigger,
   RoutineRun,
   TopologyGraph,
   Secret,
@@ -1069,9 +1070,32 @@ export function usePatchRoutine() {
   return useMutation({
     mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
       api.patch<DataResponse<Routine>>(`/routines/${uuid}`, body),
-    onSuccess: (_data, vars) => {
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ["routine", vars.uuid] });
+      const prev = qc.getQueryData<DataResponse<Routine>>(["routine", vars.uuid]);
+      qc.setQueryData<DataResponse<Routine>>(["routine", vars.uuid], (old) => {
+        if (!old) return old;
+        return { ...old, data: { ...old.data, ...vars.body } };
+      });
+      return { prev };
+    },
+    onError: (_err, vars, ctx) => {
+      if (ctx?.prev !== undefined) qc.setQueryData(["routine", vars.uuid], ctx.prev);
+    },
+    onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ["routines"] });
       qc.invalidateQueries({ queryKey: ["routine", vars.uuid] });
+    },
+  });
+}
+
+export function usePatchTrigger() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ routineUuid, triggerUuid, body }: { routineUuid: string; triggerUuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<RoutineTrigger>>(`/routines/${routineUuid}/triggers/${triggerUuid}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["routine", vars.routineUuid] });
     },
   });
 }
