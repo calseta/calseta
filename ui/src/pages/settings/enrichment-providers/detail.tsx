@@ -5,6 +5,13 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -59,8 +66,6 @@ import {
   Globe,
   Clock,
   Pencil,
-  Save,
-  X,
   Loader2,
   CheckCircle2,
   XCircle,
@@ -317,15 +322,16 @@ export function EnrichmentProviderDetailPage() {
   const deleteProvider = useDeleteEnrichmentProvider();
   const navigate = useNavigate();
 
-  // Indicator types editing (dirty-state)
-  const [indicatorTypesDraft, setIndicatorTypesDraft] = useState<string[] | null>(null);
+  // Indicator types dialog
+  const [showIndicatorTypesDialog, setShowIndicatorTypesDialog] = useState(false);
+  const [indicatorTypesDraft, setIndicatorTypesDraft] = useState<string[]>([]);
 
-  // HTTP config editing state (custom only)
-  const [editingHttpConfig, setEditingHttpConfig] = useState(false);
+  // HTTP config dialog (custom only)
+  const [showHttpConfigDialog, setShowHttpConfigDialog] = useState(false);
   const [httpConfigDraftObj, setHttpConfigDraftObj] = useState<HttpConfig>({ steps: [] });
 
-  // Malice rules editing state
-  const [editingMaliceRules, setEditingMaliceRules] = useState(false);
+  // Malice rules dialog
+  const [showMaliceRulesDialog, setShowMaliceRulesDialog] = useState(false);
   const [maliceRulesDraftObj, setMaliceRulesDraftObj] = useState<MaliceRules>({
     rules: [],
     default_verdict: "Pending",
@@ -388,36 +394,36 @@ export function EnrichmentProviderDetailPage() {
     );
   }
 
-  // --- Indicator Types (dirty-state chips) ---
-  const indicatorTypesDirty = indicatorTypesDraft !== null;
+  // --- Indicator Types dialog ---
+  function openIndicatorTypesDialog() {
+    setIndicatorTypesDraft([...provider!.supported_indicator_types]);
+    setShowIndicatorTypesDialog(true);
+  }
 
   function toggleIndicatorType(type: string) {
-    const current = indicatorTypesDraft ?? [...provider!.supported_indicator_types];
-    const next = current.includes(type)
-      ? current.filter((t) => t !== type)
-      : [...current, type];
-    setIndicatorTypesDraft(next);
+    setIndicatorTypesDraft((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
+    );
   }
 
   function handleSaveIndicatorTypes() {
-    if (indicatorTypesDraft === null) return;
     patchProvider.mutate(
       { uuid, body: { supported_indicator_types: indicatorTypesDraft } },
       {
         onSuccess: () => {
           toast.success("Indicator types updated");
-          setIndicatorTypesDraft(null);
+          setShowIndicatorTypesDialog(false);
         },
         onError: () => toast.error("Failed to update indicator types"),
       },
     );
   }
 
-  // --- HTTP Config (custom only) ---
-  function startEditingHttpConfig() {
+  // --- HTTP Config dialog (custom only) ---
+  function openHttpConfigDialog() {
     const parsed = parseHttpConfig(provider!.http_config);
     setHttpConfigDraftObj(parsed ?? { steps: [] });
-    setEditingHttpConfig(true);
+    setShowHttpConfigDialog(true);
   }
 
   function handleSaveHttpConfig() {
@@ -426,20 +432,20 @@ export function EnrichmentProviderDetailPage() {
       {
         onSuccess: () => {
           toast.success("HTTP configuration updated");
-          setEditingHttpConfig(false);
+          setShowHttpConfigDialog(false);
         },
         onError: () => toast.error("Failed to update HTTP configuration"),
       },
     );
   }
 
-  // --- Malice Rules ---
-  function startEditingMaliceRules() {
+  // --- Malice Rules dialog ---
+  function openMaliceRulesDialog() {
     const parsed = parseMaliceRules(provider!.malice_rules);
     setMaliceRulesDraftObj(
       parsed ?? { rules: [], default_verdict: "Pending", not_found_verdict: "Pending" },
     );
-    setEditingMaliceRules(true);
+    setShowMaliceRulesDialog(true);
   }
 
   function handleSaveMaliceRules() {
@@ -448,7 +454,7 @@ export function EnrichmentProviderDetailPage() {
       {
         onSuccess: () => {
           toast.success("Malice rules updated");
-          setEditingMaliceRules(false);
+          setShowMaliceRulesDialog(false);
         },
         onError: () => toast.error("Failed to update malice rules"),
       },
@@ -705,69 +711,34 @@ export function EnrichmentProviderDetailPage() {
                       Supported Indicator Types
                     </div>
                   </CardTitle>
-                  {indicatorTypesDirty && !provider.is_builtin && (
-                    <div className="flex gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIndicatorTypesDraft(null)}
-                        className="h-7 text-xs text-dim"
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Cancel
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveIndicatorTypes}
-                        disabled={patchProvider.isPending}
-                        className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                      >
-                        {patchProvider.isPending ? (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                          <Save className="h-3 w-3 mr-1" />
-                        )}
-                        Save
-                      </Button>
-                    </div>
+                  {!provider.is_builtin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={openIndicatorTypesDialog}
+                      className="h-7 text-xs text-dim hover:text-teal"
+                    >
+                      <Pencil className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
                   )}
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
                     {ALL_INDICATOR_TYPES.map((type) => {
-                      const effective = indicatorTypesDraft ?? provider.supported_indicator_types;
-                      const selected = effective.includes(type);
-
-                      if (provider.is_builtin) {
-                        return (
-                          <span
-                            key={type}
-                            className={cn(
-                              "px-3 py-1.5 rounded-md text-xs border",
-                              selected
-                                ? "bg-teal/15 border-teal/40 text-teal-light"
-                                : "bg-surface border-border text-dim",
-                            )}
-                          >
-                            {type}
-                          </span>
-                        );
-                      }
-
+                      const selected = provider.supported_indicator_types.includes(type);
                       return (
-                        <button
+                        <span
                           key={type}
-                          type="button"
-                          onClick={() => toggleIndicatorType(type)}
                           className={cn(
-                            "px-3 py-1.5 rounded-md text-xs border transition-colors",
+                            "px-3 py-1.5 rounded-md text-xs border",
                             selected
                               ? "bg-teal/15 border-teal/40 text-teal-light"
-                              : "bg-surface border-border text-dim hover:border-teal/30",
+                              : "bg-surface border-border text-dim",
                           )}
                         >
                           {type}
-                        </button>
+                        </span>
                       );
                     })}
                   </div>
@@ -784,49 +755,19 @@ export function EnrichmentProviderDetailPage() {
                     </div>
                   </CardTitle>
                   {!provider.is_builtin && (
-                    !editingHttpConfig ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={startEditingHttpConfig}
-                        className="h-7 text-xs text-dim hover:text-teal"
-                      >
-                        <Pencil className="h-3 w-3 mr-1" />
-                        Edit
-                      </Button>
-                    ) : (
-                      <div className="flex gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditingHttpConfig(false)}
-                          className="h-7 text-xs text-dim"
-                        >
-                          <X className="h-3 w-3 mr-1" />
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSaveHttpConfig}
-                          disabled={patchProvider.isPending}
-                          className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                        >
-                          <Save className="h-3 w-3 mr-1" />
-                          Save
-                        </Button>
-                      </div>
-                    )
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={openHttpConfigDialog}
+                      className="h-7 text-xs text-dim hover:text-teal"
+                    >
+                      <Pencil className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
                   )}
                 </CardHeader>
                 <CardContent>
-                  {editingHttpConfig ? (
-                    <HttpConfigBuilder
-                      value={httpConfigDraftObj}
-                      onChange={setHttpConfigDraftObj}
-                    />
-                  ) : (
-                    <HttpConfigDisplay config={provider.http_config} />
-                  )}
+                  <HttpConfigDisplay config={provider.http_config} />
                 </CardContent>
               </Card>
 
@@ -839,48 +780,18 @@ export function EnrichmentProviderDetailPage() {
                       Malice Rules
                     </div>
                   </CardTitle>
-                  {!editingMaliceRules ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={startEditingMaliceRules}
-                      className="h-7 text-xs text-dim hover:text-teal"
-                    >
-                      <Pencil className="h-3 w-3 mr-1" />
-                      Edit
-                    </Button>
-                  ) : (
-                    <div className="flex gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingMaliceRules(false)}
-                        className="h-7 text-xs text-dim"
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Cancel
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveMaliceRules}
-                        disabled={patchProvider.isPending}
-                        className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                      >
-                        <Save className="h-3 w-3 mr-1" />
-                        Save
-                      </Button>
-                    </div>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={openMaliceRulesDialog}
+                    className="h-7 text-xs text-dim hover:text-teal"
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Edit
+                  </Button>
                 </CardHeader>
                 <CardContent>
-                  {editingMaliceRules ? (
-                    <MaliceRulesBuilder
-                      value={maliceRulesDraftObj}
-                      onChange={setMaliceRulesDraftObj}
-                    />
-                  ) : (
-                    <MaliceRulesDisplay rules={provider.malice_rules} />
-                  )}
+                  <MaliceRulesDisplay rules={provider.malice_rules} />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -986,6 +897,104 @@ export function EnrichmentProviderDetailPage() {
         confirmLabel="Delete"
         onConfirm={handleDelete}
       />
+
+      {/* Indicator Types Dialog */}
+      <Dialog open={showIndicatorTypesDialog} onOpenChange={(v) => !v && setShowIndicatorTypesDialog(false)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Supported Indicator Types</DialogTitle>
+          </DialogHeader>
+          <div className="py-3">
+            <p className="text-xs text-dim mb-3">Click to toggle which indicator types this provider supports.</p>
+            <div className="flex flex-wrap gap-2">
+              {ALL_INDICATOR_TYPES.map((type) => {
+                const selected = indicatorTypesDraft.includes(type);
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => toggleIndicatorType(type)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-md text-xs border transition-colors",
+                      selected
+                        ? "bg-teal/15 border-teal/40 text-teal-light"
+                        : "bg-surface border-border text-dim hover:border-teal/30",
+                    )}
+                  >
+                    {type}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowIndicatorTypesDialog(false)} disabled={patchProvider.isPending}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-teal text-white hover:bg-teal-dim"
+              onClick={handleSaveIndicatorTypes}
+              disabled={patchProvider.isPending}
+            >
+              {patchProvider.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* HTTP Config Dialog */}
+      <Dialog open={showHttpConfigDialog} onOpenChange={(v) => !v && setShowHttpConfigDialog(false)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>HTTP Configuration</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <HttpConfigBuilder
+              value={httpConfigDraftObj}
+              onChange={setHttpConfigDraftObj}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowHttpConfigDialog(false)} disabled={patchProvider.isPending}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-teal text-white hover:bg-teal-dim"
+              onClick={handleSaveHttpConfig}
+              disabled={patchProvider.isPending}
+            >
+              {patchProvider.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Malice Rules Dialog */}
+      <Dialog open={showMaliceRulesDialog} onOpenChange={(v) => !v && setShowMaliceRulesDialog(false)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Malice Rules</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <MaliceRulesBuilder
+              value={maliceRulesDraftObj}
+              onChange={setMaliceRulesDraftObj}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMaliceRulesDialog(false)} disabled={patchProvider.isPending}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-teal text-white hover:bg-teal-dim"
+              onClick={handleSaveMaliceRules}
+              disabled={patchProvider.isPending}
+            >
+              {patchProvider.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
