@@ -207,6 +207,23 @@
   background: #2a3530;
 }
 
+/* KB Tiptap editor */
+.kb-editor h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.5rem; line-height: 1.3; }
+.kb-editor h2 { font-size: 1.25rem; font-weight: 600; margin: 0.875rem 0 0.5rem; line-height: 1.3; }
+.kb-editor h3 { font-size: 1.1rem; font-weight: 600; margin: 0.75rem 0 0.375rem; line-height: 1.3; }
+.kb-editor p { margin: 0.5rem 0; line-height: 1.6; }
+.kb-editor ul, .kb-editor ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.kb-editor ul { list-style-type: disc; }
+.kb-editor ol { list-style-type: decimal; }
+.kb-editor li { margin: 0.25rem 0; line-height: 1.5; }
+.kb-editor blockquote { border-left: 3px solid var(--border); padding-left: 1rem; margin: 0.75rem 0; color: var(--muted-foreground); font-style: italic; }
+.kb-editor pre { background: var(--muted); border: 1px solid var(--border); border-radius: 0.375rem; padding: 0.75rem 1rem; margin: 0.75rem 0; overflow-x: auto; }
+.kb-editor code { font-family: var(--font-mono, monospace); font-size: 0.85em; background: var(--muted); border-radius: 0.25rem; padding: 0.1em 0.3em; }
+.kb-editor pre code { background: transparent; padding: 0; border-radius: 0; }
+.kb-editor strong { font-weight: 600; }
+.kb-editor em { font-style: italic; }
+.kb-editor p.is-editor-empty:first-child::before { color: var(--muted-foreground); content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }
+
 /* Recharts — force transparent backgrounds to match dark theme */
 .recharts-responsive-container,
 .recharts-wrapper,

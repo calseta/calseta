@@ -1,13 +1,10 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useSearch, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -15,222 +12,240 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  DetailPageHeader,
-  DetailPageLayout,
-  DetailPageSidebar,
-  SidebarSection,
-  DetailPageField,
-} from "@/components/detail-page";
-import { MarkdownPreview } from "@/components/markdown-preview";
-import {
+  useKBPages,
+  useKBFolders,
   useKBPage,
-  useKBRevisions,
-  useSyncKBPage,
-  useAddKBPageLink,
+  useCreateKBPage,
+  usePatchKBPage,
 } from "@/hooks/use-api";
-import { formatDate, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Edit2, RefreshCw, Link as LinkIcon, Plus } from "lucide-react";
-import type { KBPageRevision, KBPageLink } from "@/lib/types";
+import {
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  FileText,
+  Folder,
+  ArrowLeft,
+  Bold,
+  Italic,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  Quote,
+  Code,
+  Undo,
+  Redo,
+} from "lucide-react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
+import type { KBFolderNode, KBPageSummary } from "@/lib/types";
 
 /* -------------------------------------------------------------------------- */
-/*  Helpers                                                                    */
+/*  Sidebar tree                                                               */
 /* -------------------------------------------------------------------------- */
 
-function statusColor(status: string): string {
-  switch (status) {
-    case "published":
-      return "text-teal bg-teal/10 border-teal/30";
-    case "draft":
-      return "text-amber bg-amber/10 border-amber/30";
-    case "archived":
-      return "text-muted-foreground bg-muted/10 border-muted/30";
-    default:
-      return "text-muted-foreground bg-muted/10 border-muted/30";
-  }
-}
-
-function syncOutcomeColor(outcome: string): string {
-  switch (outcome) {
-    case "updated":
-      return "text-teal bg-teal/10 border-teal/30";
-    case "no_change":
-      return "text-muted-foreground bg-muted/10 border-muted/30";
-    case "fetch_failed":
-    case "config_invalid":
-      return "text-red-500 bg-red-500/10 border-red-500/30";
-    default:
-      return "text-muted-foreground bg-muted/10 border-muted/30";
-  }
-}
-
-function entityTypeBadgeColor(type: string): string {
-  switch (type) {
-    case "alert":
-      return "text-red-500 bg-red-500/10 border-red-500/30";
-    case "issue":
-      return "text-amber bg-amber/10 border-amber/30";
-    case "page":
-      return "text-teal bg-teal/10 border-teal/30";
-    case "agent":
-      return "text-muted-foreground bg-muted/10 border-muted/30";
-    default:
-      return "text-muted-foreground bg-muted/10 border-muted/30";
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/*  RevisionRow                                                                */
-/* -------------------------------------------------------------------------- */
-
-function RevisionRow({
-  revision,
-  expanded,
-  onToggle,
+function FolderItem({
+  node,
+  pages,
+  selectedSlug,
+  onSelectPage,
+  depth,
 }: {
-  revision: KBPageRevision;
-  expanded: boolean;
-  onToggle: () => void;
+  node: KBFolderNode;
+  pages: KBPageSummary[];
+  selectedSlug: string;
+  onSelectPage: (page: KBPageSummary) => void;
+  depth: number;
 }) {
+  const [open, setOpen] = useState(true);
+  const folderPages = pages.filter((p) => p.folder === node.path);
+  const hasContent = folderPages.length > 0 || node.children.length > 0;
+
+  if (!hasContent) return null;
+
   return (
-    <>
-      <tr className="border-b border-border hover:bg-accent/30 transition-colors">
-        <td className="px-3 py-2.5 text-xs font-mono text-muted-foreground">
-          v{revision.revision_number}
-        </td>
-        <td className="px-3 py-2.5 text-sm text-foreground">
-          {revision.change_summary ?? (
-            <span className="text-muted-foreground italic">no summary</span>
-          )}
-        </td>
-        <td className="px-3 py-2.5 text-xs text-muted-foreground">
-          {revision.author_operator ?? "—"}
-        </td>
-        <td className="px-3 py-2.5 text-xs text-muted-foreground">
-          {formatDate(revision.created_at)}
-        </td>
-        <td className="px-3 py-2.5">
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onToggle}>
-            {expanded ? "Hide" : "View"}
-          </Button>
-        </td>
-      </tr>
-      {expanded && (
-        <tr className="border-b border-border bg-card/50">
-          <td colSpan={5} className="px-3 py-3">
-            <pre className="text-xs font-mono whitespace-pre-wrap break-words text-muted-foreground rounded-md bg-muted/30 p-3 max-h-64 overflow-y-auto">
-              {revision.body}
-            </pre>
-          </td>
-        </tr>
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors rounded"
+        style={{ paddingLeft: `${8 + depth * 12}px` }}
+      >
+        {open ? (
+          <ChevronDown className="h-3 w-3 shrink-0" />
+        ) : (
+          <ChevronRight className="h-3 w-3 shrink-0" />
+        )}
+        <Folder className="h-3 w-3 shrink-0" />
+        <span className="truncate">{node.name}</span>
+      </button>
+      {open && (
+        <div>
+          {folderPages.map((page) => (
+            <button
+              key={page.uuid}
+              type="button"
+              onClick={() => onSelectPage(page)}
+              className={cn(
+                "flex w-full items-center gap-1.5 py-1 text-xs rounded transition-colors",
+                selectedSlug === page.slug
+                  ? "bg-teal/15 text-teal"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
+              style={{ paddingLeft: `${20 + depth * 12}px` }}
+            >
+              <FileText className="h-3 w-3 shrink-0" />
+              <span className="truncate">{page.title}</span>
+            </button>
+          ))}
+          {node.children.map((child) => (
+            <FolderItem
+              key={child.path}
+              node={child}
+              pages={pages}
+              selectedSlug={selectedSlug}
+              onSelectPage={onSelectPage}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Add Link Dialog                                                            */
+/*  Toolbar                                                                    */
 /* -------------------------------------------------------------------------- */
 
-interface AddLinkDialogProps {
-  open: boolean;
-  onClose: () => void;
-  slug: string;
+function ToolbarButton({
+  onClick,
+  active,
+  disabled,
+  title,
+  children,
+}: {
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cn(
+        "h-7 w-7 flex items-center justify-center rounded text-xs transition-colors",
+        active
+          ? "bg-teal/15 text-teal"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        disabled && "opacity-40 cursor-not-allowed",
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
-const ENTITY_TYPES = ["alert", "issue", "page", "agent"] as const;
-const LINK_TYPES = ["reference", "source", "generated_from", "related"] as const;
+function ToolbarDivider() {
+  return <div className="w-px h-4 bg-border mx-1" />;
+}
 
-function AddLinkDialog({ open, onClose, slug }: AddLinkDialogProps) {
-  const addLink = useAddKBPageLink();
-  const [entityType, setEntityType] = useState<string>("alert");
-  const [entityId, setEntityId] = useState("");
-  const [linkType, setLinkType] = useState<string>("reference");
+/* -------------------------------------------------------------------------- */
+/*  New Page Dialog                                                            */
+/* -------------------------------------------------------------------------- */
+
+interface NewPageDialogProps {
+  open: boolean;
+  onClose: () => void;
+  defaultFolder?: string;
+}
+
+function NewPageDialog({ open, onClose, defaultFolder = "/" }: NewPageDialogProps) {
+  const navigate = useNavigate();
+  const createPage = useCreateKBPage();
+  const [title, setTitle] = useState("");
+  const [folder, setFolder] = useState(defaultFolder);
+  const [slugManual, setSlugManual] = useState(false);
+  const [slug, setSlug] = useState("");
+
+  function handleTitleChange(v: string) {
+    setTitle(v);
+    if (!slugManual) {
+      setSlug(v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
+    }
+  }
 
   async function handleSubmit() {
-    if (!entityId.trim()) {
-      toast.error("Entity ID is required");
+    if (!title.trim()) {
+      toast.error("Title is required");
       return;
     }
+    const finalSlug = slug.trim() || title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     try {
-      await addLink.mutateAsync({
-        slug,
-        body: {
-          linked_entity_type: entityType,
-          linked_entity_id: entityId.trim(),
-          link_type: linkType,
-        },
+      const result = await createPage.mutateAsync({
+        title: title.trim(),
+        slug: finalSlug,
+        folder: folder.trim() || "/",
+        body: "",
       });
-      toast.success("Link added");
-      setEntityId("");
+      toast.success("Page created");
       onClose();
+      setTitle("");
+      setSlug("");
+      setSlugManual(false);
+      void navigate({
+        to: "/kb/$uuid",
+        params: { uuid: result.data.uuid },
+        search: { slug: result.data.slug, tab: "content" },
+      });
     } catch {
-      toast.error("Failed to add link");
+      toast.error("Failed to create page");
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add Link</DialogTitle>
+          <DialogTitle>New Page</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-2">
+        <div className="space-y-3 py-2">
           <div className="space-y-1.5">
-            <Label>Entity Type</Label>
-            <Select value={entityType} onValueChange={setEntityType}>
-              <SelectTrigger className="h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ENTITY_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="link-entity-id">Entity ID (UUID)</Label>
+            <Label>Title</Label>
             <Input
-              id="link-entity-id"
-              value={entityId}
-              onChange={(e) => setEntityId(e.target.value)}
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              className="font-mono text-xs"
+              autoFocus
+              value={title}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              placeholder="Page title"
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Link Type</Label>
-            <Select value={linkType} onValueChange={setLinkType}>
-              <SelectTrigger className="h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LINK_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Folder</Label>
+            <Input
+              value={folder}
+              onChange={(e) => setFolder(e.target.value)}
+              placeholder="/"
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={addLink.isPending}>
-            {addLink.isPending ? "Adding..." : "Add Link"}
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={createPage.isPending || !title.trim()}
+            className="bg-teal text-white hover:bg-teal-dim"
+          >
+            {createPage.isPending ? "Creating..." : "Create"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -239,47 +254,85 @@ function AddLinkDialog({ open, onClose, slug }: AddLinkDialogProps) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  KBDetailPage                                                               */
+/*  Main page                                                                  */
 /* -------------------------------------------------------------------------- */
 
 export function KBDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
-  const { slug, tab } = useSearch({ strict: false }) as {
-    slug: string;
-    tab?: string;
-  };
+  const { slug } = useSearch({ strict: false }) as { slug?: string };
   const navigate = useNavigate();
 
+  const allPages = useKBPages({ page_size: 500 });
+  const folders = useKBFolders();
   const page = useKBPage(slug ?? "");
-  const revisions = useKBRevisions(slug ?? "");
-  const syncPage = useSyncKBPage();
+  const patchPage = usePatchKBPage();
 
-  const [activeTab, setActiveTab] = useState(tab ?? "content");
-  const [expandedRevision, setExpandedRevision] = useState<string | null>(null);
-  const [showAddLink, setShowAddLink] = useState(false);
-  const [syncOutcome, setSyncOutcome] = useState<string | null>(null);
+  const [showNewPage, setShowNewPage] = useState(false);
+  const [savedIndicator, setSavedIndicator] = useState<"idle" | "saving" | "saved">("idle");
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const data = page.data?.data;
-  const isSynced = !!data?.sync_source;
+  const pageData = page.data?.data;
+  const pagesList: KBPageSummary[] = allPages.data?.data ?? [];
+  const folderNodes: KBFolderNode[] = folders.data?.data ?? [];
 
-  async function handleSync() {
-    if (!slug) return;
-    setSyncOutcome(null);
-    try {
-      const result = await syncPage.mutateAsync(slug);
-      setSyncOutcome(result.data.outcome);
-      toast.success(`Sync complete: ${result.data.outcome}`);
-    } catch {
-      toast.error("Sync failed");
+  // Debounced save
+  const debouncedSave = useCallback(
+    (content: string) => {
+      if (!slug) return;
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      setSavedIndicator("saving");
+      saveTimeoutRef.current = setTimeout(() => {
+        patchPage.mutate(
+          { slug, body: { body: content } },
+          {
+            onSuccess: () => setSavedIndicator("saved"),
+            onError: () => {
+              setSavedIndicator("idle");
+              toast.error("Failed to save");
+            },
+          },
+        );
+      }, 1000);
+    },
+    [slug, patchPage],
+  );
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Placeholder.configure({ placeholder: "Start writing…" }),
+    ],
+    content: pageData?.body ?? "",
+    onUpdate: ({ editor }) => {
+      debouncedSave(editor.getHTML());
+      setSavedIndicator("saving");
+    },
+    editorProps: {
+      attributes: {
+        class: "kb-editor min-h-[400px] focus:outline-none px-6 py-4 text-sm text-foreground",
+      },
+    },
+  });
+
+  // When page loads or changes, update editor content
+  useEffect(() => {
+    if (editor && pageData?.body !== undefined) {
+      const current = editor.getHTML();
+      if (current !== pageData.body) {
+        editor.commands.setContent(pageData.body ?? "");
+      }
+      setSavedIndicator("idle");
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageData?.uuid]);
 
-  function handleEditClick() {
+  function handleSelectPage(p: KBPageSummary) {
     void navigate({
-      to: "/manage/kb/$uuid/edit",
-      params: { uuid },
-      search: { slug },
+      to: "/kb/$uuid",
+      params: { uuid: p.uuid },
+      search: { slug: p.slug, tab: "content" },
     });
+    setSavedIndicator("idle");
   }
 
   if (!slug) {
@@ -293,420 +346,210 @@ export function KBDetailPage() {
   }
 
   return (
-    <AppLayout title={data?.title ?? "Knowledge Base"}>
-      <div className="p-6 space-y-6 max-w-6xl">
-        {/* Header */}
-        {page.isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-7 w-80" />
+    <AppLayout title={pageData?.title ?? "Knowledge Base"}>
+      <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-64 shrink-0 border-r border-border bg-surface flex flex-col">
+          {/* Sidebar header */}
+          <div className="px-3 py-3 border-b border-border flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/kb" })}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Knowledge Base
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowNewPage(true)}
+              title="New page"
+              className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
           </div>
-        ) : data ? (
-          <DetailPageHeader
-            backTo="/manage/kb"
-            title={data.title}
-            badges={
-              <Badge
-                variant="outline"
-                className={cn("text-xs capitalize", statusColor(data.status))}
-              >
-                {data.status}
-              </Badge>
-            }
-            subtitle={
-              <span className="text-xs font-mono text-muted-foreground">
-                {data.slug}
-              </span>
-            }
-            actions={
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleEditClick}
-                disabled={isSynced}
-                title={
-                  isSynced
-                    ? "Managed by sync — edit at source"
-                    : "Edit this page"
-                }
-                className="gap-1.5"
-              >
-                <Edit2 className="h-3.5 w-3.5" />
-                Edit
-              </Button>
-            }
-          />
-        ) : (
-          <div className="text-sm text-muted-foreground">Page not found.</div>
-        )}
 
-        {data && (
-          <DetailPageLayout
-            sidebar={
-              <DetailPageSidebar>
-                <SidebarSection title="Details">
-                  <DetailPageField label="Folder" value={data.folder} mono />
-                  <DetailPageField
-                    label="Status"
-                    value={
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs capitalize",
-                          statusColor(data.status),
-                        )}
-                      >
-                        {data.status}
-                      </Badge>
-                    }
+          {/* Page tree */}
+          <div className="flex-1 overflow-y-auto py-2 px-1">
+            {allPages.isLoading || folders.isLoading ? (
+              <div className="space-y-1 px-2">
+                {[...Array(6)].map((_, i) => (
+                  <Skeleton key={i} className="h-6 w-full" />
+                ))}
+              </div>
+            ) : (
+              <>
+                {folderNodes.map((node) => (
+                  <FolderItem
+                    key={node.path}
+                    node={node}
+                    pages={pagesList}
+                    selectedSlug={slug}
+                    onSelectPage={handleSelectPage}
+                    depth={0}
                   />
-                  <DetailPageField
-                    label="Format"
-                    value={data.format}
-                    mono
-                  />
-                  <DetailPageField
-                    label="Priority"
-                    value={String(data.inject_priority)}
-                  />
-                  <DetailPageField
-                    label="Pinned"
-                    value={data.inject_pinned ? "Yes" : "No"}
-                  />
-                  <DetailPageField
-                    label="Tokens"
-                    value={
-                      data.token_count != null
-                        ? data.token_count.toLocaleString()
-                        : "—"
-                    }
-                  />
-                  <DetailPageField
-                    label="Revision"
-                    value={`v${data.latest_revision_number}`}
-                    mono
-                  />
-                </SidebarSection>
-                <SidebarSection title="Scope">
-                  {!data.inject_scope ? (
-                    <span className="text-xs text-muted-foreground">
-                      No scope set
-                    </span>
-                  ) : (
-                    <div className="flex flex-wrap gap-1">
-                      {(data.inject_scope as { global?: boolean }).global && (
-                        <Badge
-                          variant="outline"
-                          className="text-xs text-teal bg-teal/10 border-teal/30"
-                        >
-                          global
-                        </Badge>
+                ))}
+                {/* Pages without a matching folder node */}
+                {pagesList
+                  .filter((p) => !folderNodes.some((f) => f.path === p.folder || p.folder === "/"))
+                  .map((p) => (
+                    <button
+                      key={p.uuid}
+                      type="button"
+                      onClick={() => handleSelectPage(p)}
+                      className={cn(
+                        "flex w-full items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors",
+                        slug === p.slug
+                          ? "bg-teal/15 text-teal"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
                       )}
-                      {Array.isArray((data.inject_scope as { roles?: unknown[] }).roles) &&
-                        (data.inject_scope as { roles: unknown[] }).roles.length > 0 && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs text-amber bg-amber/10 border-amber/30"
-                          >
-                            {(data.inject_scope as { roles: unknown[] }).roles.length} role
-                            {(data.inject_scope as { roles: unknown[] }).roles.length !== 1 ? "s" : ""}
-                          </Badge>
-                        )}
-                      {Array.isArray((data.inject_scope as { agent_uuids?: unknown[] }).agent_uuids) &&
-                        (data.inject_scope as { agent_uuids: unknown[] }).agent_uuids.length > 0 && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs text-muted-foreground bg-muted/10 border-muted/30"
-                          >
-                            {(data.inject_scope as { agent_uuids: unknown[] }).agent_uuids.length} agent
-                            {(data.inject_scope as { agent_uuids: unknown[] }).agent_uuids.length !== 1
-                              ? "s"
-                              : ""}
-                          </Badge>
-                        )}
-                    </div>
-                  )}
-                </SidebarSection>
-                <SidebarSection title="Timestamps">
-                  <DetailPageField
-                    label="Created"
-                    value={relativeTime(data.created_at)}
-                  />
-                  <DetailPageField
-                    label="Updated"
-                    value={relativeTime(data.updated_at)}
-                  />
-                  {data.synced_at && (
-                    <DetailPageField
-                      label="Synced"
-                      value={relativeTime(data.synced_at)}
-                    />
-                  )}
-                </SidebarSection>
-              </DetailPageSidebar>
-            }
-          >
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList>
-                <TabsTrigger value="content">Content</TabsTrigger>
-                <TabsTrigger value="revisions">
-                  Revisions
-                  {revisions.data && (
-                    <span className="ml-1.5 text-xs text-muted-foreground">
-                      ({revisions.data.meta.total})
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="links">
-                  Links
-                  {data.links.length > 0 && (
-                    <span className="ml-1.5 text-xs text-muted-foreground">
-                      ({data.links.length})
-                    </span>
-                  )}
-                </TabsTrigger>
-                {isSynced && (
-                  <TabsTrigger value="sync">Sync</TabsTrigger>
-                )}
-              </TabsList>
+                    >
+                      <FileText className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{p.title}</span>
+                    </button>
+                  ))}
+              </>
+            )}
+          </div>
+        </aside>
 
-              {/* Content tab */}
-              <TabsContent value="content" className="mt-4">
-                {data.body ? (
-                  <div className="rounded-lg border border-border bg-card p-6">
-                    <MarkdownPreview content={data.body} />
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground italic">
-                    This page has no content yet.
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Revisions tab */}
-              <TabsContent value="revisions" className="mt-4">
-                {revisions.isLoading ? (
-                  <div className="space-y-2">
-                    {[...Array(4)].map((_, i) => (
-                      <Skeleton key={i} className="h-10 w-full" />
-                    ))}
-                  </div>
-                ) : revisions.data?.data.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4">
-                    No revisions recorded yet.
-                  </p>
-                ) : (
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/30">
-                        <tr>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground w-16">
-                            Rev
-                          </th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">
-                            Summary
-                          </th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground w-32">
-                            Author
-                          </th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground w-36">
-                            Created
-                          </th>
-                          <th className="px-3 py-2 w-16" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {revisions.data?.data.map((rev) => (
-                          <RevisionRow
-                            key={rev.uuid}
-                            revision={rev}
-                            expanded={expandedRevision === rev.uuid}
-                            onToggle={() =>
-                              setExpandedRevision((prev) =>
-                                prev === rev.uuid ? null : rev.uuid,
-                              )
-                            }
-                          />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Links tab */}
-              <TabsContent value="links" className="mt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-muted-foreground">
-                    Linked entities
+        {/* Editor pane */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {page.isLoading ? (
+            <div className="p-8 space-y-4">
+              <Skeleton className="h-7 w-64" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-5/6" />
+            </div>
+          ) : !pageData ? (
+            <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+              Page not found.
+            </div>
+          ) : (
+            <>
+              {/* Editor header */}
+              <div className="px-6 pt-5 pb-3 border-b border-border shrink-0">
+                <div className="flex items-center justify-between">
+                  <h1 className="text-lg font-semibold text-foreground">{pageData.title}</h1>
+                  <span className="text-xs text-muted-foreground">
+                    {savedIndicator === "saving" && "Saving…"}
+                    {savedIndicator === "saved" && "Saved"}
                   </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5 h-7 text-xs"
-                    onClick={() => setShowAddLink(true)}
-                  >
-                    <Plus className="h-3 w-3" />
-                    Add link
-                  </Button>
                 </div>
-                {data.links.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border p-6 text-center">
-                    <LinkIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      No links yet. Connect this page to alerts, issues, agents,
-                      or other pages.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/30">
-                        <tr>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground w-28">
-                            Type
-                          </th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">
-                            Entity ID
-                          </th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground w-32">
-                            Link Type
-                          </th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground w-36">
-                            Added
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.links.map((link) => (
-                          <LinkRow key={link.uuid} link={link} />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </TabsContent>
+                <p className="text-xs font-mono text-muted-foreground mt-0.5">{pageData.slug}</p>
+              </div>
 
-              {/* Sync tab */}
-              {isSynced && (
-                <TabsContent value="sync" className="mt-4">
-                  <div className="space-y-4">
-                    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="text-xs text-muted-foreground block mb-0.5">
-                            Source Type
-                          </span>
-                          <span className="font-medium">
-                            {typeof data.sync_source === "object" &&
-                            data.sync_source !== null &&
-                            "type" in data.sync_source
-                              ? String(data.sync_source.type)
-                              : "—"}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-xs text-muted-foreground block mb-0.5">
-                            Last Synced
-                          </span>
-                          <span className="font-medium">
-                            {data.synced_at
-                              ? relativeTime(data.synced_at)
-                              : "Never"}
-                          </span>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-xs text-muted-foreground block mb-0.5">
-                            Source URL
-                          </span>
-                          <span className="font-mono text-xs break-all">
-                            {typeof data.sync_source === "object" &&
-                            data.sync_source !== null &&
-                            "url" in data.sync_source
-                              ? String(data.sync_source.url)
-                              : "—"}
-                          </span>
-                        </div>
-                        {data.sync_last_hash && (
-                          <div className="col-span-2">
-                            <span className="text-xs text-muted-foreground block mb-0.5">
-                              Last Hash
-                            </span>
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {data.sync_last_hash}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <Button
-                        size="sm"
-                        onClick={handleSync}
-                        disabled={syncPage.isPending}
-                        className="gap-1.5"
-                      >
-                        <RefreshCw
-                          className={cn(
-                            "h-3.5 w-3.5",
-                            syncPage.isPending && "animate-spin",
-                          )}
-                        />
-                        {syncPage.isPending ? "Syncing..." : "Sync now"}
-                      </Button>
-                      {syncOutcome && (
-                        <Badge
-                          variant="outline"
-                          className={cn("text-xs", syncOutcomeColor(syncOutcome))}
-                        >
-                          {syncOutcome}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </TabsContent>
+              {/* Toolbar */}
+              {editor && !pageData.sync_source && (
+                <div className="px-6 py-2 border-b border-border flex items-center gap-0.5 shrink-0 bg-card/50">
+                  <ToolbarButton
+                    title="Heading 1"
+                    active={editor.isActive("heading", { level: 1 })}
+                    onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                  >
+                    <Heading1 className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                  <ToolbarButton
+                    title="Heading 2"
+                    active={editor.isActive("heading", { level: 2 })}
+                    onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                  >
+                    <Heading2 className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                  <ToolbarButton
+                    title="Heading 3"
+                    active={editor.isActive("heading", { level: 3 })}
+                    onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                  >
+                    <Heading3 className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                  <ToolbarDivider />
+                  <ToolbarButton
+                    title="Bold"
+                    active={editor.isActive("bold")}
+                    onClick={() => editor.chain().focus().toggleBold().run()}
+                  >
+                    <Bold className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                  <ToolbarButton
+                    title="Italic"
+                    active={editor.isActive("italic")}
+                    onClick={() => editor.chain().focus().toggleItalic().run()}
+                  >
+                    <Italic className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                  <ToolbarDivider />
+                  <ToolbarButton
+                    title="Bullet List"
+                    active={editor.isActive("bulletList")}
+                    onClick={() => editor.chain().focus().toggleBulletList().run()}
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                  <ToolbarButton
+                    title="Ordered List"
+                    active={editor.isActive("orderedList")}
+                    onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                  >
+                    <ListOrdered className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                  <ToolbarDivider />
+                  <ToolbarButton
+                    title="Blockquote"
+                    active={editor.isActive("blockquote")}
+                    onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                  >
+                    <Quote className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                  <ToolbarButton
+                    title="Code Block"
+                    active={editor.isActive("codeBlock")}
+                    onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+                  >
+                    <Code className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                  <ToolbarDivider />
+                  <ToolbarButton
+                    title="Undo"
+                    disabled={!editor.can().undo()}
+                    onClick={() => editor.chain().focus().undo().run()}
+                  >
+                    <Undo className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                  <ToolbarButton
+                    title="Redo"
+                    disabled={!editor.can().redo()}
+                    onClick={() => editor.chain().focus().redo().run()}
+                  >
+                    <Redo className="h-3.5 w-3.5" />
+                  </ToolbarButton>
+                </div>
               )}
-            </Tabs>
-          </DetailPageLayout>
-        )}
+
+              {/* Synced page notice */}
+              {pageData.sync_source && (
+                <div className="px-6 py-2 border-b border-border bg-amber/5 shrink-0">
+                  <p className="text-xs text-amber">
+                    This page is managed by an external sync source. Edits made here will be overwritten on the next sync.
+                  </p>
+                </div>
+              )}
+
+              {/* Editor */}
+              <div className="flex-1 overflow-y-auto">
+                <EditorContent editor={editor} />
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      {slug && (
-        <AddLinkDialog
-          open={showAddLink}
-          onClose={() => setShowAddLink(false)}
-          slug={slug}
-        />
-      )}
+      <NewPageDialog
+        open={showNewPage}
+        onClose={() => setShowNewPage(false)}
+      />
     </AppLayout>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  LinkRow                                                                    */
-/* -------------------------------------------------------------------------- */
-
-function LinkRow({ link }: { link: KBPageLink }) {
-  return (
-    <tr className="border-b border-border last:border-0 hover:bg-accent/30 transition-colors">
-      <td className="px-3 py-2.5">
-        <Badge
-          variant="outline"
-          className={cn("text-xs", entityTypeBadgeColor(link.linked_entity_type))}
-        >
-          {link.linked_entity_type}
-        </Badge>
-      </td>
-      <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground truncate max-w-[200px]">
-        {link.linked_entity_id}
-      </td>
-      <td className="px-3 py-2.5 text-xs text-muted-foreground">
-        {link.link_type}
-      </td>
-      <td className="px-3 py-2.5 text-xs text-muted-foreground">
-        {relativeTime(link.created_at)}
-      </td>
-    </tr>
   );
 }
