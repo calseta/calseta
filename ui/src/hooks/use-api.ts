@@ -1483,7 +1483,7 @@ export function useSaveAgentFile() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ agentUuid, path, content }: { agentUuid: string; path: string; content: string }) =>
-      api.patch<DataResponse<{ name: string; content: string }>>(`/agents/${agentUuid}/files/${encodeURIComponent(path)}`, { content }),
+      api.put<DataResponse<{ name: string; content: string }>>(`/agents/${agentUuid}/files/${encodeURIComponent(path)}`, { content }),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["agent-files", vars.agentUuid] });
       qc.invalidateQueries({ queryKey: ["agent", vars.agentUuid] });
@@ -1558,7 +1558,7 @@ export function useSkill(uuid: string | undefined) {
 export function useCreateSkill() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { slug: string; name: string; description: string | null }) =>
+    mutationFn: (body: { slug: string; name: string; description: string | null; is_global?: boolean }) =>
       api.post<DataResponse<Skill>>("/skills", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["skills"] }),
   });

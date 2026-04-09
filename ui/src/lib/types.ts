@@ -933,3 +933,34 @@ export interface KBSyncResult {
   error_message: string | null;
   revision_id: string | null;
 }
+
+// Skills
+export interface SkillFile {
+  uuid: string;
+  path: string;
+  content: string;
+  is_entry: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Skill {
+  uuid: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  is_global: boolean;
+  files: SkillFile[];
+  created_at: string;
+  updated_at: string;
+}
+
+// Labels
+export interface IssueLabel {
+  uuid: string;
+  name: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}

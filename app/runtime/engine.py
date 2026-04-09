@@ -95,22 +95,25 @@ class AgentRuntimeEngine:
             log.error("runtime.llm_integration_not_found")
             return RuntimeResult(success=False, error=msg)
 
-        # --- Step 2: Resolve session ---
+        # --- Step 2: Inject skills into agent working directory ---
+        await self._inject_skills(agent)
+
+        # --- Step 3: Resolve session ---
         session = await self._resolve_session(agent, context)
 
-        # --- Step 3: Build prompt ---
+        # --- Step 4: Build prompt ---
         builder = PromptBuilder(self._db)
         built = await builder.build(agent=agent, context=context, session=session)
 
-        # --- Step 4: Initialize adapter ---
+        # --- Step 5: Initialize adapter ---
         from app.integrations.llm.factory import get_adapter
 
         adapter = get_adapter(integration)
 
-        # --- Step 5: Prepare tools ---
+        # --- Step 6: Prepare tools ---
         tools = await self._load_tools(agent)
 
-        # --- Step 6: Run tool loop ---
+        # --- Step 7: Run tool loop ---
         log.info(
             "runtime.starting",
             tool_count=len(tools),
@@ -128,7 +131,7 @@ class AgentRuntimeEngine:
             integration=integration,
         )
 
-        # --- Step 7: Persist session ---
+        # --- Step 8: Persist session ---
         await self._save_session(
             session=session,
             messages=final_messages,
@@ -137,7 +140,7 @@ class AgentRuntimeEngine:
             integration=integration,
         )
 
-        # --- Step 8: Update assignment investigation_state ---
+        # --- Step 9: Update assignment investigation_state ---
         if context.assignment_id is not None and (result.findings or result.actions_proposed):
             await self._update_assignment(
                 assignment_id=context.assignment_id,
@@ -334,6 +337,68 @@ class AgentRuntimeEngine:
             input_tokens=total_input,
             output_tokens=total_output,
         )
+
+    async def _inject_skills(self, agent: AgentRegistration) -> None:
+        """Write assigned skills to the agent's working directory as a file tree.
+
+        Each skill is written to a subdirectory:
+          {AGENT_FILES_DIR}/{agent.uuid}/skills/{skill.slug}/SKILL.md
+          {AGENT_FILES_DIR}/{agent.uuid}/skills/{skill.slug}/references/playbook.md
+          ...
+
+        Claude Code picks up skill files from the agent's working directory
+        under the ``skills/`` subdirectory. This runs before the LLM loop so
+        each invocation gets the current skill set.
+
+        Errors are logged and swallowed — a missing skill file does not abort
+        the agent run.
+        """
+        import os
+        from pathlib import Path
+
+        from app.config import settings
+        from app.repositories.skill_repository import SkillRepository
+
+        try:
+            skill_repo = SkillRepository(self._db)
+            assigned_skills = await skill_repo.get_agent_skills(agent.id)
+            global_skills = await skill_repo.get_global_skills()
+
+            # Merge: global skills + assigned skills, deduplicated by ID
+            seen_ids: set[int] = set()
+            skill_list: list = []
+            for skill in global_skills + assigned_skills:
+                if skill.id not in seen_ids:
+                    seen_ids.add(skill.id)
+                    skill_list.append(skill)
+
+            if not skill_list:
+                return
+
+            base_dir = Path(settings.AGENT_FILES_DIR) / str(agent.uuid) / "skills"
+
+            total_files = 0
+            for skill in skill_list:
+                # skill.files is loaded via selectin — no extra query needed
+                for skill_file in skill.files:
+                    file_path = base_dir / skill.slug / skill_file.path
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_text(skill_file.content, encoding="utf-8")
+                    total_files += 1
+
+            logger.info(
+                "runtime.skills_injected",
+                agent_id=agent.id,
+                skill_count=len(skill_list),
+                file_count=total_files,
+                base_dir=str(base_dir),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "runtime.skills_inject_failed",
+                agent_id=agent.id,
+                error=str(exc),
+            )
 
     async def _load_tools(self, agent: AgentRegistration) -> list[dict]:
         """Load tools assigned to this agent and format for the LLM API.
