@@ -32,7 +32,6 @@ import { RoutinesPage } from "@/pages/manage/routines/index";
 import { RoutineDetailPage } from "@/pages/manage/routines/detail";
 import { KBPage } from "@/pages/manage/kb/index";
 import { KBDetailPage } from "@/pages/manage/kb/detail";
-import { KBEditorPage } from "@/pages/manage/kb/editor";
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -83,13 +82,13 @@ const approvalsRoute = createRoute({
 // Manage routes
 const detectionRulesRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/detection-rules",
+  path: "/detection-rules",
   component: DetectionRulesPage,
 });
 
 const detectionRuleDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/detection-rules/$uuid",
+  path: "/detection-rules/$uuid",
   component: DetectionRuleDetailPage,
   validateSearch: (search: Record<string, unknown>) => ({
     tab: (search.tab as string) || "documentation",
@@ -98,13 +97,13 @@ const detectionRuleDetailRoute = createRoute({
 
 const contextDocsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/context-docs",
+  path: "/context-docs",
   component: ContextDocsPage,
 });
 
 const contextDocDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/context-docs/$uuid",
+  path: "/context-docs/$uuid",
   component: ContextDocDetailPage,
   validateSearch: (search: Record<string, unknown>) => ({
     tab: (search.tab as string) || "content",
@@ -113,13 +112,13 @@ const contextDocDetailRoute = createRoute({
 
 const agentsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/agents",
+  path: "/agents",
   component: AgentsPage,
 });
 
 const agentDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/agents/$uuid",
+  path: "/agents/$uuid",
   component: AgentDetailPage,
   validateSearch: (search: Record<string, unknown>) => ({
     tab: (search.tab as string) || "configuration",
@@ -128,13 +127,13 @@ const agentDetailRoute = createRoute({
 
 const enrichmentProvidersRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/enrichment-providers",
+  path: "/enrichment-providers",
   component: EnrichmentProvidersPage,
 });
 
 const enrichmentProviderDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/enrichment-providers/$uuid",
+  path: "/enrichment-providers/$uuid",
   component: EnrichmentProviderDetailPage,
 });
 
@@ -171,13 +170,13 @@ const queueRoute = createRoute({
 
 const llmIntegrationsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/llm-integrations",
+  path: "/llm-integrations",
   component: LLMIntegrationsPage,
 });
 
 const llmIntegrationDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/llm-integrations/$uuid",
+  path: "/llm-integrations/$uuid",
   component: LLMIntegrationDetailPage,
 });
 
@@ -189,13 +188,13 @@ const secretsRoute = createRoute({
 
 const issuesRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/issues",
+  path: "/issues",
   component: IssuesPage,
 });
 
 const issueDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/issues/$uuid",
+  path: "/issues/$uuid",
   component: IssueDetailPage,
   validateSearch: (search: Record<string, unknown>) => ({
     tab: (search.tab as string) || "details",
@@ -204,13 +203,13 @@ const issueDetailRoute = createRoute({
 
 const routinesRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/routines",
+  path: "/routines",
   component: RoutinesPage,
 });
 
 const routineDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/routines/$uuid",
+  path: "/routines/$uuid",
   component: RoutineDetailPage,
   validateSearch: (search: Record<string, unknown>) => ({
     tab: (search.tab as string) || "configuration",
@@ -219,32 +218,17 @@ const routineDetailRoute = createRoute({
 
 const kbRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/kb",
+  path: "/kb",
   component: KBPage,
-});
-
-const kbNewRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/manage/kb/new",
-  component: KBEditorPage,
 });
 
 const kbDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/manage/kb/$uuid",
+  path: "/kb/$uuid",
   component: KBDetailPage,
   validateSearch: (search: Record<string, unknown>) => ({
     slug: (search.slug as string) || undefined,
     tab: (search.tab as string) || "content",
-  }),
-});
-
-const kbDetailEditRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/manage/kb/$uuid/edit",
-  component: KBEditorPage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    slug: (search.slug as string) || undefined,
   }),
 });
 
@@ -276,9 +260,7 @@ const routeTree = rootRoute.addChildren([
   routinesRoute,
   routineDetailRoute,
   kbRoute,
-  kbNewRoute,
   kbDetailRoute,
-  kbDetailEditRoute,
 ]);
 
 export const router = createRouter({ routeTree });
