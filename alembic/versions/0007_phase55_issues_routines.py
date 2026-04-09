@@ -1,7 +1,7 @@
-"""Phase 5.5 — Issues, Routines, Campaigns.
+"""Phase 5.5 — Issues, Routines.
 
 New tables: agent_issues, agent_issue_comments, agent_routines,
-routine_triggers, routine_runs, campaigns, campaign_items.
+routine_triggers, routine_runs.
 
 Revision ID: 0007
 Revises: 0006
@@ -346,96 +346,9 @@ def upgrade() -> None:
     op.create_index("idx_routine_runs_routine", "routine_runs", ["routine_id"])
     op.create_index("idx_routine_runs_status", "routine_runs", ["status"])
 
-    # ----------------------------------------------------------------
-    # campaigns
-    # FKs: agent_registrations (owner)
-    # ----------------------------------------------------------------
-    op.create_table(
-        "campaigns",
-        sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
-        sa.Column(
-            "uuid",
-            postgresql.UUID(as_uuid=True),
-            server_default=sa.text("gen_random_uuid()"),
-            nullable=False,
-        ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("status", sa.Text(), nullable=False, server_default=sa.text("'planned'")),
-        sa.Column("category", sa.Text(), nullable=False, server_default=sa.text("'custom'")),
-        sa.Column("owner_agent_id", sa.BigInteger(), nullable=True),
-        sa.Column("owner_operator", sa.Text(), nullable=True),
-        sa.Column("target_metric", sa.Text(), nullable=True),
-        sa.Column("target_value", sa.Numeric(), nullable=True),
-        sa.Column("current_value", sa.Numeric(), nullable=True),
-        sa.Column("target_date", sa.DateTime(timezone=True), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["owner_agent_id"],
-            ["agent_registrations.id"],
-            ondelete="SET NULL",
-        ),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("uuid", name="uq_campaigns_uuid"),
-    )
-    op.create_index("idx_campaigns_status", "campaigns", ["status"])
-    op.create_index("idx_campaigns_owner_agent", "campaigns", ["owner_agent_id"])
-
-    # ----------------------------------------------------------------
-    # campaign_items
-    # FKs: campaigns
-    # ----------------------------------------------------------------
-    op.create_table(
-        "campaign_items",
-        sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
-        sa.Column(
-            "uuid",
-            postgresql.UUID(as_uuid=True),
-            server_default=sa.text("gen_random_uuid()"),
-            nullable=False,
-        ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.Column("campaign_id", sa.BigInteger(), nullable=False),
-        sa.Column("item_type", sa.Text(), nullable=False),
-        sa.Column("item_uuid", sa.Text(), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["campaign_id"],
-            ["campaigns.id"],
-            ondelete="CASCADE",
-        ),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("uuid", name="uq_campaign_items_uuid"),
-    )
-    op.create_index("idx_campaign_items_campaign", "campaign_items", ["campaign_id"])
-    op.create_index("idx_campaign_items_type", "campaign_items", ["item_type"])
-
 
 def downgrade() -> None:
     # Drop in reverse dependency order
-    op.drop_index("idx_campaign_items_type", table_name="campaign_items")
-    op.drop_index("idx_campaign_items_campaign", table_name="campaign_items")
-    op.drop_table("campaign_items")
-
-    op.drop_index("idx_campaigns_owner_agent", table_name="campaigns")
-    op.drop_index("idx_campaigns_status", table_name="campaigns")
-    op.drop_table("campaigns")
-
     op.drop_index("idx_routine_runs_status", table_name="routine_runs")
     op.drop_index("idx_routine_runs_routine", table_name="routine_runs")
     op.drop_table("routine_runs")
