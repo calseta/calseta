@@ -31,7 +31,7 @@ import {
   type ColumnDef,
 } from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useWorkflows, useCreateWorkflow, useApprovalDefaults } from "@/hooks/use-api";
+import { useWorkflows, useCreateWorkflow, useApprovalDefaults, useDeleteWorkflow } from "@/hooks/use-api";
 import { useTableState } from "@/hooks/use-table-state";
 import { formatDate, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,8 @@ import { CopyableText } from "@/components/copyable-text";
 import { SortableColumnHeader } from "@/components/sortable-column-header";
 import { ColumnFilterPopover } from "@/components/column-filter-popover";
 import { TablePagination } from "@/components/table-pagination";
-import { ShieldCheck, Code, Plus, RefreshCw, X } from "lucide-react";
+import { ShieldCheck, Code, Plus, RefreshCw, X, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 const WF_COLUMNS: ColumnDef[] = [
   { key: "name", initialWidth: 380, minWidth: 200 },
@@ -52,6 +53,7 @@ const WF_COLUMNS: ColumnDef[] = [
   { key: "approval", initialWidth: 80, minWidth: 60 },
   { key: "version", initialWidth: 70, minWidth: 60 },
   { key: "updated", initialWidth: 130, minWidth: 100 },
+  { key: "actions", initialWidth: 40, minWidth: 40 },
 ];
 
 const STATE_OPTIONS = [
@@ -108,6 +110,7 @@ export function WorkflowsListPage() {
 
   const { data, isLoading, refetch, isFetching } = useWorkflows(params);
   const createWorkflow = useCreateWorkflow();
+  const deleteWorkflow = useDeleteWorkflow();
   const { data: approvalData } = useApprovalDefaults();
   const approvalDefaults = approvalData?.data;
   const workflows = data?.data ?? [];
@@ -115,6 +118,7 @@ export function WorkflowsListPage() {
 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Record<string, unknown>>({ ...INITIAL_CREATE_STATE });
+  const [deleteTarget, setDeleteTarget] = useState<{ uuid: string; name: string } | null>(null);
 
   function openCreateDialog() {
     const defaults = { ...INITIAL_CREATE_STATE };
@@ -455,13 +459,14 @@ export function WorkflowsListPage() {
                     onSort={handleSort}
                   />
                 </ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="w-8" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <TableRow key={i} className="border-border">
-                      {Array.from({ length: 9 }).map((_, j) => (
+                      {Array.from({ length: 10 }).map((_, j) => (
                         <TableCell key={j}>
                           <Skeleton className="h-5 w-20" />
                         </TableCell>
@@ -557,11 +562,26 @@ export function WorkflowsListPage() {
                       <TableCell className="text-xs text-dim">
                         {formatDate(wf.updated_at)}
                       </TableCell>
+                      <TableCell className="w-8">
+                        {wf.state !== "active" && !wf.is_system && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget({ uuid: wf.uuid, name: wf.name });
+                            }}
+                            className="p-1 text-dim hover:text-red-threat transition-colors rounded"
+                            title="Delete workflow"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
               {!isLoading && workflows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-sm text-dim py-12">
+                  <TableCell colSpan={10} className="text-center text-sm text-dim py-12">
                     No workflows configured
                   </TableCell>
                 </TableRow>
@@ -580,6 +600,24 @@ export function WorkflowsListPage() {
           />
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        title="Delete Workflow"
+        description={deleteTarget ? `Are you sure you want to delete "${deleteTarget.name}"? This action cannot be undone.` : ""}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteWorkflow.mutate(deleteTarget.uuid, {
+            onSuccess: () => {
+              toast.success("Workflow deleted");
+              setDeleteTarget(null);
+            },
+            onError: () => toast.error("Failed to delete workflow"),
+          });
+        }}
+      />
     </AppLayout>
   );
 }

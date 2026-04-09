@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useSearch } from "@tanstack/react-router";
+import { useParams, useSearch, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +39,9 @@ import {
   useWorkflowRuns,
   usePatchWorkflow,
   useTestWorkflow,
+  useDeleteWorkflow,
 } from "@/hooks/use-api";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { formatDate, riskColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from "@/lib/workflow-templates";
@@ -67,6 +69,8 @@ import {
   Copy,
   Wifi,
   WifiOff,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 
 // Use central INDICATOR_TYPES from types.ts
@@ -423,8 +427,11 @@ export function WorkflowDetailPage() {
   const { data: runsResp } = useWorkflowRuns(uuid);
   const patchWorkflow = usePatchWorkflow();
   const testWorkflow = useTestWorkflow();
+  const deleteWorkflow = useDeleteWorkflow();
+  const navigate = useNavigate();
 
   const [code, setCode] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
   const [testIndicator, setTestIndicator] = useState("1.2.3.4");
   const [testType, setTestType] = useState("ip");
@@ -521,6 +528,16 @@ export function WorkflowDetailPage() {
     );
   }
 
+  function handleDelete() {
+    deleteWorkflow.mutate(uuid, {
+      onSuccess: () => {
+        toast.success("Workflow deleted");
+        navigate({ to: "/workflows" });
+      },
+      onError: () => toast.error("Failed to delete workflow"),
+    });
+  }
+
   async function handleTest() {
     setTestResult(null);
 
@@ -599,15 +616,35 @@ export function WorkflowDetailPage() {
             </>
           }
           actions={
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={openEditDialog}
-              className="border-border text-xs"
-            >
-              <Settings className="h-3 w-3 mr-1" />
-              Edit Workflow
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={openEditDialog}
+                className="border-border text-xs"
+              >
+                <Settings className="h-3 w-3 mr-1" />
+                Edit Workflow
+              </Button>
+              {wf.state !== "active" && !wf.is_system && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-dim hover:text-foreground">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-card border-border">
+                    <DropdownMenuItem
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="text-red-threat focus:text-red-threat focus:bg-red-threat/10 cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           }
         />
 
@@ -1236,6 +1273,15 @@ export function WorkflowDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Workflow"
+        description={`Are you sure you want to delete "${wf.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={handleDelete}
+      />
     </AppLayout>
   );
 }

@@ -104,7 +104,6 @@ The related helper `_require_orchestrator()` (used in `invocations.py`) addition
 | `invocations.py` | `/invocations`, `/agents/{uuid}/invocations` | delegate, delegate-parallel, status, long-poll, history | `InvocationService` → `InvocationRepository` |
 | `issues.py` | `/issues`, `/agents/{uuid}/issues` | CRUD, checkout, release, comments | `IssueService` → `IssueRepository` |
 | `routines.py` | `/routines` | CRUD, pause, resume, trigger, triggers CRUD, webhook, runs | `RoutineService` → `RoutineRepository` |
-| `campaigns.py` | `/campaigns` | CRUD, items (link/unlink), metrics | `CampaignService` → `CampaignRepository` |
 | `topology.py` | `/topology` | full topology, routing, delegation | `TopologyService` → `AgentRepository` |
 | `secrets.py` | `/secrets` | CRUD, rotate, versions | `SecretService` → `SecretRepository` |
 | `kb.py` | `/kb` | CRUD, `/folders`, `/search`, `/sync`, revisions, links | `KBService` → `KBPageRepository` |

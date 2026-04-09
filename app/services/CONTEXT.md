@@ -51,7 +51,6 @@ Service Layer     app/services/        Business logic, orchestration — no HTTP
 | `InvocationService` | `invocation_service.py` | Multi-agent task delegation: single and parallel, status tracking, long-poll |
 | `IssueService` | `issue_service.py` | Issue/task lifecycle: create, assign, checkout, resolve, comment |
 | `RoutineService` | `routine_service.py` | Routine scheduling: cron and event-based triggers, pause/resume, manual trigger, run history |
-| `CampaignService` | `campaign_service.py` | Campaign management: link alerts/issues/routines, compute aggregated metrics |
 | `CostService` | `cost_service.py` | Token/cost tracking, per-agent and per-alert aggregates, budget enforcement data |
 | `HeartbeatService` | `heartbeat_service.py` | Heartbeat recording, run creation, last-seen timestamp updates |
 | `SecretService` | `secret_service.py` | Encrypted secrets: create, rotate, version history; uses `ENCRYPTION_KEY` env var |

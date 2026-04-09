@@ -92,7 +92,6 @@
 | `invocation_service.py` | Delegation (single + parallel), status tracking, long-poll | InvocationRepository, AgentRepository |
 | `issue_service.py` | Issue lifecycle: create, assign, checkout, resolve, comment | IssueRepository, IssueCommentRepository |
 | `routine_service.py` | Routine scheduling, cron/event triggers, pause/resume, runs | RoutineRepository, RoutineTriggerRepository, RoutineRunRepository, queue |
-| `campaign_service.py` | Campaign CRUD, item linking (alerts/issues/routines), metrics aggregation | CampaignRepository, CampaignItemRepository |
 | `cost_service.py` | Cost event recording, per-agent/per-alert aggregates, budget data | CostEventRepository, AgentRepository |
 | `heartbeat_service.py` | Heartbeat recording, run creation, last-seen updates | HeartbeatRepository, HeartbeatRunRepository |
 | `secret_service.py` | Encrypted secret create/rotate/version; uses Fernet + ENCRYPTION_KEY | SecretRepository, SecretVersionRepository |

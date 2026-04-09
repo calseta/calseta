@@ -52,6 +52,9 @@ import type {
   KBSyncResult,
   KBPageLink,
   AgentTool,
+  Skill,
+  SkillFile,
+  IssueLabel,
 } from "@/lib/types";
 
 // Settings
@@ -291,6 +294,14 @@ export function useExecuteWorkflow() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["workflow-runs", vars.uuid] });
     },
+  });
+}
+
+export function useDeleteWorkflow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/workflows/${uuid}`),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["workflows"] }),
   });
 }
 
@@ -1476,6 +1487,143 @@ export function useSaveAgentFile() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["agent-files", vars.agentUuid] });
       qc.invalidateQueries({ queryKey: ["agent", vars.agentUuid] });
+    },
+  });
+}
+
+export function useDeleteIssue() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/issues/${uuid}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["issues"] }),
+  });
+}
+
+// ============================================================
+// Labels
+// ============================================================
+
+export function useLabels() {
+  return useQuery({
+    queryKey: ["labels"],
+    queryFn: () => api.get<PaginatedResponse<IssueLabel>>("/labels?page_size=500"),
+    staleTime: 60_000,
+  });
+}
+
+export function useCreateLabel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; color: string }) =>
+      api.post<DataResponse<IssueLabel>>("/labels", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["labels"] }),
+  });
+}
+
+export function useDeleteLabel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/labels/${uuid}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["labels"] }),
+  });
+}
+
+// ============================================================
+// Skills
+// ============================================================
+
+export function useSkills(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  if (!search.has("page_size")) search.set("page_size", "500");
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["skills", qs],
+    queryFn: () => api.get<PaginatedResponse<Skill>>(`/skills?${qs}`),
+  });
+}
+
+export function useSkill(uuid: string | undefined) {
+  return useQuery({
+    queryKey: ["skill", uuid],
+    queryFn: () => api.get<DataResponse<Skill>>(`/skills/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function useCreateSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { slug: string; name: string; description: string | null }) =>
+      api.post<DataResponse<Skill>>("/skills", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["skills"] }),
+  });
+}
+
+export function usePatchSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<Skill>>(`/skills/${uuid}`, body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["skills"] });
+      qc.invalidateQueries({ queryKey: ["skill", vars.uuid] });
+    },
+  });
+}
+
+export function useDeleteSkill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/skills/${uuid}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["skills"] }),
+  });
+}
+
+export function useAgentSkills(agentUuid: string | undefined) {
+  return useQuery({
+    queryKey: ["agent-skills", agentUuid],
+    queryFn: () => api.get<DataResponse<Skill[]>>(`/agents/${agentUuid}/skills`),
+    enabled: !!agentUuid,
+    retry: false,
+  });
+}
+
+export function useSyncAgentSkills() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentUuid, skillUuids }: { agentUuid: string; skillUuids: string[] }) =>
+      api.post<DataResponse<Skill[]>>(`/agents/${agentUuid}/skills/sync`, { skill_uuids: skillUuids }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["agent-skills", vars.agentUuid] });
+    },
+  });
+}
+
+export function useUpsertSkillFile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skillUuid, path, content }: { skillUuid: string; path: string; content: string }) =>
+      api.put<DataResponse<SkillFile>>(`/skills/${skillUuid}/files`, { path, content }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["skill", vars.skillUuid] });
+      qc.invalidateQueries({ queryKey: ["skills"] });
+    },
+  });
+}
+
+export function useDeleteSkillFile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skillUuid, fileUuid }: { skillUuid: string; fileUuid: string }) =>
+      api.delete(`/skills/${skillUuid}/files/${fileUuid}`),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["skill", vars.skillUuid] });
+      qc.invalidateQueries({ queryKey: ["skills"] });
     },
   });
 }
