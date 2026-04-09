@@ -13,13 +13,14 @@ import {
   useLLMIntegration,
   useLLMIntegrationUsage,
   usePatchLLMIntegration,
+  useTestLLMIntegration,
 } from "@/hooks/use-api";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   DetailPageHeader,
 } from "@/components/detail-page";
-import { Pencil, Save, X, BarChart3, Settings } from "lucide-react";
+import { Pencil, Save, X, BarChart3, Settings, Wifi, Loader2 } from "lucide-react";
 
 const PROVIDER_DISPLAY: Record<string, string> = {
   anthropic: "Anthropic",
@@ -82,6 +83,7 @@ export function LLMIntegrationDetailPage() {
   const { data, isLoading, refetch, isFetching } = useLLMIntegration(uuid);
   const { data: usageData, isLoading: usageLoading } = useLLMIntegrationUsage(uuid);
   const patchIntegration = usePatchLLMIntegration();
+  const testIntegration = useTestLLMIntegration();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<EditFormState | null>(null);
@@ -169,7 +171,7 @@ export function LLMIntegrationDetailPage() {
     <AppLayout title={integration.name}>
       <div className="space-y-6">
         <DetailPageHeader
-          backTo="/manage/llm-integrations"
+          backTo="/llm-integrations"
           title={integration.name}
           badges={
             <div className="flex items-center gap-2">
@@ -219,15 +221,43 @@ export function LLMIntegrationDetailPage() {
                   Integration Settings
                 </CardTitle>
                 {!editing ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-3 text-xs gap-1"
-                    onClick={startEditing}
-                  >
-                    <Pencil className="h-3 w-3" />
-                    Edit
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-3 text-xs gap-1"
+                      disabled={testIntegration.isPending}
+                      onClick={() => {
+                        testIntegration.mutate(uuid, {
+                          onSuccess: (res) => {
+                            const r = res as unknown as { success: boolean; latency_ms: number; message: string };
+                            if (r.success) {
+                              toast.success(`Connected — ${r.latency_ms}ms`);
+                            } else {
+                              toast.error(r.message || "Connection failed");
+                            }
+                          },
+                          onError: () => toast.error("Connection test failed"),
+                        });
+                      }}
+                    >
+                      {testIntegration.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Wifi className="h-3 w-3" />
+                      )}
+                      Test
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-3 text-xs gap-1"
+                      onClick={startEditing}
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Edit
+                    </Button>
+                  </div>
                 ) : (
                   <div className="flex items-center gap-2">
                     <Button

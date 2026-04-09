@@ -850,6 +850,16 @@ export function useDeleteLLMIntegration() {
   });
 }
 
+export function useTestLLMIntegration() {
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      api.post<{ success: boolean; latency_ms: number; message: string }>(
+        `/llm-integrations/${uuid}/test`,
+        {},
+      ),
+  });
+}
+
 export function useLLMIntegrationUsage(uuid: string) {
   return useQuery({
     queryKey: ["llm-integration-usage", uuid],
