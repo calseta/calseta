@@ -9,6 +9,26 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# ---------------------------------------------------------------------------
+# Label schemas
+# ---------------------------------------------------------------------------
+
+
+class IssueLabelCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    color: str = Field(default="#6b7280", pattern=r"^#[0-9a-fA-F]{6}$")
+
+
+class IssueLabelResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    uuid: UUID
+    name: str
+    color: str
+    created_at: datetime
+    updated_at: datetime
+
+
 class IssueStatus:
     BACKLOG = "backlog"
     TODO = "todo"
@@ -56,6 +76,7 @@ class IssueCreate(BaseModel):
     parent_uuid: UUID | None = None
     due_at: datetime | None = None
     metadata: dict[str, Any] | None = None
+    label_uuids: list[UUID] | None = None
 
 
 class IssuePatch(BaseModel):
@@ -69,6 +90,7 @@ class IssuePatch(BaseModel):
     due_at: datetime | None = None
     resolution: str | None = None
     metadata: dict[str, Any] | None = None
+    label_uuids: list[UUID] | None = None
 
 
 class IssueResponse(BaseModel):
@@ -96,6 +118,7 @@ class IssueResponse(BaseModel):
     alert_uuid: UUID | None = None
     parent_uuid: UUID | None = None
     routine_uuid: UUID | None = None
+    labels: list[IssueLabelResponse] = []
 
 
 class IssueCommentCreate(BaseModel):

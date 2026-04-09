@@ -5,10 +5,15 @@ POST   /v1/issues                              — Create issue
 GET    /v1/issues                              — List issues (filterable)
 GET    /v1/issues/{issue_uuid}                 — Get issue details
 PATCH  /v1/issues/{issue_uuid}                 — Update issue
+DELETE /v1/issues/{issue_uuid}                 — Delete issue (204)
 POST   /v1/issues/{issue_uuid}/checkout        — Atomic checkout
 POST   /v1/issues/{issue_uuid}/release         — Release checkout
 GET    /v1/issues/{issue_uuid}/comments        — List comments
 POST   /v1/issues/{issue_uuid}/comments        — Add comment
+
+GET    /v1/labels                              — List all labels
+POST   /v1/labels                              — Create label
+DELETE /v1/labels/{label_uuid}                 — Delete label (204)
 
 GET    /v1/agents/{agent_uuid}/issues          — List issues assigned to agent
 """
@@ -35,12 +40,15 @@ from app.schemas.issues import (
     IssueCommentCreate,
     IssueCommentResponse,
     IssueCreate,
+    IssueLabelCreate,
+    IssueLabelResponse,
     IssuePatch,
     IssueResponse,
 )
 from app.services.issue_service import IssueService
 
 router = APIRouter(prefix="/issues", tags=["issues"])
+labels_router = APIRouter(prefix="/labels", tags=["issues"])
 agents_issues_router = APIRouter(prefix="/agents", tags=["agents"])
 
 _Read = Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_READ))]
@@ -80,6 +88,8 @@ async def list_issues(
     category: str | None = Query(default=None),
     assignee_agent_uuid: UUID | None = Query(default=None),
     alert_uuid: UUID | None = Query(default=None),
+    label_uuid: UUID | None = Query(default=None),
+    q: str | None = Query(default=None, description="Search title and description (ILIKE)"),
     pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedResponse[IssueResponse]:
@@ -91,6 +101,8 @@ async def list_issues(
         category=category,
         assignee_agent_uuid=assignee_agent_uuid,
         alert_uuid=alert_uuid,
+        label_uuid=label_uuid,
+        q=q,
         page=pagination.page,
         page_size=pagination.page_size,
     )
@@ -132,6 +144,20 @@ async def patch_issue(
     issue = await svc.patch_issue(issue_uuid, body)
     await db.commit()
     return DataResponse(data=issue, meta={})
+
+
+@router.delete("/{issue_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def delete_issue(
+    request: Request,
+    issue_uuid: UUID,
+    auth: _Write,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Delete an issue by UUID. Cascades to comments and label assignments."""
+    svc = IssueService(db)
+    await svc.delete_issue(issue_uuid)
+    await db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -219,6 +245,68 @@ async def add_comment(
     comment = await svc.add_comment(issue_uuid=issue_uuid, data=body)
     await db.commit()
     return DataResponse(data=comment, meta={})
+
+
+# ---------------------------------------------------------------------------
+# Labels routes
+# ---------------------------------------------------------------------------
+
+
+@labels_router.get("", response_model=PaginatedResponse[IssueLabelResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def list_labels(
+    request: Request,
+    auth: _Read,
+    pagination: PaginationParams = Depends(),
+    db: AsyncSession = Depends(get_db),
+) -> PaginatedResponse[IssueLabelResponse]:
+    """List all issue labels."""
+    svc = IssueService(db)
+    labels, total = await svc.list_labels(
+        page=pagination.page,
+        page_size=pagination.page_size,
+    )
+    return PaginatedResponse(
+        data=labels,
+        meta=PaginationMeta.from_total(
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        ),
+    )
+
+
+@labels_router.post(
+    "",
+    response_model=DataResponse[IssueLabelResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def create_label(
+    request: Request,
+    body: IssueLabelCreate,
+    auth: _Write,
+    db: AsyncSession = Depends(get_db),
+) -> DataResponse[IssueLabelResponse]:
+    """Create a new issue label."""
+    svc = IssueService(db)
+    label = await svc.create_label(body)
+    await db.commit()
+    return DataResponse(data=label, meta={})
+
+
+@labels_router.delete("/{label_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def delete_label(
+    request: Request,
+    label_uuid: UUID,
+    auth: _Write,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Delete a label. Cascades to all issue assignments."""
+    svc = IssueService(db)
+    await svc.delete_label(label_uuid)
+    await db.commit()
 
 
 # ---------------------------------------------------------------------------

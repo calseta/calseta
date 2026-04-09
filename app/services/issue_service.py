@@ -35,6 +35,8 @@ from app.schemas.issues import (
     IssueCommentCreate,
     IssueCommentResponse,
     IssueCreate,
+    IssueLabelCreate,
+    IssueLabelResponse,
     IssuePatch,
     IssuePriority,
     IssueResponse,
@@ -46,6 +48,10 @@ logger = structlog.get_logger(__name__)
 
 def _build_issue_response(issue: AgentIssue) -> IssueResponse:
     """Map an AgentIssue ORM object to IssueResponse, resolving FK UUIDs."""
+    labels = [
+        IssueLabelResponse.model_validate(lbl)
+        for lbl in (issue.labels if issue.labels is not None else [])
+    ]
     return IssueResponse(
         uuid=issue.uuid,
         identifier=issue.identifier,
@@ -68,6 +74,7 @@ def _build_issue_response(issue: AgentIssue) -> IssueResponse:
         alert_uuid=issue.alert.uuid if issue.alert else None,
         parent_uuid=None,  # self-referential — not eagerly loaded; callers fetch separately
         routine_uuid=None,
+        labels=labels,
     )
 
 
@@ -182,6 +189,11 @@ class IssueService:
         issue = await self._repo.create(create_data, identifier)
         await self._db.refresh(issue, ["assignee_agent", "created_by_agent", "alert"])
 
+        # Resolve and assign labels if provided
+        if data.label_uuids is not None:
+            labels = await self._repo.get_labels_by_uuids(data.label_uuids)
+            await self._repo.sync_issue_labels(issue, labels)
+
         logger.info("issue_created", issue_uuid=str(issue.uuid), identifier=identifier)
         return _build_issue_response(issue)
 
@@ -204,6 +216,8 @@ class IssueService:
         category: str | None = None,
         assignee_agent_uuid: UUID | None = None,
         alert_uuid: UUID | None = None,
+        label_uuid: UUID | None = None,
+        q: str | None = None,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[IssueResponse], int]:
@@ -224,12 +238,21 @@ class IssueService:
                 return [], 0
             alert_id = alert.id
 
+        label_id: int | None = None
+        if label_uuid is not None:
+            label = await self._repo.get_label_by_uuid(label_uuid)
+            if label is None:
+                return [], 0
+            label_id = label.id
+
         issues, total = await self._repo.list_issues(
             status=status,
             priority=priority,
             category=category,
             assignee_agent_id=assignee_agent_id,
             alert_id=alert_id,
+            label_id=label_id,
+            q=q,
             page=page,
             page_size=page_size,
         )
@@ -322,6 +345,12 @@ class IssueService:
 
         issue = await self._repo.patch(issue, **updates)
         await self._db.refresh(issue, ["assignee_agent", "created_by_agent", "alert"])
+
+        # Replace label set if provided
+        if patch_data.label_uuids is not None:
+            labels = await self._repo.get_labels_by_uuids(patch_data.label_uuids)
+            await self._repo.sync_issue_labels(issue, labels)
+
         return _build_issue_response(issue)
 
     async def checkout_issue(
@@ -445,6 +474,47 @@ class IssueService:
             await self._db.refresh(comment, ["author_agent"])
             responses.append(_build_comment_response(comment))
         return responses, total
+
+    async def delete_issue(self, issue_uuid: UUID) -> None:
+        """Delete an issue by UUID. Cascade handled by DB."""
+        issue = await self._repo.get_by_uuid(issue_uuid)
+        if issue is None:
+            raise CalsetaException(
+                status_code=404,
+                code="issue_not_found",
+                message=f"Issue '{issue_uuid}' not found",
+            )
+        await self._repo.delete(issue)
+        logger.info("issue_deleted", issue_uuid=str(issue_uuid))
+
+    # --- Label operations ---
+
+    async def list_labels(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> tuple[list[IssueLabelResponse], int]:
+        """List all labels."""
+        labels, total = await self._repo.list_labels(page=page, page_size=page_size)
+        return [IssueLabelResponse.model_validate(lbl) for lbl in labels], total
+
+    async def create_label(self, data: IssueLabelCreate) -> IssueLabelResponse:
+        """Create a new label."""
+        label = await self._repo.create_label(name=data.name, color=data.color)
+        logger.info("label_created", label_uuid=str(label.uuid), name=label.name)
+        return IssueLabelResponse.model_validate(label)
+
+    async def delete_label(self, label_uuid: UUID) -> None:
+        """Delete a label by UUID."""
+        label = await self._repo.get_label_by_uuid(label_uuid)
+        if label is None:
+            raise CalsetaException(
+                status_code=404,
+                code="label_not_found",
+                message=f"Label '{label_uuid}' not found",
+            )
+        await self._repo.delete_label(label)
+        logger.info("label_deleted", label_uuid=str(label_uuid))
 
     async def list_agent_issues(
         self,

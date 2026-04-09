@@ -1,4 +1,4 @@
-"""IssueRepository — CRUD and atomic operations for agent_issues and agent_issue_comments."""
+"""IssueRepository — CRUD and atomic operations for agent_issues, labels, and comments."""
 
 from __future__ import annotations
 
@@ -6,10 +6,11 @@ import uuid as uuid_module
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from app.db.models.agent_issue import AgentIssue
 from app.db.models.agent_issue_comment import AgentIssueComment
+from app.db.models.issue_label import IssueLabel
 from app.repositories.base import BaseRepository
 
 
@@ -119,27 +120,58 @@ class IssueRepository(BaseRepository[AgentIssue]):
         category: str | None = None,
         assignee_agent_id: int | None = None,
         alert_id: int | None = None,
+        label_id: int | None = None,
+        q: str | None = None,
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[AgentIssue], int]:
         """Return (issues, total) with optional filters."""
-        filters = []
+        from sqlalchemy import or_
+
+        from app.db.models.agent_issue import issue_label_assignments
+
+        base_stmt = select(AgentIssue)
+        count_stmt = select(func.count()).select_from(AgentIssue)
+
         if status is not None:
-            filters.append(AgentIssue.status == status)
+            base_stmt = base_stmt.where(AgentIssue.status == status)
+            count_stmt = count_stmt.where(AgentIssue.status == status)
         if priority is not None:
-            filters.append(AgentIssue.priority == priority)
+            base_stmt = base_stmt.where(AgentIssue.priority == priority)
+            count_stmt = count_stmt.where(AgentIssue.priority == priority)
         if category is not None:
-            filters.append(AgentIssue.category == category)
+            base_stmt = base_stmt.where(AgentIssue.category == category)
+            count_stmt = count_stmt.where(AgentIssue.category == category)
         if assignee_agent_id is not None:
-            filters.append(AgentIssue.assignee_agent_id == assignee_agent_id)
+            base_stmt = base_stmt.where(AgentIssue.assignee_agent_id == assignee_agent_id)
+            count_stmt = count_stmt.where(AgentIssue.assignee_agent_id == assignee_agent_id)
         if alert_id is not None:
-            filters.append(AgentIssue.alert_id == alert_id)
-        return await self.paginate(
-            *filters,
-            order_by=AgentIssue.created_at.desc(),
-            page=page,
-            page_size=page_size,
-        )
+            base_stmt = base_stmt.where(AgentIssue.alert_id == alert_id)
+            count_stmt = count_stmt.where(AgentIssue.alert_id == alert_id)
+        if q is not None:
+            search = f"%{q}%"
+            ilike_filter = or_(
+                AgentIssue.title.ilike(search),
+                AgentIssue.description.ilike(search),
+            )
+            base_stmt = base_stmt.where(ilike_filter)
+            count_stmt = count_stmt.where(ilike_filter)
+        if label_id is not None:
+            label_filter = AgentIssue.id.in_(
+                select(issue_label_assignments.c.issue_id).where(
+                    issue_label_assignments.c.label_id == label_id
+                )
+            )
+            base_stmt = base_stmt.where(label_filter)
+            count_stmt = count_stmt.where(label_filter)
+
+        total_result = await self._db.execute(count_stmt)
+        total: int = total_result.scalar_one()
+
+        offset = (page - 1) * page_size
+        base_stmt = base_stmt.order_by(AgentIssue.created_at.desc()).offset(offset).limit(page_size)
+        result = await self._db.execute(base_stmt)
+        return list(result.scalars().all()), total
 
     async def list_for_agent(
         self,
@@ -210,3 +242,63 @@ class IssueRepository(BaseRepository[AgentIssue]):
             select(AgentIssueComment).where(AgentIssueComment.uuid == comment_uuid)
         )
         return result.scalar_one_or_none()  # type: ignore[no-any-return]
+
+    # --- Label operations ---
+
+    async def list_labels(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> tuple[list[IssueLabel], int]:
+        """Return (labels, total) ordered by name."""
+        count_stmt = select(func.count()).select_from(IssueLabel)
+        total_result = await self._db.execute(count_stmt)
+        total: int = total_result.scalar_one()
+
+        stmt = (
+            select(IssueLabel)
+            .order_by(IssueLabel.name.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        result = await self._db.execute(stmt)
+        return list(result.scalars().all()), total
+
+    async def get_label_by_uuid(self, label_uuid: UUID) -> IssueLabel | None:
+        """Fetch a single label by UUID."""
+        result = await self._db.execute(
+            select(IssueLabel).where(IssueLabel.uuid == label_uuid)
+        )
+        return result.scalar_one_or_none()  # type: ignore[no-any-return]
+
+    async def get_labels_by_uuids(self, label_uuids: list[UUID]) -> list[IssueLabel]:
+        """Fetch multiple labels by UUID list."""
+        if not label_uuids:
+            return []
+        result = await self._db.execute(
+            select(IssueLabel).where(IssueLabel.uuid.in_(label_uuids))
+        )
+        return list(result.scalars().all())
+
+    async def create_label(self, name: str, color: str) -> IssueLabel:
+        """Create a new label row."""
+        label = IssueLabel(
+            uuid=uuid_module.uuid4(),
+            name=name,
+            color=color,
+        )
+        self._db.add(label)
+        await self._db.flush()
+        await self._db.refresh(label)
+        return label
+
+    async def delete_label(self, label: IssueLabel) -> None:
+        """Delete a label row and flush."""
+        await self._db.delete(label)
+        await self._db.flush()
+
+    async def sync_issue_labels(self, issue: AgentIssue, labels: list[IssueLabel]) -> None:
+        """Replace the full set of labels assigned to an issue."""
+        issue.labels = labels
+        await self._db.flush()
+        await self._db.refresh(issue, ["labels"])

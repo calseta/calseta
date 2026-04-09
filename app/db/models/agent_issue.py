@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Text
+import sqlalchemy as sa
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Table, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,6 +17,27 @@ if TYPE_CHECKING:
     from app.db.models.agent_registration import AgentRegistration
     from app.db.models.alert import Alert
     from app.db.models.heartbeat_run import HeartbeatRun
+    from app.db.models.issue_label import IssueLabel
+
+
+# Association table for the M2M relationship between issues and labels.
+issue_label_assignments = Table(
+    "issue_label_assignments",
+    Base.metadata,
+    sa.Column(
+        "issue_id",
+        BigInteger,
+        sa.ForeignKey("agent_issues.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    sa.Column(
+        "label_id",
+        BigInteger,
+        sa.ForeignKey("issue_labels.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    extend_existing=True,
+)
 
 
 class AgentIssue(TimestampMixin, UUIDMixin, Base):
@@ -71,4 +93,9 @@ class AgentIssue(TimestampMixin, UUIDMixin, Base):
     )
     comments: Mapped[list[AgentIssueComment]] = relationship(
         "AgentIssueComment", back_populates="issue", cascade="all, delete-orphan"
+    )
+    labels: Mapped[list[IssueLabel]] = relationship(
+        "IssueLabel",
+        secondary="issue_label_assignments",
+        lazy="selectin",
     )
