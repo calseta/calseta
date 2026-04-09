@@ -25,7 +25,6 @@ import { IndicatorMappingsPage } from "@/pages/settings/indicator-mappings";
 import { QueuePage } from "@/pages/queue";
 import { LLMIntegrationsPage } from "@/pages/manage/llm-integrations";
 import { LLMIntegrationDetailPage } from "@/pages/manage/llm-integrations/detail";
-import { TopologyPage } from "@/pages/manage/topology/index";
 import { SecretsPage } from "@/pages/settings/secrets/index";
 import { IssuesPage } from "@/pages/manage/issues/index";
 import { IssueDetailPage } from "@/pages/manage/issues/detail";
@@ -182,12 +181,6 @@ const llmIntegrationDetailRoute = createRoute({
   component: LLMIntegrationDetailPage,
 });
 
-const topologyRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/manage/topology",
-  component: TopologyPage,
-});
-
 const secretsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/secrets",
@@ -277,7 +270,6 @@ const routeTree = rootRoute.addChildren([
   queueRoute,
   llmIntegrationsRoute,
   llmIntegrationDetailRoute,
-  topologyRoute,
   secretsRoute,
   issuesRoute,
   issueDetailRoute,

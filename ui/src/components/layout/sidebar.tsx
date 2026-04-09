@@ -16,7 +16,6 @@ import {
   Cpu,
   ListTodo,
   RotateCcw,
-  GitFork,
   Lock,
   Database,
 } from "lucide-react";
@@ -39,8 +38,7 @@ const manageNav = [
   { to: "/manage/llm-integrations", icon: Cpu, label: "LLM Integrations" },
   { to: "/manage/issues", icon: ListTodo, label: "Issues" },
   { to: "/manage/routines", icon: RotateCcw, label: "Routines" },
-  { to: "/manage/topology", icon: GitFork, label: "Topology" },
-  { to: "/manage/enrichment-providers", icon: Microscope, label: "Enrichments" },
+{ to: "/manage/enrichment-providers", icon: Microscope, label: "Enrichments" },
   { to: "/manage/detection-rules", icon: Radar, label: "Detection Rules" },
   { to: "/manage/context-docs", icon: BookOpen, label: "Context Docs" },
   { to: "/manage/kb", icon: Database, label: "Knowledge Base" },
