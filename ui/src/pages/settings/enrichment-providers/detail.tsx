@@ -58,6 +58,12 @@ import {
 import { formatDate } from "@/lib/format";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FieldExtractionEditor } from "@/components/field-extraction-editor";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useNavigate } from "@tanstack/react-router";
 import { INDICATOR_TYPES as ALL_INDICATOR_TYPES } from "@/lib/types";
 import type { HttpStepDebug, EnrichmentProviderTestResult } from "@/lib/types";
@@ -67,6 +73,7 @@ import {
   Clock,
   Pencil,
   Loader2,
+  MoreHorizontal,
   CheckCircle2,
   XCircle,
   Beaker,
@@ -561,15 +568,22 @@ export function EnrichmentProviderDetailPage() {
           }
           actions={
             !provider.is_builtin ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDelete(true)}
-                className="text-dim hover:text-red-threat"
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-1" />
-                Delete
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-dim hover:text-foreground">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-card border-border">
+                  <DropdownMenuItem
+                    onClick={() => setShowDelete(true)}
+                    className="text-red-threat focus:text-red-threat focus:bg-red-threat/10 cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : undefined
           }
         />
