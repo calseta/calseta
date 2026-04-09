@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useParams, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
@@ -17,17 +17,25 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   useLLMIntegration,
   useLLMIntegrationUsage,
   usePatchLLMIntegration,
   useTestLLMIntegration,
+  useDeleteLLMIntegration,
 } from "@/hooks/use-api";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   DetailPageHeader,
 } from "@/components/detail-page";
-import { Pencil, BarChart3, Settings, Wifi, Loader2 } from "lucide-react";
+import { MoreHorizontal, Pencil, BarChart3, Settings, Wifi, Loader2, Trash2 } from "lucide-react";
 
 const PROVIDER_DISPLAY: Record<string, string> = {
   anthropic: "Anthropic",
@@ -87,13 +95,16 @@ interface EditFormState {
 
 export function LLMIntegrationDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
+  const navigate = useNavigate();
   const { data, isLoading, refetch, isFetching } = useLLMIntegration(uuid);
   const { data: usageData, isLoading: usageLoading } = useLLMIntegrationUsage(uuid);
   const patchIntegration = usePatchLLMIntegration();
   const testIntegration = useTestLLMIntegration();
+  const deleteIntegration = useDeleteLLMIntegration();
 
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [draft, setDraft] = useState<EditFormState | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const integration = data?.data;
   const usage = usageData?.data;
@@ -261,6 +272,22 @@ export function LLMIntegrationDetailPage() {
                     <Pencil className="h-3 w-3" />
                     Edit
                   </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-dim hover:text-foreground">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-card border-border">
+                      <DropdownMenuItem
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="text-red-threat focus:text-red-threat focus:bg-red-threat/10 cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -548,6 +575,24 @@ export function LLMIntegrationDetailPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete LLM Integration"
+        description={`Are you sure you want to delete "${integration.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          deleteIntegration.mutate(uuid, {
+            onSuccess: () => {
+              toast.success("Integration deleted");
+              navigate({ to: "/llm-integrations" });
+            },
+            onError: () => toast.error("Failed to delete integration"),
+          });
+        }}
+      />
     </AppLayout>
   );
 }

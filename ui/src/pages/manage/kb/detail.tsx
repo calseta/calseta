@@ -1,9 +1,17 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useParams, useSearch } from "@tanstack/react-router";
+import { useParams, useSearch, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useKBPage, usePatchKBPage } from "@/hooks/use-api";
+import { useKBPage, usePatchKBPage, useDeleteKBPage } from "@/hooks/use-api";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { cn } from "@/lib/utils";
 import {
@@ -14,8 +22,10 @@ import {
   Heading3,
   List,
   ListOrdered,
+  MoreHorizontal,
   Quote,
   Code,
+  Trash2,
   Undo,
   Redo,
   Eye,
@@ -73,12 +83,15 @@ function ToolbarDivider() {
 export function KBDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
   const { slug } = useSearch({ strict: false }) as { slug?: string };
+  const navigate = useNavigate();
 
   const page = useKBPage(slug ?? "");
   const patchPage = usePatchKBPage();
+  const deletePage = useDeleteKBPage();
 
   const [isPreview, setIsPreview] = useState(false);
   const [savedIndicator, setSavedIndicator] = useState<"idle" | "saving" | "saved">("idle");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pageData = page.data?.data;
@@ -207,6 +220,25 @@ export function KBDetailPage() {
                         </button>
                       </div>
                     )}
+                    {/* Kebab menu (only for non-synced pages) */}
+                    {!pageData.sync_source && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-dim hover:text-foreground">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-card border-border">
+                          <DropdownMenuItem
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="text-red-threat focus:text-red-threat focus:bg-red-threat/10 cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete Page
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </div>
                 <p className="text-xs font-mono text-muted-foreground mt-0.5">{pageData.slug}</p>
@@ -326,6 +358,26 @@ export function KBDetailPage() {
           )}
         </div>
       </div>
+
+      {slug && (
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          onOpenChange={setShowDeleteConfirm}
+          title="Delete KB Page"
+          description={`Are you sure you want to delete "${pageData?.title ?? slug}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          variant="destructive"
+          onConfirm={() => {
+            deletePage.mutate(slug, {
+              onSuccess: () => {
+                toast.success("Page deleted");
+                navigate({ to: "/kb" });
+              },
+              onError: () => toast.error("Failed to delete page"),
+            });
+          }}
+        />
+      )}
     </AppLayout>
   );
 }

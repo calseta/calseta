@@ -24,7 +24,7 @@ import {
   DocumentationEditor,
 } from "@/components/detail-page";
 import { CopyableText } from "@/components/copyable-text";
-import { useContextDocument, usePatchContextDocument } from "@/hooks/use-api";
+import { useContextDocument, usePatchContextDocument, useDeleteContextDocument } from "@/hooks/use-api";
 import { formatDate } from "@/lib/format";
 import {
   Select,
@@ -33,7 +33,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, FileText, Globe, GitBranch, Pencil, Target } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { BookOpen, FileText, Globe, GitBranch, MoreHorizontal, Pencil, Target, Trash2 } from "lucide-react";
 import {
   TargetingRuleBuilder,
   TargetingRuleDisplay,
@@ -50,8 +57,10 @@ export function ContextDocDetailPage() {
   const navigate = useNavigate({ from: "/context-docs/$uuid" });
   const { data, isLoading, refetch, isFetching } = useContextDocument(uuid);
   const patchDoc = usePatchContextDocument();
+  const deleteDoc = useDeleteContextDocument();
   const [showRulesDialog, setShowRulesDialog] = useState(false);
   const [draftRules, setDraftRules] = useState<TargetingRules | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const doc = data?.data;
 
@@ -134,6 +143,24 @@ export function ContextDocDetailPage() {
             doc.description ? (
               <p className="text-sm text-muted-foreground">{doc.description}</p>
             ) : undefined
+          }
+          actions={
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-dim hover:text-foreground">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card border-border">
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-red-threat focus:text-red-threat focus:bg-red-threat/10 cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           }
         />
 
@@ -284,6 +311,24 @@ export function ContextDocDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Context Document"
+        description={`Are you sure you want to delete "${doc.title}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          deleteDoc.mutate(uuid, {
+            onSuccess: () => {
+              toast.success("Document deleted");
+              navigate({ to: "/context-docs" });
+            },
+            onError: () => toast.error("Failed to delete document"),
+          });
+        }}
+      />
     </AppLayout>
   );
 }

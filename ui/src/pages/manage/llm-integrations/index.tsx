@@ -35,11 +35,13 @@ import { TablePagination } from "@/components/table-pagination";
 import {
   useLLMIntegrations,
   useCreateLLMIntegration,
+  useDeleteLLMIntegration,
 } from "@/hooks/use-api";
 import { useTableState } from "@/hooks/use-table-state";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Plus, RefreshCw, Check } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Plus, RefreshCw, Check, Trash2 } from "lucide-react";
 
 const COLUMNS: ColumnDef[] = [
   { key: "provider", initialWidth: 120, minWidth: 90 },
@@ -50,6 +52,7 @@ const COLUMNS: ColumnDef[] = [
   { key: "input_cost", initialWidth: 130, minWidth: 100 },
   { key: "output_cost", initialWidth: 130, minWidth: 100 },
   { key: "created", initialWidth: 150, minWidth: 100 },
+  { key: "actions", initialWidth: 50, minWidth: 40 },
 ];
 
 const PROVIDERS = [
@@ -135,10 +138,12 @@ export function LLMIntegrationsPage() {
 
   const { data, isLoading, refetch, isFetching } = useLLMIntegrations(params);
   const createIntegration = useCreateLLMIntegration();
+  const deleteIntegration = useDeleteLLMIntegration();
   const navigate = useNavigate();
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<CreateFormState>(EMPTY_FORM);
+  const [deleteTarget, setDeleteTarget] = useState<{ uuid: string; name: string } | null>(null);
 
   const integrations = data?.data ?? [];
   const meta = data?.meta;
@@ -182,7 +187,7 @@ export function LLMIntegrationsPage() {
         handleOpen(false);
         const uuid = res?.data?.uuid;
         if (uuid) {
-          navigate({ to: "/manage/llm-integrations/$uuid", params: { uuid } });
+          navigate({ to: "/llm-integrations/$uuid", params: { uuid } });
         }
       },
       onError: () => toast.error("Failed to create LLM integration"),
@@ -231,6 +236,7 @@ export function LLMIntegrationsPage() {
                 <ResizableTableHead columnKey="input_cost" className="text-dim text-xs">Input / 1k tokens</ResizableTableHead>
                 <ResizableTableHead columnKey="output_cost" className="text-dim text-xs">Output / 1k tokens</ResizableTableHead>
                 <ResizableTableHead columnKey="created" className="text-dim text-xs">Created</ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10"></ResizableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -245,6 +251,7 @@ export function LLMIntegrationsPage() {
                       <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
                   ))
                 : integrations.map((integration) => (
@@ -253,7 +260,7 @@ export function LLMIntegrationsPage() {
                       className="border-border hover:bg-accent/50 cursor-pointer"
                       onClick={() =>
                         navigate({
-                          to: "/manage/llm-integrations/$uuid",
+                          to: "/llm-integrations/$uuid",
                           params: { uuid: integration.uuid },
                         })
                       }
@@ -298,11 +305,22 @@ export function LLMIntegrationsPage() {
                       <TableCell className="text-xs text-dim whitespace-nowrap">
                         {formatDate(integration.created_at)}
                       </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-dim hover:text-red-threat"
+                          onClick={() => setDeleteTarget({ uuid: integration.uuid, name: integration.name })}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
               {!isLoading && integrations.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-sm text-dim py-20">
+                  <TableCell colSpan={9} className="text-center text-sm text-dim py-20">
                     No LLM integrations configured
                   </TableCell>
                 </TableRow>
@@ -439,6 +457,26 @@ export function LLMIntegrationsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}
+        title="Delete LLM Integration"
+        description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteIntegration.mutate(deleteTarget.uuid, {
+            onSuccess: () => {
+              toast.success("Integration deleted");
+              setDeleteTarget(null);
+              refetch();
+            },
+            onError: () => toast.error("Failed to delete integration"),
+          });
+        }}
+      />
     </AppLayout>
   );
 }

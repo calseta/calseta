@@ -84,8 +84,12 @@ import {
   useTools,
   useAgentFiles,
   useSaveAgentFile,
+  useAgentSkills,
+  useSkills,
+  useSyncAgentSkills,
+  useDeleteAgent,
 } from "@/hooks/use-api";
-import type { HeartbeatRun, CostEvent, AgentInvocation, AgentTool } from "@/lib/types";
+import type { HeartbeatRun, CostEvent, AgentInvocation, AgentTool, Skill } from "@/lib/types";
 import { formatDate, relativeTime } from "@/lib/format";
 import {
   Globe,
@@ -106,6 +110,7 @@ import {
   Play,
   StopCircle,
   MoreHorizontal,
+  Trash2,
   Heart,
   BookOpen,
   Wrench,
@@ -171,8 +176,8 @@ const INVOCATION_COLUMNS: ColumnDef[] = [
 
 export function AgentDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
-  const { tab: activeTab } = useSearch({ from: "/manage/agents/$uuid" });
-  const navigate = useNavigate({ from: "/manage/agents/$uuid" });
+  const { tab: activeTab } = useSearch({ from: "/agents/$uuid" });
+  const navigate = useNavigate({ from: "/agents/$uuid" });
   const { data, isLoading, refetch, isFetching } = useAgent(uuid);
   const patchAgent = usePatchAgent();
   const pauseAgent = usePauseAgent();
@@ -210,6 +215,10 @@ export function AgentDetailPage() {
   // Terminate confirm
   const [showTerminateConfirm, setShowTerminateConfirm] = useState(false);
 
+  // Delete confirm
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const deleteAgent = useDeleteAgent();
+
   // Selected run for split-pane
   const [selectedRunUuid, setSelectedRunUuid] = useState<string | null>(null);
 
@@ -235,6 +244,9 @@ export function AgentDetailPage() {
   const { data: toolsData } = useTools();
   const { data: agentFilesData, isLoading: filesLoading } = useAgentFiles(uuid);
   const saveAgentFile = useSaveAgentFile();
+  const { data: agentSkillsData } = useAgentSkills(uuid);
+  const { data: allSkillsData } = useSkills();
+  const syncAgentSkills = useSyncAgentSkills();
 
   const heartbeatRuns: HeartbeatRun[] = heartbeatData?.data ?? [];
   const costEvents: CostEvent[] = costData?.data ?? [];
@@ -248,6 +260,20 @@ export function AgentDetailPage() {
   const assignedToolIds = new Set(agent?.tool_ids ?? []);
   const assignedTools = allTools.filter((t) => assignedToolIds.has(t.id));
   const costSummary = costSummaryData?.data ?? null;
+
+  // Skills
+  const allSkills: Skill[] = allSkillsData?.data ?? [];
+  const agentSkillUuids = new Set((agentSkillsData?.data ?? []).map((s: Skill) => s.uuid));
+
+  function handleSkillToggle(skillUuid: string, checked: boolean) {
+    const newUuids = checked
+      ? [...agentSkillUuids, skillUuid]
+      : [...agentSkillUuids].filter((u) => u !== skillUuid);
+    syncAgentSkills.mutate(
+      { agentUuid: uuid, skillUuids: newUuids },
+      { onError: () => toast.error("Failed to sync skills") },
+    );
+  }
 
   // Derived: success rate from heartbeat runs
   const successCount = heartbeatRuns.filter((r) => r.status === "succeeded").length;
@@ -540,7 +566,7 @@ export function AgentDetailPage() {
     <AppLayout title="Agent Detail">
       <div className="space-y-6">
         <DetailPageHeader
-          backTo="/manage/agents"
+          backTo="/agents"
           title={agent.name}
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
@@ -618,6 +644,13 @@ export function AgentDetailPage() {
                       <StopCircle className="h-3.5 w-3.5 mr-2" />
                       Terminate Agent
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="text-sm text-red-threat cursor-pointer focus:text-red-threat focus:bg-red-threat/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-2" />
+                      Delete Agent
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -684,25 +717,13 @@ export function AgentDetailPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="bg-surface border border-border">
+            <TabsTrigger value="dashboard" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <LayoutDashboard className="h-3.5 w-3.5 mr-1" />
+              Dashboard
+            </TabsTrigger>
             <TabsTrigger value="configuration" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
               <Settings className="h-3.5 w-3.5 mr-1" />
               Configuration
-            </TabsTrigger>
-            <TabsTrigger value="documentation" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-              <FileText className="h-3.5 w-3.5 mr-1" />
-              Documentation
-            </TabsTrigger>
-            <TabsTrigger value="runs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-              <Activity className="h-3.5 w-3.5 mr-1" />
-              Runs
-            </TabsTrigger>
-            <TabsTrigger value="cost" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-              <DollarSign className="h-3.5 w-3.5 mr-1" />
-              Cost
-            </TabsTrigger>
-            <TabsTrigger value="assignments" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-              <Layers className="h-3.5 w-3.5 mr-1" />
-              Assignments
             </TabsTrigger>
             <TabsTrigger value="instructions" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
               <BookOpen className="h-3.5 w-3.5 mr-1" />
@@ -712,9 +733,21 @@ export function AgentDetailPage() {
               <Wrench className="h-3.5 w-3.5 mr-1" />
               Skills
             </TabsTrigger>
-            <TabsTrigger value="dashboard" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
-              <LayoutDashboard className="h-3.5 w-3.5 mr-1" />
-              Dashboard
+            <TabsTrigger value="assignments" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Layers className="h-3.5 w-3.5 mr-1" />
+              Assignments
+            </TabsTrigger>
+            <TabsTrigger value="runs" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Activity className="h-3.5 w-3.5 mr-1" />
+              Runs
+            </TabsTrigger>
+            <TabsTrigger value="cost" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <DollarSign className="h-3.5 w-3.5 mr-1" />
+              Cost
+            </TabsTrigger>
+            <TabsTrigger value="documentation" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              Documentation
             </TabsTrigger>
           </TabsList>
           <DetailPageLayout
@@ -1724,81 +1757,66 @@ export function AgentDetailPage() {
               <div className="flex items-start gap-2 rounded-md bg-teal/5 border border-teal/20 px-3 py-2.5">
                 <Info className="h-3.5 w-3.5 text-teal mt-0.5 shrink-0" />
                 <p className="text-xs text-muted-foreground">
-                  Global skills are configured at the platform level. Tool assignments are managed via the agent configuration.
+                  Check the skills you want to assign to this agent. Changes sync immediately.{" "}
+                  <span className="text-teal">
+                    <a href="/skills" className="hover:underline">Manage the skills library</a>
+                  </span>
                 </p>
               </div>
-              {allTools.length === 0 ? (
+
+              {allSkills.length === 0 ? (
                 <Card className="bg-card border-border">
                   <CardContent className="py-10 text-center">
                     <Wrench className="h-6 w-6 text-dim mx-auto mb-2" />
-                    <p className="text-sm text-dim">Skills &amp; tools are managed globally.</p>
-                    <p className="text-xs text-dim/70 mt-1">Contact your administrator to assign tools to this agent.</p>
+                    <p className="text-sm text-dim">No skills in the library yet.</p>
+                    <p className="text-xs text-dim/70 mt-1">
+                      <a href="/skills" className="text-teal hover:underline">Create a skill</a> to get started.
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
-                <>
-                  {assignedTools.length > 0 && (
-                    <Card className="bg-card border-border">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-foreground">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-teal" />
-                            Assigned Tools ({assignedTools.length})
-                          </div>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        {assignedTools.map((tool) => (
-                          <div key={tool.id} className="flex items-start gap-3 px-4 py-3 border-b border-border last:border-0">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <span className="text-xs font-medium text-foreground">{tool.display_name}</span>
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-teal border-teal/30 bg-teal/10">{tool.tier}</Badge>
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-dim border-dim/30">{tool.category}</Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground truncate">{tool.description}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  )}
-                  <Card className="bg-card border-border">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-foreground">
-                        <div className="flex items-center gap-2">
-                          <Wrench className="h-3.5 w-3.5 text-teal" />
-                          All Available Tools ({allTools.length})
-                        </div>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      {allTools.map((tool) => {
-                        const isAssigned = assignedToolIds.has(tool.id);
-                        return (
-                          <div key={tool.id} className={cn("flex items-start gap-3 px-4 py-3 border-b border-border last:border-0", isAssigned && "bg-teal/5")}>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <span className="text-xs font-medium text-foreground">{tool.display_name}</span>
-                                {isAssigned && <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-teal border-teal/30 bg-teal/10">assigned</Badge>}
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-dim border-dim/30">{tool.tier}</Badge>
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-dim/70 border-dim/20">{tool.category}</Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground">{tool.description}</p>
-                            </div>
-                            <div className="shrink-0">
-                              {tool.is_active ? (
-                                <span className="text-[10px] text-teal">active</span>
-                              ) : (
-                                <span className="text-[10px] text-dim">inactive</span>
+                <Card className="bg-card border-border">
+                  <CardContent className="p-0">
+                    {allSkills.map((skill) => {
+                      const isAssigned = agentSkillUuids.has(skill.uuid);
+                      return (
+                        <div
+                          key={skill.uuid}
+                          className={cn(
+                            "flex items-start gap-3 px-4 py-3 border-b border-border last:border-0 transition-colors",
+                            isAssigned && "bg-teal/5",
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isAssigned}
+                            onChange={(e) => handleSkillToggle(skill.uuid, e.target.checked)}
+                            className="mt-0.5 h-3.5 w-3.5 rounded accent-teal cursor-pointer"
+                            disabled={syncAgentSkills.isPending}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs font-medium text-foreground">{skill.name}</span>
+                              <code className="text-[10px] bg-muted px-1 rounded text-dim">{skill.slug}.md</code>
+                              {!skill.is_active && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-dim border-dim/30">inactive</Badge>
+                              )}
+                              {isAssigned && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-teal border-teal/30 bg-teal/10">
+                                  <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                                  assigned
+                                </Badge>
                               )}
                             </div>
+                            {skill.description && (
+                              <p className="text-xs text-muted-foreground truncate">{skill.description}</p>
+                            )}
                           </div>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
-                </>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
               )}
             </TabsContent>
 
@@ -1947,6 +1965,25 @@ export function AgentDetailPage() {
         confirmLabel="Terminate"
         variant="destructive"
         onConfirm={handleTerminate}
+      />
+
+      {/* Delete confirm dialog */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Agent"
+        description={`Are you sure you want to delete "${agent?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          deleteAgent.mutate(uuid, {
+            onSuccess: () => {
+              toast.success("Agent deleted");
+              navigate({ to: "/agents" });
+            },
+            onError: () => toast.error("Failed to delete agent"),
+          });
+        }}
       />
 
       {/* Assign Task modal */}

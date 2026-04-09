@@ -32,10 +32,17 @@ import {
   DocumentationEditor,
 } from "@/components/detail-page";
 import { CopyableText } from "@/components/copyable-text";
-import { useDetectionRule, usePatchDetectionRule } from "@/hooks/use-api";
+import { useDetectionRule, usePatchDetectionRule, useDeleteDetectionRule } from "@/hooks/use-api";
 import { formatDate, severityColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Shield, AlertTriangle, Radio, FileText, Settings, Save, Loader2, X, Plus, BarChart3, Bell } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Shield, AlertTriangle, Radio, FileText, Settings, Save, Loader2, MoreHorizontal, X, Plus, BarChart3, Bell, Trash2 } from "lucide-react";
 import type { DetectionRule } from "@/lib/types";
 import { DetectionRuleMetricsTab } from "./metrics-tab";
 import { DetectionRuleAlertsTab } from "./alerts-tab";
@@ -171,14 +178,16 @@ ${dataSources}
 
 export function DetectionRuleDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
-  const { tab: activeTab } = useSearch({ from: "/manage/detection-rules/$uuid" });
-  const navigate = useNavigate({ from: "/manage/detection-rules/$uuid" });
+  const { tab: activeTab } = useSearch({ from: "/detection-rules/$uuid" });
+  const navigate = useNavigate({ from: "/detection-rules/$uuid" });
   const { data, isLoading, refetch, isFetching } = useDetectionRule(uuid);
   const patchRule = usePatchDetectionRule();
+  const deleteRule = useDeleteDetectionRule();
 
   const rule = data?.data;
 
   const [editOpen, setEditOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editDraft, setEditDraft] = useState<Record<string, unknown>>({});
   const [newTactic, setNewTactic] = useState("");
   const [newTechnique, setNewTechnique] = useState("");
@@ -292,7 +301,7 @@ export function DetectionRuleDetailPage() {
     <AppLayout title="Detection Rule">
       <div className="space-y-6">
         <DetailPageHeader
-          backTo="/manage/detection-rules"
+          backTo="/detection-rules"
           title={rule.name}
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
@@ -306,15 +315,33 @@ export function DetectionRuleDetailPage() {
             </div>
           }
           actions={
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={openEditDialog}
-              className="border-border text-xs"
-            >
-              <Settings className="h-3 w-3 mr-1" />
-              Edit Rule
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={openEditDialog}
+                className="border-border text-xs"
+              >
+                <Settings className="h-3 w-3 mr-1" />
+                Edit Rule
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-dim hover:text-foreground">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-card border-border">
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-red-threat focus:text-red-threat focus:bg-red-threat/10 cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           }
           badges={
             <>
@@ -712,6 +739,24 @@ export function DetectionRuleDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Detection Rule"
+        description={`Are you sure you want to delete "${rule.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          deleteRule.mutate(uuid, {
+            onSuccess: () => {
+              toast.success("Detection rule deleted");
+              navigate({ to: "/detection-rules" });
+            },
+            onError: () => toast.error("Failed to delete detection rule"),
+          });
+        }}
+      />
     </AppLayout>
   );
 }

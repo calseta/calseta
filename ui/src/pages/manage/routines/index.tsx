@@ -35,10 +35,12 @@ import {
   useCreateRoutine,
   usePatchRoutine,
   useTriggerRoutine,
+  useDeleteRoutine,
 } from "@/hooks/use-api";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { RefreshCw, Plus, Play, Pause, RotateCcw } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { RefreshCw, Plus, Play, Pause, RotateCcw, Trash2 } from "lucide-react";
 
 const CONCURRENCY_POLICIES = ["allow", "skip", "replace", "queue"];
 
@@ -68,6 +70,9 @@ export function RoutinesPage() {
   const createRoutine = useCreateRoutine();
   const patchRoutine = usePatchRoutine();
   const triggerRoutine = useTriggerRoutine();
+  const deleteRoutine = useDeleteRoutine();
+
+  const [deleteTarget, setDeleteTarget] = useState<{ uuid: string; name: string } | null>(null);
 
   const routines = data?.data ?? [];
 
@@ -180,7 +185,7 @@ export function RoutinesPage() {
                       >
                         <TableCell>
                           <Link
-                            to="/manage/routines/$uuid"
+                            to="/routines/$uuid"
                             params={{ uuid: routine.uuid }}
                             search={{ tab: "configuration" }}
                             className="text-sm text-foreground hover:text-teal-light transition-colors font-medium"
@@ -245,6 +250,15 @@ export function RoutinesPage() {
                               ) : (
                                 <RotateCcw className="h-3 w-3" />
                               )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Delete"
+                              onClick={() => setDeleteTarget({ uuid: routine.uuid, name: routine.name })}
+                              className="h-7 w-7 p-0 text-dim hover:text-red-threat"
+                            >
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </TableCell>
@@ -327,6 +341,26 @@ export function RoutinesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}
+        title="Delete Routine"
+        description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteRoutine.mutate(deleteTarget.uuid, {
+            onSuccess: () => {
+              toast.success("Routine deleted");
+              setDeleteTarget(null);
+              refetch();
+            },
+            onError: () => toast.error("Failed to delete routine"),
+          });
+        }}
+      />
     </AppLayout>
   );
 }
