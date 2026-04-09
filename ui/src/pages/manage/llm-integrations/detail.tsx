@@ -5,6 +5,13 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,7 +27,7 @@ import { cn } from "@/lib/utils";
 import {
   DetailPageHeader,
 } from "@/components/detail-page";
-import { Pencil, Save, X, BarChart3, Settings, Wifi, Loader2 } from "lucide-react";
+import { Pencil, BarChart3, Settings, Wifi, Loader2 } from "lucide-react";
 
 const PROVIDER_DISPLAY: Record<string, string> = {
   anthropic: "Anthropic",
@@ -85,13 +92,13 @@ export function LLMIntegrationDetailPage() {
   const patchIntegration = usePatchLLMIntegration();
   const testIntegration = useTestLLMIntegration();
 
-  const [editing, setEditing] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [draft, setDraft] = useState<EditFormState | null>(null);
 
   const integration = data?.data;
   const usage = usageData?.data;
 
-  function startEditing() {
+  function openEditDialog() {
     if (!integration) return;
     setDraft({
       name: integration.name,
@@ -100,18 +107,17 @@ export function LLMIntegrationDetailPage() {
       base_url: integration.base_url ?? "",
       is_default: integration.is_default,
     });
-    setEditing(true);
+    setShowEditDialog(true);
   }
 
-  function cancelEditing() {
+  function closeEditDialog() {
     setDraft(null);
-    setEditing(false);
+    setShowEditDialog(false);
   }
 
   function handleSave() {
     if (!draft || !integration) return;
 
-    // Validate required base_url before sending
     if (
       baseUrlBehavior(integration.provider) === "required" &&
       !draft.base_url.trim()
@@ -126,13 +132,12 @@ export function LLMIntegrationDetailPage() {
     if (draft.model.trim() !== integration.model) body.model = draft.model.trim();
     if (draft.is_default !== integration.is_default) body.is_default = draft.is_default;
     if (draft.api_key_ref.trim()) body.api_key_ref = draft.api_key_ref.trim();
-    // Include base_url if it changed (empty string clears it on the backend)
     if (draft.base_url.trim() !== (integration.base_url ?? "")) {
       body.base_url = draft.base_url.trim() || null;
     }
 
     if (Object.keys(body).length === 0) {
-      cancelEditing();
+      closeEditDialog();
       return;
     }
 
@@ -141,7 +146,7 @@ export function LLMIntegrationDetailPage() {
       {
         onSuccess: () => {
           toast.success("Integration updated");
-          cancelEditing();
+          closeEditDialog();
         },
         onError: () => toast.error("Failed to update integration"),
       },
@@ -220,81 +225,49 @@ export function LLMIntegrationDetailPage() {
                 <CardTitle className="text-sm font-semibold text-foreground">
                   Integration Settings
                 </CardTitle>
-                {!editing ? (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-3 text-xs gap-1"
-                      disabled={testIntegration.isPending}
-                      onClick={() => {
-                        testIntegration.mutate(uuid, {
-                          onSuccess: (res) => {
-                            const r = res as unknown as { success: boolean; latency_ms: number; message: string };
-                            if (r.success) {
-                              toast.success(`Connected — ${r.latency_ms}ms`);
-                            } else {
-                              toast.error(r.message || "Connection failed");
-                            }
-                          },
-                          onError: () => toast.error("Connection test failed"),
-                        });
-                      }}
-                    >
-                      {testIntegration.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Wifi className="h-3 w-3" />
-                      )}
-                      Test
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-3 text-xs gap-1"
-                      onClick={startEditing}
-                    >
-                      <Pencil className="h-3 w-3" />
-                      Edit
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-3 text-xs text-dim gap-1"
-                      onClick={cancelEditing}
-                      disabled={patchIntegration.isPending}
-                    >
-                      <X className="h-3 w-3" />
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="h-7 px-3 text-xs bg-teal text-white hover:bg-teal-dim gap-1"
-                      onClick={handleSave}
-                      disabled={patchIntegration.isPending}
-                    >
-                      <Save className="h-3 w-3" />
-                      {patchIntegration.isPending ? "Saving..." : "Save"}
-                    </Button>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-3 text-xs gap-1"
+                    disabled={testIntegration.isPending}
+                    onClick={() => {
+                      testIntegration.mutate(uuid, {
+                        onSuccess: (res) => {
+                          const r = res as unknown as { success: boolean; latency_ms: number; message: string };
+                          if (r.success) {
+                            toast.success(`Connected — ${r.latency_ms}ms`);
+                          } else {
+                            toast.error(r.message || "Connection failed");
+                          }
+                        },
+                        onError: () => toast.error("Connection test failed"),
+                      });
+                    }}
+                  >
+                    {testIntegration.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Wifi className="h-3 w-3" />
+                    )}
+                    Test
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-3 text-xs gap-1"
+                    onClick={openEditDialog}
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Edit
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Name */}
                 <div className="space-y-1.5">
                   <Label className="text-xs text-dim uppercase tracking-wide">Name</Label>
-                  {editing && draft ? (
-                    <Input
-                      value={draft.name}
-                      onChange={(e) => setDraft((d) => d ? { ...d, name: e.target.value } : d)}
-                      className="max-w-sm"
-                    />
-                  ) : (
-                    <p className="text-sm text-foreground">{integration.name}</p>
-                  )}
+                  <p className="text-sm text-foreground">{integration.name}</p>
                 </div>
 
                 {/* Provider (read-only) */}
@@ -314,46 +287,24 @@ export function LLMIntegrationDetailPage() {
                 {/* Model */}
                 <div className="space-y-1.5">
                   <Label className="text-xs text-dim uppercase tracking-wide">Model</Label>
-                  {editing && draft ? (
-                    <Input
-                      value={draft.model}
-                      onChange={(e) => setDraft((d) => d ? { ...d, model: e.target.value } : d)}
-                      className="max-w-sm font-mono"
-                    />
-                  ) : (
-                    <p className="text-sm text-foreground font-mono">{integration.model}</p>
-                  )}
+                  <p className="text-sm text-foreground font-mono">{integration.model}</p>
                 </div>
 
                 {/* API Key */}
                 <div className="space-y-1.5">
                   <Label className="text-xs text-dim uppercase tracking-wide">API Key Env Var</Label>
-                  {editing && draft ? (
-                    <div className="space-y-1">
-                      <Input
-                        value={draft.api_key_ref}
-                        onChange={(e) => setDraft((d) => d ? { ...d, api_key_ref: e.target.value } : d)}
-                        placeholder="e.g. ANTHROPIC_API_KEY (leave blank to keep current)"
-                        className="max-w-sm"
-                      />
-                      <p className="text-xs text-dim">
-                        Leave blank to keep the existing key reference.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      {integration.api_key_ref_set ? (
-                        <Badge
-                          variant="outline"
-                          className="text-xs text-teal bg-teal/10 border-teal/30"
-                        >
-                          configured
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-dim">Not set</span>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {integration.api_key_ref_set ? (
+                      <Badge
+                        variant="outline"
+                        className="text-xs text-teal bg-teal/10 border-teal/30"
+                      >
+                        configured
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-dim">Not set</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Base URL — shown when provider uses it */}
@@ -365,50 +316,18 @@ export function LLMIntegrationDetailPage() {
                         <span className="font-normal normal-case ml-1 text-dim">(optional)</span>
                       )}
                     </Label>
-                    {editing && draft ? (
-                      <div className="space-y-1">
-                        <Input
-                          value={draft.base_url}
-                          onChange={(e) => setDraft((d) => d ? { ...d, base_url: e.target.value } : d)}
-                          placeholder={BASE_URL_PLACEHOLDER[integration.provider] ?? "https://"}
-                          className="max-w-sm font-mono"
-                          required={baseUrlBehavior(integration.provider) === "required"}
-                        />
-                      </div>
-                    ) : (
-                      <p className="text-sm text-foreground font-mono">
-                        {integration.base_url ?? <span className="text-dim">Not set</span>}
-                      </p>
-                    )}
+                    <p className="text-sm text-foreground font-mono">
+                      {integration.base_url ?? <span className="text-dim">Not set</span>}
+                    </p>
                   </div>
                 )}
 
-                {/* Default toggle */}
+                {/* Default */}
                 <div className="space-y-1.5">
                   <Label className="text-xs text-dim uppercase tracking-wide">Default Integration</Label>
-                  {editing && draft ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="edit-is-default"
-                        className="rounded border-border"
-                        checked={draft.is_default}
-                        onChange={(e) =>
-                          setDraft((d) => d ? { ...d, is_default: e.target.checked } : d)
-                        }
-                      />
-                      <Label
-                        htmlFor="edit-is-default"
-                        className="cursor-pointer font-normal text-sm"
-                      >
-                        Use as default LLM integration
-                      </Label>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-foreground">
-                      {integration.is_default ? "Yes" : "No"}
-                    </p>
-                  )}
+                  <p className="text-sm text-foreground">
+                    {integration.is_default ? "Yes" : "No"}
+                  </p>
                 </div>
 
                 {/* Costs (read-only) */}
@@ -525,6 +444,110 @@ export function LLMIntegrationDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Dialog */}
+      {draft && (
+        <Dialog open={showEditDialog} onOpenChange={(v) => !v && closeEditDialog()}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{integration.name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              {/* Name */}
+              <div className="space-y-1.5">
+                <Label>Name</Label>
+                <Input
+                  value={draft.name}
+                  onChange={(e) => setDraft((d) => d ? { ...d, name: e.target.value } : d)}
+                  autoFocus
+                />
+              </div>
+
+              {/* Provider (read-only) */}
+              <div className="space-y-1.5">
+                <Label>Provider</Label>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className={cn("text-xs", providerBadgeClass(integration.provider))}
+                  >
+                    {PROVIDER_DISPLAY[integration.provider] ?? integration.provider}
+                  </Badge>
+                  <span className="text-xs text-dim">(cannot be changed)</span>
+                </div>
+              </div>
+
+              {/* Model */}
+              <div className="space-y-1.5">
+                <Label>Model</Label>
+                <Input
+                  value={draft.model}
+                  onChange={(e) => setDraft((d) => d ? { ...d, model: e.target.value } : d)}
+                  className="font-mono"
+                />
+              </div>
+
+              {/* API Key Ref */}
+              <div className="space-y-1.5">
+                <Label>API Key Env Var</Label>
+                <Input
+                  value={draft.api_key_ref}
+                  onChange={(e) => setDraft((d) => d ? { ...d, api_key_ref: e.target.value } : d)}
+                  placeholder="e.g. ANTHROPIC_API_KEY (leave blank to keep current)"
+                />
+                <p className="text-xs text-dim">Leave blank to keep the existing key reference.</p>
+              </div>
+
+              {/* Base URL */}
+              {baseUrlBehavior(integration.provider) !== "none" && (
+                <div className="space-y-1.5">
+                  <Label>
+                    Base URL
+                    {baseUrlBehavior(integration.provider) === "optional" && (
+                      <span className="font-normal ml-1 text-dim">(optional)</span>
+                    )}
+                  </Label>
+                  <Input
+                    value={draft.base_url}
+                    onChange={(e) => setDraft((d) => d ? { ...d, base_url: e.target.value } : d)}
+                    placeholder={BASE_URL_PLACEHOLDER[integration.provider] ?? "https://"}
+                    className="font-mono"
+                    required={baseUrlBehavior(integration.provider) === "required"}
+                  />
+                </div>
+              )}
+
+              {/* Default */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="edit-is-default"
+                  className="rounded border-border"
+                  checked={draft.is_default}
+                  onChange={(e) =>
+                    setDraft((d) => d ? { ...d, is_default: e.target.checked } : d)
+                  }
+                />
+                <Label htmlFor="edit-is-default" className="cursor-pointer font-normal">
+                  Use as default LLM integration
+                </Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={closeEditDialog} disabled={patchIntegration.isPending}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-teal text-white hover:bg-teal-dim"
+                onClick={handleSave}
+                disabled={patchIntegration.isPending}
+              >
+                {patchIntegration.isPending ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </AppLayout>
   );
 }
