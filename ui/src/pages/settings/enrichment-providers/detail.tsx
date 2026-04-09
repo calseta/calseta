@@ -55,17 +55,12 @@ import { useNavigate } from "@tanstack/react-router";
 import { INDICATOR_TYPES as ALL_INDICATOR_TYPES } from "@/lib/types";
 import type { HttpStepDebug, EnrichmentProviderTestResult } from "@/lib/types";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
   Shield,
   Globe,
   Clock,
   Pencil,
+  Save,
+  X,
   Loader2,
   CheckCircle2,
   XCircle,
@@ -322,11 +317,16 @@ export function EnrichmentProviderDetailPage() {
   const deleteProvider = useDeleteEnrichmentProvider();
   const navigate = useNavigate();
 
-  // Edit configuration dialog
-  const [showConfigDialog, setShowConfigDialog] = useState(false);
-  const [configDraftIndicatorTypes, setConfigDraftIndicatorTypes] = useState<string[]>([]);
-  const [configDraftHttpConfig, setConfigDraftHttpConfig] = useState<HttpConfig>({ steps: [] });
-  const [configDraftMaliceRules, setConfigDraftMaliceRules] = useState<MaliceRules>({
+  // Indicator types editing (dirty-state)
+  const [indicatorTypesDraft, setIndicatorTypesDraft] = useState<string[] | null>(null);
+
+  // HTTP config editing state (custom only)
+  const [editingHttpConfig, setEditingHttpConfig] = useState(false);
+  const [httpConfigDraftObj, setHttpConfigDraftObj] = useState<HttpConfig>({ steps: [] });
+
+  // Malice rules editing state
+  const [editingMaliceRules, setEditingMaliceRules] = useState(false);
+  const [maliceRulesDraftObj, setMaliceRulesDraftObj] = useState<MaliceRules>({
     rules: [],
     default_verdict: "Pending",
     not_found_verdict: "Pending",
@@ -388,54 +388,71 @@ export function EnrichmentProviderDetailPage() {
     );
   }
 
-  // --- Edit Configuration Dialog ---
-  function openConfigDialog() {
-    setConfigDraftIndicatorTypes([...provider!.supported_indicator_types]);
-    const parsedHttp = parseHttpConfig(provider!.http_config);
-    setConfigDraftHttpConfig(parsedHttp ?? { steps: [] });
-    const parsedMalice = parseMaliceRules(provider!.malice_rules);
-    setConfigDraftMaliceRules(
-      parsedMalice ?? { rules: [], default_verdict: "Pending", not_found_verdict: "Pending" },
-    );
-    setShowConfigDialog(true);
+  // --- Indicator Types (dirty-state chips) ---
+  const indicatorTypesDirty = indicatorTypesDraft !== null;
+
+  function toggleIndicatorType(type: string) {
+    const current = indicatorTypesDraft ?? [...provider!.supported_indicator_types];
+    const next = current.includes(type)
+      ? current.filter((t) => t !== type)
+      : [...current, type];
+    setIndicatorTypesDraft(next);
   }
 
-  async function handleSaveConfig() {
-    let hasError = false;
+  function handleSaveIndicatorTypes() {
+    if (indicatorTypesDraft === null) return;
+    patchProvider.mutate(
+      { uuid, body: { supported_indicator_types: indicatorTypesDraft } },
+      {
+        onSuccess: () => {
+          toast.success("Indicator types updated");
+          setIndicatorTypesDraft(null);
+        },
+        onError: () => toast.error("Failed to update indicator types"),
+      },
+    );
+  }
 
-    if (!provider!.is_builtin) {
-      await new Promise<void>((resolve) => {
-        patchProvider.mutate(
-          { uuid, body: { supported_indicator_types: configDraftIndicatorTypes } },
-          { onSuccess: () => resolve(), onError: () => { hasError = true; resolve(); } },
-        );
-      });
-    }
+  // --- HTTP Config (custom only) ---
+  function startEditingHttpConfig() {
+    const parsed = parseHttpConfig(provider!.http_config);
+    setHttpConfigDraftObj(parsed ?? { steps: [] });
+    setEditingHttpConfig(true);
+  }
 
-    if (!hasError && !provider!.is_builtin) {
-      await new Promise<void>((resolve) => {
-        patchProvider.mutate(
-          { uuid, body: { http_config: configDraftHttpConfig as unknown as Record<string, unknown> } },
-          { onSuccess: () => resolve(), onError: () => { hasError = true; resolve(); } },
-        );
-      });
-    }
+  function handleSaveHttpConfig() {
+    patchProvider.mutate(
+      { uuid, body: { http_config: httpConfigDraftObj as unknown as Record<string, unknown> } },
+      {
+        onSuccess: () => {
+          toast.success("HTTP configuration updated");
+          setEditingHttpConfig(false);
+        },
+        onError: () => toast.error("Failed to update HTTP configuration"),
+      },
+    );
+  }
 
-    if (!hasError) {
-      await new Promise<void>((resolve) => {
-        patchProvider.mutate(
-          { uuid, body: { malice_rules: configDraftMaliceRules as unknown as Record<string, unknown> } },
-          { onSuccess: () => resolve(), onError: () => { hasError = true; resolve(); } },
-        );
-      });
-    }
+  // --- Malice Rules ---
+  function startEditingMaliceRules() {
+    const parsed = parseMaliceRules(provider!.malice_rules);
+    setMaliceRulesDraftObj(
+      parsed ?? { rules: [], default_verdict: "Pending", not_found_verdict: "Pending" },
+    );
+    setEditingMaliceRules(true);
+  }
 
-    if (hasError) {
-      toast.error("Failed to save configuration");
-    } else {
-      toast.success("Configuration saved");
-      setShowConfigDialog(false);
-    }
+  function handleSaveMaliceRules() {
+    patchProvider.mutate(
+      { uuid, body: { malice_rules: maliceRulesDraftObj as unknown as Record<string, unknown> } },
+      {
+        onSuccess: () => {
+          toast.success("Malice rules updated");
+          setEditingMaliceRules(false);
+        },
+        onError: () => toast.error("Failed to update malice rules"),
+      },
+    );
   }
 
   // --- Test ---
@@ -469,7 +486,7 @@ export function EnrichmentProviderDetailPage() {
     deleteProvider.mutate(uuid, {
       onSuccess: () => {
         toast.success("Provider deleted");
-        navigate({ to: "/enrichment-providers" });
+        navigate({ to: "/manage/enrichment-providers" });
       },
       onError: () => toast.error("Failed to delete provider"),
     });
@@ -490,7 +507,7 @@ export function EnrichmentProviderDetailPage() {
     <AppLayout title="Enrichment Provider">
       <div className="space-y-6">
         <DetailPageHeader
-          backTo="/enrichment-providers"
+          backTo="/manage/enrichment-providers"
           title={provider.display_name}
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
@@ -679,77 +696,191 @@ export function EnrichmentProviderDetailPage() {
           >
             {/* Configuration Tab */}
             <TabsContent value="configuration" className="space-y-6 mt-4">
-              <div className="flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={openConfigDialog}
-                  className="h-8 gap-1.5 text-xs text-dim hover:text-foreground"
-                >
-                  <Pencil className="h-3 w-3" />
-                  Edit Configuration
-                </Button>
-              </div>
-
-              {/* Supported Indicator Types (read-only display) */}
+              {/* Supported Indicator Types */}
               <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
                       <Microscope className="h-3.5 w-3.5 text-teal" />
                       Supported Indicator Types
                     </div>
                   </CardTitle>
+                  {indicatorTypesDirty && !provider.is_builtin && (
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIndicatorTypesDraft(null)}
+                        className="h-7 text-xs text-dim"
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveIndicatorTypes}
+                        disabled={patchProvider.isPending}
+                        className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                      >
+                        {patchProvider.isPending ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Save className="h-3 w-3 mr-1" />
+                        )}
+                        Save
+                      </Button>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
                     {ALL_INDICATOR_TYPES.map((type) => {
-                      const selected = provider.supported_indicator_types.includes(type);
+                      const effective = indicatorTypesDraft ?? provider.supported_indicator_types;
+                      const selected = effective.includes(type);
+
+                      if (provider.is_builtin) {
+                        return (
+                          <span
+                            key={type}
+                            className={cn(
+                              "px-3 py-1.5 rounded-md text-xs border",
+                              selected
+                                ? "bg-teal/15 border-teal/40 text-teal-light"
+                                : "bg-surface border-border text-dim",
+                            )}
+                          >
+                            {type}
+                          </span>
+                        );
+                      }
+
                       return (
-                        <span
+                        <button
                           key={type}
+                          type="button"
+                          onClick={() => toggleIndicatorType(type)}
                           className={cn(
-                            "px-3 py-1.5 rounded-md text-xs border",
+                            "px-3 py-1.5 rounded-md text-xs border transition-colors",
                             selected
                               ? "bg-teal/15 border-teal/40 text-teal-light"
-                              : "bg-surface border-border text-dim",
+                              : "bg-surface border-border text-dim hover:border-teal/30",
                           )}
                         >
                           {type}
-                        </span>
+                        </button>
                       );
                     })}
                   </div>
                 </CardContent>
               </Card>
 
-              {/* HTTP Configuration (read-only display) */}
+              {/* HTTP Configuration */}
               <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
                       <FileCode2 className="h-3.5 w-3.5 text-dim" />
                       HTTP Configuration
                     </div>
                   </CardTitle>
+                  {!provider.is_builtin && (
+                    !editingHttpConfig ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={startEditingHttpConfig}
+                        className="h-7 text-xs text-dim hover:text-teal"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    ) : (
+                      <div className="flex gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingHttpConfig(false)}
+                          className="h-7 text-xs text-dim"
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveHttpConfig}
+                          disabled={patchProvider.isPending}
+                          className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                        >
+                          <Save className="h-3 w-3 mr-1" />
+                          Save
+                        </Button>
+                      </div>
+                    )
+                  )}
                 </CardHeader>
                 <CardContent>
-                  <HttpConfigDisplay config={provider.http_config} />
+                  {editingHttpConfig ? (
+                    <HttpConfigBuilder
+                      value={httpConfigDraftObj}
+                      onChange={setHttpConfigDraftObj}
+                    />
+                  ) : (
+                    <HttpConfigDisplay config={provider.http_config} />
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Malice Rules (read-only display) */}
+              {/* Malice Rules */}
               <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
                       <Scale className="h-3.5 w-3.5 text-dim" />
                       Malice Rules
                     </div>
                   </CardTitle>
+                  {!editingMaliceRules ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={startEditingMaliceRules}
+                      className="h-7 text-xs text-dim hover:text-teal"
+                    >
+                      <Pencil className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
+                  ) : (
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingMaliceRules(false)}
+                        className="h-7 text-xs text-dim"
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveMaliceRules}
+                        disabled={patchProvider.isPending}
+                        className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                      >
+                        <Save className="h-3 w-3 mr-1" />
+                        Save
+                      </Button>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
-                  <MaliceRulesDisplay rules={provider.malice_rules} />
+                  {editingMaliceRules ? (
+                    <MaliceRulesBuilder
+                      value={maliceRulesDraftObj}
+                      onChange={setMaliceRulesDraftObj}
+                    />
+                  ) : (
+                    <MaliceRulesDisplay rules={provider.malice_rules} />
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -855,96 +986,6 @@ export function EnrichmentProviderDetailPage() {
         confirmLabel="Delete"
         onConfirm={handleDelete}
       />
-
-      {/* Edit Configuration Dialog */}
-      <Dialog open={showConfigDialog} onOpenChange={(v) => { if (!v) setShowConfigDialog(false); }}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Configuration</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-6 py-2">
-            {/* Indicator Types */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-dim uppercase tracking-wide flex items-center gap-1.5">
-                <Microscope className="h-3.5 w-3.5" />
-                Indicator Types
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {ALL_INDICATOR_TYPES.map((type) => {
-                  const selected = configDraftIndicatorTypes.includes(type);
-                  if (provider.is_builtin) {
-                    return (
-                      <span
-                        key={type}
-                        className={cn(
-                          "px-3 py-1.5 rounded-md text-xs border",
-                          selected ? "bg-teal/15 border-teal/40 text-teal-light" : "bg-surface border-border text-dim",
-                        )}
-                      >
-                        {type}
-                      </span>
-                    );
-                  }
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => {
-                        const next = selected
-                          ? configDraftIndicatorTypes.filter((t) => t !== type)
-                          : [...configDraftIndicatorTypes, type];
-                        setConfigDraftIndicatorTypes(next);
-                      }}
-                      className={cn(
-                        "px-3 py-1.5 rounded-md text-xs border transition-colors",
-                        selected ? "bg-teal/15 border-teal/40 text-teal-light" : "bg-surface border-border text-dim hover:border-teal/30",
-                      )}
-                    >
-                      {type}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* HTTP Config (custom only) */}
-            {!provider.is_builtin && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-dim uppercase tracking-wide flex items-center gap-1.5">
-                  <FileCode2 className="h-3.5 w-3.5" />
-                  HTTP Configuration
-                </p>
-                <HttpConfigBuilder value={configDraftHttpConfig} onChange={setConfigDraftHttpConfig} />
-              </div>
-            )}
-
-            {/* Malice Rules */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-dim uppercase tracking-wide flex items-center gap-1.5">
-                <Scale className="h-3.5 w-3.5" />
-                Malice Rules
-              </p>
-              <MaliceRulesBuilder value={configDraftMaliceRules} onChange={setConfigDraftMaliceRules} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfigDialog(false)} disabled={patchProvider.isPending}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveConfig}
-              disabled={patchProvider.isPending}
-              className="bg-teal text-white hover:bg-teal-dim"
-            >
-              {patchProvider.isPending ? (
-                <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" />Saving...</>
-              ) : (
-                "Save"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AppLayout>
   );
 }
