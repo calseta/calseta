@@ -1113,7 +1113,7 @@ export function useTriggerRoutine() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ uuid, payload }: { uuid: string; payload?: Record<string, unknown> }) =>
-      api.post<DataResponse<{ message: string }>>(`/routines/${uuid}/trigger`, payload ?? {}),
+      api.post<DataResponse<{ message: string }>>(`/routines/${uuid}/invoke`, payload ?? {}),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["routine-runs", vars.uuid] });
       qc.invalidateQueries({ queryKey: ["routine", vars.uuid] });

@@ -191,6 +191,7 @@ export function ContextDocDetailPage() {
             )}
           </TabsList>
           <DetailPageLayout
+            sidebarClassName="mt-4"
             sidebar={
               <DetailPageSidebar>
                 <SidebarSection title="Details">

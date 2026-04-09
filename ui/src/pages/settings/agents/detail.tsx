@@ -660,6 +660,7 @@ export function AgentDetailPage() {
             </TabsTrigger>
           </TabsList>
           <DetailPageLayout
+            sidebarClassName="mt-4"
             sidebar={
               <DetailPageSidebar>
                 <SidebarSection title="Details">
@@ -847,14 +848,14 @@ export function AgentDetailPage() {
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">LLM Integration</Label>
                         <Select
-                          value={configDraft.llm_integration_uuid}
-                          onValueChange={(v) => setConfigDraft({ ...configDraft, llm_integration_uuid: v })}
+                          value={configDraft.llm_integration_uuid ?? "__none__"}
+                          onValueChange={(v) => setConfigDraft({ ...configDraft, llm_integration_uuid: v === "__none__" ? undefined : v })}
                         >
                           <SelectTrigger className="bg-surface border-border text-sm">
                             <SelectValue placeholder="Select integration..." />
                           </SelectTrigger>
                           <SelectContent className="bg-card border-border">
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value="__none__">None</SelectItem>
                             {llmIntegrations.map((llm) => (
                               <SelectItem key={llm.uuid} value={llm.uuid}>
                                 {llm.name} ({llm.provider}/{llm.model})

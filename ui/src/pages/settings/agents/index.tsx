@@ -247,9 +247,15 @@ export function AgentsPage() {
                         {agent.endpoint_url ? <CopyableText text={agent.endpoint_url} mono className="text-[11px] text-dim max-w-48 truncate" /> : <span className="text-[11px] text-dim">—</span>}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={agent.is_active ? "text-teal bg-teal/10 border-teal/30 text-[11px]" : "text-dim bg-dim/10 border-dim/30 text-[11px]"}>
-                          {agent.is_active ? "active" : "inactive"}
-                        </Badge>
+                        {(() => {
+                          const s = agent.status ?? (agent.is_active ? "active" : "inactive");
+                          const isActive = s === "active" || s === "running";
+                          return (
+                            <Badge variant="outline" className={isActive ? "text-teal bg-teal/10 border-teal/30 text-[11px]" : "text-dim bg-dim/10 border-dim/30 text-[11px]"}>
+                              {s}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-xs text-dim">
                         {[

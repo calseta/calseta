@@ -207,7 +207,7 @@ function TargetCell({ tc }: { tc: Record<string, unknown> }) {
 }
 
 export function ApprovalsPage() {
-  const [activeTab, setActiveTab] = useState("workflow");
+  const [activeTab, setActiveTab] = useState("all");
 
   // Workflow approvals state
   const { page, setPage, pageSize, handlePageSizeChange, params } = useTableState({});
@@ -249,8 +249,19 @@ export function ApprovalsPage() {
         <div className="flex items-center gap-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="bg-surface border border-border">
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                All
+                {(pendingWorkflowCount + pendingActionsCount) > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] h-4 px-1.5 text-amber bg-amber/10 border-amber/30"
+                  >
+                    {pendingWorkflowCount + pendingActionsCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="workflow" className="flex items-center gap-2">
-                Workflow Approvals
+                Workflow
                 {pendingWorkflowCount > 0 && (
                   <Badge
                     variant="outline"
@@ -261,7 +272,7 @@ export function ApprovalsPage() {
                 )}
               </TabsTrigger>
               <TabsTrigger value="actions" className="flex items-center gap-2">
-                Action Approvals
+                Actions
                 {pendingActionsCount > 0 && (
                   <Badge
                     variant="outline"
@@ -272,6 +283,79 @@ export function ApprovalsPage() {
                 )}
               </TabsTrigger>
             </TabsList>
+
+            {/* ── All Approvals ── */}
+            <TabsContent value="all" className="mt-4">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { refetch(); refetchActions(); }}
+                    disabled={isFetching || actionsFetching}
+                    className="h-8 w-8 p-0 text-dim hover:text-teal"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", (isFetching || actionsFetching) && "animate-spin")} />
+                  </Button>
+                  <span className="text-xs text-dim">
+                    {approvals.length + actions.length} item{approvals.length + actions.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                {approvals.length === 0 && actions.length === 0 ? (
+                  <div className="rounded-lg border border-border bg-card">
+                    <div className="text-center text-sm text-dim py-20">No approvals</div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {/* Pending workflow approvals first */}
+                    {approvals.filter(a => a.status === "pending").map((a) => (
+                      <div key={a.uuid} className="rounded-lg border border-amber/20 bg-card px-4 py-3 flex items-center gap-4">
+                        <Badge variant="outline" className="text-[10px] shrink-0 text-purple-400 bg-purple-400/10 border-purple-400/30">Workflow</Badge>
+                        <Badge variant="outline" className={cn("text-[10px] shrink-0", statusBadgeClass(displayStatus(a)))}>
+                          <StatusIcon status={displayStatus(a)} />
+                          <span className="ml-1">{displayStatus(a)}</span>
+                        </Badge>
+                        <Link to="/workflows/$uuid" params={{ uuid: a.workflow_uuid }} className="text-sm text-foreground hover:text-teal truncate flex-1">{a.workflow_name}</Link>
+                        <span className="text-xs text-dim shrink-0">{formatDate(a.created_at)}</span>
+                      </div>
+                    ))}
+                    {/* Pending action approvals */}
+                    {actions.filter(a => a.status === "pending_approval").map((a) => (
+                      <div key={a.uuid} className="rounded-lg border border-amber/20 bg-card px-4 py-3 flex items-center gap-4">
+                        <Badge variant="outline" className={cn("text-[10px] shrink-0", actionTypeBadgeClass(a.action_type))}>Action</Badge>
+                        <Badge variant="outline" className={cn("text-[10px] shrink-0", actionStatusBadgeClass(a.status))}>
+                          {a.status.replace("_", " ")}
+                        </Badge>
+                        <span className="text-sm text-foreground flex-1">{a.action_type}: {a.action_subtype}</span>
+                        <span className="text-xs text-dim shrink-0">{formatDate(a.created_at)}</span>
+                      </div>
+                    ))}
+                    {/* Non-pending items */}
+                    {approvals.filter(a => a.status !== "pending").map((a) => (
+                      <div key={a.uuid} className="rounded-lg border border-border bg-card px-4 py-3 flex items-center gap-4 opacity-60">
+                        <Badge variant="outline" className="text-[10px] shrink-0 text-purple-400 bg-purple-400/10 border-purple-400/30">Workflow</Badge>
+                        <Badge variant="outline" className={cn("text-[10px] shrink-0", statusBadgeClass(displayStatus(a)))}>
+                          <StatusIcon status={displayStatus(a)} />
+                          <span className="ml-1">{displayStatus(a)}</span>
+                        </Badge>
+                        <Link to="/workflows/$uuid" params={{ uuid: a.workflow_uuid }} className="text-sm text-foreground hover:text-teal truncate flex-1">{a.workflow_name}</Link>
+                        <span className="text-xs text-dim shrink-0">{formatDate(a.created_at)}</span>
+                      </div>
+                    ))}
+                    {actions.filter(a => a.status !== "pending_approval").map((a) => (
+                      <div key={a.uuid} className="rounded-lg border border-border bg-card px-4 py-3 flex items-center gap-4 opacity-60">
+                        <Badge variant="outline" className={cn("text-[10px] shrink-0", actionTypeBadgeClass(a.action_type))}>Action</Badge>
+                        <Badge variant="outline" className={cn("text-[10px] shrink-0", actionStatusBadgeClass(a.status))}>
+                          {a.status.replace("_", " ")}
+                        </Badge>
+                        <span className="text-sm text-foreground flex-1">{a.action_type}: {a.action_subtype}</span>
+                        <span className="text-xs text-dim shrink-0">{formatDate(a.created_at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
 
             {/* ── Workflow Approvals ── */}
             <TabsContent value="workflow" className="mt-4">

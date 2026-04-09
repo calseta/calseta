@@ -1,6 +1,4 @@
-import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,19 +14,13 @@ import {
   type ColumnDef,
 } from "@/components/ui/resizable-table";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { TablePagination } from "@/components/table-pagination";
 import { ColumnFilterPopover } from "@/components/column-filter-popover";
-import { useAlertQueue, useCheckoutAlert } from "@/hooks/use-api";
+import { useAlertQueue } from "@/hooks/use-api";
 import { useTableState } from "@/hooks/use-table-state";
 import { severityColor, enrichmentStatusColor, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { RefreshCw, X, ClipboardList } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 
 const COLUMNS: ColumnDef[] = [
   { key: "severity", initialWidth: 100, minWidth: 80 },
@@ -37,7 +29,6 @@ const COLUMNS: ColumnDef[] = [
   { key: "ingested_at", initialWidth: 140, minWidth: 100 },
   { key: "indicators", initialWidth: 100, minWidth: 70 },
   { key: "enrichment", initialWidth: 110, minWidth: 80 },
-  { key: "actions", initialWidth: 90, minWidth: 80 },
 ];
 
 const SEVERITY_OPTIONS = [
@@ -65,29 +56,9 @@ export function QueuePage() {
   } = useTableState({ severity: [] as string[], status: [] as string[] });
 
   const { data, isLoading, refetch, isFetching } = useAlertQueue(params);
-  const checkoutAlert = useCheckoutAlert();
-  const [checkingOut, setCheckingOut] = useState<string | null>(null);
 
   const alerts = data?.data ?? [];
   const meta = data?.meta;
-
-  const apiKey = typeof localStorage !== "undefined" ? (localStorage.getItem("calseta_api_key") ?? "") : "";
-  const isOperatorKey = apiKey.startsWith("cai_");
-  const canCheckout = !isOperatorKey;
-
-  function handleCheckout(alertUuid: string) {
-    setCheckingOut(alertUuid);
-    checkoutAlert.mutate(alertUuid, {
-      onSuccess: () => {
-        toast.success("Alert checked out");
-        setCheckingOut(null);
-      },
-      onError: () => {
-        toast.error("Failed to check out alert");
-        setCheckingOut(null);
-      },
-    });
-  }
 
   return (
     <AppLayout title="Alert Queue">
@@ -150,7 +121,6 @@ export function QueuePage() {
                     <span>Enrichment</span>
                   </div>
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="actions" className="text-dim text-xs"></ResizableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -163,7 +133,6 @@ export function QueuePage() {
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-10" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     </TableRow>
                   ))
                 : alerts.map((alert) => (
@@ -203,46 +172,11 @@ export function QueuePage() {
                           {alert.enrichment_status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        {canCheckout ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs gap-1"
-                            disabled={checkingOut === alert.uuid || checkoutAlert.isPending}
-                            onClick={() => handleCheckout(alert.uuid)}
-                          >
-                            <ClipboardList className="h-3 w-3" />
-                            Checkout
-                          </Button>
-                        ) : (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2 text-xs gap-1"
-                                    disabled
-                                  >
-                                    <ClipboardList className="h-3 w-3" />
-                                    Checkout
-                                  </Button>
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                Checkout requires an agent API key (cak_*)
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                      </TableCell>
                     </TableRow>
                   ))}
               {!isLoading && alerts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-dim py-20">
+                  <TableCell colSpan={6} className="text-center text-sm text-dim py-20">
                     Queue is empty
                   </TableCell>
                 </TableRow>

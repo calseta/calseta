@@ -656,6 +656,7 @@ export function EnrichmentProviderDetailPage() {
             </TabsTrigger>
           </TabsList>
           <DetailPageLayout
+            sidebarClassName="mt-4"
             sidebar={
               <DetailPageSidebar>
                 <SidebarSection title="Details">

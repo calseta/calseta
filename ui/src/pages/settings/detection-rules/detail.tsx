@@ -404,6 +404,7 @@ export function DetectionRuleDetailPage() {
           </TabsList>
 
           <DetailPageLayout
+            sidebarClassName="mt-4"
             sidebar={
               <DetailPageSidebar>
                 <SidebarSection title="Details">
