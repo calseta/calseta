@@ -8,6 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   DetailPageHeader,
   DetailPageStatusCards,
   DetailPageLayout,
@@ -26,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, FileText, Globe, GitBranch, Pencil, Save, X, Target } from "lucide-react";
+import { BookOpen, FileText, Globe, GitBranch, Pencil, Target } from "lucide-react";
 import {
   TargetingRuleBuilder,
   TargetingRuleDisplay,
@@ -39,11 +46,11 @@ import {
 
 export function ContextDocDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
-  const { tab: activeTab } = useSearch({ from: "/manage/context-docs/$uuid" });
-  const navigate = useNavigate({ from: "/manage/context-docs/$uuid" });
+  const { tab: activeTab } = useSearch({ from: "/context-docs/$uuid" });
+  const navigate = useNavigate({ from: "/context-docs/$uuid" });
   const { data, isLoading, refetch, isFetching } = useContextDocument(uuid);
   const patchDoc = usePatchContextDocument();
-  const [editingRules, setEditingRules] = useState(false);
+  const [showRulesDialog, setShowRulesDialog] = useState(false);
   const [draftRules, setDraftRules] = useState<TargetingRules | null>(null);
 
   const doc = data?.data;
@@ -88,16 +95,16 @@ export function ContextDocDetailPage() {
       {
         onSuccess: () => {
           toast.success("Targeting rules saved");
-          setEditingRules(false);
+          setShowRulesDialog(false);
         },
         onError: () => toast.error("Failed to save targeting rules"),
       },
     );
   }
 
-  function startEditingRules() {
+  function openRulesDialog() {
     setDraftRules(parseTargetingRules(doc?.targeting_rules));
-    setEditingRules(true);
+    setShowRulesDialog(true);
   }
 
   const TypeIcon = doc.document_type === "runbook" ? BookOpen : FileText;
@@ -106,7 +113,7 @@ export function ContextDocDetailPage() {
     <AppLayout title="Context Document">
       <div className="space-y-6">
         <DetailPageHeader
-          backTo="/manage/context-docs"
+          backTo="/context-docs"
           title={doc.title}
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
@@ -234,46 +241,19 @@ export function ContextDocDetailPage() {
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm font-medium text-foreground">Targeting Rules</CardTitle>
-                      {!editingRules ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={startEditingRules}
-                          className="h-7 text-xs text-dim hover:text-teal"
-                        >
-                          <Pencil className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                      ) : (
-                        <div className="flex gap-1.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingRules(false)}
-                            className="h-7 text-xs text-dim"
-                          >
-                            <X className="h-3 w-3 mr-1" />
-                            Cancel
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={handleSaveRules}
-                            disabled={patchDoc.isPending}
-                            className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                          >
-                            <Save className="h-3 w-3 mr-1" />
-                            Save
-                          </Button>
-                        </div>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={openRulesDialog}
+                        className="h-7 text-xs text-dim hover:text-teal"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {editingRules ? (
-                      <TargetingRuleBuilder value={draftRules} onChange={setDraftRules} />
-                    ) : (
-                      <TargetingRuleDisplay rules={doc.targeting_rules} />
-                    )}
+                    <TargetingRuleDisplay rules={doc.targeting_rules} />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -281,6 +261,29 @@ export function ContextDocDetailPage() {
           </DetailPageLayout>
         </Tabs>
       </div>
+
+      <Dialog open={showRulesDialog} onOpenChange={(v) => { if (!v) setShowRulesDialog(false); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Targeting Rules</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <TargetingRuleBuilder value={draftRules} onChange={setDraftRules} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRulesDialog(false)} disabled={patchDoc.isPending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveRules}
+              disabled={patchDoc.isPending}
+              className="bg-teal text-white hover:bg-teal-dim"
+            >
+              {patchDoc.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
