@@ -9,7 +9,12 @@
       "Bash(mypy *)",
       "Bash(git status)",
       "Bash(git diff *)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(cd * && TEST_DATABASE_URL=* rtk proxy pytest *)",
+      "Bash(TEST_DATABASE_URL=* rtk proxy pytest *)",
+      "Bash(rtk proxy pytest *)",
+      "Bash(cd * && .venv/bin/mypy * --ignore-missing-imports *)",
+      "Bash(.venv/bin/mypy * --ignore-missing-imports *)"
     ],
     "deny": []
   },
