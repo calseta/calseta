@@ -7,6 +7,7 @@ from app.db.models.agent_instruction_file import AgentInstructionFile
 from app.db.models.agent_invocation import AgentInvocation
 from app.db.models.agent_issue import AgentIssue
 from app.db.models.agent_issue_comment import AgentIssueComment
+from app.db.models.issue_label import IssueLabel
 from app.db.models.agent_registration import AgentRegistration
 from app.db.models.agent_routine import AgentRoutine
 from app.db.models.agent_run import AgentRun
@@ -34,6 +35,8 @@ from app.db.models.secret import Secret, SecretVersion
 from app.db.models.source_integration import SourceIntegration
 from app.db.models.user_validation_rule import UserValidationRule
 from app.db.models.user_validation_template import UserValidationTemplate
+from app.db.models.skill import Skill
+from app.db.models.skill_file import SkillFile
 from app.db.models.workflow import Workflow
 from app.db.models.workflow_approval_request import WorkflowApprovalRequest
 from app.db.models.workflow_code_version import WorkflowCodeVersion
@@ -44,6 +47,7 @@ __all__ = [
     "AgentAction",
     "AgentIssue",
     "AgentIssueComment",
+    "IssueLabel",
     "AgentAPIKey",
     "AgentInvocation",
     "AgentInstructionFile",
@@ -79,4 +83,6 @@ __all__ = [
     "KnowledgeBasePage",
     "KBPageRevision",
     "KBPageLink",
+    "Skill",
+    "SkillFile",
 ]

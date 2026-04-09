@@ -463,7 +463,7 @@ export function AlertDetailPage() {
                     label="Name"
                     value={
                       <Link
-                        to="/manage/detection-rules/$uuid"
+                        to="/detection-rules/$uuid"
                         params={{ uuid: alert.detection_rule.uuid }}
                         search={{ tab: "documentation" }}
                         className="text-teal hover:underline text-xs truncate max-w-[160px] inline-block"
@@ -641,7 +641,7 @@ export function AlertDetailPage() {
                         <div className="flex items-start justify-between">
                           <div>
                             <Link
-                              to="/manage/agents"
+                              to="/agents"
                               className="text-xs font-medium text-teal-light hover:underline"
                             >
                               {f.agent_name}
@@ -752,7 +752,7 @@ export function AlertDetailPage() {
                         Alerting and Detection Strategy
                       </CardTitle>
                       <Link
-                        to="/manage/detection-rules/$uuid"
+                        to="/detection-rules/$uuid"
                         params={{ uuid: alert.detection_rule.uuid }}
                         search={{ tab: "documentation" }}
                         className="text-xs text-teal hover:underline"

@@ -34,6 +34,7 @@ from app.api.v1 import (
     secrets,
     sessions,
     settings,
+    skills,
     sources,
     topology,
     workflow_approvals,
@@ -71,7 +72,10 @@ v1_router.include_router(actions.router)
 v1_router.include_router(invocations.router)
 v1_router.include_router(invocations.agents_invocations_router)
 v1_router.include_router(issues.router)
+v1_router.include_router(issues.labels_router)
 v1_router.include_router(issues.agents_issues_router)
+v1_router.include_router(skills.router)
+v1_router.include_router(skills.agent_skills_router)
 v1_router.include_router(routines.router)
 v1_router.include_router(topology.router)
 v1_router.include_router(kb.router)

@@ -192,7 +192,7 @@ export function KBEditorPage() {
         await patchPage.mutateAsync({ slug, body: patchBody });
         toast.success("Page saved");
         void navigate({
-          to: "/manage/kb/$uuid",
+          to: "/kb/$uuid",
           params: { uuid: uuid ?? existingPage.data?.data.uuid ?? "" },
           search: { slug, tab: "content" },
         });
@@ -208,7 +208,7 @@ export function KBEditorPage() {
         });
         toast.success("Page created");
         void navigate({
-          to: "/manage/kb/$uuid",
+          to: "/kb/$uuid",
           params: { uuid: result.data.uuid },
           search: { slug: result.data.slug, tab: "content" },
         });
@@ -220,8 +220,8 @@ export function KBEditorPage() {
 
   const isLoading = isEditing && existingPage.isLoading;
   const backTo = isEditing && uuid
-    ? { to: "/manage/kb/$uuid" as const, params: { uuid }, search: { slug: slug ?? "", tab: "content" } }
-    : { to: "/manage/kb" as const };
+    ? { to: "/kb/$uuid" as const, params: { uuid }, search: { slug: slug ?? "", tab: "content" } }
+    : { to: "/kb" as const };
 
   return (
     <AppLayout title={uuid ? "Edit KB Page" : "New KB Page"}>

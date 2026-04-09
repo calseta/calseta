@@ -32,6 +32,7 @@ import { RoutinesPage } from "@/pages/manage/routines/index";
 import { RoutineDetailPage } from "@/pages/manage/routines/detail";
 import { KBPage } from "@/pages/manage/kb/index";
 import { KBDetailPage } from "@/pages/manage/kb/detail";
+import { SkillsPage } from "@/pages/skills/index";
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -232,6 +233,12 @@ const kbDetailRoute = createRoute({
   }),
 });
 
+const skillsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/skills",
+  component: SkillsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   alertsRoute,
@@ -261,6 +268,7 @@ const routeTree = rootRoute.addChildren([
   routineDetailRoute,
   kbRoute,
   kbDetailRoute,
+  skillsRoute,
 ]);
 
 export const router = createRouter({ routeTree });

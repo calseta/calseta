@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Text, text
+import sqlalchemy as sa
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Table, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,6 +14,27 @@ from app.db.base import Base, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
     from app.db.models.agent_api_key import AgentAPIKey
+    from app.db.models.skill import Skill
+
+
+# Association table for M2M agent ↔ skill assignments.
+agent_skill_assignments = Table(
+    "agent_skill_assignments",
+    Base.metadata,
+    sa.Column(
+        "agent_id",
+        BigInteger,
+        sa.ForeignKey("agent_registrations.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    sa.Column(
+        "skill_id",
+        BigInteger,
+        sa.ForeignKey("skills.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    extend_existing=True,
+)
 
 
 class AgentRegistration(TimestampMixin, UUIDMixin, Base):
@@ -107,4 +129,9 @@ class AgentRegistration(TimestampMixin, UUIDMixin, Base):
     # --- Relationships ---
     api_keys: Mapped[list[AgentAPIKey]] = relationship(
         "AgentAPIKey", back_populates="agent_registration", cascade="all, delete-orphan"
+    )
+    skills: Mapped[list[Skill]] = relationship(
+        "Skill",
+        secondary="agent_skill_assignments",
+        lazy="selectin",
     )

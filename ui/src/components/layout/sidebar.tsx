@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Lock,
   Database,
+  Wand2,
 } from "lucide-react";
 
 const LOGO_PATH = "/logo.png";
@@ -29,22 +30,23 @@ const mainNav = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/alerts", icon: ShieldAlert, label: "Alerts" },
   { to: "/queue", icon: Inbox, label: "Queue" },
-  { to: "/workflows", icon: Workflow, label: "Workflows" },
   { to: "/approvals", icon: CheckCircle2, label: "Approvals" },
+  { to: "/issues", icon: ListTodo, label: "Issues" },
+  { to: "/routines", icon: RotateCcw, label: "Routines" },
 ];
 
 const manageNav = [
-  { to: "/manage/agents", icon: Bot, label: "Agents" },
-  { to: "/manage/llm-integrations", icon: Cpu, label: "LLM Integrations" },
-  { to: "/manage/issues", icon: ListTodo, label: "Issues" },
-  { to: "/manage/routines", icon: RotateCcw, label: "Routines" },
-{ to: "/manage/enrichment-providers", icon: Microscope, label: "Enrichments" },
-  { to: "/manage/detection-rules", icon: Radar, label: "Detection Rules" },
-  { to: "/manage/context-docs", icon: BookOpen, label: "Context Docs" },
-  { to: "/manage/kb", icon: Database, label: "Knowledge Base" },
+  { to: "/workflows", icon: Workflow, label: "Workflows" },
+  { to: "/agents", icon: Bot, label: "Agents" },
+  { to: "/skills", icon: Wand2, label: "Skills" },
+  { to: "/enrichment-providers", icon: Microscope, label: "Enrichments" },
+  { to: "/detection-rules", icon: Radar, label: "Detection Rules" },
+  { to: "/context-docs", icon: BookOpen, label: "Context Docs" },
+  { to: "/kb", icon: Database, label: "Knowledge Base" },
 ];
 
 const settingsNav = [
+  { to: "/llm-integrations", icon: Cpu, label: "LLM Integrations" },
   { to: "/settings/api-keys", icon: Key, label: "API Keys" },
   { to: "/settings/secrets", icon: Lock, label: "Secrets" },
   { to: "/settings/alert-sources", icon: FileCode2, label: "Alert Sources" },
