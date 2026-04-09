@@ -1,6 +1,23 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +40,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { useIssues, useCreateIssue } from "@/hooks/use-api";
+import { useIssues, useCreateIssue, usePatchIssue } from "@/hooks/use-api";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { RefreshCw, Plus } from "lucide-react";
@@ -41,6 +58,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS);
 const PRIORITIES = ["critical", "high", "medium", "low"];
+
+const KANBAN_COLUMNS = [
+  { key: "open", label: "Open", statuses: ["backlog", "todo"], dropStatus: "todo", borderColor: "border-teal/50" },
+  { key: "in_progress", label: "In Progress", statuses: ["in_progress", "in_review"], dropStatus: "in_progress", borderColor: "border-amber/50" },
+  { key: "done", label: "Done", statuses: ["done"], dropStatus: "done", borderColor: "border-teal/50" },
+  { key: "blocked", label: "Blocked", statuses: ["blocked", "cancelled"], dropStatus: "blocked", borderColor: "border-red-threat/50" },
+] as const;
+
+type ColumnKey = typeof KANBAN_COLUMNS[number]["key"];
 
 function priorityColor(priority: string): string {
   switch (priority) {
@@ -72,54 +98,67 @@ function issueStatusColor(status: string): string {
   }
 }
 
-function IssueCard({ issue }: { issue: AgentIssue }) {
-  const navigate = useNavigate();
-
+// Static card used inside DragOverlay (no drag hooks)
+function KanbanCardStatic({ issue }: { issue: AgentIssue }) {
   return (
-    <Card
-      className="cursor-pointer hover:border-teal/40 transition-colors"
-      onClick={() => navigate({ to: "/manage/issues/$uuid", params: { uuid: issue.uuid }, search: { tab: "details" } })}
-    >
-      <CardContent className="p-4 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="text-[10px] font-mono text-dim border-dim/30">
-              {issue.identifier}
-            </Badge>
-            <Badge
-              variant="outline"
-              className={cn("text-[10px]", priorityColor(issue.priority))}
-            >
+    <div className="bg-card border border-border rounded-md shadow-xl rotate-1 p-3 space-y-2 w-[264px] opacity-95">
+      <p className="text-sm font-semibold text-foreground leading-snug line-clamp-1">
+        {issue.title}
+      </p>
+      {issue.description && (
+        <p className="text-xs text-dim leading-snug line-clamp-2">{issue.description}</p>
+      )}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Badge variant="outline" className="text-[10px] font-mono text-dim border-dim/30">
+            {issue.identifier}
+          </Badge>
+          {issue.priority && (
+            <Badge variant="outline" className={cn("text-[10px]", priorityColor(issue.priority))}>
               {issue.priority}
             </Badge>
-            <Badge variant="outline" className="text-[10px] text-dim border-dim/30">
-              {CATEGORY_LABELS[issue.category] ?? issue.category}
-            </Badge>
-          </div>
-          <Badge
-            variant="outline"
-            className={cn("text-[10px] shrink-0", issueStatusColor(issue.status))}
-          >
-            {issue.status}
-          </Badge>
+          )}
         </div>
-        <p className="text-sm text-foreground font-medium leading-snug">{issue.title}</p>
-        <div className="flex items-center justify-between text-[11px] text-dim">
-          <span>{issue.assignee_operator ?? issue.assignee_agent_uuid ?? "Unassigned"}</span>
-          <span>{relativeTime(issue.created_at)}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          {(issue.assignee_operator ?? issue.assignee_agent_uuid) && (
+            <span className="text-[10px] text-dim truncate max-w-[80px]">
+              {issue.assignee_operator ?? issue.assignee_agent_uuid}
+            </span>
+          )}
+          <span className="text-[10px] text-dim">{relativeTime(issue.created_at)}</span>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-function KanbanCard({ issue }: { issue: AgentIssue }) {
+// Sortable card with drag handle behavior
+function KanbanCard({ issue, isDragging }: { issue: AgentIssue; isDragging: boolean }) {
   const navigate = useNavigate();
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: issue.uuid,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   return (
     <div
-      className="bg-card border border-border rounded-md shadow-sm cursor-pointer hover:shadow-md transition-shadow p-3 space-y-2"
-      onClick={() => navigate({ to: "/manage/issues/$uuid", params: { uuid: issue.uuid }, search: { tab: "details" } })}
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={cn(
+        "bg-card border border-border rounded-md shadow-sm transition-shadow p-3 space-y-2",
+        "cursor-grab active:cursor-grabbing",
+        isDragging ? "opacity-40" : "hover:shadow-md",
+      )}
+      onClick={() => {
+        if (isDragging) return;
+        navigate({ to: "/manage/issues/$uuid", params: { uuid: issue.uuid }, search: { tab: "details" } });
+      }}
     >
       <p className="text-sm font-semibold text-foreground leading-snug line-clamp-1">
         {issue.title}
@@ -151,6 +190,54 @@ function KanbanCard({ issue }: { issue: AgentIssue }) {
   );
 }
 
+function KanbanColumn({
+  colKey,
+  label,
+  issues,
+  borderColor,
+  activeId,
+  isOver,
+}: {
+  colKey: string;
+  label: string;
+  issues: AgentIssue[];
+  borderColor: string;
+  activeId: string | null;
+  isOver: boolean;
+}) {
+  const { setNodeRef } = useDroppable({ id: colKey });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "shrink-0 w-[280px] flex flex-col rounded-lg border bg-muted/5 transition-colors",
+        isOver ? cn("border-2", borderColor) : "border-border",
+      )}
+    >
+      {/* Column header */}
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+        <span className="text-xs font-semibold text-foreground">{label}</span>
+        <span className="text-[10px] bg-muted text-dim px-1.5 py-0.5 rounded-full">
+          {issues.length}
+        </span>
+      </div>
+      {/* Scrollable card list */}
+      <SortableContext items={issues.map((i) => i.uuid)} strategy={verticalListSortingStrategy}>
+        <div className="flex flex-col gap-2 p-2 overflow-y-auto max-h-[calc(100vh-260px)]">
+          {issues.length === 0 ? (
+            <div className="text-center text-xs text-dim py-8">No issues</div>
+          ) : (
+            issues.map((issue) => (
+              <KanbanCard key={issue.uuid} issue={issue} isDragging={activeId === issue.uuid} />
+            ))
+          )}
+        </div>
+      </SortableContext>
+    </div>
+  );
+}
+
 function IssueCardSkeleton() {
   return (
     <Card>
@@ -167,9 +254,12 @@ function IssueCardSkeleton() {
 }
 
 export function IssuesPage() {
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
   const [showNewIssue, setShowNewIssue] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  // Optimistic local overrides: uuid -> status
+  const [localStatusMap, setLocalStatusMap] = useState<Record<string, string>>({});
 
   // Form state
   const [formTitle, setFormTitle] = useState("");
@@ -177,32 +267,102 @@ export function IssuesPage() {
   const [formCategory, setFormCategory] = useState<string>("");
   const [formPriority, setFormPriority] = useState<string>("");
 
-  const params: Record<string, string | number | boolean | undefined> = {
-    page_size: 200,
-  };
-  if (categoryFilter) params.category = categoryFilter;
-  if (priorityFilter) params.priority = priorityFilter;
-
-  const { data, isLoading, refetch, isFetching } = useIssues(params);
+  const { data, isLoading, refetch, isFetching } = useIssues({ page_size: 200 });
   const createIssue = useCreateIssue();
+  const patchIssue = usePatchIssue();
 
-  const issues = data?.data ?? [];
+  const rawIssues = data?.data ?? [];
 
-  function filterIssues(statuses: string[]): AgentIssue[] {
-    return issues.filter((i) => statuses.includes(i.status));
+  // Apply local optimistic overrides on top of API data
+  const issues: AgentIssue[] = rawIssues.map((issue) =>
+    localStatusMap[issue.uuid] !== undefined
+      ? { ...issue, status: localStatusMap[issue.uuid] }
+      : issue,
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const activeIssue = activeId ? issues.find((i) => i.uuid === activeId) ?? null : null;
+
+  // Determine which column key an issue belongs to (with local override applied)
+  function getColumnForStatus(status: string): ColumnKey | null {
+    for (const col of KANBAN_COLUMNS) {
+      if ((col.statuses as readonly string[]).includes(status)) return col.key;
+    }
+    return null;
   }
 
-  const KANBAN_COLUMNS = [
-    { key: "open", label: "Open", statuses: ["backlog", "todo"] },
-    { key: "in_progress", label: "In Progress", statuses: ["in_progress", "in_review"] },
-    { key: "done", label: "Done", statuses: ["done"] },
-    { key: "blocked", label: "Blocked", statuses: ["blocked", "cancelled"] },
-  ] as const;
+  function filterIssuesByColumn(colKey: ColumnKey): AgentIssue[] {
+    return issues.filter((i) => getColumnForStatus(i.status) === colKey);
+  }
 
-  const columnIssues = KANBAN_COLUMNS.map((col) => ({
-    ...col,
-    issues: filterIssues([...col.statuses]),
-  }));
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+  }, []);
+
+  const handleDragOver = useCallback((event: { over: { id: string } | null }) => {
+    setOverId(event.over ? String(event.over.id) : null);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveId(null);
+      setOverId(null);
+
+      if (!over) return;
+
+      const draggedUuid = String(active.id);
+      const overId = String(over.id);
+
+      // Determine target column: could be a column key or another card's uuid
+      let targetCol = KANBAN_COLUMNS.find((c) => c.key === overId) ?? null;
+      if (!targetCol) {
+        // over is a card uuid — find its column
+        const overIssue = issues.find((i) => i.uuid === overId);
+        if (overIssue) {
+          const colKey = getColumnForStatus(overIssue.status);
+          targetCol = KANBAN_COLUMNS.find((c) => c.key === colKey) ?? null;
+        }
+      }
+
+      if (!targetCol) return;
+
+      const draggedIssue = issues.find((i) => i.uuid === draggedUuid);
+      if (!draggedIssue) return;
+
+      const currentColKey = getColumnForStatus(draggedIssue.status);
+      if (currentColKey === targetCol.key) return; // no-op, same column
+
+      const newStatus = targetCol.dropStatus;
+      const prevStatus = draggedIssue.status;
+
+      // Optimistic update
+      setLocalStatusMap((prev) => ({ ...prev, [draggedUuid]: newStatus }));
+
+      patchIssue.mutate(
+        { uuid: draggedUuid, body: { status: newStatus } },
+        {
+          onSuccess: () => {
+            // Clear local override — API data will take over after invalidation
+            setLocalStatusMap((prev) => {
+              const next = { ...prev };
+              delete next[draggedUuid];
+              return next;
+            });
+          },
+          onError: () => {
+            // Revert optimistic update
+            setLocalStatusMap((prev) => ({ ...prev, [draggedUuid]: prevStatus }));
+            toast.error("Failed to move issue");
+          },
+        },
+      );
+    },
+    [issues, patchIssue],
+  );
 
   function handleCreateIssue() {
     if (!formTitle.trim()) {
@@ -233,54 +393,16 @@ export function IssuesPage() {
     <AppLayout title="Issues">
       <div className="space-y-4">
         {/* Top bar */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              className="h-8 w-8 p-0 text-dim hover:text-teal"
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-            </Button>
-
-            {/* Category chips */}
-            <div className="flex items-center gap-1 flex-wrap">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
-                  className={cn(
-                    "text-[11px] px-2 py-0.5 rounded border transition-colors",
-                    categoryFilter === cat
-                      ? "border-teal text-teal bg-teal/10"
-                      : "border-border text-dim hover:border-teal/40 hover:text-foreground",
-                  )}
-                >
-                  {CATEGORY_LABELS[cat]}
-                </button>
-              ))}
-            </div>
-
-            {/* Priority filter */}
-            <Select
-              value={priorityFilter ?? "all"}
-              onValueChange={(v) => setPriorityFilter(v === "all" ? null : v)}
-            >
-              <SelectTrigger className="h-7 text-xs w-32">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All priorities</SelectItem>
-                {PRIORITIES.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex items-center justify-between gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="h-8 w-8 p-0 text-dim hover:text-teal"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+          </Button>
 
           <Button size="sm" onClick={() => setShowNewIssue(true)} className="h-8 gap-1">
             <Plus className="h-3.5 w-3.5" />
@@ -301,30 +423,30 @@ export function IssuesPage() {
             ))}
           </div>
         ) : (
-          <div className="flex gap-4 overflow-x-auto pb-2 items-start">
-            {columnIssues.map((col) => (
-              <div
-                key={col.key}
-                className="shrink-0 w-[280px] flex flex-col rounded-lg border border-border bg-muted/5"
-              >
-                {/* Column header */}
-                <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
-                  <span className="text-xs font-semibold text-foreground">{col.label}</span>
-                  <span className="text-[10px] bg-muted text-dim px-1.5 py-0.5 rounded-full">
-                    {col.issues.length}
-                  </span>
-                </div>
-                {/* Scrollable card list */}
-                <div className="flex flex-col gap-2 p-2 overflow-y-auto max-h-[calc(100vh-260px)]">
-                  {col.issues.length === 0 ? (
-                    <div className="text-center text-xs text-dim py-8">No issues</div>
-                  ) : (
-                    col.issues.map((issue) => <KanbanCard key={issue.uuid} issue={issue} />)
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="flex gap-4 overflow-x-auto pb-2 items-start">
+              {KANBAN_COLUMNS.map((col) => (
+                <KanbanColumn
+                  key={col.key}
+                  colKey={col.key}
+                  label={col.label}
+                  issues={filterIssuesByColumn(col.key)}
+                  borderColor={col.borderColor}
+                  activeId={activeId}
+                  isOver={overId === col.key}
+                />
+              ))}
+            </div>
+            <DragOverlay>
+              {activeIssue ? <KanbanCardStatic issue={activeIssue} /> : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
 
