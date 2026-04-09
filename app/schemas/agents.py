@@ -51,6 +51,7 @@ class AgentRegistrationCreate(BaseModel):
     budget_monthly_cents: int = Field(default=0, ge=0)
 
     # --- Control plane: runtime limits ---
+    heartbeat_interval_seconds: int | None = None
     max_concurrent_alerts: int = Field(default=1, ge=1)
     max_cost_per_alert_cents: int = Field(default=0, ge=0)
     max_investigation_minutes: int = Field(default=0, ge=0)
@@ -130,6 +131,7 @@ class AgentRegistrationResponse(BaseModel):
 
     # --- Control plane: runtime ---
     last_heartbeat_at: datetime | None
+    heartbeat_interval_seconds: int | None
     max_concurrent_alerts: int
     max_cost_per_alert_cents: int
     max_investigation_minutes: int
@@ -167,6 +169,7 @@ class AgentRegistrationPatch(BaseModel):
     sub_agent_ids: list[str] | None = None
     max_sub_agent_calls: int | None = None
     budget_monthly_cents: int | None = Field(default=None, ge=0)
+    heartbeat_interval_seconds: int | None = None
     max_concurrent_alerts: int | None = Field(default=None, ge=1)
     max_cost_per_alert_cents: int | None = Field(default=None, ge=0)
     max_investigation_minutes: int | None = Field(default=None, ge=0)
@@ -225,3 +228,12 @@ class AgentPauseRequest(BaseModel):
 class AgentBudgetUpdate(BaseModel):
     budget_monthly_cents: int = Field(ge=0)
     reset_spent: bool = False  # if True, also reset spent_monthly_cents=0 and period_start=now()
+
+
+class AgentFileBody(BaseModel):
+    content: str
+
+
+class AgentFileResponse(BaseModel):
+    path: str
+    content: str

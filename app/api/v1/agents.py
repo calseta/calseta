@@ -320,6 +320,76 @@ async def patch_agent(
 
 
 # ---------------------------------------------------------------------------
+# GET /v1/agents/{uuid}/files/{file_path}  — Read an agent instruction file
+# PUT /v1/agents/{uuid}/files/{file_path}  — Save an agent instruction file
+# ---------------------------------------------------------------------------
+
+_ALLOWED_EXTENSIONS = {".md", ".txt", ".yaml", ".yml", ".json"}
+
+
+def _resolve_agent_file_path(agent_uuid: str, file_path: str) -> tuple[str, str]:
+    """Return (base_dir, resolved_abs_path). Raises CalsetaException on traversal."""
+    base_dir = os.path.realpath(os.path.join(settings.AGENT_FILES_DIR, agent_uuid))
+    abs_path = os.path.realpath(os.path.join(base_dir, file_path))
+    if not abs_path.startswith(base_dir + os.sep) and abs_path != base_dir:
+        raise CalsetaException(status_code=400, code="INVALID_PATH", message="Invalid file path")
+    ext = os.path.splitext(abs_path)[1].lower()
+    if ext not in _ALLOWED_EXTENSIONS:
+        raise CalsetaException(
+            status_code=400,
+            code="INVALID_EXTENSION",
+            message=f"File extension not allowed. Allowed: {', '.join(_ALLOWED_EXTENSIONS)}",
+        )
+    return base_dir, abs_path
+
+
+@router.get("/{uuid}/files/{file_path:path}")
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def get_agent_file(
+    request: Request,
+    uuid: UUID,
+    file_path: str,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[dict]:
+    repo = AgentRepository(db)
+    agent = await repo.get_by_uuid(uuid)
+    if agent is None:
+        raise CalsetaException(status_code=404, code="NOT_FOUND", message="Agent not found")
+
+    _, abs_path = _resolve_agent_file_path(str(uuid), file_path)
+    if not os.path.isfile(abs_path):
+        raise CalsetaException(status_code=404, code="NOT_FOUND", message="File not found")
+
+    with open(abs_path) as f:
+        content = f.read()
+    return DataResponse(data={"path": file_path, "content": content})
+
+
+@router.put("/{uuid}/files/{file_path:path}")
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def save_agent_file(
+    request: Request,
+    uuid: UUID,
+    file_path: str,
+    body: dict,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[dict]:
+    repo = AgentRepository(db)
+    agent = await repo.get_by_uuid(uuid)
+    if agent is None:
+        raise CalsetaException(status_code=404, code="NOT_FOUND", message="Agent not found")
+
+    base_dir, abs_path = _resolve_agent_file_path(str(uuid), file_path)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+    content = body.get("content", "")
+    with open(abs_path, "w") as f:
+        f.write(content)
+    return DataResponse(data={"path": file_path, "content": content})
+
+
+# ---------------------------------------------------------------------------
 # DELETE /v1/agents/{uuid}
 # ---------------------------------------------------------------------------
 

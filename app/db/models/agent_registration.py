@@ -87,6 +87,7 @@ class AgentRegistration(TimestampMixin, UUIDMixin, Base):
 
     # --- Control plane: runtime ---
     last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    heartbeat_interval_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_concurrent_alerts: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("1"), default=1
     )

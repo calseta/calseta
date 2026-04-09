@@ -205,7 +205,7 @@ export function SecretsPage() {
       return;
     }
     rotateSecret.mutate(
-      { name: rotateTarget.name, value: rotateValue },
+      { uuid: rotateTarget.uuid, value: rotateValue },
       {
         onSuccess: () => {
           toast.success("Secret rotated");

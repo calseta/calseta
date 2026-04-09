@@ -274,6 +274,7 @@ class Settings(BaseSettings):
     # Agent Home Directories
     # ------------------------------------------------------------------
     CALSETA_DATA_DIR: str = "/tmp/calseta"
+    AGENT_FILES_DIR: str = "./data/agents"
 
     # ------------------------------------------------------------------
     # Sandbox

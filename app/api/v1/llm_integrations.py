@@ -11,6 +11,7 @@ GET    /v1/llm-integrations/{uuid}/usage  Cost/token usage aggregate
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
@@ -216,3 +217,35 @@ async def get_llm_integration_usage(
             billing_types=usage["billing_types"],
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/llm-integrations/{uuid}/test  — Test connectivity
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{uuid}/test")
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def test_llm_integration(
+    request: Request,
+    uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[dict]:
+    repo = LLMIntegrationRepository(db)
+    integration = await repo.get_by_uuid(uuid)
+    if integration is None:
+        raise CalsetaException(status_code=404, code="NOT_FOUND", message="LLM integration not found")
+
+    start = time.time()
+    try:
+        from app.services.llm_integration_service import LLMIntegrationService
+
+        svc = LLMIntegrationService(db)
+        adapter = await svc.get_adapter(integration)
+        await adapter.test_connection()
+        latency_ms = int((time.time() - start) * 1000)
+        return DataResponse(data={"success": True, "latency_ms": latency_ms, "message": "Connection successful"})
+    except Exception as exc:  # noqa: BLE001
+        latency_ms = int((time.time() - start) * 1000)
+        return DataResponse(data={"success": False, "latency_ms": latency_ms, "message": str(exc)})

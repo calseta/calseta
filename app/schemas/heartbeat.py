@@ -28,7 +28,7 @@ class HeartbeatStatus(StrEnum):
 
 class HeartbeatRequest(BaseModel):
     assignment_id: UUID | None = None
-    status: str  # "running", "idle", "completed", "error"
+    status: str = "running"  # "running", "idle", "completed", "error"
     progress_note: str | None = None
     findings_count: int = 0
     actions_proposed: int = 0
