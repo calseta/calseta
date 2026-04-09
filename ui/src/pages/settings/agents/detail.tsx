@@ -80,8 +80,12 @@ import {
   usePostHeartbeat,
   useCreateIssue,
   useLLMIntegrations,
+  useAgentCostSummary,
+  useTools,
+  useAgentFiles,
+  useSaveAgentFile,
 } from "@/hooks/use-api";
-import type { HeartbeatRun, CostEvent, AgentInvocation } from "@/lib/types";
+import type { HeartbeatRun, CostEvent, AgentInvocation, AgentTool } from "@/lib/types";
 import { formatDate, relativeTime } from "@/lib/format";
 import {
   Globe,
@@ -103,6 +107,14 @@ import {
   StopCircle,
   MoreHorizontal,
   Heart,
+  BookOpen,
+  Wrench,
+  LayoutDashboard,
+  Plus,
+  Info,
+  TrendingUp,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 
 const ALL_SEVERITIES = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
@@ -208,17 +220,51 @@ export function AgentDetailPage() {
   // Budget input
   const [budgetInput, setBudgetInput] = useState("");
 
+  // Instructions tab state
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [fileContentDraft, setFileContentDraft] = useState<string>("");
+  const [newFileName, setNewFileName] = useState<string>("");
+  const [showNewFileInput, setShowNewFileInput] = useState(false);
+
   const agent = data?.data;
 
   const { data: heartbeatData } = useAgentHeartbeatRuns(uuid);
   const { data: costData } = useAgentCostEvents(uuid);
   const { data: invocationData } = useAgentInvocations(uuid);
+  const { data: costSummaryData } = useAgentCostSummary(uuid);
+  const { data: toolsData } = useTools();
+  const { data: agentFilesData, isLoading: filesLoading } = useAgentFiles(uuid);
+  const saveAgentFile = useSaveAgentFile();
 
   const heartbeatRuns: HeartbeatRun[] = heartbeatData?.data ?? [];
   const costEvents: CostEvent[] = costData?.data ?? [];
   const invocations: AgentInvocation[] = invocationData?.data ?? [];
 
   const totalCostCents = costEvents.reduce((sum, e) => sum + e.cost_cents, 0);
+
+  // Instructions tab derived data
+  const agentFiles: Array<{ name: string; content: string }> = agentFilesData?.data ?? agent?.instruction_files ?? [];
+  const allTools: AgentTool[] = toolsData?.data ?? [];
+  const assignedToolIds = new Set(agent?.tool_ids ?? []);
+  const assignedTools = allTools.filter((t) => assignedToolIds.has(t.id));
+  const costSummary = costSummaryData?.data ?? null;
+
+  // Derived: success rate from heartbeat runs
+  const successCount = heartbeatRuns.filter((r) => r.status === "succeeded").length;
+  const successRate = heartbeatRuns.length > 0 ? Math.round((successCount / heartbeatRuns.length) * 100) : null;
+
+  // Average duration from heartbeat runs
+  const durations = heartbeatRuns
+    .filter((r) => r.started_at && r.finished_at)
+    .map((r) => new Date(r.finished_at!).getTime() - new Date(r.started_at!).getTime());
+  const avgDurationMs = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
+
+  function formatAvgDuration(ms: number | null): string {
+    if (ms === null) return "—";
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${Math.round(ms / 60000)}m`;
+  }
 
   function setActiveTab(tab: string) {
     navigate({ search: { tab }, replace: true });
@@ -657,6 +703,18 @@ export function AgentDetailPage() {
             <TabsTrigger value="assignments" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
               <Layers className="h-3.5 w-3.5 mr-1" />
               Assignments
+            </TabsTrigger>
+            <TabsTrigger value="instructions" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <BookOpen className="h-3.5 w-3.5 mr-1" />
+              Instructions
+            </TabsTrigger>
+            <TabsTrigger value="skills" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <Wrench className="h-3.5 w-3.5 mr-1" />
+              Skills
+            </TabsTrigger>
+            <TabsTrigger value="dashboard" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
+              <LayoutDashboard className="h-3.5 w-3.5 mr-1" />
+              Dashboard
             </TabsTrigger>
           </TabsList>
           <DetailPageLayout
@@ -1524,6 +1582,354 @@ export function AgentDetailPage() {
                         ))}
                       </TableBody>
                     </ResizableTable>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Instructions Tab */}
+            <TabsContent value="instructions" className="mt-4">
+              <div className="mb-3 flex items-start gap-2 rounded-md bg-teal/5 border border-teal/20 px-3 py-2.5">
+                <Info className="h-3.5 w-3.5 text-teal mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  Global instructions are configured via Context Documents in the Knowledge Base. Files here are agent-specific instruction files.
+                </p>
+              </div>
+              {filesLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-64 w-full" />
+                </div>
+              ) : (
+                <div className="flex gap-3 h-[520px]">
+                  {/* Left: file list */}
+                  <div className="w-56 shrink-0 flex flex-col gap-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Files</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewFileInput((v) => !v)}
+                        className="p-0.5 rounded hover:bg-surface text-dim hover:text-foreground transition-colors"
+                        title="New file"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {showNewFileInput && (
+                      <div className="flex items-center gap-1 mb-1">
+                        <Input
+                          value={newFileName}
+                          onChange={(e) => setNewFileName(e.target.value)}
+                          placeholder="filename.md"
+                          className="h-7 text-xs bg-surface border-border"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newFileName.trim()) {
+                              setSelectedFile(newFileName.trim());
+                              setFileContentDraft("");
+                              setShowNewFileInput(false);
+                              setNewFileName("");
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newFileName.trim()) {
+                              setSelectedFile(newFileName.trim());
+                              setFileContentDraft("");
+                              setShowNewFileInput(false);
+                              setNewFileName("");
+                            }
+                          }}
+                          className="h-7 w-7 flex items-center justify-center rounded bg-teal text-white hover:bg-teal-dim shrink-0"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex-1 overflow-y-auto rounded-md border border-border bg-card">
+                      {agentFiles.length === 0 && !showNewFileInput ? (
+                        <div className="py-8 text-center text-xs text-dim">No instruction files</div>
+                      ) : (
+                        agentFiles.map((file) => (
+                          <button
+                            key={file.name}
+                            type="button"
+                            onClick={() => {
+                              setSelectedFile(file.name);
+                              setFileContentDraft(file.content);
+                            }}
+                            className={cn(
+                              "w-full text-left px-3 py-2 border-b border-border text-xs transition-colors truncate",
+                              selectedFile === file.name
+                                ? "bg-teal/10 text-teal-light"
+                                : "text-foreground hover:bg-surface/50",
+                            )}
+                          >
+                            <FileText className="h-3 w-3 inline mr-1.5 opacity-60" />
+                            {file.name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: file editor */}
+                  <div className="flex-1 flex flex-col gap-2">
+                    {selectedFile ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-mono text-muted-foreground">{selectedFile}</span>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              saveAgentFile.mutate(
+                                { agentUuid: uuid, path: selectedFile, content: fileContentDraft },
+                                {
+                                  onSuccess: () => toast.success("File saved"),
+                                  onError: () => toast.error("Failed to save file"),
+                                },
+                              );
+                            }}
+                            disabled={saveAgentFile.isPending}
+                            className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                          >
+                            {saveAgentFile.isPending ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <Save className="h-3 w-3 mr-1" />
+                            )}
+                            Save
+                          </Button>
+                        </div>
+                        <Textarea
+                          value={fileContentDraft}
+                          onChange={(e) => setFileContentDraft(e.target.value)}
+                          className="flex-1 font-mono text-xs bg-surface border-border resize-none"
+                          placeholder="Enter instruction content..."
+                        />
+                      </>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center rounded-md border border-dashed border-border">
+                        <p className="text-sm text-dim">Select a file to edit</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Skills Tab */}
+            <TabsContent value="skills" className="mt-4 space-y-4">
+              <div className="flex items-start gap-2 rounded-md bg-teal/5 border border-teal/20 px-3 py-2.5">
+                <Info className="h-3.5 w-3.5 text-teal mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  Global skills are configured at the platform level. Tool assignments are managed via the agent configuration.
+                </p>
+              </div>
+              {allTools.length === 0 ? (
+                <Card className="bg-card border-border">
+                  <CardContent className="py-10 text-center">
+                    <Wrench className="h-6 w-6 text-dim mx-auto mb-2" />
+                    <p className="text-sm text-dim">Skills &amp; tools are managed globally.</p>
+                    <p className="text-xs text-dim/70 mt-1">Contact your administrator to assign tools to this agent.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {assignedTools.length > 0 && (
+                    <Card className="bg-card border-border">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-foreground">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-teal" />
+                            Assigned Tools ({assignedTools.length})
+                          </div>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {assignedTools.map((tool) => (
+                          <div key={tool.id} className="flex items-start gap-3 px-4 py-3 border-b border-border last:border-0">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-xs font-medium text-foreground">{tool.display_name}</span>
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-teal border-teal/30 bg-teal/10">{tool.tier}</Badge>
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-dim border-dim/30">{tool.category}</Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">{tool.description}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
+                  <Card className="bg-card border-border">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-foreground">
+                        <div className="flex items-center gap-2">
+                          <Wrench className="h-3.5 w-3.5 text-teal" />
+                          All Available Tools ({allTools.length})
+                        </div>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {allTools.map((tool) => {
+                        const isAssigned = assignedToolIds.has(tool.id);
+                        return (
+                          <div key={tool.id} className={cn("flex items-start gap-3 px-4 py-3 border-b border-border last:border-0", isAssigned && "bg-teal/5")}>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-xs font-medium text-foreground">{tool.display_name}</span>
+                                {isAssigned && <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-teal border-teal/30 bg-teal/10">assigned</Badge>}
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-dim border-dim/30">{tool.tier}</Badge>
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-dim/70 border-dim/20">{tool.category}</Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground">{tool.description}</p>
+                            </div>
+                            <div className="shrink-0">
+                              {tool.is_active ? (
+                                <span className="text-[10px] text-teal">active</span>
+                              ) : (
+                                <span className="text-[10px] text-dim">inactive</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+
+            {/* Dashboard Tab */}
+            <TabsContent value="dashboard" className="mt-4 space-y-4">
+              {/* Metric cards */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Card className="bg-card border-border">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Activity className="h-3.5 w-3.5 text-teal" />
+                      <span className="text-xs text-muted-foreground">Total Runs</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-foreground">{heartbeatRuns.length || "—"}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-border">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <TrendingUp className="h-3.5 w-3.5 text-teal" />
+                      <span className="text-xs text-muted-foreground">Success Rate</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-foreground">
+                      {successRate !== null ? `${successRate}%` : "—"}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-border">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="h-3.5 w-3.5 text-teal" />
+                      <span className="text-xs text-muted-foreground">Avg Duration</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-foreground">{formatAvgDuration(avgDurationMs)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-border">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <DollarSign className="h-3.5 w-3.5 text-teal" />
+                      <span className="text-xs text-muted-foreground">Total Cost</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-foreground">
+                      {costSummary ? formatCents(costSummary.total_cost_cents) : (totalCostCents > 0 ? formatCents(totalCostCents) : "—")}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Cost summary breakdown */}
+              {costSummary && (
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-foreground">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-3.5 w-3.5 text-teal" />
+                        Cost Summary
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">Input Tokens</p>
+                        <p className="text-sm font-mono text-foreground">{costSummary.total_input_tokens.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">Output Tokens</p>
+                        <p className="text-sm font-mono text-foreground">{costSummary.total_output_tokens.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">Total Cost</p>
+                        <p className="text-sm font-mono text-foreground">{formatCents(costSummary.total_cost_cents)}</p>
+                      </div>
+                    </div>
+                    {Object.keys(costSummary.by_billing_type).length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <p className="text-xs text-muted-foreground mb-2">By Billing Type</p>
+                        <div className="flex flex-wrap gap-3">
+                          {Object.entries(costSummary.by_billing_type).map(([type, cents]) => (
+                            <div key={type} className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground capitalize">{type}:</span>
+                              <span className="text-xs font-mono text-foreground">{formatCents(cents)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Recent runs */}
+              <Card className="bg-card border-border overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-3.5 w-3.5 text-teal" />
+                      Recent Runs
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {heartbeatRuns.length === 0 ? (
+                    <div className="py-10 text-center">
+                      <Activity className="h-6 w-6 text-dim mx-auto mb-2" />
+                      <p className="text-sm text-dim">No runs yet</p>
+                      <p className="text-xs text-dim/70 mt-1">Runs will appear here once the agent starts processing.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {heartbeatRuns.slice(0, 10).map((run) => (
+                        <div key={run.uuid} className="flex items-center gap-3 px-4 py-2.5">
+                          <Badge
+                            variant="outline"
+                            className={cn("text-[10px] px-1.5 py-0 shrink-0", heartbeatStatusClass(run.status))}
+                          >
+                            {run.status}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground flex-1">
+                            {run.started_at ? relativeTime(run.started_at) : "—"}
+                          </span>
+                          <span className="font-mono text-xs text-dim shrink-0">
+                            {formatDuration(run.started_at, run.finished_at)}
+                          </span>
+                          <span className="font-mono text-[11px] text-dim shrink-0">
+                            #{run.uuid.slice(-6)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>

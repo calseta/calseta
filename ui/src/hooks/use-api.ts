@@ -1173,8 +1173,8 @@ export function useCreateSecret() {
 export function useRotateSecret() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, value }: { name: string; value: string }) =>
-      api.post<DataResponse<{ message: string }>>(`/secrets/${name}/versions`, { value }),
+    mutationFn: ({ uuid, value }: { uuid: string; value: string }) =>
+      api.post<DataResponse<{ message: string }>>(`/secrets/${uuid}/versions`, { value }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["secrets"] }),
   });
 }
@@ -1445,5 +1445,27 @@ export function useAgentActivity(agentUuid: string) {
     queryFn: () => api.get<PaginatedResponse<ActivityEvent>>(`/agents/${agentUuid}/activity?page_size=10`),
     enabled: !!agentUuid,
     retry: false,
+  });
+}
+
+// Agent instruction files
+export function useAgentFiles(agentUuid: string) {
+  return useQuery({
+    queryKey: ["agent-files", agentUuid],
+    queryFn: () => api.get<DataResponse<Array<{ name: string; content: string }>>>(`/agents/${agentUuid}/files`),
+    enabled: !!agentUuid,
+    retry: false,
+  });
+}
+
+export function useSaveAgentFile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentUuid, path, content }: { agentUuid: string; path: string; content: string }) =>
+      api.patch<DataResponse<{ name: string; content: string }>>(`/agents/${agentUuid}/files/${encodeURIComponent(path)}`, { content }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["agent-files", vars.agentUuid] });
+      qc.invalidateQueries({ queryKey: ["agent", vars.agentUuid] });
+    },
   });
 }
