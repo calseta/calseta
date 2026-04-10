@@ -958,7 +958,7 @@ export function EnrichmentProviderDetailPage() {
 
       {/* HTTP Config Dialog */}
       <Dialog open={showHttpConfigDialog} onOpenChange={(v) => !v && setShowHttpConfigDialog(false)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>HTTP Configuration</DialogTitle>
           </DialogHeader>
@@ -985,7 +985,7 @@ export function EnrichmentProviderDetailPage() {
 
       {/* Malice Rules Dialog */}
       <Dialog open={showMaliceRulesDialog} onOpenChange={(v) => !v && setShowMaliceRulesDialog(false)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Malice Rules</DialogTitle>
           </DialogHeader>

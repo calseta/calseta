@@ -378,6 +378,7 @@ export function RoutineDetailPage() {
                 </DetailPageSidebar>
               }
             >
+              <div className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm font-medium">About</CardTitle>
@@ -440,6 +441,7 @@ export function RoutineDetailPage() {
                   </CardContent>
                 </Card>
               )}
+              </div>
             </DetailPageLayout>
           </TabsContent>
 

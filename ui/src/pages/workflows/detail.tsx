@@ -71,6 +71,7 @@ import {
   WifiOff,
   MoreHorizontal,
   Trash2,
+  Pencil,
 } from "lucide-react";
 
 // Use central INDICATOR_TYPES from types.ts
@@ -621,10 +622,9 @@ export function WorkflowDetailPage() {
                 size="sm"
                 variant="outline"
                 onClick={openEditDialog}
-                className="border-border text-xs"
               >
-                <Settings className="h-3 w-3 mr-1" />
-                Edit Workflow
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Edit
               </Button>
               {wf.state !== "active" && !wf.is_system && (
                 <DropdownMenu>
@@ -660,7 +660,10 @@ export function WorkflowDetailPage() {
                     patchWorkflow.mutate(
                       { uuid, body: { state: v } },
                       {
-                        onSuccess: () => toast.success(`State changed to ${v}`),
+                        onSuccess: () => {
+                          toast.success(`State changed to ${v}`);
+                          void refetch();
+                        },
                         onError: () => toast.error("Failed to update state"),
                       },
                     );
