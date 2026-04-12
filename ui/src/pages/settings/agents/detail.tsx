@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useSearch, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -58,6 +58,7 @@ import {
   DocumentationEditor,
 } from "@/components/detail-page";
 import { CopyableText } from "@/components/copyable-text";
+import { MarkdownPreview } from "@/components/markdown-preview";
 import {
   TargetingRuleBuilder,
   TargetingRuleDisplay,
@@ -120,6 +121,13 @@ import {
   TrendingUp,
   CheckCircle2,
   Clock,
+  Bold,
+  Italic,
+  Heading2,
+  List,
+  Code2,
+  Link2,
+  Eye,
 } from "lucide-react";
 
 const ALL_SEVERITIES = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
@@ -234,6 +242,75 @@ export function AgentDetailPage() {
   const [fileContentDraft, setFileContentDraft] = useState<string>("");
   const [newFileName, setNewFileName] = useState<string>("");
   const [showNewFileInput, setShowNewFileInput] = useState(false);
+  // Tracks files created via + but not yet returned by the API (pre-first-save)
+  const [pendingCreates, setPendingCreates] = useState<string[]>([]);
+  const [fileEditorMode, setFileEditorMode] = useState<"write" | "preview">("write");
+  const fileTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveAgentFile = useSaveAgentFile();
+
+  const doSaveFile = useCallback((path: string, content: string) => {
+    saveAgentFile.mutate(
+      { agentUuid: uuid, path, content },
+      {
+        onSuccess: () => {
+          setPendingCreates((prev) => prev.filter((n) => n !== path));
+          toast.success("File saved");
+        },
+        onError: () => toast.error("Failed to save file"),
+      },
+    );
+  }, [saveAgentFile, uuid]);
+
+  // Autosave: fire 1.5 s after last keystroke when a file is open
+  useEffect(() => {
+    if (!selectedFile) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      doSaveFile(selectedFile, fileContentDraft);
+    }, 1500);
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileContentDraft]);
+
+  function wrapFileSelection(before: string, after: string) {
+    const el = fileTextareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = fileContentDraft.slice(start, end);
+    const next = fileContentDraft.slice(0, start) + before + selected + after + fileContentDraft.slice(end);
+    setFileContentDraft(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + before.length, start + before.length + selected.length);
+    });
+  }
+
+  function prependFileLines(prefix: string) {
+    const el = fileTextareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const lineStart = fileContentDraft.slice(0, start).lastIndexOf("\n") + 1;
+    const lines = fileContentDraft.slice(lineStart, end === start ? end : end).split("\n");
+    const next = fileContentDraft.slice(0, lineStart) + lines.map((l) => prefix + l).join("\n") + fileContentDraft.slice(end === start ? end : end);
+    setFileContentDraft(next);
+    requestAnimationFrame(() => el.focus());
+  }
+
+  function createNewFile(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setPendingCreates((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+    setSelectedFile(trimmed);
+    setFileContentDraft("");
+    setFileEditorMode("write");
+    setShowNewFileInput(false);
+    setNewFileName("");
+  }
 
   const agent = data?.data;
 
@@ -243,7 +320,6 @@ export function AgentDetailPage() {
   const { data: costSummaryData } = useAgentCostSummary(uuid);
   const { data: toolsData } = useTools();
   const { data: agentFilesData, isLoading: filesLoading } = useAgentFiles(uuid);
-  const saveAgentFile = useSaveAgentFile();
   const { data: agentSkillsData } = useAgentSkills(uuid);
   const { data: allSkillsData } = useSkills();
   const syncAgentSkills = useSyncAgentSkills();
@@ -1634,7 +1710,7 @@ export function AgentDetailPage() {
                   <Skeleton className="h-64 w-full" />
                 </div>
               ) : (
-                <div className="flex gap-3 h-[520px]">
+                <div className="flex gap-3 h-[600px]">
                   {/* Left: file list */}
                   <div className="w-56 shrink-0 flex flex-col gap-1">
                     <div className="flex items-center justify-between mb-1">
@@ -1651,14 +1727,14 @@ export function AgentDetailPage() {
                     {showNewFileInput && (
                       <div className="flex items-center gap-1 mb-1">
                         <Input
+                          autoFocus
                           value={newFileName}
                           onChange={(e) => setNewFileName(e.target.value)}
-                          placeholder="filename.md"
+                          placeholder="AGENTS.md"
                           className="h-7 text-xs bg-surface border-border"
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" && newFileName.trim()) {
-                              setSelectedFile(newFileName.trim());
-                              setFileContentDraft("");
+                            if (e.key === "Enter") createNewFile(newFileName);
+                            if (e.key === "Escape") {
                               setShowNewFileInput(false);
                               setNewFileName("");
                             }
@@ -1666,14 +1742,7 @@ export function AgentDetailPage() {
                         />
                         <button
                           type="button"
-                          onClick={() => {
-                            if (newFileName.trim()) {
-                              setSelectedFile(newFileName.trim());
-                              setFileContentDraft("");
-                              setShowNewFileInput(false);
-                              setNewFileName("");
-                            }
-                          }}
+                          onClick={() => createNewFile(newFileName)}
                           className="h-7 w-7 flex items-center justify-center rounded bg-teal text-white hover:bg-teal-dim shrink-0"
                         >
                           <Plus className="h-3 w-3" />
@@ -1681,16 +1750,25 @@ export function AgentDetailPage() {
                       </div>
                     )}
                     <div className="flex-1 overflow-y-auto rounded-md border border-border bg-card">
-                      {agentFiles.length === 0 && !showNewFileInput ? (
-                        <div className="py-8 text-center text-xs text-dim">No instruction files</div>
-                      ) : (
-                        agentFiles.map((file) => (
+                      {(() => {
+                        // pendingCreates: files created via + not yet returned by the API
+                        const pending = pendingCreates
+                          .filter((name) => !agentFiles.some((f) => f.name === name))
+                          .map((name) => ({ name, content: "" }));
+                        const displayFiles = [...pending, ...agentFiles];
+                        if (displayFiles.length === 0) {
+                          return (
+                            <div className="py-8 text-center text-xs text-dim">No instruction files</div>
+                          );
+                        }
+                        return displayFiles.map((file) => (
                           <button
                             key={file.name}
                             type="button"
                             onClick={() => {
                               setSelectedFile(file.name);
                               setFileContentDraft(file.content);
+                              setFileEditorMode("write");
                             }}
                             className={cn(
                               "w-full text-left px-3 py-2 border-b border-border text-xs transition-colors truncate",
@@ -1702,45 +1780,109 @@ export function AgentDetailPage() {
                             <FileText className="h-3 w-3 inline mr-1.5 opacity-60" />
                             {file.name}
                           </button>
-                        ))
-                      )}
+                        ));
+                      })()}
                     </div>
                   </div>
 
-                  {/* Right: file editor */}
-                  <div className="flex-1 flex flex-col gap-2">
+                  {/* Right: markdown editor */}
+                  <div className="flex-1 flex flex-col min-w-0">
                     {selectedFile ? (
                       <>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-mono text-muted-foreground">{selectedFile}</span>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              saveAgentFile.mutate(
-                                { agentUuid: uuid, path: selectedFile, content: fileContentDraft },
-                                {
-                                  onSuccess: () => toast.success("File saved"),
-                                  onError: () => toast.error("Failed to save file"),
-                                },
-                              );
-                            }}
-                            disabled={saveAgentFile.isPending}
-                            className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
-                          >
+                        {/* Header: Write/Preview tabs + filename + save status */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1 bg-surface border border-border rounded-md p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setFileEditorMode("write")}
+                              className={cn(
+                                "flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors",
+                                fileEditorMode === "write"
+                                  ? "bg-teal/15 text-teal-light"
+                                  : "text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Write
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFileEditorMode("preview")}
+                              className={cn(
+                                "flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors",
+                                fileEditorMode === "preview"
+                                  ? "bg-teal/15 text-teal-light"
+                                  : "text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              <Eye className="h-3 w-3" />
+                              Preview
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-muted-foreground">{selectedFile}</span>
                             {saveAgentFile.isPending ? (
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              <span className="flex items-center gap-1 text-[11px] text-dim">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Saving…
+                              </span>
                             ) : (
-                              <Save className="h-3 w-3 mr-1" />
+                              <Button
+                                size="sm"
+                                onClick={() => doSaveFile(selectedFile, fileContentDraft)}
+                                className="h-7 text-xs bg-teal text-white hover:bg-teal-dim"
+                              >
+                                <Save className="h-3 w-3 mr-1" />
+                                Save
+                              </Button>
                             )}
-                            Save
-                          </Button>
+                          </div>
                         </div>
-                        <Textarea
-                          value={fileContentDraft}
-                          onChange={(e) => setFileContentDraft(e.target.value)}
-                          className="flex-1 font-mono text-xs bg-surface border-border resize-none"
-                          placeholder="Enter instruction content..."
-                        />
+                        {fileEditorMode === "write" ? (
+                          <>
+                            {/* Formatting toolbar */}
+                            <TooltipProvider>
+                              <div className="flex items-center gap-0.5 px-1 py-1 border border-b-0 border-border bg-muted/20 rounded-t-md">
+                                {[
+                                  { icon: <Bold className="h-3.5 w-3.5" />, label: "Bold", action: () => wrapFileSelection("**", "**") },
+                                  { icon: <Italic className="h-3.5 w-3.5" />, label: "Italic", action: () => wrapFileSelection("*", "*") },
+                                  { icon: <Heading2 className="h-3.5 w-3.5" />, label: "Heading", action: () => prependFileLines("## ") },
+                                  { icon: <List className="h-3.5 w-3.5" />, label: "Bullet list", action: () => prependFileLines("- ") },
+                                  { icon: <Code2 className="h-3.5 w-3.5" />, label: "Code block", action: () => wrapFileSelection("```\n", "\n```") },
+                                  { icon: <Link2 className="h-3.5 w-3.5" />, label: "Link", action: () => wrapFileSelection("[", "](url)") },
+                                ].map(({ icon, label, action }) => (
+                                  <Tooltip key={label}>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => { e.preventDefault(); action(); }}
+                                        className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                      >
+                                        {icon}
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs">{label}</TooltipContent>
+                                  </Tooltip>
+                                ))}
+                              </div>
+                            </TooltipProvider>
+                            <Textarea
+                              ref={fileTextareaRef}
+                              value={fileContentDraft}
+                              onChange={(e) => setFileContentDraft(e.target.value)}
+                              className="flex-1 font-mono text-xs bg-surface border-border resize-none rounded-t-none"
+                              placeholder="Write your markdown content here..."
+                            />
+                          </>
+                        ) : (
+                          <div className="flex-1 overflow-y-auto rounded-md border border-border bg-card px-4 py-3">
+                            {fileContentDraft ? (
+                              <MarkdownPreview content={fileContentDraft} />
+                            ) : (
+                              <p className="text-xs text-dim italic">Nothing to preview</p>
+                            )}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div className="flex-1 flex items-center justify-center rounded-md border border-dashed border-border">
