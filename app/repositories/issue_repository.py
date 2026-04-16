@@ -10,6 +10,7 @@ from sqlalchemy import func, select, text
 
 from app.db.models.agent_issue import AgentIssue
 from app.db.models.agent_issue_comment import AgentIssueComment
+from app.db.models.issue_category import IssueCategoryDef
 from app.db.models.issue_label import IssueLabel
 from app.repositories.base import BaseRepository
 
@@ -20,11 +21,17 @@ class IssueRepository(BaseRepository[AgentIssue]):
     async def next_identifier(self) -> str:
         """Generate the next CAL-NNN identifier.
 
-        Uses COUNT(*)+1 — not perfectly race-safe but acceptable for v1 issue volumes.
+        Uses MAX of existing numeric suffixes to avoid collisions when issues are deleted.
         """
-        result = await self._db.execute(text("SELECT COUNT(*) FROM agent_issues"))
-        count: int = result.scalar_one()
-        return f"CAL-{count + 1:03d}"
+        result = await self._db.execute(
+            text(
+                "SELECT COALESCE(MAX(CAST(regexp_replace(identifier, '[^0-9]', '', 'g') AS INTEGER)), 0)"
+                " FROM agent_issues"
+                " WHERE identifier ~ '^CAL-[0-9]+$'"
+            )
+        )
+        max_num: int = result.scalar_one()
+        return f"CAL-{max_num + 1:03d}"
 
     async def create(
         self,
@@ -302,3 +309,49 @@ class IssueRepository(BaseRepository[AgentIssue]):
         issue.labels = labels
         await self._db.flush()
         await self._db.refresh(issue, ["labels"])
+
+    # --- Category operations ---
+
+    async def list_categories(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> tuple[list[IssueCategoryDef], int]:
+        """Return (categories, total) ordered by label."""
+        count_stmt = select(func.count()).select_from(IssueCategoryDef)
+        total_result = await self._db.execute(count_stmt)
+        total: int = total_result.scalar_one()
+
+        stmt = (
+            select(IssueCategoryDef)
+            .order_by(IssueCategoryDef.label.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        result = await self._db.execute(stmt)
+        return list(result.scalars().all()), total
+
+    async def get_category_by_uuid(self, uuid: UUID) -> IssueCategoryDef | None:
+        """Fetch a single category by UUID."""
+        result = await self._db.execute(
+            select(IssueCategoryDef).where(IssueCategoryDef.uuid == uuid)
+        )
+        return result.scalar_one_or_none()  # type: ignore[no-any-return]
+
+    async def create_category(self, key: str, label: str) -> IssueCategoryDef:
+        """Create a new category row."""
+        category = IssueCategoryDef(
+            uuid=uuid_module.uuid4(),
+            key=key,
+            label=label,
+            is_system=False,
+        )
+        self._db.add(category)
+        await self._db.flush()
+        await self._db.refresh(category)
+        return category
+
+    async def delete_category(self, category: IssueCategoryDef) -> None:
+        """Delete a category row and flush."""
+        await self._db.delete(category)
+        await self._db.flush()

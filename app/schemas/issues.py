@@ -29,6 +29,31 @@ class IssueLabelResponse(BaseModel):
     updated_at: datetime
 
 
+# ---------------------------------------------------------------------------
+# Category schemas
+# ---------------------------------------------------------------------------
+
+
+class IssueCategoryDefCreate(BaseModel):
+    key: str = Field(..., min_length=1, max_length=50, pattern=r"^[a-z][a-z0-9_]*$")
+    label: str = Field(..., min_length=1, max_length=100)
+
+
+class IssueCategoryDefPatch(BaseModel):
+    label: str = Field(..., min_length=1, max_length=100)
+
+
+class IssueCategoryDefResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    uuid: UUID
+    key: str
+    label: str
+    is_system: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class IssueStatus:
     BACKLOG = "backlog"
     TODO = "todo"

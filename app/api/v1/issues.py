@@ -36,6 +36,9 @@ from app.db.session import get_db
 from app.middleware.rate_limit import limiter
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.issues import (
+    IssueCategoryDefCreate,
+    IssueCategoryDefPatch,
+    IssueCategoryDefResponse,
     IssueCheckoutRequest,
     IssueCommentCreate,
     IssueCommentResponse,
@@ -49,6 +52,7 @@ from app.services.issue_service import IssueService
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 labels_router = APIRouter(prefix="/labels", tags=["issues"])
+categories_router = APIRouter(prefix="/issue-categories", tags=["issues"])
 agents_issues_router = APIRouter(prefix="/agents", tags=["agents"])
 
 _Read = Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_READ))]
@@ -306,6 +310,84 @@ async def delete_label(
     """Delete a label. Cascades to all issue assignments."""
     svc = IssueService(db)
     await svc.delete_label(label_uuid)
+    await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Categories routes
+# ---------------------------------------------------------------------------
+
+
+@categories_router.get("", response_model=PaginatedResponse[IssueCategoryDefResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def list_categories(
+    request: Request,
+    auth: _Read,
+    pagination: PaginationParams = Depends(),
+    db: AsyncSession = Depends(get_db),
+) -> PaginatedResponse[IssueCategoryDefResponse]:
+    """List all issue categories."""
+    svc = IssueService(db)
+    categories, total = await svc.list_categories(
+        page=pagination.page,
+        page_size=pagination.page_size,
+    )
+    return PaginatedResponse(
+        data=categories,
+        meta=PaginationMeta.from_total(
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        ),
+    )
+
+
+@categories_router.post(
+    "",
+    response_model=DataResponse[IssueCategoryDefResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def create_category(
+    request: Request,
+    body: IssueCategoryDefCreate,
+    auth: _Write,
+    db: AsyncSession = Depends(get_db),
+) -> DataResponse[IssueCategoryDefResponse]:
+    """Create a new issue category."""
+    svc = IssueService(db)
+    category = await svc.create_category(body)
+    await db.commit()
+    return DataResponse(data=category, meta={})
+
+
+@categories_router.patch("/{category_uuid}", response_model=DataResponse[IssueCategoryDefResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def patch_category(
+    request: Request,
+    category_uuid: UUID,
+    body: IssueCategoryDefPatch,
+    auth: _Write,
+    db: AsyncSession = Depends(get_db),
+) -> DataResponse[IssueCategoryDefResponse]:
+    """Update a category label."""
+    svc = IssueService(db)
+    category = await svc.patch_category(category_uuid, body.label)
+    await db.commit()
+    return DataResponse(data=category, meta={})
+
+
+@categories_router.delete("/{category_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def delete_category(
+    request: Request,
+    category_uuid: UUID,
+    auth: _Write,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Delete a category. Blocked if is_system=True."""
+    svc = IssueService(db)
+    await svc.delete_category(category_uuid)
     await db.commit()
 
 

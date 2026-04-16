@@ -32,6 +32,9 @@ from app.repositories.heartbeat_run_repository import HeartbeatRunRepository
 from app.repositories.issue_repository import IssueRepository
 from app.schemas.issues import (
     IssueCategory,
+    IssueCategoryDefCreate,
+    IssueCategoryDefPatch,
+    IssueCategoryDefResponse,
     IssueCommentCreate,
     IssueCommentResponse,
     IssueCreate,
@@ -115,12 +118,7 @@ class IssueService:
                 code="invalid_priority",
                 message=f"Invalid priority '{data.priority}'. Must be one of: {IssuePriority.ALL}",
             )
-        if data.category not in IssueCategory.ALL:
-            raise CalsetaException(
-                status_code=422,
-                code="invalid_category",
-                message=f"Invalid category '{data.category}'. Must be one of: {IssueCategory.ALL}",
-            )
+        # category is a free-text field — validated against user-defined issue_category_defs
 
         agent_repo = AgentRepository(self._db)
 
@@ -290,12 +288,6 @@ class IssueService:
                 )
             updates["priority"] = patch_data.priority
         if patch_data.category is not None:
-            if patch_data.category not in IssueCategory.ALL:
-                raise CalsetaException(
-                    status_code=422,
-                    code="invalid_category",
-                    message=f"Invalid category '{patch_data.category}'",
-                )
             updates["category"] = patch_data.category
         if patch_data.assignee_operator is not None:
             updates["assignee_operator"] = patch_data.assignee_operator
@@ -515,6 +507,56 @@ class IssueService:
             )
         await self._repo.delete_label(label)
         logger.info("label_deleted", label_uuid=str(label_uuid))
+
+    # --- Category operations ---
+
+    async def list_categories(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> tuple[list[IssueCategoryDefResponse], int]:
+        """List all issue categories."""
+        categories, total = await self._repo.list_categories(page=page, page_size=page_size)
+        return [IssueCategoryDefResponse.model_validate(cat) for cat in categories], total
+
+    async def create_category(self, data: IssueCategoryDefCreate) -> IssueCategoryDefResponse:
+        """Create a new category."""
+        category = await self._repo.create_category(key=data.key, label=data.label)
+        logger.info("category_created", category_uuid=str(category.uuid), key=category.key)
+        return IssueCategoryDefResponse.model_validate(category)
+
+    async def delete_category(self, category_uuid: UUID) -> None:
+        """Delete a category by UUID. Raises 422 if is_system=True."""
+        category = await self._repo.get_category_by_uuid(category_uuid)
+        if category is None:
+            raise CalsetaException(
+                status_code=404,
+                code="category_not_found",
+                message=f"Category '{category_uuid}' not found",
+            )
+        if category.is_system:
+            raise CalsetaException(
+                status_code=422,
+                code="SYSTEM_CATEGORY",
+                message="System categories cannot be deleted",
+            )
+        await self._repo.delete_category(category)
+        logger.info("category_deleted", category_uuid=str(category_uuid))
+
+    async def patch_category(self, category_uuid: UUID, label: str) -> "IssueCategoryDefResponse":
+        """Update a category label by UUID."""
+        category = await self._repo.get_category_by_uuid(category_uuid)
+        if category is None:
+            raise CalsetaException(
+                status_code=404,
+                code="category_not_found",
+                message=f"Category '{category_uuid}' not found",
+            )
+        category.label = label
+        await self._db.flush()
+        await self._db.refresh(category)
+        logger.info("category_updated", category_uuid=str(category_uuid))
+        return IssueCategoryDefResponse.model_validate(category)
 
     async def list_agent_issues(
         self,
