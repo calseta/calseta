@@ -38,7 +38,6 @@ class MetricsSummaryApprovals(BaseModel):
 
 
 class MetricsSummaryPlatform(BaseModel):
-    context_documents: int
     detection_rules: int
     enrichment_providers: int
     enrichment_providers_by_indicator_type: dict[str, int]
