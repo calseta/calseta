@@ -195,6 +195,9 @@ export function CustomMetricForm({ open, onOpenChange, sources, onCreated }: Cus
                 <Plus className="h-3 w-3" /> Add
               </Button>
             </div>
+            <p className="text-[10px] text-dim">
+              Scope to a specific resource — e.g. FunctionName=my-func, ClusterName=prod-ecs, DBInstanceIdentifier=mydb
+            </p>
             {dimensions.map((d, idx) => (
               <div key={idx} className="flex items-center gap-2">
                 <Input

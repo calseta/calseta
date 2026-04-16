@@ -59,7 +59,7 @@ export function SourceConfigSheet({ open, onOpenChange }: SourceConfigSheetProps
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
-      <SheetContent side="right" className="w-[420px] sm:max-w-[420px] overflow-y-auto p-6">
+      <SheetContent side="right" className="w-[420px] sm:max-w-[420px] overflow-y-auto p-0">
         {view === "list" && (
           <SourceList
             onAdd={() => setView("add")}
@@ -122,14 +122,14 @@ function SourceList({ onAdd, onEdit }: { onAdd: () => void; onEdit: (s: HealthSo
 
   return (
     <>
-      <SheetHeader>
+      <SheetHeader className="border-b border-border px-6 pt-6 pb-4">
         <SheetTitle>Health Sources</SheetTitle>
         <SheetDescription>
           Configure cloud provider connections for infrastructure monitoring.
         </SheetDescription>
       </SheetHeader>
 
-      <div className="mt-4 space-y-3">
+      <div className="px-6 py-4 space-y-3">
         <Button size="sm" onClick={onAdd} className="w-full gap-1.5">
           <Plus className="h-3.5 w-3.5" />
           Source
@@ -294,12 +294,12 @@ function SourceForm({
 
   return (
     <>
-      <SheetHeader>
+      <SheetHeader className="border-b border-border px-6 pt-6 pb-4">
         <div className="flex items-center gap-2">
           <button onClick={onBack} className="text-dim hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <SheetTitle>{isEdit ? "Edit Source" : "Add Health Source"}</SheetTitle>
+          <SheetTitle>{isEdit ? "Edit Source" : "Health Source"}</SheetTitle>
         </div>
         <SheetDescription>
           {isEdit
@@ -308,7 +308,7 @@ function SourceForm({
         </SheetDescription>
       </SheetHeader>
 
-      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+      <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
           <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Production AWS" required />
