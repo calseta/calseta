@@ -21,6 +21,7 @@ parameterized /{slug} routes to avoid FastAPI routing conflicts.
 from __future__ import annotations
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -136,6 +137,55 @@ async def sync_all_pages(
     results = await svc.sync_all_pages()
     await db.commit()
     return DataResponse(data=results, meta={})
+
+
+# ---------------------------------------------------------------------------
+# UUID-based single-page routes — registered before /{slug} to avoid conflicts
+# ---------------------------------------------------------------------------
+
+
+@router.get("/uuid/{uuid}", response_model=DataResponse[KBPageResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def get_page_by_uuid(
+    request: Request,
+    uuid: UUID,
+    auth: _Read,
+    db: AsyncSession = Depends(get_db),
+) -> DataResponse[KBPageResponse]:
+    """Get a single KB page by UUID."""
+    svc = KBService(db)
+    page = await svc.get_page_by_uuid(uuid)
+    return DataResponse(data=page, meta={})
+
+
+@router.patch("/uuid/{uuid}", response_model=DataResponse[KBPageResponse])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def patch_page_by_uuid(
+    request: Request,
+    uuid: UUID,
+    body: KBPagePatch,
+    auth: _Write,
+    db: AsyncSession = Depends(get_db),
+) -> DataResponse[KBPageResponse]:
+    """Partially update a KB page by UUID."""
+    svc = KBService(db)
+    page = await svc.update_page_by_uuid(uuid=uuid, patch=body, updated_by_operator=auth.key_prefix)
+    await db.commit()
+    return DataResponse(data=page, meta={})
+
+
+@router.delete("/uuid/{uuid}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def delete_page_by_uuid(
+    request: Request,
+    uuid: UUID,
+    auth: _Write,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Archive a KB page by UUID."""
+    svc = KBService(db)
+    await svc.delete_page_by_uuid(uuid)
+    await db.commit()
 
 
 # ---------------------------------------------------------------------------

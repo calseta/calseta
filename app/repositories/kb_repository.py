@@ -27,6 +27,13 @@ class KBPageRepository(BaseRepository[KnowledgeBasePage]):
         )
         return result.scalar_one_or_none()  # type: ignore[return-value]
 
+    async def get_by_uuid(self, uuid: UUID) -> KnowledgeBasePage | None:
+        """Fetch a single page by UUID."""
+        result = await self._db.execute(
+            select(KnowledgeBasePage).where(KnowledgeBasePage.uuid == uuid)
+        )
+        return result.scalar_one_or_none()  # type: ignore[return-value]
+
     # ----------------------------------------------------------------
     # List / filter
     # ----------------------------------------------------------------
@@ -147,6 +154,9 @@ class KBPageRepository(BaseRepository[KnowledgeBasePage]):
         folder: str = "/",
         format: str = "markdown",
         status: str = "published",
+        tags: list[str] | None = None,
+        description: str | None = None,
+        targeting_rules: dict | None = None,
         inject_scope: dict | None = None,
         inject_priority: int = 0,
         inject_pinned: bool = False,
@@ -165,6 +175,9 @@ class KBPageRepository(BaseRepository[KnowledgeBasePage]):
             folder=folder,
             format=format,
             status=status,
+            tags=tags if tags is not None else [],
+            description=description,
+            targeting_rules=targeting_rules,
             inject_scope=inject_scope,
             inject_priority=inject_priority,
             inject_pinned=inject_pinned,
@@ -227,9 +240,9 @@ class KBPageRepository(BaseRepository[KnowledgeBasePage]):
 
         # Apply field changes
         _UPDATABLE = frozenset({
-            "title", "body", "folder", "status", "inject_scope",
-            "inject_priority", "inject_pinned", "sync_source",
-            "sync_last_hash", "synced_at", "token_count", "metadata_",
+            "slug", "title", "body", "folder", "status", "tags", "description",
+            "targeting_rules", "inject_scope", "inject_priority", "inject_pinned",
+            "sync_source", "sync_last_hash", "synced_at", "token_count", "metadata_",
             "updated_by_agent_id", "updated_by_operator",
         })
         for key, value in changes.items():
@@ -345,6 +358,25 @@ class KBPageRepository(BaseRepository[KnowledgeBasePage]):
     # ----------------------------------------------------------------
     # Injection queries
     # ----------------------------------------------------------------
+
+    async def list_all_for_alert_targeting(self) -> list[KnowledgeBasePage]:
+        """Return all non-archived pages with inject_scope set.
+
+        Used by the context targeting engine to find KB pages that
+        participate in alert context injection.
+        """
+        stmt = (
+            select(KnowledgeBasePage)
+            .where(
+                and_(
+                    KnowledgeBasePage.inject_scope.is_not(None),
+                    KnowledgeBasePage.status != "archived",
+                )
+            )
+            .order_by(KnowledgeBasePage.updated_at.asc())
+        )
+        result = await self._db.execute(stmt)
+        return list(result.scalars().all())
 
     async def get_injectable_pages(
         self,

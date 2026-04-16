@@ -15,7 +15,6 @@ from app.api.v1 import (
     alert_queue,
     alerts,
     api_keys,
-    context_documents,
     detection_rules,
     enrichment_field_extractions,
     enrichment_providers,
@@ -51,7 +50,6 @@ v1_router.include_router(detection_rules.router)
 v1_router.include_router(enrichments.router)
 v1_router.include_router(enrichment_providers.router)
 v1_router.include_router(enrichment_field_extractions.router)
-v1_router.include_router(context_documents.router)
 v1_router.include_router(workflows.router)
 v1_router.include_router(workflows.workflow_runs_router)
 v1_router.include_router(workflow_approvals.router)
@@ -73,6 +71,7 @@ v1_router.include_router(invocations.router)
 v1_router.include_router(invocations.agents_invocations_router)
 v1_router.include_router(issues.router)
 v1_router.include_router(issues.labels_router)
+v1_router.include_router(issues.categories_router)
 v1_router.include_router(issues.agents_issues_router)
 v1_router.include_router(skills.router)
 v1_router.include_router(skills.agent_skills_router)

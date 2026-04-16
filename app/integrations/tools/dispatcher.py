@@ -418,44 +418,6 @@ async def _handle_get_detection_rule(
     }
 
 
-async def _handle_list_context_documents(
-    db: AsyncSession,
-    agent: AgentRegistration,
-    tool_input: dict[str, Any],
-) -> dict[str, Any]:
-    from uuid import UUID
-
-    from app.repositories.alert_repository import AlertRepository
-    from app.services.context_targeting import get_applicable_documents
-
-    alert_uuid_str = tool_input.get("alert_uuid", "")
-    try:
-        alert_uuid = UUID(str(alert_uuid_str))
-    except ValueError:
-        return {"status": "error", "error": "Invalid alert_uuid format."}
-
-    alert_repo = AlertRepository(db)
-    alert = await alert_repo.get_by_uuid(alert_uuid)
-    if alert is None:
-        return {"status": "error", "error": f"Alert {alert_uuid} not found."}
-
-    docs = await get_applicable_documents(alert, db)
-
-    return {
-        "status": "ok",
-        "data": {
-            "alert_uuid": str(alert.uuid),
-            "documents": [
-                {
-                    "uuid": str(d.uuid),
-                    "title": d.title,
-                    "snippet": (d.content or "")[:300],
-                }
-                for d in docs
-            ],
-        },
-    }
-
 
 async def _handle_execute_workflow(
     db: AsyncSession,
@@ -482,6 +444,5 @@ _BUILTIN_HANDLERS: dict[
     "post_finding": _handle_post_finding,
     "update_alert_status": _handle_update_alert_status,
     "get_detection_rule": _handle_get_detection_rule,
-    "list_context_documents": _handle_list_context_documents,
     "execute_workflow": _handle_execute_workflow,
 }

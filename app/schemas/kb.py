@@ -28,6 +28,9 @@ class KBPageCreate(BaseModel):
     folder: str = "/"
     format: str = "markdown"
     status: KBPageStatus = "published"
+    tags: list[str] = []
+    description: str | None = None
+    targeting_rules: dict[str, Any] | None = None
     inject_scope: dict[str, Any] | None = None
     inject_priority: int = Field(default=0, ge=0, le=100)
     inject_pinned: bool = False
@@ -57,10 +60,14 @@ class KBPageCreate(BaseModel):
 
 
 class KBPagePatch(BaseModel):
+    slug: str | None = Field(default=None, min_length=1, max_length=200)
     title: str | None = Field(default=None, min_length=1, max_length=500)
     body: str | None = None
     folder: str | None = None
     status: KBPageStatus | None = None
+    tags: list[str] | None = None
+    description: str | None = None
+    targeting_rules: dict[str, Any] | None = None
     inject_scope: dict[str, Any] | None = None
     inject_priority: int | None = Field(default=None, ge=0, le=100)
     inject_pinned: bool | None = None
@@ -68,6 +75,27 @@ class KBPagePatch(BaseModel):
     token_count: int | None = None
     metadata: dict[str, Any] | None = None
     change_summary: str | None = None
+
+    @field_validator("slug")
+    @classmethod
+    def validate_slug(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("slug must not be empty")
+        segments = v.split("/")
+        for segment in segments:
+            if not segment:
+                raise ValueError(
+                    "slug must not have empty path segments "
+                    "(double slash or leading/trailing slash)"
+                )
+            if not re.match(r"^[a-z0-9][a-z0-9\-]*$|^[a-z0-9]$", segment):
+                raise ValueError(
+                    "slug segments must be lowercase alphanumeric and hyphens only"
+                )
+        return v
 
 
 # --- Response schemas ---
@@ -112,6 +140,9 @@ class KBPageSummary(BaseModel):
     folder: str
     format: str
     status: str
+    tags: list[str]
+    description: str | None
+    targeting_rules: dict[str, Any] | None
     inject_scope: dict[str, Any] | None
     inject_priority: int
     inject_pinned: bool
@@ -142,6 +173,21 @@ class KBSearchResultItem(BaseModel):
     inject_scope: dict[str, Any] | None
     sync_source: str | None  # type field from sync_source JSONB, or None
     relevance_score: float | None = None
+    updated_at: datetime
+
+
+class KBPageContextSummary(BaseModel):
+    """Minimal KB page info for embedding in alert context responses."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    uuid: UUID
+    slug: str
+    title: str
+    description: str | None
+    folder: str
+    tags: list[str]
+    inject_scope: dict[str, Any] | None
     updated_at: datetime
 
 

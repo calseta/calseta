@@ -1,7 +1,8 @@
 """
-Seed sandbox context documents — 3 docs with targeting rules matching fixture scenarios.
+Seed sandbox KB pages — 3 security runbooks with alert targeting rules.
 
-Idempotent: checks (title, is_system=True) before inserting.
+These are the former sandbox context documents, converted to KB pages.
+Idempotent: checks slug before inserting.
 """
 
 from __future__ import annotations
@@ -10,17 +11,18 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.context_document import ContextDocument
+from app.db.models.kb_page import KnowledgeBasePage
 
 logger = structlog.get_logger(__name__)
 
 
-_SANDBOX_DOCS: list[dict[str, object]] = [
+_SANDBOX_KB_PAGES: list[dict[str, object]] = [
     {
+        "slug": "runbooks/identity-compromise-investigation",
         "title": "Identity Compromise Investigation Runbook",
-        "document_type": "runbook",
+        "folder": "/runbooks",
         "description": "Step-by-step investigation guide for identity-based attacks",
-        "content": (
+        "body": (
             "# Identity Compromise Investigation Runbook\n\n"
             "## Scope\n"
             "This runbook covers brute force attacks, impossible travel alerts, "
@@ -45,6 +47,7 @@ _SANDBOX_DOCS: list[dict[str, object]] = [
             "- **False positive**: Document the legitimate travel/VPN usage and "
             "close as False Positive - Legitimate Activity.\n"
         ),
+        "inject_scope": {"global": False},
         "targeting_rules": {
             "match_any": [
                 {"field": "source_name", "op": "eq", "value": "sentinel"},
@@ -54,10 +57,11 @@ _SANDBOX_DOCS: list[dict[str, object]] = [
         "tags": ["identity", "brute-force", "impossible-travel"],
     },
     {
+        "slug": "runbooks/malware-detection-containment",
         "title": "Malware Detection and Containment SOP",
-        "document_type": "sop",
+        "folder": "/runbooks",
         "description": "Standard operating procedure for malware hash detections",
-        "content": (
+        "body": (
             "# Malware Detection and Containment SOP\n\n"
             "## Scope\n"
             "Applies to alerts involving known malware hashes, suspicious "
@@ -84,6 +88,7 @@ _SANDBOX_DOCS: list[dict[str, object]] = [
             "9. **Collect forensic artifacts** — memory dump, event logs, "
             "prefetch files.\n"
         ),
+        "inject_scope": {"global": False},
         "targeting_rules": {
             "match_any": [
                 {"field": "source_name", "op": "eq", "value": "elastic"},
@@ -93,10 +98,11 @@ _SANDBOX_DOCS: list[dict[str, object]] = [
         "tags": ["malware", "containment", "powershell"],
     },
     {
+        "slug": "runbooks/data-exfiltration-investigation",
         "title": "Data Exfiltration Investigation Plan",
-        "document_type": "ir_plan",
+        "folder": "/runbooks",
         "description": "Investigation plan for anomalous data transfer alerts",
-        "content": (
+        "body": (
             "# Data Exfiltration Investigation Plan\n\n"
             "## Scope\n"
             "Covers anomalous data transfers, unusual upload volumes, and "
@@ -122,6 +128,7 @@ _SANDBOX_DOCS: list[dict[str, object]] = [
             "8. **Preserve evidence** — retain network flow logs and proxy "
             "logs for the investigation window.\n"
         ),
+        "inject_scope": {"global": False},
         "targeting_rules": {
             "match_any": [
                 {"field": "source_name", "op": "eq", "value": "splunk"},
@@ -133,35 +140,34 @@ _SANDBOX_DOCS: list[dict[str, object]] = [
 ]
 
 
-async def seed_sandbox_context_documents(db: AsyncSession) -> list[ContextDocument]:
-    """Seed sandbox context documents. Idempotent — skips existing docs."""
-    created: list[ContextDocument] = []
+async def seed_sandbox_kb_pages(db: AsyncSession) -> list[KnowledgeBasePage]:
+    """Seed sandbox KB runbook pages. Idempotent — skips existing slugs."""
+    created: list[KnowledgeBasePage] = []
 
-    for spec in _SANDBOX_DOCS:
+    for spec in _SANDBOX_KB_PAGES:
         existing = await db.execute(
-            select(ContextDocument).where(
-                ContextDocument.title == spec["title"],
-                ContextDocument.is_system.is_(True),
-            )
+            select(KnowledgeBasePage).where(KnowledgeBasePage.slug == spec["slug"])
         )
         if existing.scalar_one_or_none() is not None:
             continue
 
-        doc = ContextDocument(
+        page = KnowledgeBasePage(
+            slug=spec["slug"],  # type: ignore[arg-type]
             title=spec["title"],  # type: ignore[arg-type]
-            document_type=spec["document_type"],  # type: ignore[arg-type]
+            folder=spec["folder"],  # type: ignore[arg-type]
+            body=spec["body"],  # type: ignore[arg-type]
             description=spec.get("description"),  # type: ignore[arg-type]
-            content=spec["content"],  # type: ignore[arg-type]
+            inject_scope=spec.get("inject_scope"),  # type: ignore[arg-type]
             targeting_rules=spec.get("targeting_rules"),  # type: ignore[arg-type]
             tags=spec.get("tags", []),  # type: ignore[arg-type]
-            is_global=False,
-            is_system=True,
+            status="published",
+            format="markdown",
         )
-        db.add(doc)
-        created.append(doc)
+        db.add(page)
+        created.append(page)
 
     if created:
         await db.flush()
-        logger.info("sandbox_context_documents_seeded", count=len(created))
+        logger.info("sandbox_kb_pages_seeded", count=len(created))
 
     return created

@@ -18,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.agent_registration import AgentRegistration
 from app.db.models.alert import Alert
-from app.db.models.context_document import ContextDocument
 from app.db.models.detection_rule import DetectionRule
 from app.db.models.enrichment_provider import EnrichmentProvider
 from app.db.models.indicator_field_mapping import IndicatorFieldMapping
@@ -706,14 +705,6 @@ async def compute_metrics_summary(
     )
 
     # ------------------------------------------------------------------
-    # Platform: context_documents — count all
-    # ------------------------------------------------------------------
-    ctx_docs_result = await db.execute(
-        select(func.count(ContextDocument.id))
-    )
-    platform_context_documents: int = ctx_docs_result.scalar_one() or 0
-
-    # ------------------------------------------------------------------
     # Platform: detection_rules — count all
     # ------------------------------------------------------------------
     det_rules_result = await db.execute(
@@ -833,7 +824,6 @@ async def compute_metrics_summary(
             median_response_time_minutes=median_response_time_minutes,
         ),
         platform=MetricsSummaryPlatform(
-            context_documents=platform_context_documents,
             detection_rules=platform_detection_rules,
             enrichment_providers=platform_enrichment_providers,
             enrichment_providers_by_indicator_type=enrichment_providers_by_indicator_type,

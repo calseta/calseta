@@ -1,9 +1,15 @@
 """
 Context targeting rule evaluation engine.
 
-Evaluates which context documents apply to a given alert based on:
-  - is_global: True  → always included regardless of rules
-  - targeting_rules   → evaluated per the match_any / match_all logic
+Evaluates which KB pages apply to a given alert based on:
+  - inject_scope.global: True  → always included regardless of rules
+  - targeting_rules            → evaluated per the match_any / match_all logic
+
+A KB page participates in alert context if inject_scope is not None.
+  - inject_scope = {"global": true} → always include
+  - inject_scope set but not global → include when targeting_rules matches
+    (if targeting_rules is None, match all alerts)
+  - inject_scope = null → informational page, never in alert context
 
 Rule operators:
   eq       — exact equality (string or numeric)
@@ -24,8 +30,6 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.alert import Alert
-from app.db.models.context_document import ContextDocument
-from app.repositories.context_document_repository import ContextDocumentRepository
 
 # ---------------------------------------------------------------------------
 # Alert field accessor
@@ -138,31 +142,31 @@ def evaluate_targeting_rules(alert: Alert, rules: dict[str, Any] | None) -> bool
 
 async def get_applicable_documents(
     alert: Alert, db: AsyncSession
-) -> list[ContextDocument]:
+) -> list[Any]:
     """
-    Return context documents that apply to the given alert.
+    Return KB pages that apply to the given alert.
+
+    Only pages with inject_scope set participate in alert context.
 
     Ordering:
-      1. Global documents (is_global=True), ordered by document_type asc
-      2. Targeted documents that match the alert's fields, ordered by document_type asc
-
-    Documents without targeting_rules (None) are included for all alerts.
-    Documents with targeting_rules are included only if rules evaluate True.
+      1. Global pages (inject_scope.global = true)
+      2. Targeted pages whose targeting_rules match the alert's fields
+         (pages with targeting_rules=None match all alerts)
     """
-    repo = ContextDocumentRepository(db)
-    all_docs = await repo.list_all_for_targeting()
+    from app.db.models.kb_page import KnowledgeBasePage  # noqa: F401
+    from app.repositories.kb_repository import KBPageRepository
 
-    global_docs: list[ContextDocument] = []
-    targeted_docs: list[ContextDocument] = []
+    repo = KBPageRepository(db)
+    all_pages = await repo.list_all_for_alert_targeting()
 
-    for doc in all_docs:
-        if doc.is_global:
-            global_docs.append(doc)
-        elif evaluate_targeting_rules(alert, doc.targeting_rules):
-            targeted_docs.append(doc)
+    global_pages: list[Any] = []
+    targeted_pages: list[Any] = []
 
-    # Sort each group by document_type alphabetically
-    global_docs.sort(key=lambda d: d.document_type)
-    targeted_docs.sort(key=lambda d: d.document_type)
+    for page in all_pages:
+        scope = page.inject_scope or {}
+        if scope.get("global"):
+            global_pages.append(page)
+        elif evaluate_targeting_rules(alert, page.targeting_rules):
+            targeted_pages.append(page)
 
-    return global_docs + targeted_docs
+    return global_pages + targeted_pages

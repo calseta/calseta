@@ -16,8 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.alert import AlertCloseClassification, AlertSeverity, AlertStatus, EnrichmentStatus
 from app.schemas.common import JSONB_SIZE_SMALL, validate_jsonb_size
-from app.schemas.context_documents import ContextDocumentResponse
 from app.schemas.detection_rules import DetectionRuleResponse
+from app.schemas.kb import KBPageContextSummary
 from app.schemas.indicators import EnrichedIndicator, MaliceLevel
 
 
@@ -32,7 +32,7 @@ class AlertMetadata(BaseModel):
     indicator_count: int
     enrichment: dict[str, Any]  # succeeded, failed, enriched_at
     detection_rule_matched: bool
-    context_documents_applied: int
+    kb_pages_applied: int
 
 
 class AlertResponse(BaseModel):
@@ -60,14 +60,13 @@ class AlertResponse(BaseModel):
     closed_at: datetime | None
     tags: list[str]
     detection_rule_id: int | None
-    raw_payload: dict[str, Any] | None = None
     malice: str | None = None  # Computed: override > worst-of-indicators > "Pending"
     malice_override: str | None = None
     malice_override_source: str | None = None
     malice_override_at: datetime | None = None
     indicators: list[EnrichedIndicator] = Field(default_factory=list)
     detection_rule: DetectionRuleResponse | None = None
-    context_documents: list[ContextDocumentResponse] = Field(default_factory=list)
+    kb_pages: list[KBPageContextSummary] = Field(default_factory=list)
     agent_findings: list[dict[str, Any]] | None = None
     created_at: datetime
     updated_at: datetime

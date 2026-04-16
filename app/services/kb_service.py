@@ -66,6 +66,9 @@ def _build_page_response(page: KnowledgeBasePage) -> KBPageResponse:
         folder=page.folder,
         format=page.format,
         status=page.status,
+        tags=page.tags,
+        description=page.description,
+        targeting_rules=page.targeting_rules,
         inject_scope=page.inject_scope,
         inject_priority=page.inject_priority,
         inject_pinned=page.inject_pinned,
@@ -90,6 +93,9 @@ def _build_page_summary(page: KnowledgeBasePage) -> KBPageSummary:
         folder=page.folder,
         format=page.format,
         status=page.status,
+        tags=page.tags,
+        description=page.description,
+        targeting_rules=page.targeting_rules,
         inject_scope=page.inject_scope,
         inject_priority=page.inject_priority,
         inject_pinned=page.inject_pinned,
@@ -223,6 +229,9 @@ class KBService:
             folder=data.folder,
             format=data.format,
             status=data.status,
+            tags=data.tags,
+            description=data.description,
+            targeting_rules=data.targeting_rules,
             inject_scope=data.inject_scope,
             inject_priority=data.inject_priority,
             inject_pinned=data.inject_pinned,
@@ -252,6 +261,50 @@ class KBService:
             )
         await self._db.refresh(page, ["links"])
         return _build_page_response(page)
+
+    async def get_page_by_uuid(self, uuid: UUID) -> KBPageResponse:
+        """Fetch a page by UUID, raise 404 if missing or archived."""
+        page = await self._repo.get_by_uuid(uuid)
+        if page is None or page.status == "archived":
+            raise CalsetaException(
+                status_code=404,
+                code="kb_page_not_found",
+                message="KB page not found",
+            )
+        await self._db.refresh(page, ["links"])
+        return _build_page_response(page)
+
+    async def update_page_by_uuid(
+        self,
+        uuid: UUID,
+        patch: KBPagePatch,
+        updated_by_operator: str | None = None,
+    ) -> KBPageResponse:
+        """Update a page looked up by UUID instead of slug."""
+        page = await self._repo.get_by_uuid(uuid)
+        if page is None or page.status == "archived":
+            raise CalsetaException(
+                status_code=404,
+                code="kb_page_not_found",
+                message="KB page not found",
+            )
+        return await self.update_page(
+            slug=page.slug,
+            patch=patch,
+            updated_by_operator=updated_by_operator,
+        )
+
+    async def delete_page_by_uuid(self, uuid: UUID) -> None:
+        """Archive a page looked up by UUID."""
+        page = await self._repo.get_by_uuid(uuid)
+        if page is None:
+            raise CalsetaException(
+                status_code=404,
+                code="kb_page_not_found",
+                message="KB page not found",
+            )
+        await self._repo.update_page(page, {"status": "archived"})
+        logger.info("kb_page_deleted", uuid=str(uuid))
 
     async def list_pages(
         self,
@@ -304,6 +357,15 @@ class KBService:
                 updated_by_agent_id = agent.id
 
         changes: dict[str, Any] = {}
+        if patch.slug is not None and patch.slug != page.slug:
+            existing = await self._repo.get_by_slug(patch.slug)
+            if existing is not None:
+                raise CalsetaException(
+                    status_code=409,
+                    code="slug_conflict",
+                    message=f"A KB page with slug '{patch.slug}' already exists",
+                )
+            changes["slug"] = patch.slug
         if patch.title is not None:
             changes["title"] = patch.title
         if patch.body is not None:
@@ -313,6 +375,12 @@ class KBService:
         if patch.status is not None:
             _validate_kb_status(patch.status)
             changes["status"] = patch.status
+        if patch.tags is not None:
+            changes["tags"] = patch.tags
+        if patch.description is not None:
+            changes["description"] = patch.description
+        if patch.targeting_rules is not None:
+            changes["targeting_rules"] = patch.targeting_rules
         if patch.inject_scope is not None:
             changes["inject_scope"] = patch.inject_scope
         if patch.inject_priority is not None:

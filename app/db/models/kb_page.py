@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, Text
+from sqlalchemy import ARRAY, BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -36,7 +36,10 @@ class KnowledgeBasePage(TimestampMixin, UUIDMixin, Base):
     format: Mapped[str] = mapped_column(Text, nullable=False, default="markdown")
     status: Mapped[str] = mapped_column(Text, nullable=False, default="published")
 
+    tags: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]"))
+    description: Mapped[str | None] = mapped_column(Text)
     inject_scope: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    targeting_rules: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     inject_priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     inject_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 

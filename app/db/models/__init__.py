@@ -7,6 +7,7 @@ from app.db.models.agent_instruction_file import AgentInstructionFile
 from app.db.models.agent_invocation import AgentInvocation
 from app.db.models.agent_issue import AgentIssue
 from app.db.models.agent_issue_comment import AgentIssueComment
+from app.db.models.issue_category import IssueCategoryDef
 from app.db.models.issue_label import IssueLabel
 from app.db.models.agent_registration import AgentRegistration
 from app.db.models.agent_routine import AgentRoutine
@@ -17,7 +18,6 @@ from app.db.models.alert import Alert
 from app.db.models.alert_assignment import AlertAssignment
 from app.db.models.alert_indicator import AlertIndicator
 from app.db.models.api_key import APIKey
-from app.db.models.context_document import ContextDocument
 from app.db.models.cost_event import CostEvent
 from app.db.models.detection_rule import DetectionRule
 from app.db.models.enrichment_field_extraction import EnrichmentFieldExtraction
@@ -47,6 +47,7 @@ __all__ = [
     "AgentAction",
     "AgentIssue",
     "AgentIssueComment",
+    "IssueCategoryDef",
     "IssueLabel",
     "AgentAPIKey",
     "AgentInvocation",
@@ -59,7 +60,6 @@ __all__ = [
     "AlertAssignment",
     "AlertIndicator",
     "APIKey",
-    "ContextDocument",
     "CostEvent",
     "DetectionRule",
     "EnrichmentFieldExtraction",

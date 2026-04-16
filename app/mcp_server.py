@@ -53,7 +53,6 @@ def main() -> None:
     try:
         # Import resource modules so @mcp_server.resource decorators register
         import app.mcp.resources.alerts  # noqa: E402, F401
-        import app.mcp.resources.context_documents  # noqa: E402, F401
         import app.mcp.resources.detection_rules  # noqa: E402, F401
         import app.mcp.resources.enrichments  # noqa: E402, F401
         import app.mcp.resources.metrics  # noqa: E402, F401

@@ -15,8 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.api_key import APIKey
 from app.seed.sandbox_alerts import seed_sandbox_alerts
-from app.seed.sandbox_context_documents import seed_sandbox_context_documents
 from app.seed.sandbox_detection_rules import seed_sandbox_detection_rules
+from app.seed.sandbox_kb_pages import seed_sandbox_kb_pages
 
 logger = structlog.get_logger(__name__)
 
@@ -111,14 +111,13 @@ async def seed_sandbox(db: AsyncSession) -> None:
 
     Order matters:
       1. Detection rules (so alert ingestion can associate them)
-      2. Context documents (so they're available for context matching)
-      3. Alerts (ingested + enriched inline with mock providers)
-      4. API keys (sandbox read-only + lab full-access)
+      2. Alerts (ingested + enriched inline with mock providers)
+      3. API keys (sandbox read-only + lab full-access)
     """
     logger.info("sandbox_seed_starting")
 
     await seed_sandbox_detection_rules(db)
-    await seed_sandbox_context_documents(db)
+    await seed_sandbox_kb_pages(db)
 
     # Seed enrichment providers + field extractions, then load registry
     # so mock enrichment works during alert seeding.

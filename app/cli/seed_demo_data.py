@@ -30,7 +30,6 @@ from app.integrations.sources.sentinel import SentinelSource
 from app.integrations.sources.splunk import SplunkSource
 from app.logging_config import configure_logging
 from app.queue.base import QueueMetrics, TaskQueueBase, TaskStatus
-from app.repositories.context_document_repository import ContextDocumentRepository
 from app.repositories.detection_rule_repository import DetectionRuleRepository
 from app.schemas.detection_rules import DetectionRuleCreate
 from app.services.alert_ingestion import AlertIngestionService
@@ -198,120 +197,6 @@ DETECTION_RULES: list[dict] = [
             "## False positive scenarios\n"
             "- CDN domains with long hostnames (e.g. akamai, cloudfront)\n"
             "- DKIM/SPF TXT record lookups\n"
-        ),
-    },
-]
-
-
-# ---------------------------------------------------------------------------
-# Context documents
-# ---------------------------------------------------------------------------
-
-CONTEXT_DOCUMENTS: list[dict] = [
-    {
-        "title": "Incident Response Playbook — General",
-        "document_type": "ir_plan",
-        "is_global": True,
-        "description": "Standard incident response procedure for all alert types.",
-        "tags": ["incident-response", "general", "triage"],
-        "content": (
-            "# General Incident Response Playbook\n\n"
-            "## 1. Detection & Triage\n"
-            "- Review the alert details, severity, and associated indicators\n"
-            "- Check enrichment results for threat intelligence context\n"
-            "- Determine if this is a true positive, benign true positive, or false positive\n"
-            "- Assign severity: P1 (Critical/High active threat), P2 (Medium needs investigation), "
-            "P3 (Low/Informational for tracking)\n\n"
-            "## 2. Containment\n"
-            "- For credential compromise: revoke sessions, force password reset\n"
-            "- For endpoint compromise: isolate the host from the network\n"
-            "- For network-based threats: block IOCs at firewall/proxy\n"
-            "- Document all containment actions in the alert findings\n\n"
-            "## 3. Investigation\n"
-            "- Pivot on indicators to find related alerts\n"
-            "- Check for lateral movement from the affected host/account\n"
-            "- Review authentication logs for the affected account (30-day lookback)\n"
-            "- Collect forensic artifacts if warranted\n\n"
-            "## 4. Remediation & Recovery\n"
-            "- Remove malware/persistence mechanisms\n"
-            "- Re-image endpoint if integrity cannot be confirmed\n"
-            "- Restore from known-good backup if data was affected\n"
-            "- Re-enable account access after credential reset and MFA verification\n\n"
-            "## 5. Post-Incident\n"
-            "- Update detection rules if gaps identified\n"
-            "- Document lessons learned\n"
-            "- Update this playbook if process improvements identified\n"
-        ),
-    },
-    {
-        "title": "Escalation Matrix",
-        "document_type": "sop",
-        "is_global": True,
-        "description": "Escalation paths and response SLAs by alert severity.",
-        "tags": ["escalation", "sla", "on-call"],
-        "content": (
-            "# Escalation Matrix\n\n"
-            "## Response SLAs by Severity\n\n"
-            "| Severity | Initial Response | Escalation Deadline | Resolver |\n"
-            "|----------|-----------------|--------------------|---------|\n"
-            "| Critical | 15 minutes | 1 hour | Senior Analyst + IR Lead |\n"
-            "| High | 30 minutes | 4 hours | Senior Analyst |\n"
-            "| Medium | 2 hours | 24 hours | Analyst |\n"
-            "| Low | 8 hours | 72 hours | Junior Analyst |\n"
-            "| Informational | Next business day | — | Auto-close eligible |\n\n"
-            "## Escalation Contacts\n\n"
-            "- **Tier 1 → Tier 2**: Slack #soc-escalations or page on-call senior analyst\n"
-            "- **Tier 2 → IR Lead**: Page IR Lead via PagerDuty\n"
-            "- **IR Lead → CISO**: Phone call for confirmed breaches or data loss\n"
-            "- **After hours**: All P1/P2 alerts auto-page on-call via PagerDuty\n\n"
-            "## When to Escalate\n\n"
-            "- Active data exfiltration or ransomware execution\n"
-            "- Compromise of privileged account (Domain Admin, Global Admin)\n"
-            "- Alert affects production infrastructure or customer data\n"
-            "- Multiple related alerts suggesting coordinated attack\n"
-            "- Analyst is unsure about the scope or impact\n"
-        ),
-    },
-    {
-        "title": "Phishing Response SOP",
-        "document_type": "sop",
-        "is_global": False,
-        "description": "Step-by-step procedure for handling phishing alerts.",
-        "tags": ["phishing", "email", "credential-theft"],
-        "targeting_rules": {
-            "match_any": [
-                {"field": "tags", "op": "contains", "value": "phishing"},
-                {"field": "tags", "op": "contains", "value": "email"},
-            ],
-        },
-        "content": (
-            "# Phishing Response SOP\n\n"
-            "## Scope\n"
-            "This SOP applies to alerts tagged with `phishing` or `email`, including "
-            "credential harvesting, malware delivery via attachment, and BEC attempts.\n\n"
-            "## Response Steps\n\n"
-            "### 1. Confirm Phishing\n"
-            "- Check the sender domain against known-bad lists and enrichment results\n"
-            "- Examine email headers (SPF, DKIM, DMARC alignment)\n"
-            "- Open any URLs in a sandbox (do NOT click from a production machine)\n"
-            "- Check VirusTotal for attachment hashes\n\n"
-            "### 2. Determine Impact\n"
-            "- Did the user click the link or open the attachment?\n"
-            "- Did the user submit credentials? Check sign-in logs for the user\n"
-            "- How many users received the same email? (search by subject/sender)\n\n"
-            "### 3. Contain\n"
-            "- If credentials submitted: immediately revoke sessions and reset password\n"
-            "- Block the sender domain and any malicious URLs at the email gateway\n"
-            "- Quarantine the email from all mailboxes (search and purge)\n"
-            "- If malware was executed: isolate the endpoint\n\n"
-            "### 4. Notify\n"
-            "- Inform the affected user(s) via Slack or phone (not email)\n"
-            "- If > 10 users targeted: notify security leadership\n"
-            "- If credentials confirmed stolen: trigger the credential compromise playbook\n\n"
-            "### 5. Close\n"
-            "- Document findings and response actions in the alert\n"
-            "- Add IOCs to the blocklist\n"
-            "- Submit the phishing email to the abuse mailbox of the impersonated brand\n"
         ),
     },
 ]
@@ -669,34 +554,6 @@ async def _seed_detection_rules(session) -> int:  # type: ignore[no-untyped-def]
     return created
 
 
-async def _seed_context_documents(session) -> int:  # type: ignore[no-untyped-def]
-    """Create context documents. Returns count of docs created."""
-    repo = ContextDocumentRepository(session)
-    created = 0
-    for doc_data in CONTEXT_DOCUMENTS:
-        existing_docs, total = await repo.list_documents(page=1, page_size=500)
-        already_exists = any(d.title == doc_data["title"] for d in existing_docs)
-        if already_exists:
-            logger.info("context_document_exists", title=doc_data["title"])
-            continue
-
-        doc = await repo.create(
-            title=doc_data["title"],
-            document_type=doc_data["document_type"],
-            content=doc_data["content"],
-            is_global=doc_data.get("is_global", False),
-            description=doc_data.get("description"),
-            tags=doc_data.get("tags", []),
-            targeting_rules=doc_data.get("targeting_rules"),
-        )
-        created += 1
-        logger.info(
-            "context_document_created",
-            title=doc.title,
-            uuid=str(doc.uuid),
-        )
-    return created
-
 
 async def _seed_alerts(
     session: AsyncSession, queue: TaskQueueBase
@@ -759,9 +616,6 @@ async def _run(args: argparse.Namespace) -> None:
         # --- Detection Rules ---
         rules_created = await _seed_detection_rules(session)
 
-        # --- Context Documents ---
-        docs_created = await _seed_context_documents(session)
-
         # --- Alerts ---
         alerts_created = 0
         if not args.skip_alerts:
@@ -777,7 +631,6 @@ async def _run(args: argparse.Namespace) -> None:
     print("Demo data seeded successfully.")
     print()
     print(f"  Detection rules created: {rules_created}")
-    print(f"  Context documents created: {docs_created}")
     if args.skip_alerts:
         print("  Alerts: skipped (--skip-alerts)")
     else:

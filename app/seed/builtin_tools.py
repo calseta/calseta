@@ -168,28 +168,6 @@ BUILTIN_TOOLS: list[dict[str, object]] = [
         "handler_ref": "calseta:get_detection_rule",
     },
     {
-        "id": "list_context_documents",
-        "display_name": "List Context Documents",
-        "description": (
-            "List context documents (runbooks, IR plans, SOPs) matching the current "
-            "alert. Returns titles and snippets. Fetch full content with "
-            "get_context_document."
-        ),
-        "tier": "safe",
-        "category": "calseta_api",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "alert_uuid": {
-                    "type": "string",
-                    "description": "Alert UUID to match context documents against",
-                },
-            },
-            "required": ["alert_uuid"],
-        },
-        "handler_ref": "calseta:list_context_documents",
-    },
-    {
         "id": "execute_workflow",
         "display_name": "Execute Workflow",
         "description": (

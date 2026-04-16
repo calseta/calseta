@@ -41,7 +41,6 @@ _PHASE2_TABLES = [
 # Phase 3: Config tables — delete only user-created rows (is_system = FALSE)
 _PHASE3_TABLES = [
     "detection_rules",
-    "context_documents",
     "workflows",
     "api_keys",
 ]
