@@ -54,7 +54,7 @@ export function StepCard({
   ];
 
   return (
-    <div className="border border-border rounded-md overflow-hidden">
+    <div className="border border-border rounded-md overflow-hidden surface-2">
       {/* Header — always visible */}
       <div
         className="flex items-center gap-2 px-3 py-2 bg-surface/50 cursor-pointer select-none"

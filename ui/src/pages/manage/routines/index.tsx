@@ -152,14 +152,14 @@ export function RoutinesPage() {
           <Table>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-dim text-xs">Name</TableHead>
-                <TableHead className="text-dim text-xs">Trigger</TableHead>
-                <TableHead className="text-dim text-xs">Schedule</TableHead>
-                <TableHead className="text-dim text-xs">Status</TableHead>
-                <TableHead className="text-dim text-xs">Failures</TableHead>
-                <TableHead className="text-dim text-xs">Last Run</TableHead>
-                <TableHead className="text-dim text-xs">Next Run</TableHead>
-                <TableHead className="text-dim text-xs w-24"></TableHead>
+                <TableHead className="micro-label">Name</TableHead>
+                <TableHead className="micro-label">Trigger</TableHead>
+                <TableHead className="micro-label">Schedule</TableHead>
+                <TableHead className="micro-label">Status</TableHead>
+                <TableHead className="micro-label">Failures</TableHead>
+                <TableHead className="micro-label">Last Run</TableHead>
+                <TableHead className="micro-label">Next Run</TableHead>
+                <TableHead className="micro-label w-24"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

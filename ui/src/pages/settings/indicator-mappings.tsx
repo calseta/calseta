@@ -87,9 +87,9 @@ function TestIndicatorTable({ indicators }: { indicators: TestExtractionIndicato
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-border bg-surface">
-            <th className="text-left px-2.5 py-1.5 text-dim font-medium">Type</th>
-            <th className="text-left px-2.5 py-1.5 text-dim font-medium">Value</th>
-            <th className="text-left px-2.5 py-1.5 text-dim font-medium">Source Field</th>
+            <th className="text-left px-2.5 py-1.5 micro-label">Type</th>
+            <th className="text-left px-2.5 py-1.5 micro-label">Value</th>
+            <th className="text-left px-2.5 py-1.5 micro-label">Source Field</th>
           </tr>
         </thead>
         <tbody>
@@ -216,10 +216,10 @@ function SourcePluginFieldsTab({ fields }: { fields: IndicatorFieldMapping[] }) 
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border bg-surface">
-              <th className="text-left px-3 py-2 text-dim font-medium w-28">Source</th>
-              <th className="text-left px-3 py-2 text-dim font-medium">Field Path</th>
-              <th className="text-left px-3 py-2 text-dim font-medium w-28">Indicator Type</th>
-              <th className="text-left px-3 py-2 text-dim font-medium">Description</th>
+              <th className="text-left px-3 py-2 micro-label w-28">Source</th>
+              <th className="text-left px-3 py-2 micro-label">Field Path</th>
+              <th className="text-left px-3 py-2 micro-label w-28">Indicator Type</th>
+              <th className="text-left px-3 py-2 micro-label">Description</th>
             </tr>
           </thead>
           <tbody>
@@ -299,14 +299,14 @@ function MappingsTab({
         <ResizableTable storageKey={`indicator-mappings-${extractionTarget}`} columns={COLUMNS}>
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
-              <ResizableTableHead columnKey="source" className="text-dim text-xs">Source</ResizableTableHead>
-              <ResizableTableHead columnKey="field_path" className="text-dim text-xs">Field Path</ResizableTableHead>
-              <ResizableTableHead columnKey="indicator_type" className="text-dim text-xs">Indicator Type</ResizableTableHead>
-              <ResizableTableHead columnKey="system" className="text-dim text-xs">System</ResizableTableHead>
-              <ResizableTableHead columnKey="status" className="text-dim text-xs">Active</ResizableTableHead>
-              <ResizableTableHead columnKey="description" className="text-dim text-xs">Description</ResizableTableHead>
-              <ResizableTableHead columnKey="created" className="text-dim text-xs">Created</ResizableTableHead>
-              <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
+              <ResizableTableHead columnKey="source" className="micro-label">Source</ResizableTableHead>
+              <ResizableTableHead columnKey="field_path" className="micro-label">Field Path</ResizableTableHead>
+              <ResizableTableHead columnKey="indicator_type" className="micro-label">Indicator Type</ResizableTableHead>
+              <ResizableTableHead columnKey="system" className="micro-label">System</ResizableTableHead>
+              <ResizableTableHead columnKey="status" className="micro-label">Active</ResizableTableHead>
+              <ResizableTableHead columnKey="description" className="micro-label">Description</ResizableTableHead>
+              <ResizableTableHead columnKey="created" className="micro-label">Created</ResizableTableHead>
+              <ResizableTableHead columnKey="actions" className="micro-label w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>

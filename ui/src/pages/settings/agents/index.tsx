@@ -210,13 +210,13 @@ export function AgentsPage() {
           <ResizableTable storageKey="agents" columns={AGENT_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="agent" className="text-dim text-xs">Agent</ResizableTableHead>
-                <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
-                <ResizableTableHead columnKey="endpoint" className="text-dim text-xs">Endpoint URL</ResizableTableHead>
-                <ResizableTableHead columnKey="status" className="text-dim text-xs">Status</ResizableTableHead>
-                <ResizableTableHead columnKey="triggers" className="text-dim text-xs">Triggers</ResizableTableHead>
-                <ResizableTableHead columnKey="registered" className="text-dim text-xs">Registered</ResizableTableHead>
-                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
+                <ResizableTableHead columnKey="agent" className="micro-label">Agent</ResizableTableHead>
+                <ResizableTableHead columnKey="uuid" className="micro-label">UUID</ResizableTableHead>
+                <ResizableTableHead columnKey="endpoint" className="micro-label">Endpoint URL</ResizableTableHead>
+                <ResizableTableHead columnKey="status" className="micro-label">Status</ResizableTableHead>
+                <ResizableTableHead columnKey="triggers" className="micro-label">Triggers</ResizableTableHead>
+                <ResizableTableHead columnKey="registered" className="micro-label">Registered</ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="micro-label w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>

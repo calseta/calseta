@@ -380,28 +380,28 @@ export function ApprovalsPage() {
                   <ResizableTable storageKey="workflow-approvals" columns={APPROVAL_COLUMNS}>
                     <TableHeader>
                       <TableRow className="border-border hover:bg-transparent">
-                        <ResizableTableHead columnKey="workflow" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="workflow" className="micro-label">
                           Workflow
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="status" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="status" className="micro-label">
                           Status
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="triggered_by" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="triggered_by" className="micro-label">
                           Triggered By
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="target" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="target" className="micro-label">
                           Target
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="reason" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="reason" className="micro-label">
                           Reason
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="confidence" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="confidence" className="micro-label">
                           Confidence
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="expires" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="expires" className="micro-label">
                           Expires
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="actions" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="actions" className="micro-label">
                           Actions
                         </ResizableTableHead>
                       </TableRow>
@@ -610,22 +610,22 @@ export function ApprovalsPage() {
                   <ResizableTable storageKey="action-approvals" columns={ACTION_COLUMNS}>
                     <TableHeader>
                       <TableRow className="border-border hover:bg-transparent">
-                        <ResizableTableHead columnKey="type" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="type" className="micro-label">
                           Type
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="subtype" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="subtype" className="micro-label">
                           Subtype
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="status" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="status" className="micro-label">
                           Status
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="confidence" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="confidence" className="micro-label">
                           Confidence
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="created" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="created" className="micro-label">
                           Created
                         </ResizableTableHead>
-                        <ResizableTableHead columnKey="actions" className="text-dim text-xs">
+                        <ResizableTableHead columnKey="actions" className="micro-label">
                           Actions
                         </ResizableTableHead>
                       </TableRow>

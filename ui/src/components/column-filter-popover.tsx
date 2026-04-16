@@ -61,7 +61,7 @@ export function ColumnFilterPopover({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-48 p-2 bg-card border-border"
+        className="w-48 p-2 surface-2 border-border"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="space-y-1">

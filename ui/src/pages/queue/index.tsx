@@ -101,7 +101,7 @@ export function QueuePage() {
           <ResizableTable storageKey="alert-queue" columns={COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="severity" className="text-dim text-xs">
+                <ResizableTableHead columnKey="severity" className="micro-label">
                   <div className="flex items-center gap-1">
                     <span>Severity</span>
                     <ColumnFilterPopover
@@ -112,11 +112,11 @@ export function QueuePage() {
                     />
                   </div>
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="title" className="text-dim text-xs">Title</ResizableTableHead>
-                <ResizableTableHead columnKey="source" className="text-dim text-xs">Source</ResizableTableHead>
-                <ResizableTableHead columnKey="ingested_at" className="text-dim text-xs">Ingested</ResizableTableHead>
-                <ResizableTableHead columnKey="indicators" className="text-dim text-xs">Indicators</ResizableTableHead>
-                <ResizableTableHead columnKey="enrichment" className="text-dim text-xs">
+                <ResizableTableHead columnKey="title" className="micro-label">Title</ResizableTableHead>
+                <ResizableTableHead columnKey="source" className="micro-label">Source</ResizableTableHead>
+                <ResizableTableHead columnKey="ingested_at" className="micro-label">Ingested</ResizableTableHead>
+                <ResizableTableHead columnKey="indicators" className="micro-label">Indicators</ResizableTableHead>
+                <ResizableTableHead columnKey="enrichment" className="micro-label">
                   <div className="flex items-center gap-1">
                     <span>Enrichment</span>
                   </div>
@@ -136,7 +136,7 @@ export function QueuePage() {
                     </TableRow>
                   ))
                 : alerts.map((alert) => (
-                    <TableRow key={alert.uuid} className="border-border hover:bg-accent/50">
+                    <TableRow key={alert.uuid} className="border-border hover:bg-[var(--surface-2)]">
                       <TableCell>
                         <Badge
                           variant="outline"

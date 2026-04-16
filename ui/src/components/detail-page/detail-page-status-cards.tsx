@@ -19,7 +19,7 @@ export function DetailPageStatusCards({ items }: DetailPageStatusCardsProps) {
       {items.map((item) => (
         <div
           key={item.label}
-          className="rounded-lg border border-border bg-card p-4"
+          className="rounded-lg border border-border surface-2 p-4"
         >
           <div className="flex items-center gap-2">
             {item.icon && <item.icon className="h-3.5 w-3.5 text-dim" />}

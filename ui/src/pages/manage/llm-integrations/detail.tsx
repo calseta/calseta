@@ -295,13 +295,13 @@ export function LLMIntegrationDetailPage() {
               <CardContent className="space-y-6">
                 {/* Name */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-dim uppercase tracking-wide">Name</Label>
+                  <Label className="micro-label">Name</Label>
                   <p className="text-sm text-foreground">{integration.name}</p>
                 </div>
 
                 {/* Provider (read-only) */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-dim uppercase tracking-wide">Provider</Label>
+                  <Label className="micro-label">Provider</Label>
                   <div className="flex items-center gap-2">
                     <Badge
                       variant="outline"
@@ -315,13 +315,13 @@ export function LLMIntegrationDetailPage() {
 
                 {/* Model */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-dim uppercase tracking-wide">Model</Label>
+                  <Label className="micro-label">Model</Label>
                   <p className="text-sm text-foreground font-mono">{integration.model}</p>
                 </div>
 
                 {/* API Key */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-dim uppercase tracking-wide">API Key Env Var</Label>
+                  <Label className="micro-label">API Key Env Var</Label>
                   <div className="flex items-center gap-2">
                     {integration.api_key_ref_set ? (
                       <Badge
@@ -339,7 +339,7 @@ export function LLMIntegrationDetailPage() {
                 {/* Base URL — shown when provider uses it */}
                 {baseUrlBehavior(integration.provider) !== "none" && (
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-dim uppercase tracking-wide">
+                    <Label className="micro-label">
                       Base URL
                       {baseUrlBehavior(integration.provider) === "optional" && (
                         <span className="font-normal normal-case ml-1 text-dim">(optional)</span>
@@ -353,7 +353,7 @@ export function LLMIntegrationDetailPage() {
 
                 {/* Default */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-dim uppercase tracking-wide">Default Integration</Label>
+                  <Label className="micro-label">Default Integration</Label>
                   <p className="text-sm text-foreground">
                     {integration.is_default ? "Yes" : "No"}
                   </p>
@@ -362,7 +362,7 @@ export function LLMIntegrationDetailPage() {
                 {/* Costs (read-only) */}
                 <div className="grid grid-cols-2 gap-6 pt-2 border-t border-border">
                   <div className="space-y-1">
-                    <Label className="text-xs text-dim uppercase tracking-wide">
+                    <Label className="micro-label">
                       Input cost / 1k tokens
                     </Label>
                     <p className="text-sm text-foreground">
@@ -370,7 +370,7 @@ export function LLMIntegrationDetailPage() {
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-dim uppercase tracking-wide">
+                    <Label className="micro-label">
                       Output cost / 1k tokens
                     </Label>
                     <p className="text-sm text-foreground">
@@ -382,11 +382,11 @@ export function LLMIntegrationDetailPage() {
                 {/* Timestamps */}
                 <div className="grid grid-cols-2 gap-6 pt-2 border-t border-border">
                   <div className="space-y-1">
-                    <Label className="text-xs text-dim uppercase tracking-wide">Created</Label>
+                    <Label className="micro-label">Created</Label>
                     <p className="text-xs text-dim">{formatDate(integration.created_at)}</p>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-dim uppercase tracking-wide">Updated</Label>
+                    <Label className="micro-label">Updated</Label>
                     <p className="text-xs text-dim">{formatDate(integration.updated_at)}</p>
                   </div>
                 </div>
@@ -416,7 +416,7 @@ export function LLMIntegrationDetailPage() {
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <Card className="border-border bg-card">
                     <CardContent className="pt-4 pb-4">
-                      <p className="text-xs text-dim uppercase tracking-wide mb-1">Total Cost</p>
+                      <p className="micro-label mb-1">Total Cost</p>
                       <p className="text-xl font-bold text-foreground">
                         {formatCostDollars(usage.total_cost_cents)}
                       </p>
@@ -424,7 +424,7 @@ export function LLMIntegrationDetailPage() {
                   </Card>
                   <Card className="border-border bg-card">
                     <CardContent className="pt-4 pb-4">
-                      <p className="text-xs text-dim uppercase tracking-wide mb-1">Events</p>
+                      <p className="micro-label mb-1">Events</p>
                       <p className="text-xl font-bold text-foreground">
                         {usage.event_count.toLocaleString()}
                       </p>
@@ -432,7 +432,7 @@ export function LLMIntegrationDetailPage() {
                   </Card>
                   <Card className="border-border bg-card">
                     <CardContent className="pt-4 pb-4">
-                      <p className="text-xs text-dim uppercase tracking-wide mb-1">Input Tokens</p>
+                      <p className="micro-label mb-1">Input Tokens</p>
                       <p className="text-xl font-bold text-foreground">
                         {usage.total_input_tokens.toLocaleString()}
                       </p>
@@ -440,7 +440,7 @@ export function LLMIntegrationDetailPage() {
                   </Card>
                   <Card className="border-border bg-card">
                     <CardContent className="pt-4 pb-4">
-                      <p className="text-xs text-dim uppercase tracking-wide mb-1">Output Tokens</p>
+                      <p className="micro-label mb-1">Output Tokens</p>
                       <p className="text-xl font-bold text-foreground">
                         {usage.total_output_tokens.toLocaleString()}
                       </p>

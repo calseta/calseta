@@ -940,7 +940,7 @@ export function AgentDetailPage() {
             <TabsContent value="configuration" className="mt-4 space-y-6">
 
               {/* Agent Configuration (inline editable) */}
-              <Card className="bg-card border-border">
+              <Card className="bg-card border-border surface-2">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
@@ -1000,7 +1000,7 @@ export function AgentDetailPage() {
                     </div>
                   ) : (
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs text-muted-foreground shrink-0">Description</span>
+                      <span className="micro-label shrink-0">Description</span>
                       <span className="text-xs text-foreground text-right max-w-xs">
                         {agent.description ?? <span className="text-dim">Not set</span>}
                       </span>
@@ -1021,7 +1021,7 @@ export function AgentDetailPage() {
                       </div>
                     ) : (
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Endpoint URL</span>
+                        <span className="micro-label">Endpoint URL</span>
                         <span className="text-xs text-foreground font-mono truncate max-w-xs">
                           {agent.endpoint_url ?? <span className="text-dim">Not set</span>}
                         </span>
@@ -1044,7 +1044,7 @@ export function AgentDetailPage() {
                       </div>
                     ) : (
                       <div className="flex items-start justify-between gap-2">
-                        <span className="text-xs text-muted-foreground shrink-0">System Prompt</span>
+                        <span className="micro-label shrink-0">System Prompt</span>
                         <span className="text-xs text-foreground text-right max-w-xs">
                           {agent.system_prompt
                             ? `${agent.system_prompt.slice(0, 80)}${agent.system_prompt.length > 80 ? "…" : ""}`
@@ -1069,7 +1069,7 @@ export function AgentDetailPage() {
                       </div>
                     ) : (
                       <div className="flex items-start justify-between gap-2">
-                        <span className="text-xs text-muted-foreground shrink-0">Methodology</span>
+                        <span className="micro-label shrink-0">Methodology</span>
                         <span className="text-xs text-foreground text-right max-w-xs truncate">
                           {agent.methodology ?? <span className="text-dim">Not set</span>}
                         </span>
@@ -1101,7 +1101,7 @@ export function AgentDetailPage() {
                       </div>
                     ) : (
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">LLM Integration</span>
+                        <span className="micro-label">LLM Integration</span>
                         <span className="text-xs text-foreground">
                           {agent.llm_integration_id
                             ? (llmIntegrations.find((l: any) => l.id === agent.llm_integration_id)?.name ?? `ID: ${agent.llm_integration_id}`)
@@ -1128,7 +1128,7 @@ export function AgentDetailPage() {
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Max Concurrent Alerts</span>
+                      <span className="micro-label">Max Concurrent Alerts</span>
                       <span className="text-xs text-foreground font-mono">
                         {agent.max_concurrent_alerts ?? <span className="text-dim">No limit</span>}
                       </span>
@@ -1151,7 +1151,7 @@ export function AgentDetailPage() {
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Max Cost per Alert</span>
+                      <span className="micro-label">Max Cost per Alert</span>
                       <span className="text-xs text-foreground font-mono">
                         {agent.max_cost_per_alert_cents ? formatCents(agent.max_cost_per_alert_cents) : <span className="text-dim">No limit</span>}
                       </span>
@@ -1173,7 +1173,7 @@ export function AgentDetailPage() {
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Max Investigation Time</span>
+                      <span className="micro-label">Max Investigation Time</span>
                       <span className="text-xs text-foreground font-mono">
                         {agent.max_investigation_minutes ? `${agent.max_investigation_minutes}m` : <span className="text-dim">No limit</span>}
                       </span>
@@ -1184,9 +1184,9 @@ export function AgentDetailPage() {
 
                   {/* Run Policy */}
                   <div>
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Run Policy</span>
+                    <span className="micro-label">Run Policy</span>
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Heartbeat Interval</span>
+                      <span className="micro-label">Heartbeat Interval</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -1218,7 +1218,7 @@ export function AgentDetailPage() {
               </Card>
 
               {/* Agent Profile */}
-              <Card className="bg-card border-border">
+              <Card className="bg-card border-border surface-2">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
@@ -1230,7 +1230,7 @@ export function AgentDetailPage() {
                 <CardContent className="space-y-3">
                   {agent.execution_mode && (
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Execution Mode</span>
+                      <span className="micro-label">Execution Mode</span>
                       <Badge
                         variant="outline"
                         className={cn(
@@ -1248,7 +1248,7 @@ export function AgentDetailPage() {
                   )}
                   {agent.agent_type && (
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Agent Type</span>
+                      <span className="micro-label">Agent Type</span>
                       <Badge variant="outline" className="text-xs text-dim bg-dim/10 border-dim/30">
                         {agent.agent_type}
                       </Badge>
@@ -1256,12 +1256,12 @@ export function AgentDetailPage() {
                   )}
                   {agent.role && (
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Role</span>
+                      <span className="micro-label">Role</span>
                       <span className="text-xs text-foreground">{agent.role}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Lifecycle Status</span>
+                    <span className="micro-label">Lifecycle Status</span>
                     <Badge
                       variant="outline"
                       className={cn(
@@ -1282,7 +1282,7 @@ export function AgentDetailPage() {
               </Card>
 
               {/* Trigger Configuration */}
-              <Card className="bg-card border-border">
+              <Card className="bg-card border-border surface-2">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
@@ -1311,7 +1311,7 @@ export function AgentDetailPage() {
                 <CardContent className="space-y-3">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Sources</span>
+                      <span className="micro-label">Sources</span>
                       <span className="text-[11px] text-dim">None selected = all sources</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1337,7 +1337,7 @@ export function AgentDetailPage() {
                   <div className="border-t border-border" />
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Severities</span>
+                      <span className="micro-label">Severities</span>
                       <span className="text-[11px] text-dim">None selected = all severities</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1364,7 +1364,7 @@ export function AgentDetailPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Advanced Rules</span>
+                        <span className="micro-label">Advanced Rules</span>
                         <p className="text-[11px] text-dim mt-0.5">Match_any (OR) and match_all (AND) conditions against alert fields.</p>
                       </div>
                       {!editingFilter ? (
@@ -1396,7 +1396,7 @@ export function AgentDetailPage() {
 
               {/* Authentication */}
               {isManaged ? (
-                <Card className="bg-card border-border">
+                <Card className="bg-card border-border surface-2">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-foreground">
                       <div className="flex items-center gap-2">
@@ -1410,7 +1410,7 @@ export function AgentDetailPage() {
                   </CardContent>
                 </Card>
               ) : (
-                <Card className="bg-card border-border">
+                <Card className="bg-card border-border surface-2">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-foreground">
                       <div className="flex items-center gap-2">
@@ -1463,11 +1463,11 @@ export function AgentDetailPage() {
                     ) : (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Header Name</span>
+                          <span className="micro-label">Header Name</span>
                           <span className="text-xs text-foreground font-mono">{agent.auth_header_name || "Not set"}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Header Value</span>
+                          <span className="micro-label">Header Value</span>
                           <Badge
                             variant="outline"
                             className={cn("text-[11px]", agent.auth_header_name ? "text-teal border-teal/30" : "text-dim border-border")}
@@ -1516,7 +1516,15 @@ export function AgentDetailPage() {
                               key={run.uuid}
                               className={cn(
                                 "w-full text-left px-3 py-2.5 border-b border-border transition-colors",
-                                isSelected ? "bg-teal/10" : "hover:bg-surface/50",
+                                isSelected
+                                  ? "bg-teal/10"
+                                  : cn(
+                                      "hover:bg-surface/50",
+                                      run.status === "succeeded" && "tint-succeeded",
+                                      run.status === "failed" && "tint-failed",
+                                      run.status === "running" && "tint-running",
+                                      (run.status === "queued" || run.status === "pending") && "tint-pending",
+                                    ),
                               )}
                             >
                               <div className="flex items-center justify-between gap-2 mb-1">
@@ -1717,7 +1725,7 @@ export function AgentDetailPage() {
             {/* Cost Tab */}
             <TabsContent value="cost" className="mt-4 space-y-4">
               {/* Budget Controls */}
-              <Card className="bg-card border-border">
+              <Card className="bg-card border-border surface-2">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
@@ -1771,17 +1779,17 @@ export function AgentDetailPage() {
               </Card>
 
               {/* Summary */}
-              <Card className="bg-card border-border">
+              <Card className="bg-card border-border surface-2">
                 <CardContent className="pt-4 pb-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Total Cost (this period)</span>
+                    <span className="micro-label">Total Cost (this period)</span>
                     <span className="text-lg font-mono font-semibold text-foreground">{formatCents(totalCostCents)}</span>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Cost Events Table */}
-              <Card className="bg-card border-border">
+              <Card className="bg-card border-border surface-2">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
@@ -1797,13 +1805,13 @@ export function AgentDetailPage() {
                     <ResizableTable storageKey="agent-cost-events" columns={COST_COLUMNS}>
                       <TableHeader>
                         <TableRow className="border-border hover:bg-transparent">
-                          <ResizableTableHead columnKey="provider" className="text-xs text-muted-foreground px-3">Provider</ResizableTableHead>
-                          <ResizableTableHead columnKey="model" className="text-xs text-muted-foreground px-3">Model</ResizableTableHead>
-                          <ResizableTableHead columnKey="input_tokens" className="text-xs text-muted-foreground px-3">Input Tokens</ResizableTableHead>
-                          <ResizableTableHead columnKey="output_tokens" className="text-xs text-muted-foreground px-3">Output Tokens</ResizableTableHead>
-                          <ResizableTableHead columnKey="cost" className="text-xs text-muted-foreground px-3">Cost</ResizableTableHead>
-                          <ResizableTableHead columnKey="billing_type" className="text-xs text-muted-foreground px-3">Billing Type</ResizableTableHead>
-                          <ResizableTableHead columnKey="occurred_at" className="text-xs text-muted-foreground px-3">When</ResizableTableHead>
+                          <ResizableTableHead columnKey="provider" className="micro-label px-3">Provider</ResizableTableHead>
+                          <ResizableTableHead columnKey="model" className="micro-label px-3">Model</ResizableTableHead>
+                          <ResizableTableHead columnKey="input_tokens" className="micro-label px-3">Input Tokens</ResizableTableHead>
+                          <ResizableTableHead columnKey="output_tokens" className="micro-label px-3">Output Tokens</ResizableTableHead>
+                          <ResizableTableHead columnKey="cost" className="micro-label px-3">Cost</ResizableTableHead>
+                          <ResizableTableHead columnKey="billing_type" className="micro-label px-3">Billing Type</ResizableTableHead>
+                          <ResizableTableHead columnKey="occurred_at" className="micro-label px-3">When</ResizableTableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1829,7 +1837,7 @@ export function AgentDetailPage() {
 
             {/* Assignments Tab */}
             <TabsContent value="assignments" className="mt-4">
-              <Card className="bg-card border-border">
+              <Card className="bg-card border-border surface-2">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-foreground">
                     <div className="flex items-center gap-2">
@@ -1845,16 +1853,22 @@ export function AgentDetailPage() {
                     <ResizableTable storageKey="agent-invocations" columns={INVOCATION_COLUMNS}>
                       <TableHeader>
                         <TableRow className="border-border hover:bg-transparent">
-                          <ResizableTableHead columnKey="task_description" className="text-xs text-muted-foreground px-3">Task</ResizableTableHead>
-                          <ResizableTableHead columnKey="status" className="text-xs text-muted-foreground px-3">Status</ResizableTableHead>
-                          <ResizableTableHead columnKey="cost" className="text-xs text-muted-foreground px-3">Cost</ResizableTableHead>
-                          <ResizableTableHead columnKey="started_at" className="text-xs text-muted-foreground px-3">Started</ResizableTableHead>
-                          <ResizableTableHead columnKey="completed_at" className="text-xs text-muted-foreground px-3">Completed</ResizableTableHead>
+                          <ResizableTableHead columnKey="task_description" className="micro-label px-3">Task</ResizableTableHead>
+                          <ResizableTableHead columnKey="status" className="micro-label px-3">Status</ResizableTableHead>
+                          <ResizableTableHead columnKey="cost" className="micro-label px-3">Cost</ResizableTableHead>
+                          <ResizableTableHead columnKey="started_at" className="micro-label px-3">Started</ResizableTableHead>
+                          <ResizableTableHead columnKey="completed_at" className="micro-label px-3">Completed</ResizableTableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {invocations.map((inv) => (
-                          <TableRow key={inv.uuid} className="border-border hover:bg-surface/50">
+                          <TableRow key={inv.uuid} className={cn(
+                            "border-border hover:bg-surface/50",
+                            inv.status === "completed" && "tint-succeeded",
+                            inv.status === "failed" && "tint-failed",
+                            inv.status === "running" && "tint-running",
+                            inv.status === "pending" && "tint-pending",
+                          )}>
                             <TableCell className="px-3 py-2 text-xs text-foreground truncate">
                               {inv.task_description.length > 60 ? `${inv.task_description.slice(0, 60)}…` : inv.task_description}
                             </TableCell>
@@ -1893,7 +1907,7 @@ export function AgentDetailPage() {
                   {/* Left: file list */}
                   <div className="w-56 shrink-0 flex flex-col gap-1">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Files</span>
+                      <span className="micro-label">Files</span>
                       <button
                         type="button"
                         onClick={() => setShowNewFileInput((v) => !v)}
@@ -1928,7 +1942,7 @@ export function AgentDetailPage() {
                         </button>
                       </div>
                     )}
-                    <div className="flex-1 overflow-y-auto rounded-md border border-border bg-card">
+                    <div className="flex-1 overflow-y-auto rounded-md border border-border bg-card surface-2">
                       {(() => {
                         // pendingCreates: files created via + not yet returned by the API
                         const pending = pendingCreates
@@ -2086,7 +2100,7 @@ export function AgentDetailPage() {
               </div>
 
               {allSkills.length === 0 ? (
-                <Card className="bg-card border-border">
+                <Card className="bg-card border-border surface-2">
                   <CardContent className="py-10 text-center">
                     <Wrench className="h-6 w-6 text-dim mx-auto mb-2" />
                     <p className="text-sm text-dim">No skills in the library yet.</p>
@@ -2096,7 +2110,7 @@ export function AgentDetailPage() {
                   </CardContent>
                 </Card>
               ) : (
-                <Card className="bg-card border-border">
+                <Card className="bg-card border-border surface-2">
                   <CardContent className="p-0">
                     {allSkills.map((skill) => {
                       const isAssigned = agentSkillUuids.has(skill.uuid);
@@ -2149,7 +2163,7 @@ export function AgentDetailPage() {
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center gap-2 mb-1">
                       <Activity className="h-3.5 w-3.5 text-teal" />
-                      <span className="text-xs text-muted-foreground">Total Runs</span>
+                      <span className="micro-label">Total Runs</span>
                     </div>
                     <p className="text-2xl font-semibold text-foreground">{heartbeatRuns.length || "—"}</p>
                   </CardContent>
@@ -2158,7 +2172,7 @@ export function AgentDetailPage() {
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center gap-2 mb-1">
                       <TrendingUp className="h-3.5 w-3.5 text-teal" />
-                      <span className="text-xs text-muted-foreground">Success Rate</span>
+                      <span className="micro-label">Success Rate</span>
                     </div>
                     <p className="text-2xl font-semibold text-foreground">
                       {successRate !== null ? `${successRate}%` : "—"}
@@ -2169,7 +2183,7 @@ export function AgentDetailPage() {
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center gap-2 mb-1">
                       <Clock className="h-3.5 w-3.5 text-teal" />
-                      <span className="text-xs text-muted-foreground">Avg Duration</span>
+                      <span className="micro-label">Avg Duration</span>
                     </div>
                     <p className="text-2xl font-semibold text-foreground">{formatAvgDuration(avgDurationMs)}</p>
                   </CardContent>
@@ -2178,7 +2192,7 @@ export function AgentDetailPage() {
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center gap-2 mb-1">
                       <DollarSign className="h-3.5 w-3.5 text-teal" />
-                      <span className="text-xs text-muted-foreground">Total Cost</span>
+                      <span className="micro-label">Total Cost</span>
                     </div>
                     <p className="text-2xl font-semibold text-foreground">
                       {costSummary ? formatCents(costSummary.total_cost_cents) : (totalCostCents > 0 ? formatCents(totalCostCents) : "—")}
@@ -2201,15 +2215,15 @@ export function AgentDetailPage() {
                   <CardContent>
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                       <div>
-                        <p className="text-xs text-muted-foreground mb-0.5">Input Tokens</p>
+                        <p className="micro-label mb-0.5">Input Tokens</p>
                         <p className="text-sm font-mono text-foreground">{costSummary.total_input_tokens.toLocaleString()}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground mb-0.5">Output Tokens</p>
+                        <p className="micro-label mb-0.5">Output Tokens</p>
                         <p className="text-sm font-mono text-foreground">{costSummary.total_output_tokens.toLocaleString()}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground mb-0.5">Total Cost</p>
+                        <p className="micro-label mb-0.5">Total Cost</p>
                         <p className="text-sm font-mono text-foreground">{formatCents(costSummary.total_cost_cents)}</p>
                       </div>
                     </div>
@@ -2254,7 +2268,13 @@ export function AgentDetailPage() {
                           key={run.uuid}
                           type="button"
                           onClick={() => setTranscriptRunUuid(run.uuid)}
-                          className="flex items-center gap-3 px-4 py-2.5 w-full text-left hover:bg-surface/50 transition-colors"
+                          className={cn(
+                            "flex items-center gap-3 px-4 py-2.5 w-full text-left hover:bg-surface/50 transition-colors",
+                            run.status === "succeeded" && "tint-succeeded",
+                            run.status === "failed" && "tint-failed",
+                            run.status === "running" && "tint-running",
+                            (run.status === "queued" || run.status === "pending") && "tint-pending",
+                          )}
                         >
                           <Badge
                             variant="outline"

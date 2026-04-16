@@ -21,7 +21,7 @@ interface SidebarSectionProps {
 export function SidebarSection({ title, children }: SidebarSectionProps) {
   return (
     <div>
-      <span className="text-[11px] font-medium uppercase tracking-wider text-dim">
+      <span className="micro-label">
         {title}
       </span>
       <div className="mt-1.5 space-y-1">{children}</div>

@@ -406,7 +406,7 @@ export function WorkflowsListPage() {
           <ResizableTable storageKey="workflows" columns={WF_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="name" className="text-dim text-xs">
+                <ResizableTableHead columnKey="name" className="micro-label">
                   <SortableColumnHeader
                     label="Name"
                     sortKey="name"
@@ -414,8 +414,8 @@ export function WorkflowsListPage() {
                     onSort={handleSort}
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
-                <ResizableTableHead columnKey="state" className="text-dim text-xs">
+                <ResizableTableHead columnKey="uuid" className="micro-label">UUID</ResizableTableHead>
+                <ResizableTableHead columnKey="state" className="micro-label">
                   <SortableColumnHeader
                     label="State"
                     sortKey="state"
@@ -431,9 +431,9 @@ export function WorkflowsListPage() {
                     }
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="type" className="text-dim text-xs">Type</ResizableTableHead>
-                <ResizableTableHead columnKey="indicators" className="text-dim text-xs">Indicators</ResizableTableHead>
-                <ResizableTableHead columnKey="risk" className="text-dim text-xs">
+                <ResizableTableHead columnKey="type" className="micro-label">Type</ResizableTableHead>
+                <ResizableTableHead columnKey="indicators" className="micro-label">Indicators</ResizableTableHead>
+                <ResizableTableHead columnKey="risk" className="micro-label">
                   <SortableColumnHeader
                     label="Risk"
                     sortKey="risk"
@@ -449,9 +449,9 @@ export function WorkflowsListPage() {
                     }
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="approval" className="text-dim text-xs">Approval</ResizableTableHead>
-                <ResizableTableHead columnKey="version" className="text-dim text-xs">Version</ResizableTableHead>
-                <ResizableTableHead columnKey="updated" className="text-dim text-xs">
+                <ResizableTableHead columnKey="approval" className="micro-label">Approval</ResizableTableHead>
+                <ResizableTableHead columnKey="version" className="micro-label">Version</ResizableTableHead>
+                <ResizableTableHead columnKey="updated" className="micro-label">
                   <SortableColumnHeader
                     label="Updated"
                     sortKey="updated"

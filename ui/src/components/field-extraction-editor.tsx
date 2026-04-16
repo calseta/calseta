@@ -358,16 +358,16 @@ export function FieldExtractionEditor({
             {/* Table header */}
             <div
               className={cn(
-                "grid gap-2 bg-surface px-3 py-2 border-b border-border text-[11px] uppercase tracking-wider text-dim font-medium",
+                "grid gap-2 bg-surface px-3 py-2 border-b border-border",
                 GRID_COLS,
               )}
             >
-              <div>Type</div>
-              <div>Source Path</div>
+              <div className="micro-label">Type</div>
+              <div className="micro-label">Source Path</div>
               <div />
-              <div>Target Key</div>
-              <div>Value Type</div>
-              <div className="text-center">Active</div>
+              <div className="micro-label">Target Key</div>
+              <div className="micro-label">Value Type</div>
+              <div className="micro-label text-center">Active</div>
               <div />
             </div>
 

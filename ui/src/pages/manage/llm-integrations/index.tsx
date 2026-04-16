@@ -228,15 +228,15 @@ export function LLMIntegrationsPage() {
           <ResizableTable storageKey="llm-integrations" columns={COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="provider" className="text-dim text-xs">Provider</ResizableTableHead>
-                <ResizableTableHead columnKey="name" className="text-dim text-xs">Name</ResizableTableHead>
-                <ResizableTableHead columnKey="model" className="text-dim text-xs">Model</ResizableTableHead>
-                <ResizableTableHead columnKey="default" className="text-dim text-xs">Default</ResizableTableHead>
-                <ResizableTableHead columnKey="api_key" className="text-dim text-xs">API Key</ResizableTableHead>
-                <ResizableTableHead columnKey="input_cost" className="text-dim text-xs">Input / 1k tokens</ResizableTableHead>
-                <ResizableTableHead columnKey="output_cost" className="text-dim text-xs">Output / 1k tokens</ResizableTableHead>
-                <ResizableTableHead columnKey="created" className="text-dim text-xs">Created</ResizableTableHead>
-                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10"></ResizableTableHead>
+                <ResizableTableHead columnKey="provider" className="micro-label">Provider</ResizableTableHead>
+                <ResizableTableHead columnKey="name" className="micro-label">Name</ResizableTableHead>
+                <ResizableTableHead columnKey="model" className="micro-label">Model</ResizableTableHead>
+                <ResizableTableHead columnKey="default" className="micro-label">Default</ResizableTableHead>
+                <ResizableTableHead columnKey="api_key" className="micro-label">API Key</ResizableTableHead>
+                <ResizableTableHead columnKey="input_cost" className="micro-label">Input / 1k tokens</ResizableTableHead>
+                <ResizableTableHead columnKey="output_cost" className="micro-label">Output / 1k tokens</ResizableTableHead>
+                <ResizableTableHead columnKey="created" className="micro-label">Created</ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="micro-label w-10"></ResizableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

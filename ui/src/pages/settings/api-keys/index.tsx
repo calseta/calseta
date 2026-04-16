@@ -178,7 +178,7 @@ export function ApiKeysPage() {
                     <Input
                       value={newKey}
                       readOnly
-                      className="bg-surface border-border text-sm font-mono"
+                      className="surface-2 border-border text-sm font-mono"
                     />
                     <Button
                       size="sm"
@@ -333,14 +333,14 @@ export function ApiKeysPage() {
           <ResizableTable storageKey="api-keys" columns={AK_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="prefix" className="text-dim text-xs">Prefix</ResizableTableHead>
-                <ResizableTableHead columnKey="name" className="text-dim text-xs">Name</ResizableTableHead>
-                <ResizableTableHead columnKey="type" className="text-dim text-xs">Type</ResizableTableHead>
-                <ResizableTableHead columnKey="scopes" className="text-dim text-xs">Scopes</ResizableTableHead>
-                <ResizableTableHead columnKey="status" className="text-dim text-xs">Status</ResizableTableHead>
-                <ResizableTableHead columnKey="last_used" className="text-dim text-xs">Last Used</ResizableTableHead>
-                <ResizableTableHead columnKey="created" className="text-dim text-xs">Created</ResizableTableHead>
-                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
+                <ResizableTableHead columnKey="prefix" className="micro-label">Prefix</ResizableTableHead>
+                <ResizableTableHead columnKey="name" className="micro-label">Name</ResizableTableHead>
+                <ResizableTableHead columnKey="type" className="micro-label">Type</ResizableTableHead>
+                <ResizableTableHead columnKey="scopes" className="micro-label">Scopes</ResizableTableHead>
+                <ResizableTableHead columnKey="status" className="micro-label">Status</ResizableTableHead>
+                <ResizableTableHead columnKey="last_used" className="micro-label">Last Used</ResizableTableHead>
+                <ResizableTableHead columnKey="created" className="micro-label">Created</ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="micro-label w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>

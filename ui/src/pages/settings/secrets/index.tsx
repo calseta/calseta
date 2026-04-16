@@ -258,11 +258,11 @@ export function SecretsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="py-2 px-3 text-left text-[11px] uppercase tracking-wide text-dim font-medium">Name</th>
-                    <th className="py-2 px-3 text-left text-[11px] uppercase tracking-wide text-dim font-medium">Provider</th>
-                    <th className="py-2 px-3 text-left text-[11px] uppercase tracking-wide text-dim font-medium">Description</th>
-                    <th className="py-2 px-3 text-center text-[11px] uppercase tracking-wide text-dim font-medium">Version</th>
-                    <th className="py-2 px-3 text-left text-[11px] uppercase tracking-wide text-dim font-medium">Created</th>
+                    <th className="py-2 px-3 text-left micro-label">Name</th>
+                    <th className="py-2 px-3 text-left micro-label">Provider</th>
+                    <th className="py-2 px-3 text-left micro-label">Description</th>
+                    <th className="py-2 px-3 text-center micro-label">Version</th>
+                    <th className="py-2 px-3 text-left micro-label">Created</th>
                     <th className="py-2 px-3" />
                   </tr>
                 </thead>
@@ -286,19 +286,19 @@ export function SecretsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="py-2 px-3 text-left text-[11px] uppercase tracking-wide text-dim font-medium">
+                    <th className="py-2 px-3 text-left micro-label">
                       Name
                     </th>
-                    <th className="py-2 px-3 text-left text-[11px] uppercase tracking-wide text-dim font-medium">
+                    <th className="py-2 px-3 text-left micro-label">
                       Provider
                     </th>
-                    <th className="py-2 px-3 text-left text-[11px] uppercase tracking-wide text-dim font-medium">
+                    <th className="py-2 px-3 text-left micro-label">
                       Description
                     </th>
-                    <th className="py-2 px-3 text-center text-[11px] uppercase tracking-wide text-dim font-medium">
+                    <th className="py-2 px-3 text-center micro-label">
                       Version
                     </th>
-                    <th className="py-2 px-3 text-left text-[11px] uppercase tracking-wide text-dim font-medium">
+                    <th className="py-2 px-3 text-left micro-label">
                       Created
                     </th>
                     <th className="py-2 px-3" />
@@ -334,7 +334,7 @@ export function SecretsPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label htmlFor="secret-name">Name *</Label>
+              <Label htmlFor="secret-name" className="micro-label">Name *</Label>
               <Input
                 id="secret-name"
                 placeholder="MY_SECRET_NAME"
@@ -344,7 +344,7 @@ export function SecretsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="secret-description">Description</Label>
+              <Label htmlFor="secret-description" className="micro-label">Description</Label>
               <Input
                 id="secret-description"
                 placeholder="What is this secret used for?"
@@ -353,7 +353,7 @@ export function SecretsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Provider *</Label>
+              <Label className="micro-label">Provider *</Label>
               <Select
                 value={formProvider}
                 onValueChange={(v) => setFormProvider(v as "local_encrypted" | "env_var")}
@@ -370,7 +370,7 @@ export function SecretsPage() {
 
             {formProvider === "local_encrypted" && (
               <div className="space-y-1.5">
-                <Label htmlFor="secret-value">Value *</Label>
+                <Label htmlFor="secret-value" className="micro-label">Value *</Label>
                 <Input
                   id="secret-value"
                   type="password"
@@ -384,7 +384,7 @@ export function SecretsPage() {
 
             {formProvider === "env_var" && (
               <div className="space-y-1.5">
-                <Label htmlFor="secret-env-var">Environment Variable Name *</Label>
+                <Label htmlFor="secret-env-var" className="micro-label">Environment Variable Name *</Label>
                 <Input
                   id="secret-env-var"
                   placeholder="MY_ENV_VAR"
@@ -433,7 +433,7 @@ export function SecretsPage() {
               previous value will be replaced.
             </p>
             <div className="space-y-1.5">
-              <Label htmlFor="rotate-value">New Value *</Label>
+              <Label htmlFor="rotate-value" className="micro-label">New Value *</Label>
               <Input
                 id="rotate-value"
                 type="password"

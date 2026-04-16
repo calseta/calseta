@@ -283,7 +283,7 @@ export function EnrichmentProvidersPage() {
           <ResizableTable storageKey="enrichment-providers" columns={EP_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="display_name" className="text-dim text-xs">
+                <ResizableTableHead columnKey="display_name" className="micro-label">
                   <SortableColumnHeader
                     label="Display Name"
                     sortKey="display_name"
@@ -291,7 +291,7 @@ export function EnrichmentProvidersPage() {
                     onSort={handleSort}
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="provider_name" className="text-dim text-xs">
+                <ResizableTableHead columnKey="provider_name" className="micro-label">
                   <SortableColumnHeader
                     label="Provider"
                     sortKey="provider_name"
@@ -299,7 +299,7 @@ export function EnrichmentProvidersPage() {
                     onSort={handleSort}
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="type" className="text-dim text-xs">
+                <ResizableTableHead columnKey="type" className="micro-label">
                   <SortableColumnHeader
                     label="Type"
                     sortKey="type"
@@ -315,7 +315,7 @@ export function EnrichmentProvidersPage() {
                     }
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="status" className="text-dim text-xs">
+                <ResizableTableHead columnKey="status" className="micro-label">
                   <SortableColumnHeader
                     label="Status"
                     sortKey="status"
@@ -331,9 +331,9 @@ export function EnrichmentProvidersPage() {
                     }
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="configured" className="text-dim text-xs">Configured</ResizableTableHead>
-                <ResizableTableHead columnKey="indicator_types" className="text-dim text-xs">Indicator Types</ResizableTableHead>
-                <ResizableTableHead columnKey="created" className="text-dim text-xs">
+                <ResizableTableHead columnKey="configured" className="micro-label">Configured</ResizableTableHead>
+                <ResizableTableHead columnKey="indicator_types" className="micro-label">Indicator Types</ResizableTableHead>
+                <ResizableTableHead columnKey="created" className="micro-label">
                   <SortableColumnHeader
                     label="Created (UTC)"
                     sortKey="created"
@@ -341,7 +341,7 @@ export function EnrichmentProvidersPage() {
                     onSort={handleSort}
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
+                <ResizableTableHead columnKey="actions" className="micro-label w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>

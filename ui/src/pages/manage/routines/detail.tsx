@@ -376,9 +376,9 @@ export function RoutineDetailPage() {
               }
             >
               <div className="space-y-6">
-                <Card>
+                <Card className="surface-2">
                   <CardHeader>
-                    <CardTitle className="text-sm font-medium">About</CardTitle>
+                    <CardTitle className="micro-label">About</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-foreground">
@@ -390,19 +390,19 @@ export function RoutineDetailPage() {
               </Card>
 
               {routine.triggers.length > 0 && (
-                <Card>
+                <Card className="surface-2">
                   <CardHeader>
-                    <CardTitle className="text-sm font-medium">Triggers</CardTitle>
+                    <CardTitle className="micro-label">Triggers</CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
                     <Table>
                       <TableHeader>
                         <TableRow className="border-border hover:bg-transparent">
-                          <TableHead className="text-dim text-xs pl-6">Kind</TableHead>
-                          <TableHead className="text-dim text-xs">Cron Expression</TableHead>
-                          <TableHead className="text-dim text-xs">Timezone</TableHead>
-                          <TableHead className="text-dim text-xs">Next Run</TableHead>
-                          <TableHead className="text-dim text-xs">Active</TableHead>
+                          <TableHead className="micro-label pl-6">Kind</TableHead>
+                          <TableHead className="micro-label">Cron Expression</TableHead>
+                          <TableHead className="micro-label">Timezone</TableHead>
+                          <TableHead className="micro-label">Next Run</TableHead>
+                          <TableHead className="micro-label">Active</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -451,16 +451,22 @@ export function RoutineDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border hover:bg-transparent">
-                      <TableHead className="text-dim text-xs">Source</TableHead>
-                      <TableHead className="text-dim text-xs">Status</TableHead>
-                      <TableHead className="text-dim text-xs">Started</TableHead>
-                      <TableHead className="text-dim text-xs">Duration</TableHead>
-                      <TableHead className="text-dim text-xs">Error</TableHead>
+                      <TableHead className="micro-label">Source</TableHead>
+                      <TableHead className="micro-label">Status</TableHead>
+                      <TableHead className="micro-label">Started</TableHead>
+                      <TableHead className="micro-label">Duration</TableHead>
+                      <TableHead className="micro-label">Error</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {runs.map((run) => (
-                      <TableRow key={run.uuid} className="border-border hover:bg-accent/50">
+                      <TableRow key={run.uuid} className={cn(
+                        "border-border hover:bg-accent/50",
+                        run.status === "completed" && "tint-succeeded",
+                        run.status === "failed" && "tint-failed",
+                        run.status === "running" && "tint-running",
+                        run.status === "skipped" && "tint-pending",
+                      )}>
                         <TableCell className="text-xs text-muted-foreground">
                           {run.source}
                         </TableCell>

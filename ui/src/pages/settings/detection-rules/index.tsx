@@ -517,7 +517,7 @@ export function DetectionRulesPage() {
           <ResizableTable storageKey="detection-rules" columns={DR_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="name" className="text-dim text-xs">
+                <ResizableTableHead columnKey="name" className="micro-label">
                   <SortableColumnHeader
                     label="Name"
                     sortKey="name"
@@ -525,8 +525,8 @@ export function DetectionRulesPage() {
                     onSort={handleSort}
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
-                <ResizableTableHead columnKey="source" className="text-dim text-xs">
+                <ResizableTableHead columnKey="uuid" className="micro-label">UUID</ResizableTableHead>
+                <ResizableTableHead columnKey="source" className="micro-label">
                   <SortableColumnHeader
                     label="Source"
                     sortKey="source"
@@ -542,7 +542,7 @@ export function DetectionRulesPage() {
                     }
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="severity" className="text-dim text-xs">
+                <ResizableTableHead columnKey="severity" className="micro-label">
                   <SortableColumnHeader
                     label="Severity"
                     sortKey="severity"
@@ -558,8 +558,8 @@ export function DetectionRulesPage() {
                     }
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="mitre" className="text-dim text-xs">MITRE</ResizableTableHead>
-                <ResizableTableHead columnKey="created" className="text-dim text-xs">
+                <ResizableTableHead columnKey="mitre" className="micro-label">MITRE</ResizableTableHead>
+                <ResizableTableHead columnKey="created" className="micro-label">
                   <SortableColumnHeader
                     label="Created (UTC)"
                     sortKey="created"
@@ -567,7 +567,7 @@ export function DetectionRulesPage() {
                     onSort={handleSort}
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
+                <ResizableTableHead columnKey="actions" className="micro-label w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>

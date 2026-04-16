@@ -162,12 +162,12 @@ export function SourcesPage() {
           <ResizableTable storageKey="alert-sources" columns={SRC_COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="expand" className="text-dim text-xs w-8" />
-                <ResizableTableHead columnKey="source" className="text-dim text-xs">Source</ResizableTableHead>
-                <ResizableTableHead columnKey="display_name" className="text-dim text-xs">Display Name</ResizableTableHead>
-                <ResizableTableHead columnKey="status" className="text-dim text-xs">Status</ResizableTableHead>
-                <ResizableTableHead columnKey="created" className="text-dim text-xs">Created</ResizableTableHead>
-                <ResizableTableHead columnKey="actions" className="text-dim text-xs w-10" />
+                <ResizableTableHead columnKey="expand" className="micro-label w-8" />
+                <ResizableTableHead columnKey="source" className="micro-label">Source</ResizableTableHead>
+                <ResizableTableHead columnKey="display_name" className="micro-label">Display Name</ResizableTableHead>
+                <ResizableTableHead columnKey="status" className="micro-label">Status</ResizableTableHead>
+                <ResizableTableHead columnKey="created" className="micro-label">Created</ResizableTableHead>
+                <ResizableTableHead columnKey="actions" className="micro-label w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -214,7 +214,7 @@ export function SourcesPage() {
                         </TableCell>
                       </TableRow>
                       {expandedSource === src.uuid && (
-                        <TableRow key={`${src.uuid}-detail`} className="border-border bg-surface/50">
+                        <TableRow key={`${src.uuid}-detail`} className="border-border surface-2">
                           <TableCell colSpan={6}>
                             <div className="py-3 px-2 space-y-3">
                               <div>

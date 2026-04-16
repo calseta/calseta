@@ -223,7 +223,7 @@ function TestResultDisplay({
   onToggleStep: (idx: number) => void;
 }) {
   return (
-    <div className="space-y-3 mt-3">
+    <div className={cn("space-y-3 mt-3 rounded-md p-3", result.success ? "tint-succeeded" : "tint-failed")}>
       {/* Summary bar */}
       <div className="flex items-center gap-3">
         {result.success ? (

@@ -281,7 +281,7 @@ export function IssueDetailPage() {
 
             {/* Description */}
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-dim mb-1.5">Description</p>
+              <p className="micro-label mb-1.5">Description</p>
               <InlineEditField
                 value={issue.description}
                 onSave={(v) => patch({ description: v })}
@@ -294,7 +294,7 @@ export function IssueDetailPage() {
             {/* Resolution (only for done/cancelled) */}
             {showDone && (
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-dim mb-1.5">Resolution</p>
+                <p className="micro-label mb-1.5">Resolution</p>
                 <InlineEditField
                   value={issue.resolution}
                   onSave={(v) => patch({ resolution: v })}
@@ -309,7 +309,7 @@ export function IssueDetailPage() {
 
             {/* Comments */}
             <div className="space-y-3">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-dim">
+              <p className="micro-label">
                 Comments {comments.length > 0 && `(${comments.length})`}
               </p>
 
@@ -318,7 +318,7 @@ export function IssueDetailPage() {
               ) : (
                 <div className="space-y-3">
                   {comments.map((comment) => (
-                    <div key={comment.uuid} className="flex gap-3">
+                    <div key={comment.uuid} className={cn("flex gap-3 rounded-md p-2 -mx-2", comment.author_agent_uuid ? "tint-actor-agent" : "tint-actor-api")}>
                       <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
                         {comment.author_agent_uuid ? (
                           <Bot className="h-3.5 w-3.5 text-teal" />
@@ -462,9 +462,9 @@ export function IssueDetailPage() {
 
             {/* Linked Entities */}
             {(issue.alert_uuid || issue.routine_uuid || issue.parent_uuid) && (
-              <Card className="bg-card border-border">
+              <Card className="surface-2 border-border">
                 <CardContent className="p-4 space-y-0.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-dim mb-2">Linked To</p>
+                  <p className="micro-label mb-2">Linked To</p>
                   {issue.alert_uuid && (
                     <PropRow label="Alert">
                       <Link

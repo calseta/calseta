@@ -335,7 +335,7 @@ export function KBEditorPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs">Inject Scope</Label>
+                    <Label className="micro-label">Inject Scope</Label>
                     <div className="rounded-md border border-border p-3 space-y-2 bg-background">
                       <label className="flex items-center gap-2 text-xs cursor-pointer">
                         <input

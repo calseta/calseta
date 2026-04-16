@@ -148,7 +148,7 @@ export function AlertsListPage() {
           <ResizableTable storageKey="alerts" columns={COLUMNS}>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <ResizableTableHead columnKey="title" className="text-dim text-xs">
+                <ResizableTableHead columnKey="title" className="micro-label">
                   <SortableColumnHeader
                     label="Title"
                     sortKey="title"
@@ -156,8 +156,8 @@ export function AlertsListPage() {
                     onSort={handleSort}
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="uuid" className="text-dim text-xs">UUID</ResizableTableHead>
-                <ResizableTableHead columnKey="status" className="text-dim text-xs">
+                <ResizableTableHead columnKey="uuid" className="micro-label">UUID</ResizableTableHead>
+                <ResizableTableHead columnKey="status" className="micro-label">
                   <SortableColumnHeader
                     label="Status"
                     sortKey="status"
@@ -173,7 +173,7 @@ export function AlertsListPage() {
                     }
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="enrichment" className="text-dim text-xs">
+                <ResizableTableHead columnKey="enrichment" className="micro-label">
                   <div className="flex items-center gap-1">
                     <span>Enrichment</span>
                     <ColumnFilterPopover
@@ -184,7 +184,7 @@ export function AlertsListPage() {
                     />
                   </div>
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="severity" className="text-dim text-xs">
+                <ResizableTableHead columnKey="severity" className="micro-label">
                   <SortableColumnHeader
                     label="Severity"
                     sortKey="severity"
@@ -200,7 +200,7 @@ export function AlertsListPage() {
                     }
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="source" className="text-dim text-xs">
+                <ResizableTableHead columnKey="source" className="micro-label">
                   <SortableColumnHeader
                     label="Source"
                     sortKey="source"
@@ -216,7 +216,7 @@ export function AlertsListPage() {
                     }
                   />
                 </ResizableTableHead>
-                <ResizableTableHead columnKey="time" className="text-dim text-xs">
+                <ResizableTableHead columnKey="time" className="micro-label">
                   <SortableColumnHeader
                     label="Time (UTC)"
                     sortKey="time"
@@ -242,7 +242,7 @@ export function AlertsListPage() {
                 : alerts.map((alert) => (
                     <TableRow
                       key={alert.uuid}
-                      className="border-border hover:bg-accent/50 cursor-pointer"
+                      className="border-border hover:bg-[var(--surface-2)] cursor-pointer"
                     >
                       <TableCell className="truncate">
                         <Link

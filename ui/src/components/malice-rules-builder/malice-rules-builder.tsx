@@ -166,20 +166,22 @@ export function MaliceRulesBuilder({ value, onChange }: MaliceRulesBuilderProps)
       </div>
 
       {/* Rules */}
-      <div className="space-y-1.5">
-        {ruleRows.map((rule, i) => (
-          <RuleRow
-            key={rule.id}
-            rule={rule}
-            index={i}
-            total={ruleRows.length}
-            onChange={(updated) => updateRule(rule.id, updated)}
-            onRemove={() => removeRule(rule.id)}
-            onMoveUp={() => moveRule(i, -1)}
-            onMoveDown={() => moveRule(i, 1)}
-          />
-        ))}
-      </div>
+      {ruleRows.length > 0 && (
+        <div className="space-y-1.5 surface-2 rounded-md p-2">
+          {ruleRows.map((rule, i) => (
+            <RuleRow
+              key={rule.id}
+              rule={rule}
+              index={i}
+              total={ruleRows.length}
+              onChange={(updated) => updateRule(rule.id, updated)}
+              onRemove={() => removeRule(rule.id)}
+              onMoveUp={() => moveRule(i, -1)}
+              onMoveDown={() => moveRule(i, 1)}
+            />
+          ))}
+        </div>
+      )}
 
       <Button
         variant="outline"

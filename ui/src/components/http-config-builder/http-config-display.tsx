@@ -30,7 +30,7 @@ function KvList({ label, data }: { label: string; data: Record<string, string> }
 function StepDisplay({ step, index }: { step: HttpStep; index: number }) {
   const method = (step.method || "GET") as HttpMethod;
   return (
-    <div className="border border-border rounded-md px-3 py-2">
+    <div className="border border-border rounded-md px-3 py-2 surface-2">
       {/* Step header */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-[11px] text-dim font-mono">#{index + 1}</span>

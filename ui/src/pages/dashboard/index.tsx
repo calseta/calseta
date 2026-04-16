@@ -109,7 +109,7 @@ const SEVERITY_ORDER = ["Critical", "High", "Medium", "Low", "Informational", "P
 const STATUS_ORDER = ["Open", "Triaging", "Escalated", "Closed"];
 
 const tooltipStyle: React.CSSProperties = {
-  backgroundColor: "#0d1117",
+  backgroundColor: "#131920",
   border: "1px solid #1e2a25",
   borderRadius: 8,
   color: "#CCD0CF",
@@ -243,87 +243,107 @@ export function DashboardPage() {
 
     // Alert KPIs
     "total-alerts": (
-      <KpiCard
-        icon={ShieldAlert}
-        label="Total Alerts"
-        value={metrics?.alerts.total ?? 0}
-        sub={`${metrics?.alerts.active ?? 0} active`}
-      />
+      <div className="h-full" style={{ background: "rgba(234, 89, 27, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={ShieldAlert}
+          label="Total Alerts"
+          value={metrics?.alerts.total ?? 0}
+          sub={`${metrics?.alerts.active ?? 0} active`}
+        />
+      </div>
     ),
     mttd: (
-      <KpiCard
-        icon={Clock}
-        label="MTTD"
-        value={formatSeconds(metrics?.alerts.mttd_seconds ?? null)}
-        sub="Mean Time to Detect"
-      />
+      <div className="h-full" style={{ background: "rgba(234, 89, 27, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Clock}
+          label="MTTD"
+          value={formatSeconds(metrics?.alerts.mttd_seconds ?? null)}
+          sub="Mean Time to Detect"
+        />
+      </div>
     ),
     mtta: (
-      <KpiCard
-        icon={Timer}
-        label="MTTA"
-        value={formatSeconds(metrics?.alerts.mtta_seconds ?? null)}
-        sub="Mean Time to Acknowledge"
-      />
+      <div className="h-full" style={{ background: "rgba(234, 89, 27, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Timer}
+          label="MTTA"
+          value={formatSeconds(metrics?.alerts.mtta_seconds ?? null)}
+          sub="Mean Time to Acknowledge"
+        />
+      </div>
     ),
     mttt: (
-      <KpiCard
-        icon={Hourglass}
-        label="MTTT"
-        value={formatSeconds(metrics?.alerts.mttt_seconds ?? null)}
-        sub="Mean Time to Triage"
-      />
+      <div className="h-full" style={{ background: "rgba(234, 89, 27, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Hourglass}
+          label="MTTT"
+          value={formatSeconds(metrics?.alerts.mttt_seconds ?? null)}
+          sub="Mean Time to Triage"
+        />
+      </div>
     ),
     mttc: (
-      <KpiCard
-        icon={Target}
-        label="MTTC"
-        value={formatSeconds(metrics?.alerts.mttc_seconds ?? null)}
-        sub="Mean Time to Conclusion"
-      />
+      <div className="h-full" style={{ background: "rgba(234, 89, 27, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Target}
+          label="MTTC"
+          value={formatSeconds(metrics?.alerts.mttc_seconds ?? null)}
+          sub="Mean Time to Conclusion"
+        />
+      </div>
     ),
 
     // Ops KPIs
     "wf-exec": (
-      <KpiCard
-        icon={Workflow}
-        label="Workflow Executions"
-        value={metrics?.workflows.executions ?? 0}
-        sub={`${formatPercent(metrics?.workflows.success_rate ?? 0)} success`}
-      />
+      <div className="h-full" style={{ background: "rgba(255, 187, 26, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Workflow}
+          label="Workflow Executions"
+          value={metrics?.workflows.executions ?? 0}
+          sub={`${formatPercent(metrics?.workflows.success_rate ?? 0)} success`}
+        />
+      </div>
     ),
     "time-saved": (
-      <KpiCard
-        icon={TrendingUp}
-        label="Time Saved"
-        value={`${(metrics?.workflows.estimated_time_saved_hours ?? 0).toFixed(1)}h`}
-        sub="Estimated via workflows"
-      />
+      <div className="h-full" style={{ background: "rgba(255, 187, 26, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={TrendingUp}
+          label="Time Saved"
+          value={`${(metrics?.workflows.estimated_time_saved_hours ?? 0).toFixed(1)}h`}
+          sub="Estimated via workflows"
+        />
+      </div>
     ),
     "fp-rate": (
-      <KpiCard
-        icon={AlertTriangle}
-        label="False Positive Rate"
-        value={formatPercent(metrics?.alerts.false_positive_rate ?? 0)}
-        sub="Last 30 days"
-      />
+      <div className="h-full" style={{ background: "rgba(234, 89, 27, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={AlertTriangle}
+          label="False Positive Rate"
+          value={formatPercent(metrics?.alerts.false_positive_rate ?? 0)}
+          sub="Last 30 days"
+        />
+      </div>
     ),
     "enrich-cov": (
-      <KpiCard
-        icon={Activity}
-        label="Enrichment Coverage"
-        value={formatPercent(metrics?.alerts.enrichment_coverage ?? 0)}
-        sub="Alerts enriched"
-      />
+      <div className="h-full" style={{ background: "rgba(234, 89, 27, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Activity}
+          label="Enrichment Coverage"
+          value={formatPercent(metrics?.alerts.enrichment_coverage ?? 0)}
+          sub="Alerts enriched"
+        />
+      </div>
     ),
     "pending-approvals": (
-      <KpiCard
-        icon={CheckCircle2}
-        label="Pending Approvals"
-        value={pendingApprovals}
-        sub={`${formatPercent(metrics?.approvals.approval_rate ?? 0)} approval rate`}
-        highlight={pendingApprovals > 0}
-      />
+      <div className="h-full" style={{ background: "rgba(255, 187, 26, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={CheckCircle2}
+          label="Pending Approvals"
+          value={pendingApprovals}
+          sub={`${formatPercent(metrics?.approvals.approval_rate ?? 0)} approval rate`}
+          highlight={pendingApprovals > 0}
+        />
+      </div>
     ),
 
     // Queue KPIs
@@ -415,48 +435,58 @@ export function DashboardPage() {
 
     // Workflow performance
     "wf-configured": (
-      <KpiCard
-        icon={Workflow}
-        label="Workflows Configured"
-        value={metrics?.workflows.total_configured ?? 0}
-        sub="Total active workflows"
-      />
+      <div className="h-full" style={{ background: "rgba(255, 187, 26, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Workflow}
+          label="Workflows Configured"
+          value={metrics?.workflows.total_configured ?? 0}
+          sub="Total active workflows"
+        />
+      </div>
     ),
     "wf-success-rate": (
-      <KpiCard
-        icon={Target}
-        label="Workflow Success Rate"
-        value={formatPercent(metrics?.workflows.success_rate ?? 0)}
-        sub="Last 30 days"
-      />
+      <div className="h-full" style={{ background: "rgba(255, 187, 26, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Target}
+          label="Workflow Success Rate"
+          value={formatPercent(metrics?.workflows.success_rate ?? 0)}
+          sub="Last 30 days"
+        />
+      </div>
     ),
     "approvals-30d": (
-      <KpiCard
-        icon={CheckCircle2}
-        label="Approvals (30d)"
-        value={metrics?.approvals.approved_last_30_days ?? 0}
-        sub={`${formatPercent(metrics?.approvals.approval_rate ?? 0)} approval rate`}
-      />
+      <div className="h-full" style={{ background: "rgba(255, 187, 26, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={CheckCircle2}
+          label="Approvals (30d)"
+          value={metrics?.approvals.approved_last_30_days ?? 0}
+          sub={`${formatPercent(metrics?.approvals.approval_rate ?? 0)} approval rate`}
+        />
+      </div>
     ),
     "median-approval-time": (
-      <KpiCard
-        icon={Timer}
-        label="Median Approval Time"
-        value={
-          metrics?.approvals.median_response_time_minutes != null
-            ? `${metrics.approvals.median_response_time_minutes.toFixed(1)} min`
-            : "--"
-        }
-        sub="Response latency"
-      />
+      <div className="h-full" style={{ background: "rgba(255, 187, 26, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Timer}
+          label="Median Approval Time"
+          value={
+            metrics?.approvals.median_response_time_minutes != null
+              ? `${metrics.approvals.median_response_time_minutes.toFixed(1)} min`
+              : "--"
+          }
+          sub="Response latency"
+        />
+      </div>
     ),
     mtte: (
-      <KpiCard
-        icon={Search}
-        label="MTTE"
-        value={formatSeconds(metrics?.alerts.mean_time_to_enrich_seconds ?? null)}
-        sub="Mean Time to Enrich"
-      />
+      <div className="h-full" style={{ background: "rgba(234, 89, 27, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Search}
+          label="MTTE"
+          value={formatSeconds(metrics?.alerts.mean_time_to_enrich_seconds ?? null)}
+          sub="Mean Time to Enrich"
+        />
+      </div>
     ),
 
     // Control plane widgets
@@ -470,15 +500,17 @@ export function DashboardPage() {
       />
     ),
     "cp-agent-fleet": (
-      <KpiCard
-        icon={Bot}
-        label="Agent Fleet"
-        value={cpDash?.agents.by_status["active"] ?? 0}
-        sub={(() => {
-          const paused = cpDash?.agents.by_status["paused"] ?? 0;
-          return paused > 0 ? `${paused} paused` : "All agents active";
-        })()}
-      />
+      <div className="h-full" style={{ background: "rgba(77, 125, 113, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={Bot}
+          label="Agent Fleet"
+          value={cpDash?.agents.by_status["active"] ?? 0}
+          sub={(() => {
+            const paused = cpDash?.agents.by_status["paused"] ?? 0;
+            return paused > 0 ? `${paused} paused` : "All agents active";
+          })()}
+        />
+      </div>
     ),
     "cp-costs-mtd": (
       <KpiCard
@@ -489,13 +521,15 @@ export function DashboardPage() {
       />
     ),
     "cp-pending-actions": (
-      <KpiCard
-        icon={ShieldCheck}
-        label="Pending Actions"
-        value={pendingActionsCount}
-        sub={pendingActionsCount > 0 ? "Requires review" : "No pending actions"}
-        highlight={pendingActionsCount > 0}
-      />
+      <div className="h-full" style={{ background: "rgba(77, 125, 113, 0.04)", borderRadius: "inherit" }}>
+        <KpiCard
+          icon={ShieldCheck}
+          label="Pending Actions"
+          value={pendingActionsCount}
+          sub={pendingActionsCount > 0 ? "Requires review" : "No pending actions"}
+          highlight={pendingActionsCount > 0}
+        />
+      </div>
     ),
 
     // Future agent cards (placeholders)
@@ -687,13 +721,13 @@ function StatCard({
   value: string | number;
 }) {
   return (
-    <Card className="bg-card border-border hover:border-teal/20 transition-colors h-full">
+    <Card className="surface-2 border-border hover:border-teal/20 transition-colors h-full">
       <CardContent className="flex items-center gap-2.5 p-4 h-full">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-teal/10">
           <Icon className="h-3.5 w-3.5 text-teal" />
         </div>
         <div className="min-w-0">
-          <p className="text-[10px] text-muted-foreground truncate leading-tight">{label}</p>
+          <p className="micro-label truncate leading-tight">{label}</p>
           <p className="text-base font-heading font-extrabold tracking-tight text-foreground">
             {value}
           </p>
@@ -717,13 +751,13 @@ function KpiCard({
   highlight?: boolean;
 }) {
   return (
-    <Card className="bg-card border-border hover:border-teal/30 transition-colors h-full">
+    <Card className="surface-2 border-border hover:border-teal/30 transition-colors h-full">
       <CardContent className="flex items-center gap-3 p-4 h-full">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal/10">
           <Icon className="h-4.5 w-4.5 text-teal" />
         </div>
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground truncate">{label}</p>
+          <p className="micro-label truncate">{label}</p>
           <p
             className={`text-xl font-heading font-extrabold tracking-tight ${
               highlight ? "text-amber" : "text-foreground"
@@ -750,9 +784,9 @@ function ChartCard({
   children: ReactNode;
 }) {
   return (
-    <Card className="bg-card border-border h-full flex flex-col">
+    <Card className="surface-2 border-border h-full flex flex-col">
       <CardHeader className="pb-2 shrink-0">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="micro-label">{title}</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 min-h-0">
         {!empty ? (

@@ -17,7 +17,7 @@ export function JsonViewer({ data, defaultExpanded = 2 }: JsonViewerProps) {
   }
 
   return (
-    <div className="relative rounded-lg border border-border bg-[#0a0e14] overflow-auto">
+    <div className="relative rounded-lg border border-border surface-2 overflow-auto">
       <div className="absolute top-2 right-2 z-10">
         <button
           onClick={handleCopy}

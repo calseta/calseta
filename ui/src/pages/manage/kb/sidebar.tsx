@@ -61,7 +61,7 @@ function DraggablePageItem({
         isDragging ? "opacity-40" : "",
         selectedUuid === page.uuid
           ? "bg-teal/15 text-teal"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+          : "text-muted-foreground hover:bg-[var(--surface-2)] hover:text-foreground",
       )}
       style={{ paddingLeft }}
       {...attributes}

@@ -820,7 +820,7 @@ export function WorkflowDetailPage() {
               <DetailPageSidebar>
                 <SidebarSection title="Identity">
                 <div>
-                  <span className="text-xs text-muted-foreground">UUID</span>
+                  <span className="micro-label">UUID</span>
                   <div className="mt-1">
                     <CopyableText text={wf.uuid} mono className="text-[11px] text-dim" />
                   </div>
@@ -830,7 +830,7 @@ export function WorkflowDetailPage() {
                 <DetailPageField label="Type" value={wf.workflow_type ?? "—"} />
                 {wf.indicator_types.length > 0 && (
                   <div>
-                    <span className="text-xs text-muted-foreground">Indicator types</span>
+                    <span className="micro-label">Indicator types</span>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {wf.indicator_types.map((t) => (
                         <Badge key={t} variant="outline" className="text-[10px] text-foreground border-border">
@@ -1045,7 +1045,12 @@ export function WorkflowDetailPage() {
               {runs.length > 0 ? (
                 <div className="space-y-2">
                   {runs.map((run) => (
-                    <Card key={run.uuid} className="bg-card border-border">
+                    <Card key={run.uuid} className={cn(
+                      "bg-card border-border",
+                      run.status === "completed" && "tint-succeeded",
+                      run.status === "failed" && "tint-failed",
+                      run.status === "running" && "tint-running",
+                    )}>
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">

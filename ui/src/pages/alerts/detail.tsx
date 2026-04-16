@@ -572,12 +572,12 @@ export function AlertDetailPage() {
                     <Table>
                       <TableHeader>
                         <TableRow className="border-border hover:bg-transparent">
-                          <TableHead className="text-xs text-dim">Type</TableHead>
-                          <TableHead className="text-xs text-dim">Value</TableHead>
-                          <TableHead className="text-xs text-dim">Malice</TableHead>
-                          <TableHead className="text-xs text-dim">Enrichments</TableHead>
-                          <TableHead className="text-xs text-dim">First Seen</TableHead>
-                          <TableHead className="text-xs text-dim">Last Seen</TableHead>
+                          <TableHead className="micro-label">Type</TableHead>
+                          <TableHead className="micro-label">Value</TableHead>
+                          <TableHead className="micro-label">Malice</TableHead>
+                          <TableHead className="micro-label">Enrichments</TableHead>
+                          <TableHead className="micro-label">First Seen</TableHead>
+                          <TableHead className="micro-label">Last Seen</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -589,7 +589,12 @@ export function AlertDetailPage() {
                           return (
                             <TableRow
                               key={ind.uuid}
-                              className="border-border cursor-pointer hover:bg-surface-hover"
+                              className={cn(
+                                "border-border cursor-pointer hover:bg-surface-hover",
+                                ind.malice === "Malicious" && "tint-malicious",
+                                ind.malice === "Suspicious" && "tint-suspicious",
+                                ind.malice === "Benign" && "tint-benign",
+                              )}
                               onClick={() =>
                                 setSelectedIndicator({
                                   uuid: ind.uuid,
@@ -650,7 +655,7 @@ export function AlertDetailPage() {
               {alert.agent_findings && alert.agent_findings.length > 0 ? (
                 <div className="space-y-3">
                   {alert.agent_findings.map((f) => (
-                    <Card key={f.id} className="bg-card border-border">
+                    <Card key={f.id} className="card-finding">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between">
                           <div>
@@ -698,7 +703,7 @@ export function AlertDetailPage() {
               {kbPages.length > 0 ? (
                 <div className="space-y-3">
                   {kbPages.map((page) => (
-                    <Card key={page.uuid} className="bg-card border-border">
+                    <Card key={page.uuid} className="card-kb">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-foreground">
                           {page.title}
@@ -728,7 +733,12 @@ export function AlertDetailPage() {
                 {activities.length > 0 ? (
                   <div className="space-y-0">
                     {activities.map((ev, i) => (
-                      <div key={ev.uuid} className="flex gap-4">
+                      <div key={ev.uuid} className={cn(
+                        "flex gap-4 rounded-md px-2 -mx-2",
+                        ev.actor_type === "system" && "tint-actor-system",
+                        ev.actor_type === "agent" && "tint-actor-agent",
+                        ev.actor_type === "api" && "tint-actor-api",
+                      )}>
                         <div className="flex flex-col items-center">
                           <div className={cn("h-2 w-2 rounded-full mt-2", eventDotColor(ev.event_type))} />
                           {i < activities.length - 1 && (

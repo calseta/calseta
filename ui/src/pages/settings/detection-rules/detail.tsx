@@ -454,7 +454,7 @@ export function DetectionRuleDetailPage() {
                 <SidebarSection title="MITRE ATT&CK">
                   {rule.mitre_tactics?.length > 0 && (
                     <div>
-                      <span className="text-[11px] text-dim">Tactics</span>
+                      <span className="micro-label">Tactics</span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {rule.mitre_tactics.map((t) => (
                           <Badge key={t} variant="outline" className="text-[11px] text-teal bg-teal/10 border-teal/30">
@@ -466,7 +466,7 @@ export function DetectionRuleDetailPage() {
                   )}
                   {rule.mitre_techniques?.length > 0 && (
                     <div>
-                      <span className="text-[11px] text-dim">Techniques</span>
+                      <span className="micro-label">Techniques</span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {rule.mitre_techniques.map((t) => (
                           <Badge key={t} variant="outline" className="text-[11px] text-foreground border-border">
@@ -478,7 +478,7 @@ export function DetectionRuleDetailPage() {
                   )}
                   {rule.mitre_subtechniques?.length > 0 && (
                     <div>
-                      <span className="text-[11px] text-dim">Sub-techniques</span>
+                      <span className="micro-label">Sub-techniques</span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {rule.mitre_subtechniques.map((t) => (
                           <Badge key={t} variant="outline" className="text-[11px] text-foreground border-border">

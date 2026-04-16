@@ -117,7 +117,7 @@ function priorityDot(priority: string): string {
 
 function KanbanCardStatic({ issue }: { issue: AgentIssue }) {
   return (
-    <div className="bg-card border border-border rounded-md shadow-xl rotate-1 p-3 space-y-2 w-[264px] opacity-95">
+    <div className="surface-2 border border-border rounded-md shadow-xl rotate-1 p-3 space-y-2 w-[264px] opacity-95">
       <div className="flex items-center gap-1.5">
         <div className={cn("h-2 w-2 rounded-full shrink-0", priorityDot(issue.priority))} />
         <p className="text-sm font-medium text-foreground leading-snug line-clamp-1">{issue.title}</p>
@@ -142,7 +142,7 @@ function KanbanCard({ issue, isDragging }: { issue: AgentIssue; isDragging: bool
       {...attributes}
       {...listeners}
       className={cn(
-        "bg-card border border-border rounded-md shadow-sm transition-shadow p-3 space-y-2",
+        "surface-2 border border-border rounded-md shadow-sm transition-shadow p-3 space-y-2",
         "cursor-grab active:cursor-grabbing",
         isDragging ? "opacity-40" : "hover:shadow-md",
       )}
@@ -199,12 +199,12 @@ function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "shrink-0 w-[280px] flex flex-col rounded-lg border bg-muted/5 transition-colors h-full",
+        "shrink-0 w-[280px] flex flex-col rounded-lg border surface-1 transition-colors h-full",
         isOver ? cn("border-2", borderColor) : "border-border",
       )}
     >
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
-        <span className="text-xs font-semibold text-foreground">{label}</span>
+        <span className="micro-label text-foreground">{label}</span>
         <span className="text-[10px] bg-muted text-dim px-1.5 py-0.5 rounded-full">{issues.length}</span>
       </div>
       <SortableContext items={issues.map((i) => i.uuid)} strategy={verticalListSortingStrategy}>
@@ -238,13 +238,13 @@ function ListView({ issues, categoryMap }: { issues: AgentIssue[]; categoryMap: 
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead className="text-xs font-semibold w-20">ID</TableHead>
-            <TableHead className="text-xs font-semibold">Title</TableHead>
-            <TableHead className="text-xs font-semibold w-28">Status</TableHead>
-            <TableHead className="text-xs font-semibold w-24">Priority</TableHead>
-            <TableHead className="text-xs font-semibold w-28">Category</TableHead>
-            <TableHead className="text-xs font-semibold w-28">Assignee</TableHead>
-            <TableHead className="text-xs font-semibold w-28">Created</TableHead>
+            <TableHead className="micro-label w-20">ID</TableHead>
+            <TableHead className="micro-label">Title</TableHead>
+            <TableHead className="micro-label w-28">Status</TableHead>
+            <TableHead className="micro-label w-24">Priority</TableHead>
+            <TableHead className="micro-label w-28">Category</TableHead>
+            <TableHead className="micro-label w-28">Assignee</TableHead>
+            <TableHead className="micro-label w-28">Created</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -859,7 +859,7 @@ export function IssuesPage() {
         {isLoading ? (
           <div className="flex gap-4 overflow-x-auto pb-2 flex-1 min-h-0">
             {Array.from({ length: 4 }).map((_, ci) => (
-              <div key={ci} className="shrink-0 w-[280px] h-full bg-muted/5 rounded-lg border border-border p-3 space-y-3">
+              <div key={ci} className="shrink-0 w-[280px] h-full surface-1 rounded-lg border border-border p-3 space-y-3">
                 <Skeleton className="h-5 w-24" />
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Card key={i}>

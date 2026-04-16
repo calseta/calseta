@@ -526,7 +526,7 @@ export function KBDetailPage() {
               <div className="px-6 py-3 border-b border-border shrink-0 space-y-2.5">
                 {/* Description */}
                 <div className="flex items-start gap-3">
-                  <span className="text-[11px] text-dim w-24 shrink-0 pt-0.5">Description</span>
+                  <span className="micro-label w-24 shrink-0 pt-0.5">Description</span>
                   <input
                     value={descriptionDraft}
                     onChange={(e) => setDescriptionDraft(e.target.value)}
@@ -538,7 +538,7 @@ export function KBDetailPage() {
 
                 {/* Tags */}
                 <div className="flex items-start gap-3">
-                  <span className="text-[11px] text-dim w-24 shrink-0 pt-0.5">Tags</span>
+                  <span className="micro-label w-24 shrink-0 pt-0.5">Tags</span>
                   <div className="flex-1">
                     <TagInput tags={tags} onChange={handleTagsChange} />
                   </div>
@@ -546,7 +546,7 @@ export function KBDetailPage() {
 
                 {/* Scope */}
                 <div className="flex items-center gap-3">
-                  <span className="text-[11px] text-dim w-24 shrink-0">Scope</span>
+                  <span className="micro-label w-24 shrink-0">Scope</span>
                   <Select value={scopeMode} onValueChange={(v) => handleScopeChange(v as ScopeMode)}>
                     <SelectTrigger className="h-6 text-xs border-border bg-transparent w-36 focus:ring-0">
                       <SelectValue />
@@ -567,7 +567,7 @@ export function KBDetailPage() {
 
                 {/* Alert targeting */}
                 <div className="flex items-center gap-3">
-                  <span className="text-[11px] text-dim w-24 shrink-0">Alert targeting</span>
+                  <span className="micro-label w-24 shrink-0">Alert targeting</span>
                   <Select
                     value={targetingMode}
                     onValueChange={(v) => handleTargetingModeChange(v as "none" | "with_rules")}
