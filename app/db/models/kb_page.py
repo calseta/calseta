@@ -36,7 +36,9 @@ class KnowledgeBasePage(TimestampMixin, UUIDMixin, Base):
     format: Mapped[str] = mapped_column(Text, nullable=False, default="markdown")
     status: Mapped[str] = mapped_column(Text, nullable=False, default="published")
 
-    tags: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]"))
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]"),
+    )
     description: Mapped[str | None] = mapped_column(Text)
     inject_scope: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     targeting_rules: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)

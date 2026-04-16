@@ -59,13 +59,13 @@ from app.schemas.alerts import (
 )
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.detection_rules import DetectionRuleResponse
-from app.schemas.kb import KBPageContextSummary
 from app.schemas.indicators import (
     EnrichedIndicator,
     IndicatorAddRequest,
     IndicatorAddResponse,
     IndicatorResponse,
 )
+from app.schemas.kb import KBPageContextSummary
 from app.schemas.relationship_graph import (
     AlertRelationshipGraph,
     GraphAlertNode,

@@ -25,7 +25,8 @@ class IssueRepository(BaseRepository[AgentIssue]):
         """
         result = await self._db.execute(
             text(
-                "SELECT COALESCE(MAX(CAST(regexp_replace(identifier, '[^0-9]', '', 'g') AS INTEGER)), 0)"
+                "SELECT COALESCE(MAX(CAST("
+                "regexp_replace(identifier, '[^0-9]', '', 'g') AS INTEGER)), 0)"
                 " FROM agent_issues"
                 " WHERE identifier ~ '^CAL-[0-9]+$'"
             )

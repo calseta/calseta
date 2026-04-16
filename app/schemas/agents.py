@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
+from uuid import UUID
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
@@ -77,12 +77,12 @@ class AgentRegistrationCreate(BaseModel):
 class AgentRegistrationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    uuid: uuid.UUID
+    uuid: UUID
     name: str
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
-    def id(self) -> uuid.UUID:
+    def id(self) -> "UUID":
         """Expose uuid as 'id' — the canonical external identifier for this agent."""
         return self.uuid
     description: str | None
@@ -201,7 +201,7 @@ class AgentKeyCreate(BaseModel):
 class AgentKeyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    uuid: uuid.UUID
+    uuid: UUID
     name: str
     key_prefix: str
     scopes: list[str]

@@ -24,4 +24,4 @@ class SkillFile(TimestampMixin, UUIDMixin, Base):
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
     is_entry: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    skill: Mapped["Skill"] = relationship("Skill", back_populates="files")
+    skill: Mapped[Skill] = relationship("Skill", back_populates="files")

@@ -182,7 +182,8 @@ class DispatchSingleWebhookHandler:
         session: AsyncSession,
     ) -> None:
         """Create assignment + heartbeat run and enqueue managed agent task."""
-        from sqlalchemy import delete, select as sa_select
+        from sqlalchemy import delete
+        from sqlalchemy import select as sa_select
 
         from app.db.models.alert_assignment import AlertAssignment
         from app.queue.registry import run_managed_agent_task

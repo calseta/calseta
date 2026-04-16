@@ -267,8 +267,9 @@ class PromptBuilder:
 
         # Include detection rule if present (load explicitly to avoid async lazy-load)
         if alert.detection_rule_id is not None:
-            from app.db.models.detection_rule import DetectionRule
             from sqlalchemy import select as sa_select
+
+            from app.db.models.detection_rule import DetectionRule
 
             dr_result = await self._db.execute(
                 sa_select(DetectionRule).where(DetectionRule.id == alert.detection_rule_id)

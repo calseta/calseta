@@ -235,7 +235,9 @@ async def test_llm_integration(
     repo = LLMIntegrationRepository(db)
     integration = await repo.get_by_uuid(uuid)
     if integration is None:
-        raise CalsetaException(status_code=404, code="NOT_FOUND", message="LLM integration not found")
+        raise CalsetaException(
+            status_code=404, code="NOT_FOUND", message="LLM integration not found",
+        )
 
     start = time.time()
     try:
@@ -244,7 +246,9 @@ async def test_llm_integration(
         adapter = get_adapter(integration)
         result = await adapter.test_environment()
         latency_ms = int((time.time() - start) * 1000)
-        return DataResponse(data={"success": result.ok, "latency_ms": latency_ms, "message": result.message})
+        return DataResponse(data={
+            "success": result.ok, "latency_ms": latency_ms, "message": result.message,
+        })
     except Exception as exc:  # noqa: BLE001
         latency_ms = int((time.time() - start) * 1000)
         return DataResponse(data={"success": False, "latency_ms": latency_ms, "message": str(exc)})

@@ -31,9 +31,7 @@ from app.repositories.alert_repository import AlertRepository
 from app.repositories.heartbeat_run_repository import HeartbeatRunRepository
 from app.repositories.issue_repository import IssueRepository
 from app.schemas.issues import (
-    IssueCategory,
     IssueCategoryDefCreate,
-    IssueCategoryDefPatch,
     IssueCategoryDefResponse,
     IssueCommentCreate,
     IssueCommentResponse,
@@ -543,7 +541,7 @@ class IssueService:
         await self._repo.delete_category(category)
         logger.info("category_deleted", category_uuid=str(category_uuid))
 
-    async def patch_category(self, category_uuid: UUID, label: str) -> "IssueCategoryDefResponse":
+    async def patch_category(self, category_uuid: UUID, label: str) -> IssueCategoryDefResponse:
         """Update a category label by UUID."""
         category = await self._repo.get_category_by_uuid(category_uuid)
         if category is None:

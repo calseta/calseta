@@ -229,7 +229,7 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
             if email:
                 msg = f"Authenticated as {email}" + (f" ({sub})" if sub else "")
             else:
-                msg = f"Claude Code CLI authenticated" + (f" ({sub})" if sub else "") + "."
+                msg = "Claude Code CLI authenticated" + (f" ({sub})" if sub else "") + "."
         except json.JSONDecodeError:
             msg = "Claude Code CLI authenticated."
 

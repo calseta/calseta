@@ -7,8 +7,6 @@ from app.db.models.agent_instruction_file import AgentInstructionFile
 from app.db.models.agent_invocation import AgentInvocation
 from app.db.models.agent_issue import AgentIssue
 from app.db.models.agent_issue_comment import AgentIssueComment
-from app.db.models.issue_category import IssueCategoryDef
-from app.db.models.issue_label import IssueLabel
 from app.db.models.agent_registration import AgentRegistration
 from app.db.models.agent_routine import AgentRoutine
 from app.db.models.agent_run import AgentRun
@@ -25,6 +23,8 @@ from app.db.models.enrichment_provider import EnrichmentProvider
 from app.db.models.heartbeat_run import HeartbeatRun
 from app.db.models.indicator import Indicator
 from app.db.models.indicator_field_mapping import IndicatorFieldMapping
+from app.db.models.issue_category import IssueCategoryDef
+from app.db.models.issue_label import IssueLabel
 from app.db.models.kb_page import KnowledgeBasePage
 from app.db.models.kb_page_link import KBPageLink
 from app.db.models.kb_page_revision import KBPageRevision
@@ -32,11 +32,11 @@ from app.db.models.llm_integration import LLMIntegration
 from app.db.models.routine_run import RoutineRun
 from app.db.models.routine_trigger import RoutineTrigger
 from app.db.models.secret import Secret, SecretVersion
+from app.db.models.skill import Skill
+from app.db.models.skill_file import SkillFile
 from app.db.models.source_integration import SourceIntegration
 from app.db.models.user_validation_rule import UserValidationRule
 from app.db.models.user_validation_template import UserValidationTemplate
-from app.db.models.skill import Skill
-from app.db.models.skill_file import SkillFile
 from app.db.models.workflow import Workflow
 from app.db.models.workflow_approval_request import WorkflowApprovalRequest
 from app.db.models.workflow_code_version import WorkflowCodeVersion

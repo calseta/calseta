@@ -354,7 +354,6 @@ class AgentRuntimeEngine:
         Errors are logged and swallowed — a missing skill file does not abort
         the agent run.
         """
-        import os
         from pathlib import Path
 
         from app.config import settings
