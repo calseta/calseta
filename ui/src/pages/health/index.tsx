@@ -261,7 +261,7 @@ function InfrastructureTab() {
           action={
             <Button size="sm" onClick={() => setSourceSheetOpen(true)} className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
-              Add Source
+              Source
             </Button>
           }
         />
@@ -292,7 +292,7 @@ function InfrastructureTab() {
           </Button>
           <Button size="sm" variant="outline" onClick={() => setPresetOpen(true)} className="gap-1.5 h-7 text-xs">
             <Plus className="h-3.5 w-3.5" />
-            Add Service
+            Service
           </Button>
           <Button size="sm" variant="outline" onClick={() => setSourceSheetOpen(true)} className="gap-1.5 h-7 text-xs">
             <Settings2 className="h-3.5 w-3.5" />
@@ -308,7 +308,7 @@ function InfrastructureTab() {
           action={
             <Button size="sm" onClick={() => setPresetOpen(true)} className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
-              Add Service
+              Service
             </Button>
           }
         />
@@ -387,7 +387,7 @@ function CustomTab() {
           action={
             <Button size="sm" onClick={() => setSourceSheetOpen(true)} className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
-              Add Source
+              Source
             </Button>
           }
         />
@@ -418,7 +418,7 @@ function CustomTab() {
           </Button>
           <Button size="sm" variant="outline" onClick={() => setFormOpen(true)} className="gap-1.5 h-7 text-xs">
             <Plus className="h-3.5 w-3.5" />
-            Add Custom Metric
+            Custom Metric
           </Button>
         </div>
       </div>
@@ -430,7 +430,7 @@ function CustomTab() {
           action={
             <Button size="sm" onClick={() => setFormOpen(true)} className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
-              Add Custom Metric
+              Custom Metric
             </Button>
           }
         />

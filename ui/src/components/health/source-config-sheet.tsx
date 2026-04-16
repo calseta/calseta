@@ -59,7 +59,7 @@ export function SourceConfigSheet({ open, onOpenChange }: SourceConfigSheetProps
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
-      <SheetContent side="right" className="w-[420px] sm:max-w-[420px] overflow-y-auto">
+      <SheetContent side="right" className="w-[420px] sm:max-w-[420px] overflow-y-auto p-6">
         {view === "list" && (
           <SourceList
             onAdd={() => setView("add")}
@@ -132,7 +132,7 @@ function SourceList({ onAdd, onEdit }: { onAdd: () => void; onEdit: (s: HealthSo
       <div className="mt-4 space-y-3">
         <Button size="sm" onClick={onAdd} className="w-full gap-1.5">
           <Plus className="h-3.5 w-3.5" />
-          Add Source
+          Source
         </Button>
 
         {sources.length === 0 ? (

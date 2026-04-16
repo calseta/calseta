@@ -77,7 +77,7 @@ export function PresetSelector({ open, onOpenChange, sources, onApplied }: Prese
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add Service Monitoring</DialogTitle>
+          <DialogTitle>Service Monitoring</DialogTitle>
           <DialogDescription>
             Select a cloud source and apply a monitoring preset to auto-configure metrics.
           </DialogDescription>
