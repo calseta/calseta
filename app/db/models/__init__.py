@@ -21,6 +21,9 @@ from app.db.models.cost_event import CostEvent
 from app.db.models.detection_rule import DetectionRule
 from app.db.models.enrichment_field_extraction import EnrichmentFieldExtraction
 from app.db.models.enrichment_provider import EnrichmentProvider
+from app.db.models.health_metric import HealthMetric
+from app.db.models.health_metric_config import HealthMetricConfig
+from app.db.models.health_source import HealthSource
 from app.db.models.heartbeat_run import HeartbeatRun
 from app.db.models.indicator import Indicator
 from app.db.models.indicator_field_mapping import IndicatorFieldMapping
@@ -66,6 +69,9 @@ __all__ = [
     "DetectionRule",
     "EnrichmentFieldExtraction",
     "EnrichmentProvider",
+    "HealthMetric",
+    "HealthMetricConfig",
+    "HealthSource",
     "HeartbeatRun",
     "Indicator",
     "IndicatorFieldMapping",

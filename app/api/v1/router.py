@@ -19,6 +19,7 @@ from app.api.v1 import (
     enrichment_field_extractions,
     enrichment_providers,
     enrichments,
+    health,
     heartbeat,
     indicator_mappings,
     indicators,
@@ -82,3 +83,4 @@ v1_router.include_router(topology.router)
 v1_router.include_router(kb.router)
 v1_router.include_router(memory.router)
 v1_router.include_router(memory.agents_memory_router)
+v1_router.include_router(health.router)

@@ -309,6 +309,15 @@ async def sync_kb_pages_task(timestamp: int) -> None:
         )
 
 
+@procrastinate_app.periodic(cron="*/1 * * * *")
+@procrastinate_app.task(name="poll_health_metrics_task", queue="default")
+async def poll_health_metrics_task(timestamp: int) -> None:
+    """Periodic task — poll all active health sources for metrics every minute."""
+    from app.queue.handlers.poll_health_metrics import handle_poll_health_metrics
+
+    await handle_poll_health_metrics()
+
+
 if settings.SANDBOX_MODE:
 
     @procrastinate_app.periodic(cron="0 0 * * *")
