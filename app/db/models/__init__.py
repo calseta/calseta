@@ -13,6 +13,7 @@ from app.db.models.agent_run import AgentRun
 from app.db.models.agent_run_event import AgentRunEvent
 from app.db.models.agent_task_session import AgentTaskSession
 from app.db.models.agent_tool import AgentTool
+from app.db.models.agent_workspace import AgentWorkspace
 from app.db.models.alert import Alert
 from app.db.models.alert_assignment import AlertAssignment
 from app.db.models.alert_indicator import AlertIndicator
@@ -57,6 +58,7 @@ __all__ = [
     "AgentInvocation",
     "AgentInstructionFile",
     "AgentRegistration",
+    "AgentWorkspace",
     "AgentRun",
     "AgentRunEvent",
     "AgentTaskSession",

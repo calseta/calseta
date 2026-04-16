@@ -126,6 +126,11 @@ class AgentRegistration(TimestampMixin, UUIDMixin, Base):
         Boolean, nullable=False, server_default=text("false"), default=False
     )
 
+    # --- Control plane: workspace ---
+    workspace_mode: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'none'"), default="none"
+    )
+
     # --- Relationships ---
     api_keys: Mapped[list[AgentAPIKey]] = relationship(
         "AgentAPIKey", back_populates="agent_registration", cascade="all, delete-orphan"
