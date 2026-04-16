@@ -78,7 +78,6 @@ export interface AlertResponse extends AlertSummary {
   malice_override_at: string | null;
   indicators: EnrichedIndicator[];
   agent_findings: AgentFinding[] | null;
-  raw_payload: Record<string, unknown> | null;
   updated_at: string;
 }
 
@@ -150,20 +149,6 @@ export interface ActivityEvent {
   created_at: string;
 }
 
-// Context Documents (list endpoint returns summary — no content field)
-export interface ContextDocument {
-  uuid: string;
-  title: string;
-  document_type: string;
-  is_global: boolean;
-  description: string | null;
-  content?: string;
-  targeting_rules?: Record<string, unknown> | null;
-  tags: string[];
-  version: number;
-  created_at: string;
-  updated_at: string;
-}
 
 // Queue metrics
 export interface QueueEntry {
@@ -189,7 +174,7 @@ export interface QueueMetrics {
 export interface MetricsSummary {
   period: string;
   platform: {
-    context_documents: number;
+    kb_pages: number;
     detection_rules: number;
     enrichment_providers: number;
     enrichment_providers_by_indicator_type: Record<string, number>;
@@ -334,12 +319,11 @@ export interface AgentRegistration {
   trigger_filter: Record<string, unknown> | null;
   timeout_seconds: number;
   retry_count: number;
-  is_active: boolean;
   documentation: string | null;
   created_at: string;
   updated_at: string;
   // Control plane fields (v2)
-  status?: string;
+  status: string;
   execution_mode?: string;
   agent_type?: string;
   role?: string | null;
@@ -583,6 +567,7 @@ export interface DetectionRuleMetrics {
 
 // LLM Integrations
 export interface LLMIntegration {
+  id: number;
   uuid: string;
   name: string;
   provider: string;
@@ -872,6 +857,12 @@ export interface KBPageSummary {
   folder: string;
   format: string;
   status: string;
+  description: string | null;
+  tags: string[];
+  targeting_rules: {
+    match_any?: Array<{ field: string; op: string; value: unknown }>;
+    match_all?: Array<{ field: string; op: string; value: unknown }>;
+  } | null;
   inject_scope: Record<string, unknown> | null;
   inject_priority: number;
   inject_pinned: boolean;
@@ -880,6 +871,17 @@ export interface KBPageSummary {
   token_count: number | null;
   latest_revision_number: number;
   created_at: string;
+  updated_at: string;
+}
+
+export interface KBPageContextSummary {
+  uuid: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  folder: string;
+  tags: string[];
+  inject_scope: Record<string, unknown> | null;
   updated_at: string;
 }
 
@@ -961,6 +963,16 @@ export interface IssueLabel {
   uuid: string;
   name: string;
   color: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Categories
+export interface IssueCategoryDef {
+  uuid: string;
+  key: string;
+  label: string;
+  is_system: boolean;
   created_at: string;
   updated_at: string;
 }

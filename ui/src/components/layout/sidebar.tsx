@@ -5,7 +5,6 @@ import {
   Workflow,
   CheckCircle2,
   Key,
-  BookOpen,
   Radar,
   Bot,
   FileCode2,
@@ -39,9 +38,8 @@ const manageNav = [
   { to: "/workflows", icon: Workflow, label: "Workflows" },
   { to: "/agents", icon: Bot, label: "Agents" },
   { to: "/skills", icon: Wand2, label: "Skills" },
-  { to: "/enrichment-providers", icon: Microscope, label: "Enrichments" },
+  { to: "/enrichments", icon: Microscope, label: "Enrichments" },
   { to: "/detection-rules", icon: Radar, label: "Detection Rules" },
-  { to: "/context-docs", icon: BookOpen, label: "Context Docs" },
   { to: "/kb", icon: Database, label: "Knowledge Base" },
 ];
 

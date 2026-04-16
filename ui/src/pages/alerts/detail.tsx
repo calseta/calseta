@@ -28,7 +28,8 @@ import { CopyableText } from "@/components/copyable-text";
 import {
   useAlert,
   useAlertActivity,
-  useAlertContext,
+  useAlertKBContext,
+  useAlertRawPayload,
   usePatchAlert,
   useEnrichAlert,
 } from "@/hooks/use-api";
@@ -114,7 +115,8 @@ export function AlertDetailPage() {
   const navigate = useNavigate({ from: "/alerts/$uuid" });
   const { data: alertResp, isLoading, refetch, isFetching } = useAlert(uuid);
   const { data: activityResp, refetch: refetchActivity } = useAlertActivity(uuid);
-  const { data: contextResp, refetch: refetchContext } = useAlertContext(uuid);
+  const { data: contextResp, refetch: refetchContext } = useAlertKBContext(uuid);
+  const { data: rawPayloadResp } = useAlertRawPayload(uuid, activeTab === "raw");
   const patchAlert = usePatchAlert();
   const enrichAlert = useEnrichAlert();
 
@@ -134,7 +136,7 @@ export function AlertDetailPage() {
 
   const alert = alertResp?.data;
   const activities = activityResp?.data ?? [];
-  const contextDocs = contextResp?.data ?? [];
+  const kbPages = contextResp?.data ?? [];
 
   if (isLoading) {
     return (
@@ -396,7 +398,7 @@ export function AlertDetailPage() {
             </TabsTrigger>
             <TabsTrigger value="context" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
               <FileText className="h-3.5 w-3.5 mr-1" />
-              Context ({contextDocs.length})
+              Knowledge Base ({kbPages.length})
             </TabsTrigger>
             <TabsTrigger value="activity" className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-sm">
               <Activity className="h-3.5 w-3.5 mr-1" />
@@ -679,30 +681,32 @@ export function AlertDetailPage() {
               )}
             </TabsContent>
 
-            {/* Context Docs */}
+            {/* KB Context */}
             <TabsContent value="context" className="mt-4">
-              {contextDocs.length > 0 ? (
+              {kbPages.length > 0 ? (
                 <div className="space-y-3">
-                  {contextDocs.map((doc) => (
-                    <Card key={doc.uuid} className="bg-card border-border">
+                  {kbPages.map((page) => (
+                    <Card key={page.uuid} className="bg-card border-border">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-foreground">
-                          {doc.title}
+                          {page.title}
                         </CardTitle>
                         <span className="text-[11px] text-dim">
-                          {doc.document_type}
+                          {page.folder}
                         </span>
                       </CardHeader>
-                      <CardContent className="pt-0">
-                        <pre className="text-xs text-muted-foreground whitespace-pre-wrap max-h-48 overflow-auto">
-                          {doc.content}
-                        </pre>
-                      </CardContent>
+                      {page.description && (
+                        <CardContent className="pt-0">
+                          <p className="text-xs text-muted-foreground">
+                            {page.description}
+                          </p>
+                        </CardContent>
+                      )}
                     </Card>
                   ))}
                 </div>
               ) : (
-                <Empty text="No context documents apply to this alert" />
+                <Empty text="No KB pages apply to this alert" />
               )}
             </TabsContent>
 
@@ -790,8 +794,8 @@ export function AlertDetailPage() {
 
             {/* Raw Data */}
             <TabsContent value="raw" className="mt-4">
-              {alert.raw_payload ? (
-                <JsonViewer data={alert.raw_payload} defaultExpanded={2} />
+              {rawPayloadResp?.data ? (
+                <JsonViewer data={rawPayloadResp.data} defaultExpanded={2} />
               ) : (
                 <Empty text="No raw payload data available" />
               )}

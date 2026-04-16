@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useSearch, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -420,6 +420,50 @@ function TestResultDisplay({ result }: { result: Record<string, unknown> }) {
   );
 }
 
+function InlineTitle({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
+
+  function commit() {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onSave(trimmed);
+    else setDraft(value);
+  }
+
+  function cancel() {
+    setEditing(false);
+    setDraft(value);
+  }
+
+  if (editing) {
+    return (
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          if (e.key === "Escape") { e.preventDefault(); cancel(); }
+        }}
+        autoFocus
+        className="text-xl font-heading font-extrabold tracking-tight text-foreground bg-transparent border-b border-teal outline-none w-full"
+      />
+    );
+  }
+
+  return (
+    <h2
+      className="text-xl font-heading font-extrabold tracking-tight text-foreground cursor-pointer rounded px-1 -mx-1 hover:bg-muted/40 transition-colors"
+      onClick={() => { setDraft(value); setEditing(true); }}
+    >
+      {value}
+    </h2>
+  );
+}
+
 export function WorkflowDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
   const { tab: tabParam } = useSearch({ strict: false }) as { tab?: string };
@@ -582,7 +626,17 @@ export function WorkflowDetailPage() {
       <div className="space-y-6">
         <DetailPageHeader
           backTo="/workflows"
-          title={wf.name}
+          titleNode={
+            <InlineTitle
+              value={wf.name}
+              onSave={(name) =>
+                patchWorkflow.mutate(
+                  { uuid, body: { name } },
+                  { onError: () => toast.error("Failed to update name") },
+                )
+              }
+            />
+          }
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
           badges={

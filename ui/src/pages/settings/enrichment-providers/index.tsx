@@ -137,7 +137,7 @@ export function EnrichmentProvidersPage() {
           toast.success("Enrichment provider created");
           const uuid = res?.data?.uuid;
           if (uuid) {
-            navigate({ to: "/enrichment-providers/$uuid", params: { uuid } });
+            navigate({ to: "/enrichments/$uuid", params: { uuid } });
           }
         },
         onError: () => toast.error("Failed to create enrichment provider"),
@@ -357,7 +357,7 @@ export function EnrichmentProvidersPage() {
                     <TableRow key={provider.uuid} className="border-border hover:bg-accent/50">
                       <TableCell>
                         <Link
-                          to="/enrichment-providers/$uuid"
+                          to="/enrichments/$uuid"
                           params={{ uuid: provider.uuid }}
                           className="flex items-center gap-2 hover:text-teal transition-colors"
                         >

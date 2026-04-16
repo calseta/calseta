@@ -18,29 +18,33 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
+  DetailPageSidebar,
+  SidebarSection,
+  DetailPageField,
+} from "@/components/detail-page";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   useIssue,
   useIssueComments,
   usePatchIssue,
   useAddIssueComment,
   useDeleteIssue,
   useAgents,
+  useIssueCategories,
 } from "@/hooks/use-api";
 import { formatDate, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Bot, User, Trash2, ExternalLink, Check, X } from "lucide-react";
+import { ArrowLeft, Bot, User, Trash2, ExternalLink, MoreHorizontal } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 
-const CATEGORY_LABELS: Record<string, string> = {
-  remediation: "Remediation",
-  detection_tuning: "Detection Tuning",
-  investigation: "Investigation",
-  compliance: "Compliance",
-  post_incident: "Post Incident",
-  maintenance: "Maintenance",
-  custom: "Custom",
-};
-
-const CATEGORIES = Object.keys(CATEGORY_LABELS);
+function formatStatus(status: string): string {
+  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const ISSUE_STATUSES = ["backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"];
 const PRIORITIES = ["critical", "high", "medium", "low"];
@@ -100,37 +104,31 @@ function InlineEditField({
   }
 
   if (editing) {
-    return (
-      <div className="space-y-1.5">
-        {multiline ? (
-          <Textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            autoFocus
-            rows={4}
-            className="text-sm resize-none"
-          />
-        ) : (
-          <Input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            autoFocus
-            className="text-sm font-semibold h-9"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); commit(); }
-              if (e.key === "Escape") cancel();
-            }}
-          />
-        )}
-        <div className="flex items-center gap-1.5">
-          <Button size="sm" className="h-6 px-2 text-xs gap-1" onClick={commit}>
-            <Check className="h-3 w-3" /> Save
-          </Button>
-          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs gap-1" onClick={cancel}>
-            <X className="h-3 w-3" /> Cancel
-          </Button>
-        </div>
-      </div>
+    return multiline ? (
+      <Textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        autoFocus
+        rows={4}
+        className={cn("text-sm resize-none", className)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") { e.preventDefault(); cancel(); }
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); }
+        }}
+      />
+    ) : (
+      <Input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        autoFocus
+        className={cn("text-sm font-semibold h-9", className)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          if (e.key === "Escape") { e.preventDefault(); cancel(); }
+        }}
+      />
     );
   }
 
@@ -151,7 +149,7 @@ function InlineEditField({
 // Property row in sidebar
 function PropRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-border/50 last:border-0">
+    <div className="flex items-center justify-between gap-2 py-1 border-b border-border/50 last:border-0">
       <span className="text-xs text-dim shrink-0">{label}</span>
       <div className="text-xs text-foreground text-right">{children}</div>
     </div>
@@ -167,6 +165,7 @@ export function IssueDetailPage() {
   const addComment = useAddIssueComment();
   const deleteIssue = useDeleteIssue();
   const { data: agentsResp } = useAgents({ page_size: 200 });
+  const { data: categoriesResp } = useIssueCategories();
 
   const [commentBody, setCommentBody] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -174,6 +173,7 @@ export function IssueDetailPage() {
   const issue = issueResp?.data;
   const comments = commentsResp?.data ?? [];
   const agents = agentsResp?.data ?? [];
+  const categories = categoriesResp?.data ?? [];
 
   function patch(body: Record<string, unknown>) {
     patchIssue.mutate({ uuid, body }, {
@@ -241,11 +241,28 @@ export function IssueDetailPage() {
             {issue.identifier}
           </Badge>
           <Badge variant="outline" className={cn("text-[10px]", statusColor(issue.status))}>
-            {issue.status.replace(/_/g, " ")}
+            {formatStatus(issue.status)}
           </Badge>
           <Badge variant="outline" className={cn("text-[10px]", priorityColor(issue.priority))}>
-            {issue.priority}
+            {issue.priority.charAt(0).toUpperCase() + issue.priority.slice(1)}
           </Badge>
+          <div className="flex-1" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-dim hover:text-foreground">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-card border-border">
+              <DropdownMenuItem
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-sm text-red-threat cursor-pointer focus:text-red-threat focus:bg-red-threat/10"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                Delete Issue
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Two-column layout */}
@@ -366,10 +383,8 @@ export function IssueDetailPage() {
 
           {/* Right: Properties sidebar */}
           <div className="w-64 shrink-0 space-y-4">
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 space-y-0.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-dim mb-2">Properties</p>
-
+            <DetailPageSidebar>
+              <SidebarSection title="Properties">
                 <PropRow label="Status">
                   <Select value={issue.status} onValueChange={(v) => patch({ status: v })}>
                     <SelectTrigger className="h-6 text-xs border-0 bg-transparent p-0 shadow-none w-auto gap-1 hover:bg-muted rounded">
@@ -377,7 +392,7 @@ export function IssueDetailPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {ISSUE_STATUSES.map((s) => (
-                        <SelectItem key={s} value={s} className="text-xs">{s.replace(/_/g, " ")}</SelectItem>
+                        <SelectItem key={s} value={s} className="text-xs">{formatStatus(s)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -402,8 +417,8 @@ export function IssueDetailPage() {
                       <SelectValue placeholder="—" />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat} value={cat} className="text-xs">{CATEGORY_LABELS[cat]}</SelectItem>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.uuid} value={cat.key} className="text-xs">{cat.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -425,29 +440,25 @@ export function IssueDetailPage() {
                     </SelectContent>
                   </Select>
                 </PropRow>
-              </CardContent>
-            </Card>
+              </SidebarSection>
 
-            {/* Timestamps */}
-            <Card className="bg-card border-border">
-              <CardContent className="p-4 space-y-0.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-dim mb-2">Timeline</p>
-                <PropRow label="Created"><span className="text-dim">{formatDate(issue.created_at)}</span></PropRow>
-                <PropRow label="Updated"><span className="text-dim">{formatDate(issue.updated_at)}</span></PropRow>
+              <SidebarSection title="Timeline">
+                <DetailPageField label="Created" value={formatDate(issue.created_at)} />
+                <DetailPageField label="Updated" value={formatDate(issue.updated_at)} />
                 {issue.started_at && (
-                  <PropRow label="Started"><span className="text-dim">{formatDate(issue.started_at)}</span></PropRow>
+                  <DetailPageField label="Started" value={formatDate(issue.started_at)} />
                 )}
                 {issue.completed_at && (
-                  <PropRow label="Completed"><span className="text-teal">{formatDate(issue.completed_at)}</span></PropRow>
+                  <DetailPageField label="Completed" value={<span className="text-teal">{formatDate(issue.completed_at)}</span>} />
                 )}
                 {issue.cancelled_at && (
-                  <PropRow label="Cancelled"><span className="text-red-threat">{formatDate(issue.cancelled_at)}</span></PropRow>
+                  <DetailPageField label="Cancelled" value={<span className="text-red-threat">{formatDate(issue.cancelled_at)}</span>} />
                 )}
                 {issue.due_at && (
-                  <PropRow label="Due"><span className="text-amber">{formatDate(issue.due_at)}</span></PropRow>
+                  <DetailPageField label="Due" value={<span className="text-amber">{formatDate(issue.due_at)}</span>} />
                 )}
-              </CardContent>
-            </Card>
+              </SidebarSection>
+            </DetailPageSidebar>
 
             {/* Linked Entities */}
             {(issue.alert_uuid || issue.routine_uuid || issue.parent_uuid) && (
@@ -497,16 +508,6 @@ export function IssueDetailPage() {
               </Card>
             )}
 
-            {/* Danger zone */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full h-8 text-xs text-red-threat hover:bg-red-threat/10 hover:text-red-threat gap-1.5"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete Issue
-            </Button>
           </div>
         </div>
       </div>

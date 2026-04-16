@@ -259,6 +259,15 @@ export function RoutineDetailPage() {
           actions={
             <>
               <Button
+                variant="ghost"
+                size="sm"
+                onClick={openEditDialog}
+                className="h-8 gap-1.5 text-xs text-dim hover:text-foreground"
+              >
+                <Pencil className="h-3 w-3" />
+                Edit
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={handleTrigger}
@@ -316,18 +325,6 @@ export function RoutineDetailPage() {
 
           {/* Configuration tab */}
           <TabsContent value="configuration" className="mt-4">
-            <div className="flex justify-end mb-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={openEditDialog}
-                className="h-8 gap-1.5 text-xs text-dim hover:text-foreground"
-              >
-                <Pencil className="h-3 w-3" />
-                Edit
-              </Button>
-            </div>
-
             <DetailPageLayout
               sidebar={
                 <DetailPageSidebar>
@@ -378,10 +375,10 @@ export function RoutineDetailPage() {
                 </DetailPageSidebar>
               }
             >
-              <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium">About</CardTitle>
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">About</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-foreground">

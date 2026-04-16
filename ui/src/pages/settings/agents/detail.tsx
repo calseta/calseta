@@ -182,6 +182,50 @@ const INVOCATION_COLUMNS: ColumnDef[] = [
   { key: "completed_at", initialWidth: 160 },
 ];
 
+function InlineTitle({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
+
+  function commit() {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onSave(trimmed);
+    else setDraft(value);
+  }
+
+  function cancel() {
+    setEditing(false);
+    setDraft(value);
+  }
+
+  if (editing) {
+    return (
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          if (e.key === "Escape") { e.preventDefault(); cancel(); }
+        }}
+        autoFocus
+        className="text-xl font-heading font-extrabold tracking-tight text-foreground bg-transparent border-b border-teal outline-none w-full"
+      />
+    );
+  }
+
+  return (
+    <h2
+      className="text-xl font-heading font-extrabold tracking-tight text-foreground cursor-pointer rounded px-1 -mx-1 hover:bg-muted/40 transition-colors"
+      onClick={() => { setDraft(value); setEditing(true); }}
+    >
+      {value}
+    </h2>
+  );
+}
+
 export function AgentDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
   const { tab: activeTab } = useSearch({ from: "/agents/$uuid" });
@@ -214,7 +258,7 @@ export function AgentDetailPage() {
     endpoint_url: "",
     system_prompt: "",
     methodology: "",
-    llm_integration_uuid: "",
+    llm_integration_id: "__none__",
     max_concurrent_alerts: "",
     max_cost_per_alert_dollars: "",
     max_investigation_minutes: "",
@@ -499,7 +543,7 @@ export function AgentDetailPage() {
       endpoint_url: a.endpoint_url ?? "",
       system_prompt: a.system_prompt ?? "",
       methodology: a.methodology ?? "",
-      llm_integration_uuid: "",
+      llm_integration_id: a.llm_integration_id ? String(a.llm_integration_id) : "__none__",
       max_concurrent_alerts: a.max_concurrent_alerts ? String(a.max_concurrent_alerts) : "",
       max_cost_per_alert_dollars: a.max_cost_per_alert_cents ? (a.max_cost_per_alert_cents / 100).toFixed(2) : "",
       max_investigation_minutes: a.max_investigation_minutes ? String(a.max_investigation_minutes) : "",
@@ -517,7 +561,9 @@ export function AgentDetailPage() {
     if (isManaged) {
       body.system_prompt = configDraft.system_prompt || null;
       body.methodology = configDraft.methodology || null;
-      if (configDraft.llm_integration_uuid) body.llm_integration_uuid = configDraft.llm_integration_uuid;
+      body.llm_integration_id = configDraft.llm_integration_id !== "__none__"
+        ? Number(configDraft.llm_integration_id)
+        : null;
     }
     body.max_concurrent_alerts = configDraft.max_concurrent_alerts ? Number(configDraft.max_concurrent_alerts) : null;
     body.max_cost_per_alert_cents = configDraft.max_cost_per_alert_dollars
@@ -643,7 +689,17 @@ export function AgentDetailPage() {
       <div className="space-y-6">
         <DetailPageHeader
           backTo="/agents"
-          title={agent.name}
+          titleNode={
+            <InlineTitle
+              value={agent.name}
+              onSave={(name) =>
+                patchAgent.mutate(
+                  { uuid, body: { name } },
+                  { onError: () => toast.error("Failed to update name") },
+                )
+              }
+            />
+          }
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
           badges={
@@ -1015,8 +1071,8 @@ export function AgentDetailPage() {
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">LLM Integration</Label>
                         <Select
-                          value={configDraft.llm_integration_uuid ?? "__none__"}
-                          onValueChange={(v) => setConfigDraft({ ...configDraft, llm_integration_uuid: v === "__none__" ? undefined : v })}
+                          value={configDraft.llm_integration_id}
+                          onValueChange={(v) => setConfigDraft({ ...configDraft, llm_integration_id: v })}
                         >
                           <SelectTrigger className="bg-surface border-border text-sm">
                             <SelectValue placeholder="Select integration..." />
@@ -1024,7 +1080,7 @@ export function AgentDetailPage() {
                           <SelectContent className="bg-card border-border">
                             <SelectItem value="__none__">None</SelectItem>
                             {llmIntegrations.map((llm) => (
-                              <SelectItem key={llm.uuid} value={llm.uuid}>
+                              <SelectItem key={llm.id} value={String(llm.id)}>
                                 {llm.name} ({llm.provider}/{llm.model})
                               </SelectItem>
                             ))}

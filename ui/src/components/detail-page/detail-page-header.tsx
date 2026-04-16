@@ -6,7 +6,8 @@ import { ArrowLeft, RefreshCw } from "lucide-react";
 
 interface DetailPageHeaderProps {
   backTo: string;
-  title: string;
+  title?: string;
+  titleNode?: ReactNode;
   badges?: ReactNode;
   actions?: ReactNode;
   subtitle?: ReactNode;
@@ -17,6 +18,7 @@ interface DetailPageHeaderProps {
 export function DetailPageHeader({
   backTo,
   title,
+  titleNode,
   badges,
   actions,
   subtitle,
@@ -47,9 +49,11 @@ export function DetailPageHeader({
           {actions}
         </div>
       </div>
-      <h2 className="text-xl font-heading font-extrabold tracking-tight text-foreground">
-        {title}
-      </h2>
+      {titleNode ?? (
+        <h2 className="text-xl font-heading font-extrabold tracking-tight text-foreground">
+          {title}
+        </h2>
+      )}
       {subtitle && <div className="mt-1">{subtitle}</div>}
     </div>
   );

@@ -13,7 +13,7 @@ import type {
   WorkflowRun,
   WorkflowApproval,
   DetectionRule,
-  ContextDocument,
+  KBPageContextSummary,
   SourceIntegration,
   AgentRegistration,
   ApiKeyResponse,
@@ -55,6 +55,7 @@ import type {
   Skill,
   SkillFile,
   IssueLabel,
+  IssueCategoryDef,
 } from "@/lib/types";
 
 // Settings
@@ -121,12 +122,21 @@ export function useAlertActivity(uuid: string) {
   });
 }
 
-export function useAlertContext(uuid: string) {
+export function useAlertKBContext(uuid: string) {
   return useQuery({
-    queryKey: ["alert-context", uuid],
+    queryKey: ["alert-kb-context", uuid],
     queryFn: () =>
-      api.get<DataResponse<ContextDocument[]>>(`/alerts/${uuid}/context`),
+      api.get<DataResponse<KBPageContextSummary[]>>(`/alerts/${uuid}/kb-context`),
     enabled: !!uuid,
+  });
+}
+
+export function useAlertRawPayload(uuid: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ["alert-raw-payload", uuid],
+    queryFn: () =>
+      api.get<DataResponse<Record<string, unknown>>>(`/alerts/${uuid}/raw-payload`),
+    enabled: !!uuid && enabled,
   });
 }
 
@@ -405,60 +415,6 @@ export function useDetectionRuleMetrics(uuid: string) {
   });
 }
 
-// Context Documents
-export function useContextDocuments(params?: Record<string, string | number | boolean | undefined>) {
-  const search = new URLSearchParams();
-  if (params) {
-    for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined && v !== "") search.set(k, String(v));
-    }
-  }
-  const qs = search.toString();
-  return useQuery({
-    queryKey: ["context-documents", qs],
-    queryFn: () =>
-      api.get<PaginatedResponse<ContextDocument>>(
-        `/context-documents${qs ? `?${qs}` : ""}`,
-      ),
-  });
-}
-
-export function useCreateContextDocument() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: Record<string, unknown>) =>
-      api.post<DataResponse<ContextDocument>>("/context-documents", body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["context-documents"] }),
-  });
-}
-
-export function useContextDocument(uuid: string) {
-  return useQuery({
-    queryKey: ["context-document", uuid],
-    queryFn: () => api.get<DataResponse<ContextDocument>>(`/context-documents/${uuid}`),
-    enabled: !!uuid,
-  });
-}
-
-export function usePatchContextDocument() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
-      api.patch<DataResponse<ContextDocument>>(`/context-documents/${uuid}`, body),
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["context-document", vars.uuid] });
-      qc.invalidateQueries({ queryKey: ["context-documents"] });
-    },
-  });
-}
-
-export function useDeleteContextDocument() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (uuid: string) => api.delete(`/context-documents/${uuid}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["context-documents"] }),
-  });
-}
 
 // Sources
 export function useSources(params?: Record<string, string | number | boolean | undefined>) {
@@ -1402,9 +1358,45 @@ export function useDeleteKBPage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (slug: string) => api.delete(`/kb/${encodeURIComponent(slug)}`),
+    onSuccess: (_data, slug) => {
+      qc.removeQueries({ queryKey: ["kb-pages"] });
+      qc.removeQueries({ queryKey: ["kb-folders"] });
+      qc.removeQueries({ queryKey: ["kb-page", slug] });
+    },
+  });
+}
+
+export function useKBPageByUUID(uuid: string) {
+  return useQuery({
+    queryKey: ["kb-page-uuid", uuid],
+    queryFn: () => api.get<DataResponse<KBPageResponse>>(`/kb/uuid/${uuid}`),
+    enabled: !!uuid,
+  });
+}
+
+export function usePatchKBPageByUUID() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<KBPageResponse>>(`/kb/uuid/${uuid}`, body),
+    onSuccess: (data) => {
+      const slug = data.data.slug;
+      qc.removeQueries({ queryKey: ["kb-pages"] });
+      qc.removeQueries({ queryKey: ["kb-folders"] });
+      qc.removeQueries({ queryKey: ["kb-page-uuid"] });
+      qc.removeQueries({ queryKey: ["kb-page", slug] });
+    },
+  });
+}
+
+export function useDeleteKBPageByUUID() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/kb/uuid/${uuid}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["kb-pages"] });
-      qc.invalidateQueries({ queryKey: ["kb-folders"] });
+      qc.removeQueries({ queryKey: ["kb-pages"] });
+      qc.removeQueries({ queryKey: ["kb-folders"] });
+      qc.removeQueries({ queryKey: ["kb-page-uuid"] });
     },
   });
 }
@@ -1525,6 +1517,44 @@ export function useDeleteLabel() {
   return useMutation({
     mutationFn: (uuid: string) => api.delete(`/labels/${uuid}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["labels"] }),
+  });
+}
+
+// ============================================================
+// Issue Categories
+// ============================================================
+
+export function useIssueCategories() {
+  return useQuery({
+    queryKey: ["issue-categories"],
+    queryFn: () => api.get<PaginatedResponse<IssueCategoryDef>>("/issue-categories?page_size=500"),
+    staleTime: 60_000,
+  });
+}
+
+export function useCreateIssueCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { key: string; label: string }) =>
+      api.post<DataResponse<IssueCategoryDef>>("/issue-categories", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["issue-categories"] }),
+  });
+}
+
+export function useDeleteIssueCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/issue-categories/${uuid}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["issue-categories"] }),
+  });
+}
+
+export function usePatchIssueCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, label }: { uuid: string; label: string }) =>
+      api.patch<DataResponse<IssueCategoryDef>>(`/issue-categories/${uuid}`, { label }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["issue-categories"] }),
   });
 }
 

@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AppLayout } from "@/components/layout/app-layout";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -54,28 +55,25 @@ import {
   usePatchIssue,
   useAgents,
   useLabels,
+  useIssueCategories,
+  useCreateIssueCategory,
+  useDeleteIssueCategory,
+  usePatchIssueCategory,
 } from "@/hooks/use-api";
 import { relativeTime, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { RefreshCw, Plus, LayoutList, Columns, Search, X } from "lucide-react";
-import type { AgentIssue } from "@/lib/types";
+import { RefreshCw, Plus, LayoutList, Columns, Search, X, Settings2, Trash2, Pencil, Check } from "lucide-react";
+import type { AgentIssue, IssueCategoryDef } from "@/lib/types";
 
-const CATEGORY_LABELS: Record<string, string> = {
-  remediation: "Remediation",
-  detection_tuning: "Detection Tuning",
-  investigation: "Investigation",
-  compliance: "Compliance",
-  post_incident: "Post Incident",
-  maintenance: "Maintenance",
-  custom: "Custom",
-};
+function formatStatus(status: string): string {
+  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
-const CATEGORIES = Object.keys(CATEGORY_LABELS);
 const PRIORITIES = ["critical", "high", "medium", "low"];
 const STATUSES = ["backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"];
 
 const KANBAN_COLUMNS = [
-  { key: "open", label: "Backlog / Todo", statuses: ["backlog", "todo"], dropStatus: "todo", borderColor: "border-teal/50" },
+  { key: "open", label: "Backlog", statuses: ["backlog", "todo"], dropStatus: "todo", borderColor: "border-teal/50" },
   { key: "in_progress", label: "In Progress", statuses: ["in_progress", "in_review"], dropStatus: "in_progress", borderColor: "border-amber/50" },
   { key: "blocked", label: "Blocked", statuses: ["blocked"], dropStatus: "blocked", borderColor: "border-red-threat/50" },
   { key: "done", label: "Done", statuses: ["done", "cancelled"], dropStatus: "done", borderColor: "border-teal/50" },
@@ -126,7 +124,7 @@ function KanbanCardStatic({ issue }: { issue: AgentIssue }) {
       </div>
       <div className="flex items-center gap-1.5 flex-wrap">
         <Badge variant="outline" className="text-[10px] font-mono text-dim border-dim/30">{issue.identifier}</Badge>
-        <Badge variant="outline" className={cn("text-[10px]", statusColor(issue.status))}>{issue.status}</Badge>
+        <Badge variant="outline" className={cn("text-[10px]", statusColor(issue.status))}>{formatStatus(issue.status)}</Badge>
       </div>
     </div>
   );
@@ -164,7 +162,7 @@ function KanbanCard({ issue, isDragging }: { issue: AgentIssue; isDragging: bool
         <div className="flex items-center gap-1.5 flex-wrap">
           <Badge variant="outline" className="text-[10px] font-mono text-dim border-dim/30">{issue.identifier}</Badge>
           {issue.priority && (
-            <Badge variant="outline" className={cn("text-[10px]", priorityColor(issue.priority))}>{issue.priority}</Badge>
+            <Badge variant="outline" className={cn("text-[10px]", priorityColor(issue.priority))}>{issue.priority.charAt(0).toUpperCase() + issue.priority.slice(1)}</Badge>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -201,16 +199,16 @@ function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "shrink-0 w-[280px] flex flex-col rounded-lg border bg-muted/5 transition-colors",
+        "shrink-0 w-[280px] flex flex-col rounded-lg border bg-muted/5 transition-colors h-full",
         isOver ? cn("border-2", borderColor) : "border-border",
       )}
     >
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
         <span className="text-xs font-semibold text-foreground">{label}</span>
         <span className="text-[10px] bg-muted text-dim px-1.5 py-0.5 rounded-full">{issues.length}</span>
       </div>
       <SortableContext items={issues.map((i) => i.uuid)} strategy={verticalListSortingStrategy}>
-        <div className="flex flex-col gap-2 p-2 overflow-y-auto max-h-[calc(100vh-260px)]">
+        <div className="flex flex-col gap-2 p-2 flex-1 overflow-y-auto min-h-0">
           {issues.length === 0 ? (
             <div className="text-center text-xs text-dim py-8">No issues</div>
           ) : (
@@ -226,7 +224,7 @@ function KanbanColumn({
 
 // ─── List View ───────────────────────────────────────────────────────────────
 
-function ListView({ issues }: { issues: AgentIssue[] }) {
+function ListView({ issues, categoryMap }: { issues: AgentIssue[]; categoryMap: Record<string, string> }) {
   const navigate = useNavigate();
 
   if (issues.length === 0) {
@@ -267,16 +265,16 @@ function ListView({ issues }: { issues: AgentIssue[] }) {
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className={cn("text-[10px]", statusColor(issue.status))}>
-                  {issue.status.replace(/_/g, " ")}
+                  {formatStatus(issue.status)}
                 </Badge>
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className={cn("text-[10px]", priorityColor(issue.priority))}>
-                  {issue.priority}
+                  {issue.priority.charAt(0).toUpperCase() + issue.priority.slice(1)}
                 </Badge>
               </TableCell>
               <TableCell>
-                <span className="text-xs text-dim">{CATEGORY_LABELS[issue.category] ?? issue.category ?? "—"}</span>
+                <span className="text-xs text-dim">{categoryMap[issue.category] ?? issue.category ?? "—"}</span>
               </TableCell>
               <TableCell>
                 <span className="text-xs text-dim truncate block max-w-[100px]">
@@ -299,16 +297,18 @@ function ListView({ issues }: { issues: AgentIssue[] }) {
 function NewIssueDialog({
   open,
   onOpenChange,
+  categories,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  categories: IssueCategoryDef[];
 }) {
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formCategory, setFormCategory] = useState<string>("");
   const [formPriority, setFormPriority] = useState<string>("medium");
   const [formStatus, setFormStatus] = useState<string>("backlog");
-  const [formAssignee, setFormAssignee] = useState<string>("");
+  const [formAssignee, setFormAssignee] = useState<string>("_none_");
 
   const createIssue = useCreateIssue();
   const { data: agentsResp } = useAgents({ page_size: 200 });
@@ -326,7 +326,7 @@ function NewIssueDialog({
     };
     if (formDescription.trim()) body.description = formDescription.trim();
     if (formCategory) body.category = formCategory;
-    if (formAssignee) body.assignee_agent_uuid = formAssignee;
+    if (formAssignee && formAssignee !== "_none_") body.assignee_agent_uuid = formAssignee;
 
     createIssue.mutate(body, {
       onSuccess: () => {
@@ -337,7 +337,7 @@ function NewIssueDialog({
         setFormCategory("");
         setFormPriority("medium");
         setFormStatus("backlog");
-        setFormAssignee("");
+        setFormAssignee("_none_");
       },
       onError: () => toast.error("Failed to create issue"),
     });
@@ -379,7 +379,7 @@ function NewIssueDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>
+                    <SelectItem key={s} value={s}>{formatStatus(s)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -399,13 +399,13 @@ function NewIssueDialog({
             </div>
             <div className="space-y-1.5">
               <Label>Category</Label>
-              <Select value={formCategory} onValueChange={setFormCategory}>
+              <Select value={formCategory || undefined} onValueChange={setFormCategory}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>{CATEGORY_LABELS[cat]}</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.uuid} value={cat.key}>{cat.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -417,7 +417,7 @@ function NewIssueDialog({
                   <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="_none_">None</SelectItem>
                   {agents.map((a) => (
                     <SelectItem key={a.uuid} value={a.uuid}>{a.name}</SelectItem>
                   ))}
@@ -437,17 +437,217 @@ function NewIssueDialog({
   );
 }
 
+// ─── Issue Categories Dialog ─────────────────────────────────────────────────
+
+function IssueCategoriesDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [editingUuid, setEditingUuid] = useState<string | null>(null);
+  const [editingLabel, setEditingLabel] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<IssueCategoryDef | null>(null);
+  const [pendingRows, setPendingRows] = useState<Array<{ id: string; label: string }>>([]);
+
+  const { data: categoriesResp } = useIssueCategories();
+  const categories = categoriesResp?.data ?? [];
+  const createCategory = useCreateIssueCategory();
+  const deleteCategory = useDeleteIssueCategory();
+  const patchCategory = usePatchIssueCategory();
+
+  function toKey(label: string): string {
+    return label.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "").replace(/^[^a-z]+/, "");
+  }
+
+  function addPendingRow() {
+    setPendingRows((prev) => [...prev, { id: crypto.randomUUID(), label: "" }]);
+  }
+
+  function removePendingRow(id: string) {
+    setPendingRows((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  function updatePendingRow(id: string, label: string) {
+    setPendingRows((prev) => prev.map((r) => r.id === id ? { ...r, label } : r));
+  }
+
+  function savePendingRow(id: string) {
+    const row = pendingRows.find((r) => r.id === id);
+    if (!row) return;
+    const label = row.label.trim();
+    if (!label) { removePendingRow(id); return; }
+    const key = toKey(label);
+    if (!key) { toast.error("Label must start with a letter"); return; }
+    createCategory.mutate(
+      { key, label },
+      {
+        onSuccess: () => { toast.success("Category added"); removePendingRow(id); },
+        onError: () => toast.error("Failed to add category"),
+      },
+    );
+  }
+
+  function startEdit(cat: IssueCategoryDef) {
+    setEditingUuid(cat.uuid);
+    setEditingLabel(cat.label);
+  }
+
+  function commitEdit() {
+    if (!editingUuid || !editingLabel.trim()) return;
+    patchCategory.mutate(
+      { uuid: editingUuid, label: editingLabel.trim() },
+      {
+        onSuccess: () => { toast.success("Category updated"); setEditingUuid(null); },
+        onError: () => toast.error("Failed to update category"),
+      },
+    );
+  }
+
+  function cancelEdit() { setEditingUuid(null); }
+
+  function confirmDelete(cat: IssueCategoryDef) { setDeleteTarget(cat); }
+
+  function handleDelete() {
+    if (!deleteTarget) return;
+    deleteCategory.mutate(deleteTarget.uuid, {
+      onSuccess: () => { toast.success(`"${deleteTarget.label}" deleted`); setDeleteTarget(null); },
+      onError: () => toast.error("Failed to delete category"),
+    });
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Issue Settings</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Categories</p>
+            <div className="space-y-0.5">
+              {categories.map((cat) => (
+                <div key={cat.uuid} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30">
+                  {editingUuid === cat.uuid ? (
+                    <>
+                      <Input
+                        value={editingLabel}
+                        onChange={(e) => setEditingLabel(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
+                        autoFocus
+                        className="h-7 text-xs flex-1"
+                      />
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-teal" onClick={commitEdit} disabled={patchCategory.isPending}>
+                        <Check className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-dim" onClick={cancelEdit}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-sm text-foreground truncate">{cat.label}</span>
+                        <span className="text-[10px] font-mono text-dim">{cat.key}</span>
+                        {cat.is_system && (
+                          <Badge variant="outline" className="text-[9px] text-dim border-dim/30 h-4 px-1">System</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-dim hover:text-teal" onClick={() => startEdit(cat)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-6 w-6 p-0",
+                            cat.is_system
+                              ? "text-dim/30 cursor-not-allowed"
+                              : "text-red-threat hover:text-red-threat/80",
+                          )}
+                          onClick={() => { if (!cat.is_system) confirmDelete(cat); }}
+                          disabled={cat.is_system}
+                          title={cat.is_system ? "System categories cannot be deleted" : "Delete"}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              {/* Pending new rows */}
+              {pendingRows.map((row) => (
+                <div key={row.id} className="flex items-center gap-1.5 px-2 py-1">
+                  <Input
+                    value={row.label}
+                    onChange={(e) => updatePendingRow(row.id, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") savePendingRow(row.id);
+                      if (e.key === "Escape") removePendingRow(row.id);
+                    }}
+                    placeholder="Category label..."
+                    autoFocus
+                    className="h-7 text-xs flex-1"
+                  />
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-teal shrink-0" onClick={() => savePendingRow(row.id)} disabled={createCategory.isPending}>
+                    <Check className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-dim hover:text-red-threat shrink-0" onClick={() => removePendingRow(row.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addPendingRow}
+              className="text-xs border-dashed border-border text-dim hover:text-teal hover:border-teal/40 h-7 w-full mt-1"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add Category
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}
+        title="Delete Category"
+        description={`Delete "${deleteTarget?.label}"? Issues using this category will keep the key but it won't appear in the list.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
+    </>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export function IssuesPage() {
   const [view, setView] = useState<"list" | "board">("board");
   const [showNewIssue, setShowNewIssue] = useState(false);
+  const [showCategoriesSettings, setShowCategoriesSettings] = useState(false);
+
+  // Categories from API
+  const { data: categoriesResp } = useIssueCategories();
+  const categories = categoriesResp?.data ?? [];
+  const categoryMap: Record<string, string> = Object.fromEntries(
+    categories.map((c) => [c.key, c.label]),
+  );
 
   // Filters
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [priorityFilter, setPriorityFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
 
   // Debounce search
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -555,9 +755,9 @@ export function IssuesPage() {
 
   return (
     <AppLayout title="Issues">
-      <div className="space-y-4">
+      <div className="h-full flex flex-col gap-4">
         {/* Top bar */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           {/* Search */}
           <div className="relative flex-1 max-w-64">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-dim" />
@@ -579,24 +779,24 @@ export function IssuesPage() {
 
           {/* Status filter */}
           <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
-            <SelectTrigger className="h-8 w-32 text-xs">
+            <SelectTrigger className="h-8 w-36 text-xs">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="all">All Statuses</SelectItem>
               {STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>
+                <SelectItem key={s} value={s}>{formatStatus(s)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
           {/* Priority filter */}
           <Select value={priorityFilter || "all"} onValueChange={(v) => setPriorityFilter(v === "all" ? "" : v)}>
-            <SelectTrigger className="h-8 w-32 text-xs">
+            <SelectTrigger className="h-8 w-40 text-xs">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All priorities</SelectItem>
+              <SelectItem value="all">All Priorities</SelectItem>
               {PRIORITIES.map((p) => (
                 <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
               ))}
@@ -632,6 +832,16 @@ export function IssuesPage() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => setShowCategoriesSettings(true)}
+            className="h-8 w-8 p-0 text-dim hover:text-teal"
+            title="Issue Settings"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => refetch()}
             disabled={isFetching}
             className="h-8 w-8 p-0 text-dim hover:text-teal"
@@ -647,9 +857,9 @@ export function IssuesPage() {
 
         {/* Content */}
         {isLoading ? (
-          <div className="flex gap-4 overflow-x-auto pb-2">
+          <div className="flex gap-4 overflow-x-auto pb-2 flex-1 min-h-0">
             {Array.from({ length: 4 }).map((_, ci) => (
-              <div key={ci} className="shrink-0 w-[280px] bg-muted/5 rounded-lg border border-border p-3 space-y-3">
+              <div key={ci} className="shrink-0 w-[280px] h-full bg-muted/5 rounded-lg border border-border p-3 space-y-3">
                 <Skeleton className="h-5 w-24" />
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Card key={i}>
@@ -663,36 +873,41 @@ export function IssuesPage() {
             ))}
           </div>
         ) : view === "board" ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-4 overflow-x-auto pb-2 items-start">
-              {KANBAN_COLUMNS.map((col) => (
-                <KanbanColumn
-                  key={col.key}
-                  colKey={col.key}
-                  label={col.label}
-                  issues={filterIssuesByColumn(col.key)}
-                  borderColor={col.borderColor}
-                  activeId={activeId}
-                  isOver={overId === col.key}
-                />
-              ))}
-            </div>
-            <DragOverlay>
-              {activeIssue ? <KanbanCardStatic issue={activeIssue} /> : null}
-            </DragOverlay>
-          </DndContext>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex gap-4 overflow-x-auto h-full pb-2">
+                {KANBAN_COLUMNS.map((col) => (
+                  <KanbanColumn
+                    key={col.key}
+                    colKey={col.key}
+                    label={col.label}
+                    issues={filterIssuesByColumn(col.key)}
+                    borderColor={col.borderColor}
+                    activeId={activeId}
+                    isOver={overId === col.key}
+                  />
+                ))}
+              </div>
+              <DragOverlay>
+                {activeIssue ? <KanbanCardStatic issue={activeIssue} /> : null}
+              </DragOverlay>
+            </DndContext>
+          </div>
         ) : (
-          <ListView issues={issues} />
+          <div className="flex-1 min-h-0 overflow-auto">
+            <ListView issues={issues} categoryMap={categoryMap} />
+          </div>
         )}
       </div>
 
-      <NewIssueDialog open={showNewIssue} onOpenChange={setShowNewIssue} />
+      <NewIssueDialog open={showNewIssue} onOpenChange={setShowNewIssue} categories={categories} />
+      <IssueCategoriesDialog open={showCategoriesSettings} onOpenChange={setShowCategoriesSettings} />
     </AppLayout>
   );
 }

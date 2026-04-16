@@ -45,7 +45,6 @@ import {
   X,
   Lock,
   FileText,
-  FilePlus,
   ChevronRight,
   ChevronDown,
   Folder,
@@ -221,42 +220,53 @@ function SkillTreeRow({
 }) {
   const files = skill.files ?? [];
   const tree = buildTree(files);
+  const [showAddFile, setShowAddFile] = useState(false);
+  const upsertFile = useUpsertSkillFile();
 
   return (
     <div>
       {/* Skill folder row */}
-      <button
-        onClick={onToggle}
-        className={cn(
-          "w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-left transition-colors",
-          isSelected
-            ? "text-teal-light"
-            : "hover:bg-muted/40 text-foreground",
-        )}
-      >
-        {isExpanded ? (
-          <ChevronDown className="h-3 w-3 shrink-0 text-dim" />
-        ) : (
-          <ChevronRight className="h-3 w-3 shrink-0 text-dim" />
-        )}
-        {isExpanded ? (
-          <FolderOpen className="h-3.5 w-3.5 shrink-0 text-teal" />
-        ) : (
-          <Folder className="h-3.5 w-3.5 shrink-0 text-dim" />
-        )}
-        <span className="text-xs font-medium truncate flex-1">{skill.name}</span>
-        {skill.is_global && (
-          <Globe className="h-3 w-3 text-teal shrink-0" title="Global — injected into all agents" />
-        )}
-        {!skill.is_active && (
-          <Badge
-            variant="outline"
-            className="text-[9px] text-dim border-dim/30 px-1 py-0 shrink-0"
-          >
-            off
-          </Badge>
-        )}
-      </button>
+      <div className="group relative">
+        <button
+          onClick={onToggle}
+          className={cn(
+            "w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-left transition-colors",
+            isSelected
+              ? "text-teal-light"
+              : "hover:bg-muted/40 text-foreground",
+          )}
+        >
+          {isExpanded ? (
+            <ChevronDown className="h-3 w-3 shrink-0 text-dim" />
+          ) : (
+            <ChevronRight className="h-3 w-3 shrink-0 text-dim" />
+          )}
+          {isExpanded ? (
+            <FolderOpen className="h-3.5 w-3.5 shrink-0 text-teal" />
+          ) : (
+            <Folder className="h-3.5 w-3.5 shrink-0 text-dim" />
+          )}
+          <span className="text-xs font-medium truncate flex-1">{skill.name}</span>
+          {skill.is_global && (
+            <Globe className="h-3 w-3 text-teal shrink-0" title="Global — injected into all agents" />
+          )}
+          {!skill.is_active && (
+            <Badge
+              variant="outline"
+              className="text-[9px] text-dim border-dim/30 px-1 py-0 shrink-0"
+            >
+              off
+            </Badge>
+          )}
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowAddFile(true); }}
+          className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity h-4 w-4 flex items-center justify-center rounded hover:bg-muted/60 text-dim hover:text-foreground"
+          title="Add file"
+        >
+          <Plus className="h-3 w-3" />
+        </button>
+      </div>
 
       {/* File tree */}
       {isExpanded && (
@@ -273,6 +283,26 @@ function SkillTreeRow({
           )}
         </div>
       )}
+
+      <AddFileDialog
+        open={showAddFile}
+        onOpenChange={setShowAddFile}
+        existingPaths={files.map((f) => f.path)}
+        isPending={upsertFile.isPending}
+        onAdd={(path) => {
+          upsertFile.mutate(
+            { skillUuid: skill.uuid, path, content: "" },
+            {
+              onSuccess: () => {
+                toast.success(`${path} added`);
+                onSelectFile(skill.uuid, path);
+                setShowAddFile(false);
+              },
+              onError: () => toast.error("Failed to add file"),
+            },
+          );
+        }}
+      />
     </div>
   );
 }
@@ -641,7 +671,7 @@ function SkillDetailPanel({
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-foreground">Files</span>
             <Button size="sm" variant="outline" className="h-6 px-2 text-xs gap-1" onClick={() => setShowAddFile(true)}>
-              <FilePlus className="h-3 w-3" />
+              <Plus className="h-3 w-3" />
               Add File
             </Button>
           </div>
@@ -765,6 +795,7 @@ export function SkillsPage() {
   const [showNew, setShowNew] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(288);
   const [activeFilePath, setActiveFilePath] = useState<string>("SKILL.md");
   const [expandedUuids, setExpandedUuids] = useState<Set<string>>(new Set());
 
@@ -807,7 +838,7 @@ export function SkillsPage() {
     <AppLayout title="Skills Library">
       <div className="flex gap-0 h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden">
         {/* Left sidebar — file explorer */}
-        <div className="w-72 shrink-0 flex flex-col border-r border-border bg-muted/5">
+        <div className="relative shrink-0 flex flex-col border-r border-border bg-muted/5" style={{ width: sidebarWidth }}>
           {/* Header */}
           <div className="p-3 border-b border-border space-y-2 shrink-0">
             <div className="flex items-center justify-between">
@@ -861,6 +892,24 @@ export function SkillsPage() {
               {allSkills.length} skill{allSkills.length !== 1 ? "s" : ""} total
             </p>
           </div>
+          {/* Resize handle */}
+          <div
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-teal/30 active:bg-teal/50 transition-colors z-10"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+              function onMove(ev: MouseEvent) {
+                setSidebarWidth(Math.min(480, Math.max(180, startWidth + ev.clientX - startX)));
+              }
+              function onUp() {
+                document.removeEventListener("mousemove", onMove);
+                document.removeEventListener("mouseup", onUp);
+              }
+              document.addEventListener("mousemove", onMove);
+              document.addEventListener("mouseup", onUp);
+            }}
+          />
         </div>
 
         {/* Right panel */}

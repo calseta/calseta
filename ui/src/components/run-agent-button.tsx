@@ -26,7 +26,7 @@ export function RunAgentButton({ alertUuid }: RunAgentButtonProps) {
   const { data: agentsResp, isLoading } = useAgents();
   const dispatchAgent = useDispatchAgent();
 
-  const agents = (agentsResp?.data ?? []).filter((a) => a.is_active);
+  const agents = (agentsResp?.data ?? []).filter((a) => a.status === "active");
 
   function handleSelect(agentUuid: string) {
     const agent = agents.find((a) => a.uuid === agentUuid);
@@ -58,7 +58,7 @@ export function RunAgentButton({ alertUuid }: RunAgentButtonProps) {
           Run Agent
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-0 bg-card border-border" align="end">
+      <PopoverContent className="w-64 p-0 bg-card border-border" align="end" sideOffset={6}>
         <Command>
           <CommandInput placeholder="Search agents..." className="text-xs" />
           <CommandList>
@@ -68,7 +68,7 @@ export function RunAgentButton({ alertUuid }: RunAgentButtonProps) {
               </div>
             ) : (
               <>
-                <CommandEmpty className="text-xs text-dim">
+                <CommandEmpty className="py-6 px-3 text-center text-xs text-dim">
                   No agents found
                 </CommandEmpty>
                 <CommandGroup>

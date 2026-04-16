@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -319,6 +319,50 @@ function TestResultDisplay({
   );
 }
 
+function InlineTitle({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
+
+  function commit() {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onSave(trimmed);
+    else setDraft(value);
+  }
+
+  function cancel() {
+    setEditing(false);
+    setDraft(value);
+  }
+
+  if (editing) {
+    return (
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          if (e.key === "Escape") { e.preventDefault(); cancel(); }
+        }}
+        autoFocus
+        className="text-xl font-heading font-extrabold tracking-tight text-foreground bg-transparent border-b border-teal outline-none w-full"
+      />
+    );
+  }
+
+  return (
+    <h2
+      className="text-xl font-heading font-extrabold tracking-tight text-foreground cursor-pointer rounded px-1 -mx-1 hover:bg-muted/40 transition-colors"
+      onClick={() => { setDraft(value); setEditing(true); }}
+    >
+      {value}
+    </h2>
+  );
+}
+
 export function EnrichmentProviderDetailPage() {
   const { uuid } = useParams({ strict: false }) as { uuid: string };
   const { data, isLoading, refetch, isFetching } = useEnrichmentProvider(uuid);
@@ -499,7 +543,7 @@ export function EnrichmentProviderDetailPage() {
     deleteProvider.mutate(uuid, {
       onSuccess: () => {
         toast.success("Provider deleted");
-        navigate({ to: "/manage/enrichment-providers" });
+        navigate({ to: "/manage/enrichments" });
       },
       onError: () => toast.error("Failed to delete provider"),
     });
@@ -520,8 +564,24 @@ export function EnrichmentProviderDetailPage() {
     <AppLayout title="Enrichment Provider">
       <div className="space-y-6">
         <DetailPageHeader
-          backTo="/manage/enrichment-providers"
-          title={provider.display_name}
+          backTo="/enrichments"
+          titleNode={
+            provider.is_builtin ? (
+              <h2 className="text-xl font-heading font-extrabold tracking-tight text-foreground">
+                {provider.display_name}
+              </h2>
+            ) : (
+              <InlineTitle
+                value={provider.display_name}
+                onSave={(display_name) =>
+                  patchProvider.mutate(
+                    { uuid, body: { display_name } },
+                    { onError: () => toast.error("Failed to update name") },
+                  )
+                }
+              />
+            )
+          }
           onRefresh={() => refetch()}
           isRefreshing={isFetching}
           badges={

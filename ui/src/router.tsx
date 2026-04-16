@@ -12,8 +12,6 @@ import { WorkflowDetailPage } from "@/pages/workflows/detail";
 import { ApprovalsPage } from "@/pages/workflows/approvals";
 import { DetectionRulesPage } from "@/pages/settings/detection-rules";
 import { DetectionRuleDetailPage } from "@/pages/settings/detection-rules/detail";
-import { ContextDocsPage } from "@/pages/settings/context-docs";
-import { ContextDocDetailPage } from "@/pages/settings/context-docs/detail";
 import { SourcesPage } from "@/pages/settings/sources";
 import { AgentsPage } from "@/pages/settings/agents/index";
 import { AgentDetailPage } from "@/pages/settings/agents/detail";
@@ -96,21 +94,6 @@ const detectionRuleDetailRoute = createRoute({
   }),
 });
 
-const contextDocsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/context-docs",
-  component: ContextDocsPage,
-});
-
-const contextDocDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/context-docs/$uuid",
-  component: ContextDocDetailPage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    tab: (search.tab as string) || "content",
-  }),
-});
-
 const agentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/agents",
@@ -128,13 +111,13 @@ const agentDetailRoute = createRoute({
 
 const enrichmentProvidersRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/enrichment-providers",
+  path: "/enrichments",
   component: EnrichmentProvidersPage,
 });
 
 const enrichmentProviderDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/enrichment-providers/$uuid",
+  path: "/enrichments/$uuid",
   component: EnrichmentProviderDetailPage,
 });
 
@@ -228,7 +211,6 @@ const kbDetailRoute = createRoute({
   path: "/kb/$uuid",
   component: KBDetailPage,
   validateSearch: (search: Record<string, unknown>) => ({
-    slug: (search.slug as string) || undefined,
     tab: (search.tab as string) || "content",
   }),
 });
@@ -248,8 +230,6 @@ const routeTree = rootRoute.addChildren([
   approvalsRoute,
   detectionRulesRoute,
   detectionRuleDetailRoute,
-  contextDocsRoute,
-  contextDocDetailRoute,
   sourcesRoute,
   enrichmentProvidersRoute,
   enrichmentProviderDetailRoute,

@@ -200,7 +200,7 @@ export function DashboardPage() {
   const cards: Record<string, ReactNode> = {
     // Platform stats
     "ctx-docs": (
-      <StatCard icon={FileText} label="Context Docs" value={metrics?.platform?.context_documents ?? 0} />
+      <StatCard icon={FileText} label="Knowledge Base" value={metrics?.platform?.kb_pages ?? 0} />
     ),
     "det-rules": (
       <StatCard icon={Shield} label="Detection Rules" value={metrics?.platform?.detection_rules ?? 0} />

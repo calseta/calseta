@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -16,7 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKBPages, useKBFolders, useCreateKBPage, usePatchKBPage } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight, Plus, FileText, Folder } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Folder, FilePlus, FolderPlus, RefreshCw, ChevronsUpDown } from "lucide-react";
 import type { KBFolderNode, KBPageSummary } from "@/lib/types";
 
 /* -------------------------------------------------------------------------- */
@@ -37,12 +37,12 @@ function slugify(name: string): string {
 
 function DraggablePageItem({
   page,
-  selectedSlug,
+  selectedUuid,
   onSelect,
   paddingLeft,
 }: {
   page: KBPageSummary;
-  selectedSlug: string | undefined;
+  selectedUuid: string | undefined;
   onSelect: (page: KBPageSummary) => void;
   paddingLeft: number;
 }) {
@@ -59,7 +59,7 @@ function DraggablePageItem({
       className={cn(
         "flex w-full items-center gap-1.5 py-1 text-xs rounded transition-colors",
         isDragging ? "opacity-40" : "",
-        selectedSlug === page.slug
+        selectedUuid === page.uuid
           ? "bg-teal/15 text-teal"
           : "text-muted-foreground hover:bg-accent hover:text-foreground",
       )}
@@ -68,7 +68,7 @@ function DraggablePageItem({
       {...listeners}
     >
       <FileText className="h-3 w-3 shrink-0" />
-      <span className="truncate">{page.title}</span>
+      <span className="truncate">{page.slug}.md</span>
     </button>
   );
 }
@@ -80,17 +80,19 @@ function DraggablePageItem({
 function DroppableFolderItem({
   node,
   pages,
-  selectedSlug,
+  selectedUuid,
   onSelect,
   depth,
+  defaultOpen = true,
 }: {
   node: KBFolderNode;
   pages: KBPageSummary[];
-  selectedSlug: string | undefined;
+  selectedUuid: string | undefined;
   onSelect: (page: KBPageSummary) => void;
   depth: number;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(defaultOpen);
   const folderPages = pages.filter((p) => p.folder === node.path);
   const hasContent = folderPages.length > 0 || node.children.length > 0;
 
@@ -151,7 +153,7 @@ function DroppableFolderItem({
             <DraggablePageItem
               key={page.uuid}
               page={page}
-              selectedSlug={selectedSlug}
+              selectedUuid={selectedUuid}
               onSelect={onSelect}
               paddingLeft={22 + depth * 12}
             />
@@ -161,7 +163,7 @@ function DroppableFolderItem({
               key={child.path}
               node={child}
               pages={pages}
-              selectedSlug={selectedSlug}
+              selectedUuid={selectedUuid}
               onSelect={onSelect}
               depth={depth + 1}
             />
@@ -202,9 +204,13 @@ function DroppableRoot({ children, isOver }: { children: React.ReactNode; isOver
 function InlineFileInput({
   onConfirm,
   onCancel,
+  icon: Icon = FileText,
+  placeholder = "filename.md",
 }: {
   onConfirm: (filename: string) => void;
   onCancel: () => void;
+  icon?: React.ElementType;
+  placeholder?: string;
 }) {
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -229,7 +235,7 @@ function InlineFileInput({
 
   return (
     <div className="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-accent/50">
-      <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+      <Icon className="h-3 w-3 shrink-0 text-muted-foreground" />
       <input
         ref={inputRef}
         type="text"
@@ -237,7 +243,7 @@ function InlineFileInput({
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
-        placeholder="filename.md"
+        placeholder={placeholder}
         className="flex-1 bg-transparent outline-none text-xs text-foreground placeholder:text-muted-foreground/60 min-w-0"
       />
     </div>
@@ -261,14 +267,18 @@ function PageDragOverlay({ page }: { page: KBPageSummary }) {
 /*  KBSidebar — shared across index and detail                                */
 /* -------------------------------------------------------------------------- */
 
-export function KBSidebar({ selectedSlug }: { selectedSlug?: string }) {
+export function KBSidebar({ selectedUuid }: { selectedUuid?: string }) {
   const navigate = useNavigate();
   const allPages = useKBPages({ page_size: 500 });
   const folders = useKBFolders();
   const createPage = useCreateKBPage();
   const patchPage = usePatchKBPage();
 
+  const [sidebarWidth, setSidebarWidth] = useState(256);
   const [showInlineInput, setShowInlineInput] = useState(false);
+  const [showInlineFolderInput, setShowInlineFolderInput] = useState(false);
+  const [collapseKey, setCollapseKey] = useState(0);
+  const [defaultFolderOpen, setDefaultFolderOpen] = useState(true);
   const [activeDragPage, setActiveDragPage] = useState<KBPageSummary | null>(null);
   const [overDropId, setOverDropId] = useState<string | null>(null);
 
@@ -283,12 +293,38 @@ export function KBSidebar({ selectedSlug }: { selectedSlug?: string }) {
     void navigate({
       to: "/kb/$uuid",
       params: { uuid: page.uuid },
-      search: { slug: page.slug, tab: "content" },
+      search: { tab: "content" },
     });
   }
 
   const rootPages = pagesList.filter(
     (p) => !folderNodes.some((f) => f.path === p.folder),
+  );
+
+  const handleFolderConfirm = useCallback(
+    async (folderName: string) => {
+      setShowInlineFolderInput(false);
+      const folderSlug = slugify(folderName);
+      const pageSlug = `${folderSlug}-index`;
+      const title = folderSlug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") + " Index";
+      try {
+        const result = await createPage.mutateAsync({
+          title,
+          slug: pageSlug,
+          folder: `/${folderSlug}`,
+          body: "",
+        });
+        toast.success("Folder created");
+        void navigate({
+          to: "/kb/$uuid",
+          params: { uuid: result.data.uuid },
+          search: { tab: "content" },
+        });
+      } catch {
+        toast.error("Failed to create folder");
+      }
+    },
+    [createPage, navigate],
   );
 
   const handleInlineConfirm = useCallback(
@@ -310,7 +346,7 @@ export function KBSidebar({ selectedSlug }: { selectedSlug?: string }) {
         void navigate({
           to: "/kb/$uuid",
           params: { uuid: result.data.uuid },
-          search: { slug: result.data.slug, tab: "content" },
+          search: { tab: "content" },
         });
       } catch {
         toast.error("Failed to create page");
@@ -354,88 +390,143 @@ export function KBSidebar({ selectedSlug }: { selectedSlug?: string }) {
   const isRootOver = overDropId === "folder:/";
 
   return (
-    <aside className="w-64 shrink-0 border-r border-border bg-surface flex flex-col">
-      {/* Header */}
-      <div className="px-3 py-3 border-b border-border flex items-center justify-between">
-        <span className="text-xs font-semibold text-foreground">Knowledge Base</span>
-        <button
-          type="button"
-          onClick={() => setShowInlineInput(true)}
-          title="New page"
-          className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      {/* Tree */}
-      <div className="flex-1 overflow-y-auto py-2 px-1">
-        {allPages.isLoading || folders.isLoading ? (
-          <div className="space-y-1 px-2">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-6 w-full" />
-            ))}
+    <div className="relative shrink-0 flex" style={{ width: sidebarWidth }}>
+      <aside className="group flex-1 border-r border-border bg-surface flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="px-3 py-3 border-b border-border flex items-center justify-between">
+          <span className="text-xs font-semibold text-foreground">Knowledge Base</span>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={() => { setShowInlineFolderInput(false); setShowInlineInput(true); }}
+              title="New Page"
+              className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <FilePlus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowInlineInput(false); setShowInlineFolderInput(true); }}
+              title="New Folder"
+              className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <FolderPlus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => { void allPages.refetch(); void folders.refetch(); }}
+              title="Refresh"
+              className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDefaultFolderOpen(false); setCollapseKey((k) => k + 1); }}
+              title="Collapse All"
+              className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <ChevronsUpDown className="h-3.5 w-3.5" />
+            </button>
           </div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragOver={(e) => setOverDropId(e.over?.id ? String(e.over.id) : null)}
-            onDragEnd={handleDragEnd}
-            onDragCancel={() => { setActiveDragPage(null); setOverDropId(null); }}
-          >
-            {/* Inline input at top */}
-            {showInlineInput && (
-              <InlineFileInput
-                onConfirm={handleInlineConfirm}
-                onCancel={() => setShowInlineInput(false)}
-              />
-            )}
+        </div>
 
-            {pagesList.length === 0 && !showInlineInput ? (
-              <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-                No pages yet.{" "}
-                <button
-                  type="button"
-                  className="text-teal underline"
-                  onClick={() => setShowInlineInput(true)}
-                >
-                  Create one
-                </button>
-              </div>
-            ) : (
-              <>
-                {folderNodes.map((node) => (
-                  <DroppableFolderItem
-                    key={node.path}
-                    node={node}
-                    pages={pagesList}
-                    selectedSlug={selectedSlug}
-                    onSelect={handleSelect}
-                    depth={0}
-                  />
-                ))}
-                <DroppableRoot isOver={isRootOver}>
-                  {rootPages.map((page) => (
-                    <DraggablePageItem
-                      key={page.uuid}
-                      page={page}
-                      selectedSlug={selectedSlug}
+        {/* Tree */}
+        <div className="flex-1 overflow-y-auto py-2 px-1">
+          {allPages.isLoading || folders.isLoading ? (
+            <div className="space-y-1 px-2">
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} className="h-6 w-full" />
+              ))}
+            </div>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragOver={(e) => setOverDropId(e.over?.id ? String(e.over.id) : null)}
+              onDragEnd={handleDragEnd}
+              onDragCancel={() => { setActiveDragPage(null); setOverDropId(null); }}
+            >
+              {/* Inline input at top */}
+              {showInlineInput && (
+                <InlineFileInput
+                  onConfirm={handleInlineConfirm}
+                  onCancel={() => setShowInlineInput(false)}
+                />
+              )}
+              {showInlineFolderInput && (
+                <InlineFileInput
+                  onConfirm={handleFolderConfirm}
+                  onCancel={() => setShowInlineFolderInput(false)}
+                  icon={Folder}
+                  placeholder="folder name"
+                />
+              )}
+
+              {pagesList.length === 0 && !showInlineInput ? (
+                <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+                  No pages yet.{" "}
+                  <button
+                    type="button"
+                    className="text-teal underline"
+                    onClick={() => setShowInlineInput(true)}
+                  >
+                    Create one
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {folderNodes.map((node) => (
+                    <DroppableFolderItem
+                      key={`${collapseKey}-${node.path}`}
+                      defaultOpen={defaultFolderOpen}
+                      node={node}
+                      pages={pagesList}
+                      selectedUuid={selectedUuid}
                       onSelect={handleSelect}
-                      paddingLeft={8}
+                      depth={0}
                     />
                   ))}
-                </DroppableRoot>
-              </>
-            )}
+                  <DroppableRoot isOver={isRootOver}>
+                    {rootPages.map((page) => (
+                      <DraggablePageItem
+                        key={page.uuid}
+                        page={page}
+                        selectedUuid={selectedUuid}
+                        onSelect={handleSelect}
+                        paddingLeft={8}
+                      />
+                    ))}
+                  </DroppableRoot>
+                </>
+              )}
 
-            <DragOverlay>
-              {activeDragPage ? <PageDragOverlay page={activeDragPage} /> : null}
-            </DragOverlay>
-          </DndContext>
-        )}
-      </div>
-    </aside>
+              <DragOverlay>
+                {activeDragPage ? <PageDragOverlay page={activeDragPage} /> : null}
+              </DragOverlay>
+            </DndContext>
+          )}
+        </div>
+      </aside>
+      <div
+        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-teal/30 active:bg-teal/50 transition-colors z-10"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          const startX = e.clientX;
+          const startWidth = sidebarWidth;
+          function onMove(ev: MouseEvent) {
+            const newWidth = Math.min(384, Math.max(160, startWidth + ev.clientX - startX));
+            setSidebarWidth(newWidth);
+          }
+          function onUp() {
+            document.removeEventListener("mousemove", onMove);
+            document.removeEventListener("mouseup", onUp);
+          }
+          document.addEventListener("mousemove", onMove);
+          document.addEventListener("mouseup", onUp);
+        }}
+      />
+    </div>
   );
 }

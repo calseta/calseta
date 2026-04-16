@@ -194,7 +194,7 @@ export function KBEditorPage() {
         void navigate({
           to: "/kb/$uuid",
           params: { uuid: uuid ?? existingPage.data?.data.uuid ?? "" },
-          search: { slug, tab: "content" },
+          search: { tab: "content" },
         });
       } else {
         const result = await createPage.mutateAsync({
@@ -210,7 +210,7 @@ export function KBEditorPage() {
         void navigate({
           to: "/kb/$uuid",
           params: { uuid: result.data.uuid },
-          search: { slug: result.data.slug, tab: "content" },
+          search: { tab: "content" },
         });
       }
     } catch {
@@ -220,7 +220,7 @@ export function KBEditorPage() {
 
   const isLoading = isEditing && existingPage.isLoading;
   const backTo = isEditing && uuid
-    ? { to: "/kb/$uuid" as const, params: { uuid }, search: { slug: slug ?? "", tab: "content" } }
+    ? { to: "/kb/$uuid" as const, params: { uuid }, search: { tab: "content" } }
     : { to: "/kb" as const };
 
   return (

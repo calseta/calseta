@@ -42,7 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Shield, AlertTriangle, Radio, FileText, Settings, Save, Loader2, MoreHorizontal, X, Plus, BarChart3, Bell, Trash2 } from "lucide-react";
+import { Shield, AlertTriangle, Radio, FileText, Pencil, Save, Loader2, MoreHorizontal, X, Plus, BarChart3, Bell, Trash2 } from "lucide-react";
 import type { DetectionRule } from "@/lib/types";
 import { DetectionRuleMetricsTab } from "./metrics-tab";
 import { DetectionRuleAlertsTab } from "./alerts-tab";
@@ -322,8 +322,8 @@ export function DetectionRuleDetailPage() {
                 onClick={openEditDialog}
                 className="border-border text-xs"
               >
-                <Settings className="h-3 w-3 mr-1" />
-                Edit Rule
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Edit
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

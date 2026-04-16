@@ -209,6 +209,61 @@ export function LLMIntegrationDetailPage() {
           }
           onRefresh={refetch}
           isRefreshing={isFetching}
+          actions={
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                disabled={testIntegration.isPending}
+                onClick={() => {
+                  testIntegration.mutate(uuid, {
+                    onSuccess: (res) => {
+                      const r = res as unknown as { success: boolean; latency_ms: number; message: string };
+                      if (r.success) {
+                        toast.success(`Connected — ${r.latency_ms}ms`);
+                      } else {
+                        toast.error(r.message || "Connection failed");
+                      }
+                    },
+                    onError: () => toast.error("Connection test failed"),
+                  });
+                }}
+              >
+                {testIntegration.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Wifi className="h-3.5 w-3.5" />
+                )}
+                Test
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                onClick={openEditDialog}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-dim hover:text-foreground">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-card border-border">
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-red-threat focus:text-red-threat focus:bg-red-threat/10 cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          }
         />
 
         <Tabs defaultValue="configuration">
@@ -232,63 +287,10 @@ export function LLMIntegrationDetailPage() {
           {/* Configuration Tab */}
           <TabsContent value="configuration" className="pt-6">
             <Card className="border-border bg-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-4">
+              <CardHeader className="pb-4">
                 <CardTitle className="text-sm font-semibold text-foreground">
                   Integration Settings
                 </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-3 text-xs gap-1"
-                    disabled={testIntegration.isPending}
-                    onClick={() => {
-                      testIntegration.mutate(uuid, {
-                        onSuccess: (res) => {
-                          const r = res as unknown as { success: boolean; latency_ms: number; message: string };
-                          if (r.success) {
-                            toast.success(`Connected — ${r.latency_ms}ms`);
-                          } else {
-                            toast.error(r.message || "Connection failed");
-                          }
-                        },
-                        onError: () => toast.error("Connection test failed"),
-                      });
-                    }}
-                  >
-                    {testIntegration.isPending ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Wifi className="h-3 w-3" />
-                    )}
-                    Test
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-3 text-xs gap-1"
-                    onClick={openEditDialog}
-                  >
-                    <Pencil className="h-3 w-3" />
-                    Edit
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-dim hover:text-foreground">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-card border-border">
-                      <DropdownMenuItem
-                        onClick={() => setShowDeleteConfirm(true)}
-                        className="text-red-threat focus:text-red-threat focus:bg-red-threat/10 cursor-pointer"
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Name */}

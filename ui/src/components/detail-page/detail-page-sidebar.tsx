@@ -8,7 +8,7 @@ interface DetailPageSidebarProps {
 export function DetailPageSidebar({ children }: DetailPageSidebarProps) {
   return (
     <Card className="bg-card border-border py-0">
-      <CardContent className="p-4 space-y-3">{children}</CardContent>
+      <CardContent className="p-3 space-y-2">{children}</CardContent>
     </Card>
   );
 }
@@ -24,7 +24,7 @@ export function SidebarSection({ title, children }: SidebarSectionProps) {
       <span className="text-[11px] font-medium uppercase tracking-wider text-dim">
         {title}
       </span>
-      <div className="mt-2 space-y-2">{children}</div>
+      <div className="mt-1.5 space-y-1">{children}</div>
     </div>
   );
 }

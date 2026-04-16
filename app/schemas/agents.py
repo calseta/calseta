@@ -20,7 +20,7 @@ class AgentRegistrationCreate(BaseModel):
     trigger_on_sources: list[str] = Field(default_factory=list)
     trigger_on_severities: list[str] = Field(default_factory=list)
     trigger_filter: dict[str, Any] | None = None
-    timeout_seconds: int = Field(default=30, ge=1, le=300)
+    timeout_seconds: int = Field(default=30, ge=1, le=3600)
     retry_count: int = Field(default=3, ge=0, le=10)
     documentation: str | None = None
 
@@ -148,7 +148,7 @@ class AgentRegistrationPatch(BaseModel):
     trigger_on_sources: list[str] | None = None
     trigger_on_severities: list[str] | None = None
     trigger_filter: dict[str, Any] | None = None
-    timeout_seconds: int | None = Field(default=None, ge=1, le=300)
+    timeout_seconds: int | None = Field(default=None, ge=1, le=3600)
     retry_count: int | None = Field(default=None, ge=0, le=10)
     documentation: str | None = None
 

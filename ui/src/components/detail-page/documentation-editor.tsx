@@ -113,7 +113,7 @@ export function DocumentationEditor({
                 className="data-[state=active]:bg-teal/15 data-[state=active]:text-teal-light text-xs"
               >
                 <Pencil className="h-3 w-3 mr-1" />
-                Write
+                Edit
               </TabsTrigger>
               <TabsTrigger
                 value="preview"
