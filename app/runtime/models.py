@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from uuid import UUID
 
 
 @dataclass
@@ -12,6 +13,7 @@ class RuntimeContext:
     heartbeat_run_id: int             # heartbeat_runs.id — for cost attribution
     alert_id: int | None = None       # alerts.id if this is alert work
     assignment_id: int | None = None  # alert_assignments.id if alert work
+    run_uuid: UUID | None = None      # heartbeat_runs.uuid — for log store paths
 
 
 @dataclass

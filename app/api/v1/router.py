@@ -30,6 +30,7 @@ from app.api.v1 import (
     memory,
     metrics,
     routines,
+    runs,
     secrets,
     sessions,
     settings,
@@ -64,6 +65,7 @@ v1_router.include_router(alert_queue.queue_router)
 v1_router.include_router(alert_queue.assignments_router)
 v1_router.include_router(alert_queue.dashboard_router)
 v1_router.include_router(heartbeat.router)
+v1_router.include_router(runs.router)
 v1_router.include_router(sessions.router)
 v1_router.include_router(sessions.agents_sessions_router)
 v1_router.include_router(actions.router)

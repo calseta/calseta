@@ -113,6 +113,53 @@ class AgentRuntimeEngine:
         # --- Step 6: Prepare tools ---
         tools = await self._load_tools(agent)
 
+        # --- Step 6b: Initialize run log store ---
+        log_handle = None
+        log_store = None
+        event_seq = 0
+        try:
+            from app.config import settings
+            from app.services.run_log_store import RunLogStore
+
+            if context.run_uuid is not None:
+                log_store = RunLogStore(settings.CALSETA_DATA_DIR)
+                log_handle = log_store.open(agent.uuid, context.run_uuid)
+        except Exception as exc:
+            log.warning("runtime.log_store_init_failed", error=str(exc))
+
+        async def _on_log(stream: str, chunk: str) -> None:
+            """Write event to NDJSON file and DB."""
+            import contextlib
+
+            nonlocal event_seq
+            event_seq += 1
+            etype = "llm_response" if stream == "assistant" else stream
+            event_data = {
+                "event_type": etype,
+                "stream": stream,
+                "content": chunk[:10_000],
+            }
+            # Write to NDJSON file (non-blocking)
+            if log_handle is not None and log_store is not None:
+                with contextlib.suppress(Exception):
+                    log_store.append(log_handle, event_data)
+            # Write to DB + NOTIFY (non-blocking)
+            with contextlib.suppress(Exception):
+                from app.repositories.run_event_repository import RunEventRepository
+                repo = RunEventRepository(self._db)
+                await repo.create_event(
+                    heartbeat_run_id=context.heartbeat_run_id,
+                    seq=event_seq,
+                    event_type=etype,
+                    stream=stream,
+                    content=chunk[:10_000],
+                )
+                from app.services.run_event_stream import notify_run_event
+                await notify_run_event(
+                    self._db, context.heartbeat_run_id,
+                    event_seq, event_data,
+                )
+
         # --- Step 7: Run tool loop ---
         log.info(
             "runtime.starting",
@@ -129,7 +176,36 @@ class AgentRuntimeEngine:
             agent=agent,
             context=context,
             integration=integration,
+            on_log=_on_log,
         )
+
+        # --- Step 7b: Finalize run log ---
+        log_sha256 = None
+        log_bytes = None
+        log_ref = None
+        if log_handle is not None and log_store is not None:
+            try:
+                log_sha256, log_bytes = log_store.finalize(log_handle)
+                log_ref = str(log_handle.path)
+            except Exception as exc:
+                log.warning("runtime.log_finalize_failed", error=str(exc))
+
+        # Update HeartbeatRun with log metadata
+        if log_sha256 is not None:
+            try:
+                from app.repositories.heartbeat_run_repository import HeartbeatRunRepository
+                hr_repo = HeartbeatRunRepository(self._db)
+                run_obj = await hr_repo.get_by_id(context.heartbeat_run_id)
+                if run_obj is not None:
+                    await hr_repo.update_status(
+                        run_obj,
+                        run_obj.status,
+                        log_ref=log_ref,
+                        log_sha256=log_sha256,
+                        log_bytes=log_bytes,
+                    )
+            except Exception as exc:
+                log.warning("runtime.log_metadata_update_failed", error=str(exc))
 
         # --- Step 8: Persist session ---
         await self._save_session(
@@ -150,6 +226,10 @@ class AgentRuntimeEngine:
                 )
             await self._release_assignment(context.assignment_id)
 
+        # --- Step 9b: Clear cancellation flag ---
+        from app.services.run_cancellation import clear_cancellation
+        clear_cancellation(context.heartbeat_run_id)
+
         log.info(
             "runtime.completed",
             success=result.success,
@@ -169,6 +249,7 @@ class AgentRuntimeEngine:
         agent: AgentRegistration,
         context: RuntimeContext,
         integration: Any,
+        on_log: Any = None,
     ) -> tuple[list[dict], RuntimeResult]:
         """The core LLM → tool → LLM loop.
 
@@ -192,6 +273,25 @@ class AgentRuntimeEngine:
                 agent_id=agent.id,
             )
 
+            # Check cancellation flag (for API-based adapters)
+            from app.services.run_cancellation import is_cancelled
+
+            if is_cancelled(context.heartbeat_run_id):
+                logger.info(
+                    "runtime.cancelled",
+                    iteration=iteration,
+                    agent_id=agent.id,
+                )
+                return messages, RuntimeResult(
+                    success=False,
+                    error="Run cancelled by user.",
+                    findings=findings,
+                    actions_proposed=actions_proposed,
+                    total_cost_cents=total_cost_cents,
+                    input_tokens=total_input,
+                    output_tokens=total_output,
+                )
+
             # Call LLM
             llm_messages = [
                 LLMMessage(role=m["role"], content=m["content"])
@@ -203,6 +303,7 @@ class AgentRuntimeEngine:
                     tools=tools,
                     system=system,
                     max_tokens=agent.max_tokens,
+                    on_log=on_log,
                 )
             except Exception as exc:
                 error_msg = f"LLM API call failed on iteration {iteration}: {exc}"
@@ -238,6 +339,16 @@ class AgentRuntimeEngine:
                 agent.max_cost_per_alert_cents > 0
                 and total_cost_cents >= agent.max_cost_per_alert_cents
             )
+            # Emit budget_check event
+            if on_log is not None:
+                import contextlib
+                with contextlib.suppress(Exception):
+                    await on_log(
+                        "budget_check",
+                        f"cost={total_cost_cents}c"
+                        f" / {agent.max_cost_per_alert_cents}c",
+                    )
+
             if budget_exceeded:
                 logger.warning(
                     "runtime.per_alert_budget_exceeded",
@@ -289,30 +400,60 @@ class AgentRuntimeEngine:
                     agent_id=agent.id,
                 )
 
+                # Emit tool_call event
+                if on_log is not None:
+                    import contextlib
+                    with contextlib.suppress(Exception):
+                        args_str = json.dumps(tool_input, default=str)[:500]
+                        await on_log("tool_call", f"{tool_id}({args_str})")
+
                 try:
                     result_data = await dispatcher.dispatch(tool_id, tool_input)
+                    result_str = json.dumps(result_data, default=str)
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": tool_use_id,
-                        "content": json.dumps(result_data, default=str),
+                        "content": result_str,
                     })
+
+                    # Emit tool_result event
+                    if on_log is not None:
+                        import contextlib
+                        with contextlib.suppress(Exception):
+                            await on_log("tool_result", result_str[:2000])
+
                     # Extract findings/actions from tool results
                     if isinstance(result_data, dict):
                         if "finding" in result_data:
                             findings.append(result_data["finding"])
+                            if on_log is not None:
+                                import contextlib
+                                with contextlib.suppress(Exception):
+                                    await on_log(
+                                        "finding",
+                                        json.dumps(result_data["finding"], default=str),
+                                    )
                         if "action_proposed" in result_data:
                             actions_proposed.append(result_data["action_proposed"])
-                        # post_finding tool returns recorded=True with classification
+                        # post_finding tool returns recorded=True
                         data_block = result_data.get("data", {})
                         if isinstance(data_block, dict) and data_block.get("recorded") is True:
                             classification = data_block.get("classification")
                             confidence = data_block.get("confidence")
                             if classification:
-                                findings.append({
+                                finding = {
                                     "classification": classification,
                                     "confidence": confidence,
                                     "alert_uuid": data_block.get("alert_uuid"),
-                                })
+                                }
+                                findings.append(finding)
+                                if on_log is not None:
+                                    import contextlib
+                                    with contextlib.suppress(Exception):
+                                        await on_log(
+                                            "finding",
+                                            json.dumps(finding, default=str),
+                                        )
                 except Exception as exc:
                     logger.warning(
                         "runtime.tool_error",

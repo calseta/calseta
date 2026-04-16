@@ -202,20 +202,21 @@ async def run_managed_agent_task(
             )
             return
 
+        # Load HeartbeatRun for UUID (needed by log store)
+        hr_repo = HeartbeatRunRepository(db)
+        run = await hr_repo.get_by_id(heartbeat_run_id)
+
         context = RuntimeContext(
             agent_id=agent.id,
             task_key=f"alert:{assignment.alert_id}",
             heartbeat_run_id=heartbeat_run_id,
             alert_id=assignment.alert_id,
             assignment_id=assignment.id,
+            run_uuid=run.uuid if run else None,
         )
 
         engine = AgentRuntimeEngine(db=db)
         result = await engine.run(agent=agent, context=context)
-
-        # Update heartbeat run status
-        hr_repo = HeartbeatRunRepository(db)
-        run = await hr_repo.get_by_id(heartbeat_run_id)
         if run is not None:
             run_status = "succeeded" if result.success else "failed"
             await hr_repo.update_status(

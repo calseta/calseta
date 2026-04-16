@@ -8,7 +8,7 @@ Never makes LLM calls. All decisions are deterministic rules against DB state.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -43,6 +43,9 @@ class AgentSupervisor:
 
         report = SupervisionReport()
         now = datetime.now(UTC)
+
+        # Check for orphaned HeartbeatRuns (dead PIDs)
+        await self._check_orphans(report)
 
         # Load all in-progress assignments
         result = await self._db.execute(
@@ -319,6 +322,108 @@ class AgentSupervisor:
             )
 
         return True
+
+    async def _check_orphans(self, report: SupervisionReport) -> None:
+        """Check running HeartbeatRuns for dead PIDs and auto-retry."""
+        import os
+
+        from app.repositories.heartbeat_run_repository import HeartbeatRunRepository
+
+        hr_repo = HeartbeatRunRepository(self._db)
+        running_runs = await hr_repo.list_running_with_pid()
+
+        for run in running_runs:
+            pid = run.process_pid
+            if pid is None:
+                continue
+
+            # Check if PID is alive
+            try:
+                os.kill(pid, 0)
+                continue  # Process is alive, skip
+            except ProcessLookupError:
+                pass  # Process is dead
+            except PermissionError:
+                continue  # Process exists but we lack permission — alive
+
+            logger.warning(
+                "supervisor.orphan_detected",
+                heartbeat_run_id=run.id,
+                process_pid=pid,
+                agent_id=run.agent_registration_id,
+            )
+
+            # Mark as failed with process_lost
+            await hr_repo.mark_orphaned(run)
+            report.timed_out += 1  # Reuse counter for orphans
+
+            # Log activity event
+            try:
+                await self._log_orphan_event(run)
+            except Exception as exc:
+                logger.warning(
+                    "supervisor.orphan_event_failed",
+                    heartbeat_run_id=run.id,
+                    error=str(exc),
+                )
+
+            # Auto-retry if count < 1
+            if run.process_loss_retry_count < 1:
+                try:
+                    await self._retry_orphaned_run(run, hr_repo)
+                except Exception as exc:
+                    logger.error(
+                        "supervisor.orphan_retry_failed",
+                        heartbeat_run_id=run.id,
+                        error=str(exc),
+                    )
+
+    async def _log_orphan_event(self, run: Any) -> None:
+        """Emit heartbeat.process_lost activity event."""
+        import uuid as uuid_module
+
+        from app.db.models.activity_event import ActivityEvent
+
+        self._db.add(ActivityEvent(
+            uuid=uuid_module.uuid4(),
+            event_type="heartbeat.process_lost",
+            actor_type="system",
+            actor_key_prefix=None,
+            references={
+                "heartbeat_run_id": run.id,
+                "agent_id": run.agent_registration_id,
+                "process_pid": run.process_pid,
+            },
+        ))
+        await self._db.flush()
+
+    async def _retry_orphaned_run(
+        self, run: Any, hr_repo: Any,
+    ) -> None:
+        """Enqueue a new HeartbeatRun as a retry of the orphaned run."""
+        import uuid as uuid_module
+
+        from app.db.models.heartbeat_run import HeartbeatRun
+
+        retry_run = HeartbeatRun(
+            uuid=uuid_module.uuid4(),
+            agent_registration_id=run.agent_registration_id,
+            source=run.source,
+            status="queued",
+            context_snapshot=run.context_snapshot,
+            process_loss_retry_count=run.process_loss_retry_count + 1,
+            retry_of_run_id=run.id,
+            invocation_source=run.invocation_source,
+        )
+        self._db.add(retry_run)
+        await self._db.flush()
+
+        logger.info(
+            "supervisor.orphan_retry_enqueued",
+            original_run_id=run.id,
+            retry_run_id=retry_run.id,
+            retry_count=retry_run.process_loss_retry_count,
+        )
 
     async def _log_stall_event(
         self,
