@@ -6,6 +6,7 @@ then starts the procrastinate worker consuming from all four named queues:
   - enrichment  (alert enrichment pipeline)
   - dispatch    (trigger evaluation + webhook delivery)
   - workflows   (workflow execution)
+  - agents      (managed agent LLM execution)
   - default     (catch-all)
 
 Concurrency is controlled by QUEUE_CONCURRENCY env var (default 10).
@@ -25,7 +26,7 @@ import structlog  # noqa: E402 (must be after configure_logging)
 
 logger = structlog.get_logger(__name__)
 
-WORKER_QUEUES = ["enrichment", "dispatch", "workflows", "default"]
+WORKER_QUEUES = ["enrichment", "dispatch", "workflows", "agents", "default"]
 
 
 async def _load_enrichment_registry() -> None:

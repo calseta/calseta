@@ -13,7 +13,9 @@ from app.queue.handlers.payloads import (
     DispatchSingleAgentWebhookPayload,
 )
 from app.repositories.agent_repository import AgentRepository
+from app.repositories.alert_assignment_repository import AlertAssignmentRepository
 from app.repositories.alert_repository import AlertRepository
+from app.repositories.heartbeat_run_repository import HeartbeatRunRepository
 from app.schemas.activity_events import ActivityEventType
 from app.services.activity_event import ActivityEventService
 from app.services.agent_dispatch import build_webhook_payload, dispatch_to_agent
@@ -148,6 +150,10 @@ class DispatchSingleWebhookHandler:
     """Dispatch an alert to a single specific agent (bypasses trigger matching).
 
     Enqueued by POST /v1/alerts/{uuid}/dispatch-agent for manual agent runs.
+
+    For external agents: sends a webhook to endpoint_url.
+    For managed agents: creates an assignment (skipping if already active) and
+    enqueues run_managed_agent_task on the agents queue.
     """
 
     async def execute(
@@ -164,6 +170,108 @@ class DispatchSingleWebhookHandler:
             logger.warning("dispatch_single_agent_not_found", agent_id=agent_id)
             return
 
+        if agent.execution_mode == "managed":
+            await self._dispatch_managed(agent, alert_id, session)
+        else:
+            await self._dispatch_webhook(agent, alert_id, session)
+
+    async def _dispatch_managed(
+        self,
+        agent: AgentRegistration,
+        alert_id: int,
+        session: AsyncSession,
+    ) -> None:
+        """Create assignment + heartbeat run and enqueue managed agent task."""
+        from sqlalchemy import delete, select as sa_select
+
+        from app.db.models.alert_assignment import AlertAssignment
+        from app.queue.registry import run_managed_agent_task
+
+        assign_repo = AlertAssignmentRepository(session)
+
+        # Check for an existing assignment for this specific agent+alert pair.
+        existing_result = await session.execute(
+            sa_select(AlertAssignment).where(
+                AlertAssignment.alert_id == alert_id,
+                AlertAssignment.agent_registration_id == agent.id,
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+
+        if existing is not None:
+            if existing.status not in ("released", "resolved"):
+                # Already actively assigned — skip.
+                logger.info(
+                    "dispatch_single_managed_skipped_already_assigned",
+                    agent_id=agent.id,
+                    alert_id=alert_id,
+                    assignment_status=existing.status,
+                )
+                return
+            # Previous run is done — delete old row so we can create a fresh one.
+            await session.execute(
+                delete(AlertAssignment).where(AlertAssignment.id == existing.id)
+            )
+            await session.flush()
+
+        assignment = await assign_repo.atomic_checkout(
+            alert_id=alert_id,
+            agent_registration_id=agent.id,
+        )
+        if assignment is None:
+            logger.info(
+                "dispatch_single_managed_skipped_already_assigned",
+                agent_id=agent.id,
+                alert_id=alert_id,
+            )
+            return
+
+        hr_repo = HeartbeatRunRepository(session)
+        heartbeat_run = await hr_repo.create(agent_id=agent.id, source="manual_dispatch")
+        await session.commit()
+
+        await run_managed_agent_task.defer_async(
+            agent_registration_id=agent.id,
+            assignment_id=assignment.id,
+            heartbeat_run_id=heartbeat_run.id,
+        )
+
+        logger.info(
+            "dispatch_single_managed_enqueued",
+            agent_id=agent.id,
+            alert_id=alert_id,
+            assignment_id=assignment.id,
+            heartbeat_run_id=heartbeat_run.id,
+        )
+
+        try:
+            activity_svc = ActivityEventService(session)
+            await activity_svc.write(
+                ActivityEventType.AGENT_WEBHOOK_DISPATCHED,
+                actor_type="system",
+                actor_key_prefix=None,
+                alert_id=alert_id,
+                references={
+                    "agent_name": agent.name,
+                    "agent_uuid": str(agent.uuid),
+                    "status": "enqueued",
+                    "managed": True,
+                },
+            )
+        except Exception:
+            logger.exception(
+                "agent_dispatch_activity_event_failed",
+                agent_id=agent.id,
+                alert_id=alert_id,
+            )
+
+    async def _dispatch_webhook(
+        self,
+        agent: AgentRegistration,
+        alert_id: int,
+        session: AsyncSession,
+    ) -> None:
+        """Send webhook to external agent endpoint_url."""
         webhook_payload = await build_webhook_payload(alert_id, session)
         if not webhook_payload:
             logger.warning("dispatch_single_alert_not_found", alert_id=alert_id)
@@ -171,7 +279,6 @@ class DispatchSingleWebhookHandler:
 
         result = await dispatch_to_agent(agent, alert_id, webhook_payload, session)
 
-        # Write activity event for the dispatch
         try:
             activity_svc = ActivityEventService(session)
             await activity_svc.write(
@@ -190,6 +297,6 @@ class DispatchSingleWebhookHandler:
         except Exception:
             logger.exception(
                 "agent_dispatch_activity_event_failed",
-                agent_id=agent_id,
+                agent_id=agent.id,
                 alert_id=alert_id,
             )

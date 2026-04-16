@@ -203,7 +203,7 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
         """Run ``claude auth status`` to verify the CLI is installed and authenticated."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                _CLAUDE_CLI, "auth", "status", "--output-format", "json",
+                _CLAUDE_CLI, "auth", "status",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -219,17 +219,18 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
         if proc.returncode != 0:
             return EnvironmentTestResult(
                 ok=False,
-                message=f"claude auth status returned exit code {proc.returncode}.",
+                message="claude CLI is not authenticated. Run 'claude login' first.",
             )
 
         try:
             status_data = json.loads(stdout_bytes.decode("utf-8", errors="replace"))
-            if not status_data.get("logged_in", False):
-                return EnvironmentTestResult(
-                    ok=False,
-                    message="claude CLI is not logged in. Run 'claude login' first.",
-                )
+            email = status_data.get("email") or ""
+            sub = status_data.get("subscriptionType") or ""
+            if email:
+                msg = f"Authenticated as {email}" + (f" ({sub})" if sub else "")
+            else:
+                msg = f"Claude Code CLI authenticated" + (f" ({sub})" if sub else "") + "."
         except json.JSONDecodeError:
-            pass  # Some versions don't return JSON; non-zero exit is the real signal
+            msg = "Claude Code CLI authenticated."
 
-        return EnvironmentTestResult(ok=True, message="Claude Code CLI authenticated.")
+        return EnvironmentTestResult(ok=True, message=msg)

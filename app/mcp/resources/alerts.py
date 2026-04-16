@@ -3,8 +3,8 @@ MCP resources for alerts.
 
 Exposes alert data as MCP resources for AI agent consumption:
   - calseta://alerts              — Recent alerts (last 50)
-  - calseta://alerts/{uuid}       — Full alert with indicators, detection rule, context docs
-  - calseta://alerts/{uuid}/context  — Applicable context documents
+  - calseta://alerts/{uuid}       — Full alert with indicators, detection rule, applicable KB pages
+  - calseta://alerts/{uuid}/context  — KB pages applicable to this alert
   - calseta://alerts/{uuid}/activity — Activity log (newest-first, max 100)
 """
 
@@ -142,16 +142,19 @@ async def get_alert(uuid: str, ctx: Context) -> str:
                     "documentation": rule.documentation,
                 }
 
-        # Applicable context documents
-        context_docs = await get_applicable_documents(alert, session)
+        # Applicable KB pages (context documents)
+        kb_pages = await get_applicable_documents(alert, session)
         context_data = [
             {
-                "uuid": str(doc.uuid),
-                "title": doc.title,
-                "document_type": doc.document_type,
-                "content": doc.content,
+                "uuid": str(page.uuid),
+                "slug": page.slug,
+                "title": page.title,
+                "description": page.description,
+                "folder": page.folder,
+                "tags": page.tags,
+                "body": page.body,
             }
-            for doc in context_docs
+            for page in kb_pages
         ]
 
         result = {
@@ -174,7 +177,7 @@ async def get_alert(uuid: str, ctx: Context) -> str:
             "tags": alert.tags,
             "indicators": indicator_data,
             "detection_rule": detection_rule_data,
-            "context_documents": context_data,
+            "kb_pages": context_data,
             "agent_findings": alert.agent_findings,
         }
 
@@ -183,7 +186,7 @@ async def get_alert(uuid: str, ctx: Context) -> str:
 
 @mcp_server.resource("calseta://alerts/{uuid}/context")
 async def get_alert_context(uuid: str, ctx: Context) -> str:
-    """Applicable context documents for an alert, ordered by global-first then targeted."""
+    """KB pages applicable to an alert, ordered by global-first then targeted."""
     try:
         alert_uuid = _uuid.UUID(uuid)
     except ValueError:
@@ -199,21 +202,21 @@ async def get_alert_context(uuid: str, ctx: Context) -> str:
         if alert is None:
             raise ValueError(f"Alert not found: {uuid}")
 
-        docs = await get_applicable_documents(alert, session)
+        pages = await get_applicable_documents(alert, session)
         result = [
             {
-                "uuid": str(doc.uuid),
-                "title": doc.title,
-                "document_type": doc.document_type,
-                "is_global": doc.is_global,
-                "description": doc.description,
-                "content": doc.content,
-                "tags": doc.tags,
+                "uuid": str(page.uuid),
+                "slug": page.slug,
+                "title": page.title,
+                "description": page.description,
+                "folder": page.folder,
+                "tags": page.tags,
+                "body": page.body,
             }
-            for doc in docs
+            for page in pages
         ]
 
-        return json.dumps({"context_documents": result, "count": len(result)})
+        return json.dumps({"kb_pages": result, "count": len(result)})
 
 
 @mcp_server.resource("calseta://alerts/{uuid}/activity")

@@ -32,7 +32,6 @@ from app.db.models.workflow import Workflow
 from app.repositories.alert_repository import AlertRepository
 from app.repositories.indicator_repository import IndicatorRepository
 from app.services.agent_runs import record_agent_run
-from app.services.context_targeting import get_applicable_documents
 from app.services.url_validation import validate_outbound_url
 
 logger = structlog.get_logger(__name__)
@@ -73,7 +72,7 @@ def _build_indicator_dict(ind: object) -> dict[str, Any]:
 
 
 def _build_alert_dict(
-    alert: Alert, indicator_count: int, context_doc_count: int
+    alert: Alert, indicator_count: int
 ) -> dict[str, Any]:
     """Serialize an Alert ORM object to a dict with _metadata block."""
     metadata: dict[str, Any] = {
@@ -86,7 +85,6 @@ def _build_alert_dict(
             "enriched_at": alert.enriched_at.isoformat() if alert.enriched_at else None,
         },
         "detection_rule_matched": alert.detection_rule_id is not None,
-        "context_documents_applied": context_doc_count,
     }
 
     return {
@@ -136,24 +134,6 @@ def _build_detection_rule_dict(rule: DetectionRule | None) -> dict[str, Any] | N
     }
 
 
-def _build_context_doc_dict(doc: object) -> dict[str, Any]:
-    """Serialize a ContextDocument ORM object."""
-    from app.db.models.context_document import ContextDocument
-
-    assert isinstance(doc, ContextDocument)
-    return {
-        "uuid": str(doc.uuid),
-        "title": doc.title,
-        "document_type": doc.document_type,
-        "description": doc.description,
-        "is_global": doc.is_global,
-        "tags": list(doc.tags or []),
-        "content": doc.content,
-        "version": doc.version,
-        "created_at": doc.created_at.isoformat() if doc.created_at else None,
-        "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
-    }
-
 
 def _build_workflow_summary_dict(workflow: Workflow) -> dict[str, Any]:
     """Serialize a Workflow ORM object summary (no code) for webhook payload."""
@@ -182,7 +162,6 @@ async def build_webhook_payload(alert_id: int, db: AsyncSession) -> dict[str, An
       alert              — full alert dict with _metadata block
       indicators         — list of indicator dicts (enrichment_results excludes "raw" key)
       detection_rule     — full rule dict with documentation, or None
-      context_documents  — applicable context docs for this alert
       workflows          — active workflow summaries (no code), limit 20
       calseta_api_base_url — from settings.CALSETA_API_BASE_URL
     """
@@ -197,12 +176,8 @@ async def build_webhook_payload(alert_id: int, db: AsyncSession) -> dict[str, An
     indicators = await indicator_repo.list_for_alert(alert_id)
     indicator_dicts = [_build_indicator_dict(ind) for ind in indicators]
 
-    # Load applicable context documents
-    context_docs = await get_applicable_documents(alert, db)
-    context_doc_dicts = [_build_context_doc_dict(doc) for doc in context_docs]
-
-    # Build alert dict (includes _metadata with context_doc count)
-    alert_dict = _build_alert_dict(alert, len(indicators), len(context_docs))
+    # Build alert dict (includes _metadata block)
+    alert_dict = _build_alert_dict(alert, len(indicators))
 
     # Load matched detection rule if present
     detection_rule: DetectionRule | None = None
@@ -227,7 +202,6 @@ async def build_webhook_payload(alert_id: int, db: AsyncSession) -> dict[str, An
         "alert": alert_dict,
         "indicators": indicator_dicts,
         "detection_rule": detection_rule_dict,
-        "context_documents": context_doc_dicts,
         "workflows": workflow_dicts,
         "calseta_api_base_url": settings.CALSETA_API_BASE_URL,
     }

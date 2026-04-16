@@ -10,6 +10,7 @@ POST   /v1/alerts/{uuid}/findings           — Add an agent finding to an alert
 GET    /v1/alerts/{uuid}/indicators         — List indicators for an alert
 POST   /v1/alerts/{uuid}/indicators         — Add indicators to an alert
 GET    /v1/alerts/{uuid}/activity           — List activity events for an alert
+GET    /v1/alerts/{uuid}/raw-payload        — Get the original source payload
 GET    /v1/alerts/{uuid}/relationship-graph — Alert-indicator-sibling relationship graph
 
 Note on ingest paths:
@@ -57,8 +58,8 @@ from app.schemas.alerts import (
     FindingResponse,
 )
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
-from app.schemas.context_documents import ContextDocumentResponse
 from app.schemas.detection_rules import DetectionRuleResponse
+from app.schemas.kb import KBPageContextSummary
 from app.schemas.indicators import (
     EnrichedIndicator,
     IndicatorAddRequest,
@@ -124,7 +125,7 @@ def _compute_dominant_malice(indicators: list[EnrichedIndicator]) -> str:
 def _build_metadata(
     alert: object,
     indicators: list[EnrichedIndicator],
-    context_docs_count: int = 0,
+    kb_pages_count: int = 0,
 ) -> AlertMetadata:
     from app.db.models.alert import Alert
 
@@ -155,7 +156,7 @@ def _build_metadata(
         indicator_count=len(indicators),
         enrichment=enrichment,
         detection_rule_matched=alert.detection_rule_id is not None,
-        context_documents_applied=context_docs_count,
+        kb_pages_applied=kb_pages_count,
     )
 
 
@@ -353,8 +354,8 @@ async def get_alert(
     indicators = await indicator_repo.list_for_alert(alert.id)
     enriched_indicators = [_build_indicator(i) for i in indicators]
 
-    # Load applicable context documents
-    context_docs = await get_applicable_documents(alert, db)
+    # Load applicable KB pages for alert context
+    kb_pages = await get_applicable_documents(alert, db)
 
     # Load detection rule if linked
     detection_rule_resp = None
@@ -368,14 +369,12 @@ async def get_alert(
         if dr is not None:
             detection_rule_resp = DetectionRuleResponse.model_validate(dr)
 
-    metadata = _build_metadata(alert, enriched_indicators, len(context_docs))
+    metadata = _build_metadata(alert, enriched_indicators, len(kb_pages))
 
     response = _alert_response_from_orm(alert)
     response.indicators = enriched_indicators
     response.detection_rule = detection_rule_resp
-    response.context_documents = [
-        ContextDocumentResponse.model_validate(d) for d in context_docs
-    ]
+    response.kb_pages = [KBPageContextSummary.model_validate(p) for p in kb_pages]
     # Compute effective malice: override > worst-of-indicators > "Pending"
     response.malice = (
         alert.malice_override
@@ -674,21 +673,22 @@ async def list_findings(
 
 
 @router.get(
-    "/{alert_uuid}/context",
-    response_model=DataResponse[list[ContextDocumentResponse]],
+    "/{alert_uuid}/kb-context",
+    response_model=DataResponse[list[KBPageContextSummary]],
 )
 @limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
-async def get_alert_context(
+async def get_alert_kb_context(
     request: Request,
     alert_uuid: UUID,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> DataResponse[list[ContextDocumentResponse]]:
+) -> DataResponse[list[KBPageContextSummary]]:
     """
-    Return all applicable context documents for an alert.
+    Return all applicable KB pages for an alert.
 
-    Global documents appear first (sorted by document_type), followed by
-    targeted documents that match the alert's fields (also sorted by document_type).
+    Global pages (inject_scope.global = true) appear first, followed by
+    targeted pages whose targeting_rules match the alert's fields.
+    Pages with targeting_rules=None match all alerts.
     """
     alert_repo = AlertRepository(db)
     alert = await alert_repo.get_by_uuid(alert_uuid)
@@ -699,8 +699,8 @@ async def get_alert_context(
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    docs = await get_applicable_documents(alert, db)
-    return DataResponse(data=[ContextDocumentResponse.model_validate(d) for d in docs])
+    pages = await get_applicable_documents(alert, db)
+    return DataResponse(data=[KBPageContextSummary.model_validate(p) for p in pages])
 
 
 # ---------------------------------------------------------------------------
@@ -1007,6 +1007,31 @@ async def get_relationship_graph(
 
 
 # ---------------------------------------------------------------------------
+# GET /v1/alerts/{uuid}/raw-payload
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{alert_uuid}/raw-payload")
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def get_alert_raw_payload(
+    request: Request,
+    alert_uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[dict]:  # type: ignore[type-arg]
+    """Return the raw source payload for an alert."""
+    alert_repo = AlertRepository(db)
+    alert = await alert_repo.get_by_uuid(alert_uuid)
+    if alert is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Alert not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return DataResponse(data=alert.raw_payload or {})
+
+
+# ---------------------------------------------------------------------------
 # POST /v1/alerts/{uuid}/trigger-agents
 # ---------------------------------------------------------------------------
 # Distinct from /v1/alerts/{uuid}/dispatch-agent:
@@ -1117,6 +1142,13 @@ async def dispatch_agent(
         raise CalsetaException(
             code="AGENT_INACTIVE",
             message=f"Agent '{agent.name}' is not active (current status: {agent.status}).",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    if agent.execution_mode != "managed" and not agent.endpoint_url:
+        raise CalsetaException(
+            code="AGENT_MISCONFIGURED",
+            message=f"Agent '{agent.name}' has no endpoint_url configured.",
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 

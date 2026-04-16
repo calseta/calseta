@@ -265,15 +265,23 @@ class PromptBuilder:
             "agent_findings": alert.agent_findings or [],
         }
 
-        # Include detection rule if present
-        if alert.detection_rule:
-            alert_data["detection_rule"] = {
-                "uuid": str(alert.detection_rule.uuid),
-                "name": alert.detection_rule.name,
-                "documentation": alert.detection_rule.documentation,
-                "mitre_tactics": alert.detection_rule.mitre_tactics,
-                "mitre_techniques": alert.detection_rule.mitre_techniques,
-            }
+        # Include detection rule if present (load explicitly to avoid async lazy-load)
+        if alert.detection_rule_id is not None:
+            from app.db.models.detection_rule import DetectionRule
+            from sqlalchemy import select as sa_select
+
+            dr_result = await self._db.execute(
+                sa_select(DetectionRule).where(DetectionRule.id == alert.detection_rule_id)
+            )
+            dr = dr_result.scalar_one_or_none()
+            if dr is not None:
+                alert_data["detection_rule"] = {
+                    "uuid": str(dr.uuid),
+                    "name": dr.name,
+                    "documentation": dr.documentation,
+                    "mitre_tactics": dr.mitre_tactics,
+                    "mitre_techniques": dr.mitre_techniques,
+                }
 
         # Include assignment context if available
         if context.assignment_id is not None:

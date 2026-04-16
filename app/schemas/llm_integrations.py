@@ -64,6 +64,7 @@ class LLMIntegrationPatch(BaseModel):
 class LLMIntegrationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: int
     uuid: uuid.UUID
     name: str
     provider: str
@@ -80,6 +81,7 @@ class LLMIntegrationResponse(BaseModel):
     @classmethod
     def from_orm(cls, obj: Any) -> LLMIntegrationResponse:
         return cls(
+            id=obj.id,
             uuid=obj.uuid,
             name=obj.name,
             provider=obj.provider,

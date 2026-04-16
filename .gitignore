@@ -56,5 +56,8 @@ ui/.vite/
 # Personal testing notes
 JC-TODO.md
 
+# PM session state (local only)
+.pm/
+
 # Marketing drafts (not shipped with product)
 marketing/

@@ -140,13 +140,15 @@ class AgentRuntimeEngine:
             integration=integration,
         )
 
-        # --- Step 9: Update assignment investigation_state ---
-        if context.assignment_id is not None and (result.findings or result.actions_proposed):
-            await self._update_assignment(
-                assignment_id=context.assignment_id,
-                findings=result.findings,
-                actions_proposed=result.actions_proposed,
-            )
+        # --- Step 9: Update assignment investigation_state + release ---
+        if context.assignment_id is not None:
+            if result.findings or result.actions_proposed:
+                await self._update_assignment(
+                    assignment_id=context.assignment_id,
+                    findings=result.findings,
+                    actions_proposed=result.actions_proposed,
+                )
+            await self._release_assignment(context.assignment_id)
 
         log.info(
             "runtime.completed",
@@ -260,18 +262,17 @@ class AgentRuntimeEngine:
             # Append assistant response to conversation
             messages.append({"role": "assistant", "content": response.content})
 
-            # Check termination condition
-            if response.stop_reason == "end_turn":
-                logger.debug("runtime.end_turn", iteration=iteration, agent_id=agent.id)
-                break
-
             # Find tool_use blocks
+            # Check tool_use BEFORE end_turn: the Claude Code CLI always returns
+            # stop_reason="end_turn" even when it includes tool_use blocks, unlike
+            # the Anthropic API which returns "tool_use". Process tools whenever
+            # they are present, regardless of stop_reason.
             tool_uses = [
                 b for b in response.content
                 if isinstance(b, dict) and b.get("type") == "tool_use"
             ]
             if not tool_uses:
-                # No tool calls — agent finished
+                logger.debug("runtime.end_turn", iteration=iteration, agent_id=agent.id)
                 break
 
             # Execute tools and collect results
@@ -553,3 +554,21 @@ class AgentRuntimeEngine:
         current_state["last_updated"] = datetime.now(UTC).isoformat()
 
         await repo.patch(assignment, investigation_state=current_state)
+
+    async def _release_assignment(self, assignment_id: int) -> None:
+        """Set assignment status to 'released' when the agent run completes."""
+        from app.repositories.alert_assignment_repository import AlertAssignmentRepository
+
+        repo = AlertAssignmentRepository(self._db)
+        assignment = await repo.get_by_id(assignment_id)
+        if assignment is None:
+            return
+        try:
+            await repo.release(assignment)
+            await self._db.flush()
+        except Exception as exc:
+            logger.warning(
+                "runtime.release_assignment_failed",
+                assignment_id=assignment_id,
+                error=str(exc),
+            )

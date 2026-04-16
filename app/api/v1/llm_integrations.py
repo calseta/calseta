@@ -239,13 +239,12 @@ async def test_llm_integration(
 
     start = time.time()
     try:
-        from app.services.llm_integration_service import LLMIntegrationService
+        from app.integrations.llm.factory import get_adapter
 
-        svc = LLMIntegrationService(db)
-        adapter = await svc.get_adapter(integration)
-        await adapter.test_connection()
+        adapter = get_adapter(integration)
+        result = await adapter.test_environment()
         latency_ms = int((time.time() - start) * 1000)
-        return DataResponse(data={"success": True, "latency_ms": latency_ms, "message": "Connection successful"})
+        return DataResponse(data={"success": result.ok, "latency_ms": latency_ms, "message": result.message})
     except Exception as exc:  # noqa: BLE001
         latency_ms = int((time.time() - start) * 1000)
         return DataResponse(data={"success": False, "latency_ms": latency_ms, "message": str(exc)})

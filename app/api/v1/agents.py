@@ -320,6 +320,7 @@ async def patch_agent(
 
 
 # ---------------------------------------------------------------------------
+# GET /v1/agents/{uuid}/files              — List agent instruction files
 # GET /v1/agents/{uuid}/files/{file_path}  — Read an agent instruction file
 # PUT /v1/agents/{uuid}/files/{file_path}  — Save an agent instruction file
 # ---------------------------------------------------------------------------
@@ -341,6 +342,38 @@ def _resolve_agent_file_path(agent_uuid: str, file_path: str) -> tuple[str, str]
             message=f"File extension not allowed. Allowed: {', '.join(_ALLOWED_EXTENSIONS)}",
         )
     return base_dir, abs_path
+
+
+@router.get("/{uuid}/files")
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def list_agent_files(
+    request: Request,
+    uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[list[dict]]:
+    repo = AgentRepository(db)
+    agent = await repo.get_by_uuid(uuid)
+    if agent is None:
+        raise CalsetaException(status_code=404, code="NOT_FOUND", message="Agent not found")
+
+    base_dir = os.path.realpath(os.path.join(settings.AGENT_FILES_DIR, str(uuid)))
+    files: list[dict] = []
+    if os.path.isdir(base_dir):
+        for root, dirs, filenames in os.walk(base_dir):
+            # Skip the skills/ subdirectory — managed by the runtime, not by users
+            dirs[:] = [d for d in dirs if d != "skills"]
+            for filename in filenames:
+                ext = os.path.splitext(filename)[1].lower()
+                if ext not in _ALLOWED_EXTENSIONS:
+                    continue
+                abs_path = os.path.join(root, filename)
+                rel_path = os.path.relpath(abs_path, base_dir)
+                with open(abs_path) as f:
+                    content = f.read()
+                files.append({"name": rel_path, "content": content})
+    files.sort(key=lambda f: f["name"])
+    return DataResponse(data=files)
 
 
 @router.get("/{uuid}/files/{file_path:path}")
@@ -461,7 +494,6 @@ async def test_agent_webhook(
         },
         "indicators": [],
         "detection_rule": None,
-        "context_documents": [],
         "workflows": [],
         "calseta_api_base_url": settings.CALSETA_API_BASE_URL,
         "_metadata": {
@@ -470,7 +502,6 @@ async def test_agent_webhook(
             "indicator_count": 0,
             "enrichment": {"succeeded": [], "failed": [], "enriched_at": None},
             "detection_rule_matched": False,
-            "context_documents_applied": 0,
         },
     }
 
