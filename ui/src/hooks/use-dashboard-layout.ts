@@ -1,77 +1,98 @@
 import { useState, useCallback } from "react";
 import type { Layout, LayoutItem } from "react-grid-layout/legacy";
+import {
+  CARD_MAP,
+  SIZE_TO_GRID,
+  DEFAULT_CARD_IDS,
+  DEFAULT_PRESET_ID,
+  PRESETS,
+} from "@/components/dashboard/card-registry";
 
 // Bump version when grid columns or default card set changes.
 // This discards stale layouts from localStorage automatically.
-const LAYOUT_VERSION = 4;
+const LAYOUT_VERSION = 5;
 const STORAGE_KEY = `calseta:dashboard-grid:v${LAYOUT_VERSION}`;
+const CARDS_STORAGE_KEY = `calseta:dashboard-cards:v${LAYOUT_VERSION}`;
+const PRESET_STORAGE_KEY = `calseta:dashboard-preset:v${LAYOUT_VERSION}`;
 
-// 12-column grid (industry standard — divisible by 1,2,3,4,6,12).
-// rowHeight=80px. Cards fill every row edge-to-edge.
-const DEFAULT_LAYOUT: LayoutItem[] = [
-  // Row 0: Control plane widgets — 4 items × 3 cols = 12 (full row)
-  { i: "cp-queue-depth",     x: 0,  y: 0, w: 3, h: 2, minW: 2, maxW: 6, minH: 2 },
-  { i: "cp-agent-fleet",     x: 3,  y: 0, w: 3, h: 2, minW: 2, maxW: 6, minH: 2 },
-  { i: "cp-costs-mtd",       x: 6,  y: 0, w: 3, h: 2, minW: 2, maxW: 6, minH: 2 },
-  { i: "cp-pending-actions", x: 9,  y: 0, w: 3, h: 2, minW: 2, maxW: 6, minH: 2 },
+// ---------------------------------------------------------------------------
+// Layout generation from card IDs
+// ---------------------------------------------------------------------------
 
-  // Row 2: Platform stats — 6 items × 2 cols = 12 (full row)
-  { i: "ctx-docs",        x: 0,  y: 2, w: 2, h: 1, minW: 1, maxW: 4 },
-  { i: "det-rules",       x: 2,  y: 2, w: 2, h: 1, minW: 1, maxW: 4 },
-  { i: "enrich-prov",     x: 4,  y: 2, w: 2, h: 1, minW: 1, maxW: 4 },
-  { i: "agents",          x: 6,  y: 2, w: 2, h: 1, minW: 1, maxW: 4 },
-  { i: "workflows-count", x: 8,  y: 2, w: 2, h: 1, minW: 1, maxW: 4 },
-  { i: "ind-maps",        x: 10, y: 2, w: 2, h: 1, minW: 1, maxW: 4 },
+/** Build a LayoutItem[] for the given card IDs, arranging them in rows. */
+function buildLayout(cardIds: string[]): LayoutItem[] {
+  const items: LayoutItem[] = [];
+  let x = 0;
+  let y = 0;
+  let rowMaxH = 0;
 
-  // Row 3: Alert KPIs — 4 items × 3 cols = 12 (full row)
-  { i: "total-alerts", x: 0, y: 3, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "mttd",         x: 3, y: 3, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "mtta",         x: 6, y: 3, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "mttt",         x: 9, y: 3, w: 3, h: 1, minW: 2, maxW: 6 },
+  for (const id of cardIds) {
+    const def = CARD_MAP.get(id);
+    const grid = def ? SIZE_TO_GRID[def.size] : SIZE_TO_GRID["small"];
+    const { w, h, minW, maxW, minH } = grid;
 
-  // Row 4: More KPIs — MTTC + Ops KPIs — 4 items × 3 cols = 12 (full row)
-  { i: "mttc",      x: 0, y: 4, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "wf-exec",   x: 3, y: 4, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "time-saved", x: 6, y: 4, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "fp-rate",   x: 9, y: 4, w: 3, h: 1, minW: 2, maxW: 6 },
+    // Wrap to next row if this card doesn't fit
+    if (x + w > 12) {
+      x = 0;
+      y += rowMaxH;
+      rowMaxH = 0;
+    }
 
-  // Row 5: Remaining Ops KPIs — 4 items × 3 cols = 12 (full row)
-  { i: "enrich-cov",        x: 0, y: 5, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "pending-approvals", x: 3, y: 5, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "queue-pending",     x: 6, y: 5, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "queue-oldest",      x: 9, y: 5, w: 3, h: 1, minW: 2, maxW: 6 },
+    items.push({ i: id, x, y, w, h, minW, maxW, ...(minH ? { minH } : {}) });
+    x += w;
+    if (h > rowMaxH) rowMaxH = h;
+  }
 
-  // Row 6–7: Charts — 2 × 6 cols = 12 (full row)
-  { i: "sev-chart",    x: 0, y: 6, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
-  { i: "status-chart", x: 6, y: 6, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
+  return items;
+}
 
-  // Row 9–10: Charts — 2 × 6 cols = 12 (full row)
-  { i: "source-chart",  x: 0, y: 9, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
-  { i: "queue-health",  x: 6, y: 9, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
+// ---------------------------------------------------------------------------
+// Persistence helpers
+// ---------------------------------------------------------------------------
 
-  // Row 12–13: Charts — 1 × 6 cols (provider type chart)
-  { i: "provider-type-chart", x: 0, y: 12, w: 6, h: 3, minW: 4, maxW: 12, minH: 2 },
+function loadCards(): string[] | null {
+  try {
+    const raw = localStorage.getItem(CARDS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed: string[] = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
-  // Row 15: Workflow & enrichment KPIs — 5 items
-  { i: "wf-configured",      x: 0,    y: 15, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "wf-success-rate",    x: 3,    y: 15, w: 3, h: 1, minW: 2, maxW: 6 },
-  { i: "approvals-30d",      x: 6,    y: 15, w: 2, h: 1, minW: 2, maxW: 6 },
-  { i: "median-approval-time", x: 8,  y: 15, w: 2, h: 1, minW: 2, maxW: 6 },
-  { i: "mtte",               x: 10,   y: 15, w: 2, h: 1, minW: 2, maxW: 6 },
-];
+function saveCards(cardIds: string[]) {
+  try {
+    localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify(cardIds));
+  } catch {
+    // silently ignore
+  }
+}
+
+function loadPreset(): string | null {
+  try {
+    return localStorage.getItem(PRESET_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function savePreset(presetId: string) {
+  try {
+    localStorage.setItem(PRESET_STORAGE_KEY, presetId);
+  } catch {
+    // silently ignore
+  }
+}
 
 function loadLayout(): LayoutItem[] | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const saved: LayoutItem[] = JSON.parse(raw);
-    const defaultMap = new Map(DEFAULT_LAYOUT.map((l) => [l.i, l]));
-    const savedIds = new Set(saved.map((l) => l.i));
-    const reconciled = saved.filter((l) => defaultMap.has(l.i));
-    for (const dl of DEFAULT_LAYOUT) {
-      if (!savedIds.has(dl.i)) reconciled.push(dl);
-    }
-    return reconciled;
+    if (!Array.isArray(saved) || saved.length === 0) return null;
+    return saved;
   } catch {
     return null;
   }
@@ -86,37 +107,168 @@ function saveLayout(layout: readonly LayoutItem[]) {
   }
 }
 
+function clearStorage() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(CARDS_STORAGE_KEY);
+    localStorage.removeItem(PRESET_STORAGE_KEY);
+    // Clean up legacy keys
+    localStorage.removeItem("calseta:dashboard-grid");
+    localStorage.removeItem("calseta:dashboard-layout");
+    // Clean up older versioned keys
+    for (let v = 1; v <= LAYOUT_VERSION - 1; v++) {
+      localStorage.removeItem(`calseta:dashboard-grid:v${v}`);
+      localStorage.removeItem(`calseta:dashboard-cards:v${v}`);
+      localStorage.removeItem(`calseta:dashboard-preset:v${v}`);
+    }
+  } catch {
+    // silently ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reconcile saved layout with current card set
+// ---------------------------------------------------------------------------
+
+function reconcileLayout(savedLayout: LayoutItem[], cardIds: string[]): LayoutItem[] {
+  const cardSet = new Set(cardIds);
+  const savedMap = new Map(savedLayout.map((l) => [l.i, l]));
+
+  // Keep only cards that are in the active set, preserving saved positions
+  const reconciled: LayoutItem[] = [];
+  for (const id of cardIds) {
+    const saved = savedMap.get(id);
+    if (saved) {
+      // Restore constraints from registry
+      const def = CARD_MAP.get(id);
+      const grid = def ? SIZE_TO_GRID[def.size] : SIZE_TO_GRID["small"];
+      reconciled.push({ ...saved, minW: grid.minW, maxW: grid.maxW, ...(grid.minH ? { minH: grid.minH } : {}) });
+    } else {
+      // New card — give it a position from buildLayout
+      const generated = buildLayout([id]);
+      if (generated[0]) {
+        // Place new cards at the bottom
+        const maxY = reconciled.reduce((m, l) => Math.max(m, l.y + l.h), 0);
+        reconciled.push({ ...generated[0], y: maxY });
+      }
+    }
+  }
+
+  // Remove cards not in active set
+  return reconciled.filter((l) => cardSet.has(l.i));
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
 export function useDashboardLayout() {
+  const [cards, setCards] = useState<string[]>(() => {
+    return loadCards() ?? [...DEFAULT_CARD_IDS];
+  });
+
+  const [activePreset, setActivePreset] = useState<string>(() => {
+    return loadPreset() ?? DEFAULT_PRESET_ID;
+  });
+
   const [layout, setLayout] = useState<LayoutItem[]>(() => {
-    const saved = loadLayout();
-    return saved ?? [...DEFAULT_LAYOUT];
+    const savedLayout = loadLayout();
+    const activeCards = loadCards() ?? [...DEFAULT_CARD_IDS];
+    if (savedLayout) {
+      return reconcileLayout(savedLayout, activeCards);
+    }
+    return buildLayout(activeCards);
   });
 
   const handleLayoutChange = useCallback((newLayout: Layout) => {
-    const defaultMap = new Map(DEFAULT_LAYOUT.map((l) => [l.i, l]));
-    const merged = newLayout.map((item) => {
-      const defaults = defaultMap.get(item.i);
-      return defaults
-        ? { ...item, minW: defaults.minW, maxW: defaults.maxW, minH: defaults.minH }
-        : { ...item };
+    setLayout((prev) => {
+      // Preserve constraint fields from previous state
+      const prevMap = new Map(prev.map((l) => [l.i, l]));
+      const merged = newLayout.map((item) => {
+        const existing = prevMap.get(item.i);
+        const def = CARD_MAP.get(item.i);
+        const grid = def ? SIZE_TO_GRID[def.size] : SIZE_TO_GRID["small"];
+        return {
+          ...item,
+          minW: existing?.minW ?? grid.minW,
+          maxW: existing?.maxW ?? grid.maxW,
+          ...(existing?.minH != null ? { minH: existing.minH } : grid.minH ? { minH: grid.minH } : {}),
+        };
+      });
+      saveLayout(merged);
+      return merged;
     });
-    setLayout(merged);
-    saveLayout(merged);
   }, []);
 
-  const resetLayout = useCallback(() => {
-    setLayout([...DEFAULT_LAYOUT]);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      // Clean up legacy keys from older versions
-      localStorage.removeItem("calseta:dashboard-grid");
-      localStorage.removeItem("calseta:dashboard-layout");
-    } catch {
-      // silently ignore
-    }
+  const addCard = useCallback((id: string) => {
+    setCards((prev) => {
+      if (prev.includes(id)) return prev;
+      const next = [...prev, id];
+      saveCards(next);
+      // Mark as custom (no preset)
+      setActivePreset("custom");
+      savePreset("custom");
+      return next;
+    });
+    setLayout((prev) => {
+      if (prev.some((l) => l.i === id)) return prev;
+      const def = CARD_MAP.get(id);
+      const grid = def ? SIZE_TO_GRID[def.size] : SIZE_TO_GRID["small"];
+      const maxY = prev.reduce((m, l) => Math.max(m, l.y + l.h), 0);
+      const newItem: LayoutItem = { i: id, x: 0, y: maxY, ...grid };
+      const next = [...prev, newItem];
+      saveLayout(next);
+      return next;
+    });
   }, []);
 
-  return { layout, handleLayoutChange, resetLayout };
+  const removeCard = useCallback((id: string) => {
+    setCards((prev) => {
+      const next = prev.filter((c) => c !== id);
+      saveCards(next);
+      setActivePreset("custom");
+      savePreset("custom");
+      return next;
+    });
+    setLayout((prev) => {
+      const next = prev.filter((l) => l.i !== id);
+      saveLayout(next);
+      return next;
+    });
+  }, []);
+
+  const setPresetById = useCallback((presetId: string) => {
+    const preset = PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    const nextCards = [...preset.cardIds];
+    const nextLayout = buildLayout(nextCards);
+    setCards(nextCards);
+    setLayout(nextLayout);
+    setActivePreset(presetId);
+    saveCards(nextCards);
+    saveLayout(nextLayout);
+    savePreset(presetId);
+  }, []);
+
+  const resetToDefault = useCallback(() => {
+    clearStorage();
+    const defaultCards = [...DEFAULT_CARD_IDS];
+    const defaultLayout = buildLayout(defaultCards);
+    setCards(defaultCards);
+    setLayout(defaultLayout);
+    setActivePreset(DEFAULT_PRESET_ID);
+  }, []);
+
+  return {
+    cards,
+    layout,
+    activePreset,
+    addCard,
+    removeCard,
+    setPreset: setPresetById,
+    resetToDefault,
+    handleLayoutChange,
+  };
 }
 
-export { DEFAULT_LAYOUT };
+export { buildLayout };

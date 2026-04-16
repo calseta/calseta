@@ -7,6 +7,16 @@ import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { formatSeconds, formatPercent } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CardCatalog } from "@/components/dashboard/card-catalog";
+import { PRESETS } from "@/components/dashboard/card-registry";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   ShieldAlert,
   Clock,
@@ -25,11 +35,14 @@ import {
   Link,
   Hourglass,
   Activity,
-  RotateCcw,
   Layers,
   Inbox,
   DollarSign,
   ShieldCheck,
+  Plus,
+  ChevronDown,
+  X,
+  LayoutDashboard,
 } from "lucide-react";
 import {
   BarChart,
@@ -120,8 +133,20 @@ export function DashboardPage() {
   const { data: approvalsResp } = useApprovals({ status: "pending" });
   const { data: cpDashResp } = useControlPlaneDashboard();
   const { data: pendingActionsResp } = useActions({ status: "pending" });
-  const { layout, handleLayoutChange, resetLayout } = useDashboardLayout();
+  const {
+    cards: activeCardIds,
+    layout,
+    activePreset,
+    addCard,
+    removeCard,
+    setPreset,
+    resetToDefault,
+    handleLayoutChange,
+  } = useDashboardLayout();
   const { ref: containerRef, width } = useResizeWidth();
+
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [presetConfirm, setPresetConfirm] = useState<string | null>(null);
 
   const metrics = metricsResp?.data;
   const pendingApprovals = approvalsResp?.data?.length ?? 0;
@@ -196,8 +221,8 @@ export function DashboardPage() {
     );
   }
 
-  // Build card map: id → rendered content
-  const cards: Record<string, ReactNode> = {
+  // Build card map: id -> rendered content
+  const cardRenderers: Record<string, ReactNode> = {
     // Platform stats
     "ctx-docs": (
       <StatCard icon={FileText} label="Knowledge Base" value={metrics?.platform?.kb_pages ?? 0} />
@@ -425,7 +450,7 @@ export function DashboardPage() {
         sub="Response latency"
       />
     ),
-    "mtte": (
+    mtte: (
       <KpiCard
         icon={Search}
         label="MTTE"
@@ -472,21 +497,82 @@ export function DashboardPage() {
         highlight={pendingActionsCount > 0}
       />
     ),
+
+    // Future agent cards (placeholders)
+    "agent-avg-cost": (
+      <ComingSoonCard title="Avg Cost per Alert" />
+    ),
+    "agent-resolution-rate": (
+      <ComingSoonCard title="Agent Resolution Rate" />
+    ),
+    "agent-avg-time": (
+      <ComingSoonCard title="Avg Investigation Time" />
+    ),
+    "agent-delegation-chart": (
+      <ComingSoonCard title="Agent Delegations" />
+    ),
   };
+
+  const currentPresetName = PRESETS.find((p) => p.id === activePreset)?.name ?? "Custom";
 
   return (
     <AppLayout title="Dashboard">
       <div className="space-y-2">
         <div className="flex justify-end gap-1">
+          {/* Preset dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-dim hover:text-teal text-xs gap-1"
+              >
+                <LayoutDashboard className="h-3 w-3" />
+                {currentPresetName}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-[#0d1117] border-border">
+              {PRESETS.map((preset) => (
+                <DropdownMenuItem
+                  key={preset.id}
+                  onClick={() => {
+                    if (activePreset === preset.id) return;
+                    setPresetConfirm(preset.id);
+                  }}
+                  className={cn(
+                    "text-xs cursor-pointer",
+                    activePreset === preset.id && "text-teal",
+                  )}
+                >
+                  <div>
+                    <div className="font-medium">{preset.name}</div>
+                    <div className="text-dim text-[10px]">{preset.description}</div>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setPresetConfirm("__reset__")}
+                className="text-xs cursor-pointer"
+              >
+                Reset to SOC Overview
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Add card button */}
           <Button
             variant="ghost"
             size="sm"
-            onClick={resetLayout}
+            onClick={() => setCatalogOpen(true)}
             className="h-8 px-2 text-dim hover:text-teal text-xs gap-1"
           >
-            <RotateCcw className="h-3 w-3" />
-            Reset layout
+            <Plus className="h-3 w-3" />
+            Add card
           </Button>
+
+          {/* Refresh */}
           <Button
             variant="ghost"
             size="sm"
@@ -516,8 +602,9 @@ export function DashboardPage() {
               useCSSTransforms
             >
               {layout.map((item) => (
-                <div key={item.i} className="group relative">
-                  <div className="drag-handle absolute top-1 right-1 z-10 flex h-6 w-6 cursor-grab items-center justify-center rounded-md opacity-0 transition-opacity group-hover:opacity-100 hover:bg-teal/10 active:cursor-grabbing">
+                <div key={item.i} className="group/card relative">
+                  {/* Drag handle */}
+                  <div className="drag-handle absolute top-1 right-7 z-10 flex h-6 w-6 cursor-grab items-center justify-center rounded-md opacity-0 transition-opacity group-hover/card:opacity-100 hover:bg-teal/10 active:cursor-grabbing">
                     <svg
                       width="14"
                       height="14"
@@ -527,7 +614,7 @@ export function DashboardPage() {
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      className="text-dim group-hover:text-teal"
+                      className="text-dim group-hover/card:text-teal"
                     >
                       <circle cx="9" cy="5" r="1" />
                       <circle cx="9" cy="12" r="1" />
@@ -537,13 +624,51 @@ export function DashboardPage() {
                       <circle cx="15" cy="19" r="1" />
                     </svg>
                   </div>
-                  {cards[item.i]}
+                  {/* Remove button */}
+                  <button
+                    type="button"
+                    onClick={() => removeCard(item.i)}
+                    className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-md opacity-0 transition-opacity group-hover/card:opacity-100 hover:bg-red-threat/10 text-dim hover:text-red-threat"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  {cardRenderers[item.i] ?? <ComingSoonCard title={item.i} />}
                 </div>
               ))}
             </Responsive>
           )}
         </div>
       </div>
+
+      {/* Card catalog sheet */}
+      <CardCatalog
+        open={catalogOpen}
+        onOpenChange={setCatalogOpen}
+        activeCardIds={activeCardIds}
+        onAddCard={addCard}
+      />
+
+      {/* Preset confirmation dialog */}
+      <ConfirmDialog
+        open={presetConfirm !== null}
+        onOpenChange={(open) => { if (!open) setPresetConfirm(null); }}
+        title="Switch Dashboard Layout"
+        description={
+          presetConfirm === "__reset__"
+            ? "This will reset your dashboard to the default SOC Overview layout. Any custom card selections and positions will be lost."
+            : `This will replace all current cards with the "${PRESETS.find((p) => p.id === presetConfirm)?.name ?? ""}" preset. Any custom card selections and positions will be lost.`
+        }
+        confirmLabel="Switch Layout"
+        variant="default"
+        onConfirm={() => {
+          if (presetConfirm === "__reset__") {
+            resetToDefault();
+          } else if (presetConfirm) {
+            setPreset(presetConfirm);
+          }
+          setPresetConfirm(null);
+        }}
+      />
     </AppLayout>
   );
 }
@@ -639,6 +764,18 @@ function ChartCard({
             {emptyText}
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ComingSoonCard({ title }: { title: string }) {
+  return (
+    <Card className="bg-card border-border border-dashed h-full flex flex-col">
+      <CardContent className="flex-1 flex flex-col items-center justify-center gap-1.5 p-4">
+        <Bot className="h-5 w-5 text-dim" />
+        <p className="text-xs font-medium text-muted-foreground">{title}</p>
+        <p className="text-[10px] text-dim">Coming soon</p>
       </CardContent>
     </Card>
   );
