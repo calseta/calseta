@@ -1,0 +1,1164 @@
+[
+  {
+    "scenario": "credential_stuffing",
+    "scenario_index": 1,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/cs-cred-001",
+      "name": "cs-cred-001",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"cs001-etag\"",
+      "properties": {
+        "title": "Multiple failed sign-in attempts from Tor exit node",
+        "description": "Repeated authentication failures detected from known Tor exit node 185.220.101.34 targeting account jsmith@acme.com. 47 failed attempts in 8 minutes using password spray technique. Source IP is listed on multiple threat intelligence feeds as a credential stuffing endpoint.",
+        "severity": "High",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:02:15.000Z",
+        "firstActivityTimeUtc": "2026-04-15T09:54:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:02:00.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:02:20.000Z",
+        "incidentNumber": 40201,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/cs-cred-001",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40201",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-brute-force-001"
+        ],
+        "labels": [
+          {"labelName": "credential-stuffing", "labelType": "User"},
+          {"labelName": "tor-exit-node", "labelType": "User"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Active Directory Identity Protection"],
+          "tactics": ["InitialAccess", "CredentialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "185.220.101.34"},
+        {"Type": "account", "Name": "jsmith", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "AAD-PROXY-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 3,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "True Positive",
+      "expected_severity": "High",
+      "notes": "Part of 5-alert credential stuffing campaign. IP 185.220.101.34 is a known Tor exit node. Should deduplicate with alerts cs-cred-002 through cs-cred-005."
+    }
+  },
+  {
+    "scenario": "credential_stuffing",
+    "scenario_index": 2,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/cs-cred-002",
+      "name": "cs-cred-002",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"cs002-etag\"",
+      "properties": {
+        "title": "Brute force attack against Azure AD account",
+        "description": "High-volume authentication failures from IP 91.243.44.11 targeting account agarcia@acme.com. 62 failed attempts detected in 12 minutes. Source IP is associated with a known brute-force botnet tracked by Spamhaus and Abuse.ch.",
+        "severity": "High",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:08:30.000Z",
+        "firstActivityTimeUtc": "2026-04-15T09:56:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:08:00.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:08:35.000Z",
+        "incidentNumber": 40202,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/cs-cred-002",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40202",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-brute-force-001"
+        ],
+        "labels": [
+          {"labelName": "credential-stuffing", "labelType": "User"},
+          {"labelName": "botnet", "labelType": "User"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Active Directory Identity Protection"],
+          "tactics": ["InitialAccess", "CredentialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "91.243.44.11"},
+        {"Type": "account", "Name": "agarcia", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "AAD-PROXY-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 3,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "True Positive",
+      "expected_severity": "High",
+      "notes": "Part of 5-alert credential stuffing campaign. IP 91.243.44.11 is a known brute-force botnet node."
+    }
+  },
+  {
+    "scenario": "credential_stuffing",
+    "scenario_index": 3,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/cs-cred-003",
+      "name": "cs-cred-003",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"cs003-etag\"",
+      "properties": {
+        "title": "Password spray attack from Tor exit node",
+        "description": "Distributed password spray attack detected from 185.220.101.34 targeting multiple accounts. This attempt focused on mchen@acme.com with 38 failed attempts using common password patterns. Attack correlates with concurrent activity against other acme.com accounts.",
+        "severity": "High",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:12:45.000Z",
+        "firstActivityTimeUtc": "2026-04-15T09:58:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:12:00.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:12:50.000Z",
+        "incidentNumber": 40203,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/cs-cred-003",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40203",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-brute-force-001"
+        ],
+        "labels": [
+          {"labelName": "credential-stuffing", "labelType": "User"},
+          {"labelName": "tor-exit-node", "labelType": "User"},
+          {"labelName": "password-spray", "labelType": "User"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Active Directory Identity Protection"],
+          "tactics": ["InitialAccess", "CredentialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "185.220.101.34"},
+        {"Type": "account", "Name": "mchen", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "AAD-PROXY-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 3,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "True Positive",
+      "expected_severity": "High",
+      "notes": "Part of 5-alert credential stuffing campaign. Same Tor exit IP as cs-cred-001 — tests indicator deduplication."
+    }
+  },
+  {
+    "scenario": "credential_stuffing",
+    "scenario_index": 4,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/cs-cred-004",
+      "name": "cs-cred-004",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"cs004-etag\"",
+      "properties": {
+        "title": "Successful sign-in after brute force attempts",
+        "description": "After 51 failed authentication attempts from 91.243.44.11, a successful sign-in was observed for jsmith@acme.com. The successful login originated from the same botnet IP that was conducting brute force attacks. This may indicate credential compromise.",
+        "severity": "High",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:18:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T10:15:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:17:30.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:18:05.000Z",
+        "incidentNumber": 40204,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/cs-cred-004",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40204",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-successful-brute-002"
+        ],
+        "labels": [
+          {"labelName": "credential-stuffing", "labelType": "User"},
+          {"labelName": "successful-brute", "labelType": "User"},
+          {"labelName": "account-compromise", "labelType": "User"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Active Directory Identity Protection"],
+          "tactics": ["InitialAccess", "CredentialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "91.243.44.11"},
+        {"Type": "account", "Name": "jsmith", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "AAD-PROXY-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 3,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "True Positive",
+      "expected_severity": "High",
+      "notes": "Part of 5-alert credential stuffing campaign. Successful login after brute force — highest priority in the campaign. Tests indicator deduplication for jsmith@acme.com (also in cs-cred-001) and 91.243.44.11 (also in cs-cred-002)."
+    }
+  },
+  {
+    "scenario": "credential_stuffing",
+    "scenario_index": 5,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/cs-cred-005",
+      "name": "cs-cred-005",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"cs005-etag\"",
+      "properties": {
+        "title": "Coordinated brute force from multiple source IPs",
+        "description": "Coordinated authentication attack detected against agarcia@acme.com from both 185.220.101.34 (Tor exit) and 91.243.44.11 (botnet). Both IPs are rotating attempts against the same account, suggesting a coordinated campaign with shared credential lists.",
+        "severity": "High",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:24:10.000Z",
+        "firstActivityTimeUtc": "2026-04-15T10:18:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:23:45.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:24:15.000Z",
+        "incidentNumber": 40205,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/cs-cred-005",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40205",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-brute-force-001"
+        ],
+        "labels": [
+          {"labelName": "credential-stuffing", "labelType": "User"},
+          {"labelName": "coordinated-attack", "labelType": "User"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Active Directory Identity Protection"],
+          "tactics": ["InitialAccess", "CredentialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "185.220.101.34"},
+        {"Type": "ip", "Address": "91.243.44.11"},
+        {"Type": "account", "Name": "agarcia", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "AAD-PROXY-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 4,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "True Positive",
+      "expected_severity": "High",
+      "notes": "Part of 5-alert credential stuffing campaign. Both attacker IPs in one alert — tests multi-indicator extraction and dedup across all 5 campaign alerts."
+    }
+  },
+  {
+    "scenario": "impossible_travel",
+    "scenario_index": 1,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/it-travel-001",
+      "name": "it-travel-001",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"it001-etag\"",
+      "properties": {
+        "title": "Impossible travel: sign-in from New York then Amsterdam in 20 minutes",
+        "description": "User bwilson@acme.com authenticated from IP 198.51.100.15 (New York, NY, US) at 10:30 UTC, then from IP 203.0.113.42 (Amsterdam, NL) at 10:50 UTC. Physical travel between these locations requires approximately 8 hours. This may indicate credential compromise or VPN usage.",
+        "severity": "High",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:52:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T10:30:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:50:00.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:52:05.000Z",
+        "incidentNumber": 40206,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/it-travel-001",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40206",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-impossible-travel-001"
+        ],
+        "labels": [
+          {"labelName": "impossible-travel", "labelType": "AutoAssigned"},
+          {"labelName": "identity", "labelType": "AutoAssigned"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Active Directory Identity Protection"],
+          "tactics": ["InitialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "198.51.100.15"},
+        {"Type": "ip", "Address": "203.0.113.42"},
+        {"Type": "account", "Name": "bwilson", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "AAD-PROXY-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 4,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "Needs Investigation",
+      "expected_severity": "High",
+      "notes": "First of 2 impossible travel alerts. Requires identity context — is bwilson a known VPN/travel user? NYC IP is the office, Amsterdam IP could be VPN."
+    }
+  },
+  {
+    "scenario": "impossible_travel",
+    "scenario_index": 2,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/it-travel-002",
+      "name": "it-travel-002",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"it002-etag\"",
+      "properties": {
+        "title": "Anomalous sign-in: bwilson@acme.com from Netherlands after US session",
+        "description": "Follow-up anomalous activity for bwilson@acme.com. User accessed SharePoint and Exchange Online from 203.0.113.42 (Amsterdam, NL) while an active session remains open from 198.51.100.15 (New York). Concurrent sessions from geographically distant locations detected.",
+        "severity": "High",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T11:05:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T10:55:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T11:04:00.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T11:05:05.000Z",
+        "incidentNumber": 40207,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/it-travel-002",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40207",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-impossible-travel-001"
+        ],
+        "labels": [
+          {"labelName": "impossible-travel", "labelType": "AutoAssigned"},
+          {"labelName": "concurrent-sessions", "labelType": "AutoAssigned"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Active Directory Identity Protection", "Microsoft Cloud App Security"],
+          "tactics": ["InitialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "203.0.113.42"},
+        {"Type": "ip", "Address": "198.51.100.15"},
+        {"Type": "account", "Name": "bwilson", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "AAD-PROXY-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 4,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "Needs Investigation",
+      "expected_severity": "High",
+      "notes": "Second impossible travel alert. Same IPs and account as it-travel-001 — tests indicator deduplication for bwilson@acme.com and both IPs. Concurrent sessions make this more suspicious than a simple travel scenario."
+    }
+  },
+  {
+    "scenario": "ransomware_beachhead",
+    "scenario_index": 1,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/rw-c2-001",
+      "name": "rw-c2-001",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"rw001-etag\"",
+      "properties": {
+        "title": "Ransomware C2 callback detected from FINANCE-WS-03",
+        "description": "Endpoint FINANCE-WS-03 established outbound connections to 3 known command-and-control IPs associated with the LockBit ransomware group. File hash analysis identified 2 files matching known ransomware dropper signatures. The C2 domain evil-update.darknet.services has been flagged by multiple threat intelligence feeds. Immediate containment recommended.",
+        "severity": "Critical",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:45:30.000Z",
+        "firstActivityTimeUtc": "2026-04-15T10:40:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:44:55.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:45:35.000Z",
+        "incidentNumber": 40208,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/rw-c2-001",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40208",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-ransomware-c2-001"
+        ],
+        "labels": [
+          {"labelName": "ransomware", "labelType": "User"},
+          {"labelName": "c2-callback", "labelType": "User"},
+          {"labelName": "lockbit", "labelType": "User"},
+          {"labelName": "critical", "labelType": "AutoAssigned"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 3,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Microsoft Defender for Endpoint", "Microsoft Defender for Cloud"],
+          "tactics": ["CommandAndControl", "Execution", "Impact"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "194.26.29.110"},
+        {"Type": "ip", "Address": "45.155.205.233"},
+        {"Type": "ip", "Address": "193.142.146.35"},
+        {"Type": "host", "HostName": "FINANCE-WS-03", "DnsDomain": "acme.com"},
+        {"Type": "filehash", "Algorithm": "SHA256", "Value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+        {"Type": "filehash", "Algorithm": "SHA256", "Value": "7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730"},
+        {"Type": "url", "Url": "https://evil-update.darknet.services/gate.php"},
+        {"Type": "account", "Name": "finance-svc", "UPNSuffix": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 8,
+      "indicator_types": ["ip", "domain", "hash_sha256", "url", "account"],
+      "expected_classification": "True Positive",
+      "expected_severity": "Critical",
+      "notes": "Single critical ransomware alert with 8 indicators. Tests full orchestrator -> multi-specialist delegation. 3 C2 IPs (all enrichable via VT/AbuseIPDB), 2 file hashes (ransomware dropper signatures), 1 C2 URL, 1 service account. Immediate containment needed."
+    }
+  },
+  {
+    "scenario": "lateral_movement",
+    "scenario_index": 1,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/lm-scan-001",
+      "name": "lm-scan-001",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"lm001-etag\"",
+      "properties": {
+        "title": "Internal port scan detected from 10.0.15.22",
+        "description": "Host 10.0.15.22 initiated SMB (445) and RDP (3389) connection attempts to 10.0.15.30 over a 5-minute window. Activity originated from the svc-backup service account. This pattern could indicate legitimate backup operations or lateral movement reconnaissance.",
+        "severity": "Medium",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:35:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T10:28:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:33:00.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:35:05.000Z",
+        "incidentNumber": 40209,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/lm-scan-001",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40209",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-lateral-movement-001"
+        ],
+        "labels": [
+          {"labelName": "lateral-movement", "labelType": "AutoAssigned"},
+          {"labelName": "internal-scan", "labelType": "AutoAssigned"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Microsoft Defender for Endpoint"],
+          "tactics": ["LateralMovement", "Discovery"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "10.0.15.22"},
+        {"Type": "ip", "Address": "10.0.15.30"},
+        {"Type": "account", "Name": "svc-backup", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "BACKUP-SRV-01", "DnsDomain": "acme.com"},
+        {"Type": "host", "HostName": "FILESERVER-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 5,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "Needs Investigation",
+      "expected_severity": "Medium",
+      "notes": "Part of 3-alert lateral movement cluster. Internal IPs (RFC1918) are not enrichable via VT/AbuseIPDB. Tests internal IP handling and alert correlation with svc-backup account."
+    }
+  },
+  {
+    "scenario": "lateral_movement",
+    "scenario_index": 2,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/lm-scan-002",
+      "name": "lm-scan-002",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"lm002-etag\"",
+      "properties": {
+        "title": "Suspicious SMB enumeration from backup server",
+        "description": "Host 10.0.15.22 (BACKUP-SRV-01) is performing SMB share enumeration on 10.0.15.31 (DC-01). The svc-backup account is accessing administrative shares (C$, ADMIN$) which is unusual for the backup service's normal operation. 23 unique share access attempts detected.",
+        "severity": "Medium",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:38:15.000Z",
+        "firstActivityTimeUtc": "2026-04-15T10:34:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:37:45.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:38:20.000Z",
+        "incidentNumber": 40210,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/lm-scan-002",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40210",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-lateral-movement-001"
+        ],
+        "labels": [
+          {"labelName": "lateral-movement", "labelType": "AutoAssigned"},
+          {"labelName": "smb-enumeration", "labelType": "AutoAssigned"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Microsoft Defender for Endpoint"],
+          "tactics": ["LateralMovement", "Discovery"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "10.0.15.22"},
+        {"Type": "ip", "Address": "10.0.15.31"},
+        {"Type": "account", "Name": "svc-backup", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "BACKUP-SRV-01", "DnsDomain": "acme.com"},
+        {"Type": "host", "HostName": "DC-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 5,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "Needs Investigation",
+      "expected_severity": "Medium",
+      "notes": "Part of 3-alert lateral movement cluster. Same source host and svc-backup account as lm-scan-001. Target is a domain controller — more concerning than a file server. Tests indicator deduplication for 10.0.15.22 and svc-backup@acme.com."
+    }
+  },
+  {
+    "scenario": "lateral_movement",
+    "scenario_index": 3,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/lm-scan-003",
+      "name": "lm-scan-003",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"lm003-etag\"",
+      "properties": {
+        "title": "WMI remote execution attempt from backup server",
+        "description": "Host 10.0.15.22 (BACKUP-SRV-01) attempted WMI remote command execution on 10.0.15.32 (HR-DB-01) using the svc-backup service account. WMI execution is outside the expected behavior profile for this service account. The target host contains sensitive HR data.",
+        "severity": "Medium",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:42:30.000Z",
+        "firstActivityTimeUtc": "2026-04-15T10:39:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:42:00.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:42:35.000Z",
+        "incidentNumber": 40211,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/lm-scan-003",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40211",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-lateral-movement-001"
+        ],
+        "labels": [
+          {"labelName": "lateral-movement", "labelType": "AutoAssigned"},
+          {"labelName": "wmi-execution", "labelType": "AutoAssigned"},
+          {"labelName": "sensitive-data", "labelType": "User"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Microsoft Defender for Endpoint"],
+          "tactics": ["LateralMovement", "Execution"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "10.0.15.22"},
+        {"Type": "ip", "Address": "10.0.15.32"},
+        {"Type": "account", "Name": "svc-backup", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "BACKUP-SRV-01", "DnsDomain": "acme.com"},
+        {"Type": "host", "HostName": "HR-DB-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 5,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "Needs Investigation",
+      "expected_severity": "Medium",
+      "notes": "Part of 3-alert lateral movement cluster. WMI execution is a significant escalation from port scanning. Same source IP and service account dedup tests. Target is HR database server."
+    }
+  },
+  {
+    "scenario": "coinminer",
+    "scenario_index": 1,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/cm-mine-001",
+      "name": "cm-mine-001",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"cm001-etag\"",
+      "properties": {
+        "title": "Outbound connections to cryptocurrency mining pool from PROD-APP-07",
+        "description": "Host PROD-APP-07 established persistent outbound connections to known Monero mining pool endpoints at pool.minexmr.com (104.238.222.24) and xmr.nanopool.org (162.159.200.1). Connections are using Stratum protocol on non-standard ports. CPU utilization on the host has spiked to 98% over the last 2 hours.",
+        "severity": "Medium",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:55:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T08:50:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:54:30.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:55:05.000Z",
+        "incidentNumber": 40212,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/cm-mine-001",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40212",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-coinminer-001"
+        ],
+        "labels": [
+          {"labelName": "cryptomining", "labelType": "AutoAssigned"},
+          {"labelName": "production", "labelType": "User"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Microsoft Defender for Cloud"],
+          "tactics": ["Impact"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "104.238.222.24"},
+        {"Type": "ip", "Address": "162.159.200.1"},
+        {"Type": "url", "Url": "stratum+tcp://pool.minexmr.com:4444"},
+        {"Type": "url", "Url": "stratum+tcp://xmr.nanopool.org:14444"},
+        {"Type": "host", "HostName": "PROD-APP-07", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 5,
+      "indicator_types": ["ip", "url", "domain"],
+      "expected_classification": "True Positive",
+      "expected_severity": "Medium",
+      "notes": "First of 2 coinminer alerts. Mining pool IPs and domains should enrich as malicious. Tests enrichment -> response action proposal (block_ip workflow) and approval gate."
+    }
+  },
+  {
+    "scenario": "coinminer",
+    "scenario_index": 2,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/cm-mine-002",
+      "name": "cm-mine-002",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"cm002-etag\"",
+      "properties": {
+        "title": "Cryptomining process detected on PROD-APP-07",
+        "description": "Process xmrig.exe (SHA256: 5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9) detected on PROD-APP-07. The binary was dropped to C:\\ProgramData\\svchost\\xmrig.exe and is running under the LOCAL SYSTEM context. Process is connecting to pool.minexmr.com on port 4444.",
+        "severity": "Medium",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T11:02:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T10:58:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T11:01:30.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T11:02:05.000Z",
+        "incidentNumber": 40213,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/cm-mine-002",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40213",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-coinminer-001"
+        ],
+        "labels": [
+          {"labelName": "cryptomining", "labelType": "AutoAssigned"},
+          {"labelName": "malware", "labelType": "AutoAssigned"},
+          {"labelName": "production", "labelType": "User"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Microsoft Defender for Endpoint"],
+          "tactics": ["Impact", "Execution"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "104.238.222.24"},
+        {"Type": "host", "HostName": "PROD-APP-07", "DnsDomain": "acme.com"},
+        {"Type": "filehash", "Algorithm": "SHA256", "Value": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"},
+        {"Type": "url", "Url": "stratum+tcp://pool.minexmr.com:4444"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 4,
+      "indicator_types": ["ip", "domain", "hash_sha256", "url"],
+      "expected_classification": "True Positive",
+      "expected_severity": "Medium",
+      "notes": "Second coinminer alert with file hash of xmrig binary. IP 104.238.222.24 should deduplicate with cm-mine-001. Hash should enrich as known coinminer via VirusTotal."
+    }
+  },
+  {
+    "scenario": "benign_noise",
+    "scenario_index": 1,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/bn-noise-001",
+      "name": "bn-noise-001",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"bn001-etag\"",
+      "properties": {
+        "title": "SSH brute force attempt from known scanner IP",
+        "description": "22 failed SSH login attempts from 71.6.135.131 (Censys scanner) targeting root account on bastion-01.acme.com. This IP is a well-known internet scanner operated by Censys for research purposes. No successful authentication observed.",
+        "severity": "Low",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T09:15:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T09:05:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T09:14:30.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T09:15:05.000Z",
+        "incidentNumber": 40214,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/bn-noise-001",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40214",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-ssh-brute-001"
+        ],
+        "labels": [
+          {"labelName": "ssh", "labelType": "AutoAssigned"},
+          {"labelName": "brute-force", "labelType": "AutoAssigned"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Sentinel"],
+          "tactics": ["InitialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "71.6.135.131"},
+        {"Type": "account", "Name": "root"},
+        {"Type": "host", "HostName": "bastion-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 3,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "Benign Positive",
+      "expected_severity": "Low",
+      "notes": "Known Censys scanner IP. Should classify as benign positive — real scanning activity but not a threat. Tests false positive classification and auto-close confidence."
+    }
+  },
+  {
+    "scenario": "benign_noise",
+    "scenario_index": 2,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/bn-noise-002",
+      "name": "bn-noise-002",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"bn002-etag\"",
+      "properties": {
+        "title": "DNS query to newly registered domain",
+        "description": "Host MARKETING-WS-02 resolved DNS for freshpromo-deals2026.com, a domain registered 3 days ago. Newly registered domains (NRDs) are frequently used for phishing and malware distribution. However, this domain appears to be a legitimate marketing promotion site.",
+        "severity": "Informational",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T09:22:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T09:20:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T09:21:30.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T09:22:05.000Z",
+        "incidentNumber": 40215,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/bn-noise-002",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40215",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-nrd-dns-001"
+        ],
+        "labels": [
+          {"labelName": "dns", "labelType": "AutoAssigned"},
+          {"labelName": "newly-registered-domain", "labelType": "AutoAssigned"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Sentinel"],
+          "tactics": ["CommandAndControl"]
+        }
+      },
+      "Entities": [
+        {"Type": "host", "HostName": "MARKETING-WS-02", "DnsDomain": "acme.com"},
+        {"Type": "url", "Url": "https://freshpromo-deals2026.com/spring-sale"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 2,
+      "indicator_types": ["domain", "url"],
+      "expected_classification": "False Positive",
+      "expected_severity": "Informational",
+      "notes": "Newly registered domain alert — very common false positive source. Domain is a legitimate marketing site. Tests FP classification with informational severity."
+    }
+  },
+  {
+    "scenario": "benign_noise",
+    "scenario_index": 3,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/bn-noise-003",
+      "name": "bn-noise-003",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"bn003-etag\"",
+      "properties": {
+        "title": "Repeated authentication failure for disabled account",
+        "description": "153 failed authentication attempts for disabled account ex-employee-tmorris@acme.com over the past 24 hours. The account was disabled 45 days ago during offboarding. Attempts are originating from internal IP 10.0.5.100 which maps to a shared conference room workstation with a cached credential.",
+        "severity": "Low",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T09:30:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T08:30:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T09:29:45.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T09:30:05.000Z",
+        "incidentNumber": 40216,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/bn-noise-003",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40216",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-disabled-account-001"
+        ],
+        "labels": [
+          {"labelName": "disabled-account", "labelType": "AutoAssigned"},
+          {"labelName": "cached-credential", "labelType": "User"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Active Directory Identity Protection"],
+          "tactics": ["InitialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "10.0.5.100"},
+        {"Type": "account", "Name": "ex-employee-tmorris", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "CONF-RM-WS-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 3,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "Benign Positive",
+      "expected_severity": "Low",
+      "notes": "Disabled account with cached credential on shared workstation. Classic benign noise — account is disabled so no risk. Tests auto-close confidence with identity enrichment showing disabled account."
+    }
+  },
+  {
+    "scenario": "benign_noise",
+    "scenario_index": 4,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/bn-noise-004",
+      "name": "bn-noise-004",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"bn004-etag\"",
+      "properties": {
+        "title": "Antivirus detection: EICAR test file on DEV-WS-09",
+        "description": "Microsoft Defender for Endpoint detected EICAR-Test-File on DEV-WS-09 at path C:\\Users\\devteam\\Downloads\\eicar_com.zip. The EICAR test file is a standard antivirus test file and is not malicious. File was automatically quarantined.",
+        "severity": "Informational",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T09:40:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T09:38:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T09:39:30.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T09:40:05.000Z",
+        "incidentNumber": 40217,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/bn-noise-004",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40217",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-av-detection-001"
+        ],
+        "labels": [
+          {"labelName": "antivirus", "labelType": "AutoAssigned"},
+          {"labelName": "eicar-test", "labelType": "AutoAssigned"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Microsoft Defender for Endpoint"],
+          "tactics": ["Execution"]
+        }
+      },
+      "Entities": [
+        {"Type": "host", "HostName": "DEV-WS-09", "DnsDomain": "acme.com"},
+        {"Type": "filehash", "Algorithm": "SHA256", "Value": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"},
+        {"Type": "account", "Name": "devteam", "UPNSuffix": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 3,
+      "indicator_types": ["domain", "hash_sha256", "account"],
+      "expected_classification": "False Positive",
+      "expected_severity": "Informational",
+      "notes": "EICAR test file — the standard AV test hash. SHA256 275a021b... is the well-known EICAR hash. VirusTotal enrichment will show 60+ detections but it is a test file. Tests nuanced FP classification."
+    }
+  },
+  {
+    "scenario": "benign_noise",
+    "scenario_index": 5,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/bn-noise-005",
+      "name": "bn-noise-005",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"bn005-etag\"",
+      "properties": {
+        "title": "Network scan from vulnerability scanner",
+        "description": "High-volume network scanning detected from 10.0.1.50 (VULN-SCANNER-01) targeting 10.0.0.0/16 subnet. Scan includes SYN probes on ports 22, 80, 443, 445, 3389, 8080. This host is the authorized Qualys vulnerability scanner running scheduled weekly scan.",
+        "severity": "Low",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T09:50:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T09:00:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T09:49:30.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T09:50:05.000Z",
+        "incidentNumber": 40218,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/bn-noise-005",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40218",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-network-scan-001"
+        ],
+        "labels": [
+          {"labelName": "network-scan", "labelType": "AutoAssigned"},
+          {"labelName": "vulnerability-scanner", "labelType": "User"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Sentinel"],
+          "tactics": ["Discovery", "Reconnaissance"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "10.0.1.50"},
+        {"Type": "host", "HostName": "VULN-SCANNER-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 2,
+      "indicator_types": ["ip", "domain"],
+      "expected_classification": "Benign Positive",
+      "expected_severity": "Low",
+      "notes": "Authorized vulnerability scanner. Internal IP, known scanning host. Should be auto-closed as benign. Tests internal IP handling and known-asset recognition."
+    }
+  },
+  {
+    "scenario": "benign_noise",
+    "scenario_index": 6,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/bn-noise-006",
+      "name": "bn-noise-006",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"bn006-etag\"",
+      "properties": {
+        "title": "Email with suspicious attachment sandboxed and found clean",
+        "description": "Email to procurement@acme.com from vendor-invoices@supplier-corp.com contained attachment Q1-Invoice-2026.xlsm with macros. Microsoft Defender for Office 365 sandboxed the attachment. Detonation analysis: no malicious behavior detected. Macros contain standard Excel automation for invoice formatting.",
+        "severity": "Informational",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:00:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T09:55:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T09:59:30.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:00:05.000Z",
+        "incidentNumber": 40219,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/bn-noise-006",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40219",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-email-attachment-001"
+        ],
+        "labels": [
+          {"labelName": "email", "labelType": "AutoAssigned"},
+          {"labelName": "macro", "labelType": "AutoAssigned"},
+          {"labelName": "sandboxed-clean", "labelType": "AutoAssigned"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Microsoft Defender for Office 365"],
+          "tactics": ["InitialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "account", "Name": "procurement", "UPNSuffix": "acme.com"},
+        {"Type": "filehash", "Algorithm": "SHA256", "Value": "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"},
+        {"Type": "url", "Url": "mailto:vendor-invoices@supplier-corp.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 3,
+      "indicator_types": ["account", "hash_sha256", "url"],
+      "expected_classification": "False Positive",
+      "expected_severity": "Informational",
+      "notes": "Email attachment that was detonated and found clean. Sandbox already cleared it. Tests FP classification with informational severity and auto-close."
+    }
+  },
+  {
+    "scenario": "benign_noise",
+    "scenario_index": 7,
+    "alert": {
+      "id": "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/incidents/bn-noise-007",
+      "name": "bn-noise-007",
+      "type": "Microsoft.SecurityInsights/incidents",
+      "etag": "\"bn007-etag\"",
+      "properties": {
+        "title": "VPN login from new device for cto@acme.com",
+        "description": "First-time VPN connection from a new device (MacBook Pro, macOS 15.4) for cto@acme.com. Login originated from IP 73.162.214.130 (Comcast residential, Chicago, IL). User has not previously authenticated from this device. MFA was successfully completed via push notification.",
+        "severity": "Low",
+        "status": "New",
+        "createdTimeUtc": "2026-04-15T10:10:00.000Z",
+        "firstActivityTimeUtc": "2026-04-15T10:08:00.000Z",
+        "lastActivityTimeUtc": "2026-04-15T10:09:30.000Z",
+        "lastModifiedTimeUtc": "2026-04-15T10:10:05.000Z",
+        "incidentNumber": 40220,
+        "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/incident/bn-noise-007",
+        "providerName": "Azure Sentinel",
+        "providerIncidentId": "40220",
+        "relatedAnalyticRuleIds": [
+          "/subscriptions/sub-acme-001/resourceGroups/rg-soc/providers/Microsoft.OperationalInsights/workspaces/ws-prod/providers/Microsoft.SecurityInsights/alertRules/rule-new-device-vpn-001"
+        ],
+        "labels": [
+          {"labelName": "vpn", "labelType": "AutoAssigned"},
+          {"labelName": "new-device", "labelType": "AutoAssigned"}
+        ],
+        "owner": {
+          "objectId": null,
+          "email": null,
+          "userPrincipalName": null,
+          "assignedTo": null,
+          "ownerType": "Unknown"
+        },
+        "additionalData": {
+          "alertsCount": 1,
+          "bookmarksCount": 0,
+          "commentsCount": 0,
+          "alertProductNames": ["Azure Active Directory Identity Protection"],
+          "tactics": ["InitialAccess"]
+        }
+      },
+      "Entities": [
+        {"Type": "ip", "Address": "73.162.214.130"},
+        {"Type": "account", "Name": "cto", "UPNSuffix": "acme.com"},
+        {"Type": "host", "HostName": "VPN-GW-01", "DnsDomain": "acme.com"}
+      ]
+    },
+    "expected": {
+      "indicator_count": 3,
+      "indicator_types": ["ip", "account", "domain"],
+      "expected_classification": "Benign Positive",
+      "expected_severity": "Low",
+      "notes": "New device VPN login with successful MFA. Residential IP from user's home metro area. Should classify as benign — MFA was completed, location is consistent. Tests auto-close with identity context."
+    }
+  }
+]
