@@ -89,7 +89,9 @@ import {
   useSkills,
   useSyncAgentSkills,
   useDeleteAgent,
+  useCancelRun,
 } from "@/hooks/use-api";
+import { RunTranscriptPanel } from "@/components/run-transcript/run-transcript-panel";
 import type { HeartbeatRun, CostEvent, AgentInvocation, AgentTool, Skill } from "@/lib/types";
 import { formatDate, relativeTime } from "@/lib/format";
 import {
@@ -128,6 +130,7 @@ import {
   Code2,
   Link2,
   Eye,
+  XCircle,
 } from "lucide-react";
 
 const ALL_SEVERITIES = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
@@ -137,7 +140,10 @@ function heartbeatStatusClass(status: string): string {
   switch (status) {
     case "succeeded": return "text-teal bg-teal/10 border-teal/30";
     case "failed": return "text-red-threat bg-red-threat/10 border-red-threat/30";
-    case "running": return "text-amber bg-amber/10 border-amber/30";
+    case "running": return "text-teal bg-teal/10 border-teal/30 animate-pulse";
+    case "cancelled": return "text-[#9CA3AF] bg-[#57635F]/30 border-[#57635F]/50";
+    case "timed_out": return "text-amber bg-amber/10 border-amber/30";
+    case "queued": return "text-muted-foreground bg-muted/50 border-muted";
     default: return "text-dim bg-dim/10 border-dim/30";
   }
 }
@@ -273,6 +279,11 @@ export function AgentDetailPage() {
 
   // Selected run for split-pane
   const [selectedRunUuid, setSelectedRunUuid] = useState<string | null>(null);
+
+  // Transcript panel (slide-out sheet)
+  const [transcriptRunUuid, setTranscriptRunUuid] = useState<string | null>(null);
+  const [showCancelRunConfirm, setShowCancelRunConfirm] = useState<string | null>(null);
+  const cancelRun = useCancelRun();
 
   // Assign task modal
   const [assignTaskOpen, setAssignTaskOpen] = useState(false);
@@ -683,6 +694,7 @@ export function AgentDetailPage() {
   const agentStatus = agent.status ?? (agent.is_active ? "active" : "inactive");
   const isManaged = agent.execution_mode === "claude_code" || agent.execution_mode === "managed";
   const selectedRun = selectedRunUuid ? heartbeatRuns.find((r) => r.uuid === selectedRunUuid) : null;
+  const transcriptRun = transcriptRunUuid ? heartbeatRuns.find((r) => r.uuid === transcriptRunUuid) : null;
 
   return (
     <AppLayout title="Agent Detail">
@@ -1479,7 +1491,7 @@ export function AgentDetailPage() {
               />
             </TabsContent>
 
-            {/* Runs Tab — split pane */}
+            {/* Runs Tab — split pane + transcript sheet */}
             <TabsContent value="runs" className="mt-4">
               <Card className="bg-card border-border overflow-hidden">
                 <CardHeader className="pb-2">
@@ -1500,33 +1512,78 @@ export function AgentDetailPage() {
                         {heartbeatRuns.map((run) => {
                           const isSelected = selectedRunUuid === run.uuid;
                           return (
-                            <button
+                            <div
                               key={run.uuid}
-                              type="button"
-                              onClick={() => setSelectedRunUuid(isSelected ? null : run.uuid)}
                               className={cn(
                                 "w-full text-left px-3 py-2.5 border-b border-border transition-colors",
                                 isSelected ? "bg-teal/10" : "hover:bg-surface/50",
                               )}
                             >
                               <div className="flex items-center justify-between gap-2 mb-1">
-                                <span className="font-mono text-[11px] text-dim">#{run.uuid.slice(-6)}</span>
-                                <Badge
-                                  variant="outline"
-                                  className={cn("text-[10px] px-1.5 py-0", heartbeatStatusClass(run.status))}
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedRunUuid(isSelected ? null : run.uuid)}
+                                  className="flex items-center gap-2 min-w-0 flex-1"
                                 >
-                                  {run.status}
-                                </Badge>
+                                  <span className="font-mono text-[11px] text-dim">#{run.uuid.slice(-6)}</span>
+                                </button>
+                                <div className="flex items-center gap-1">
+                                  <Badge
+                                    variant="outline"
+                                    className={cn("text-[10px] px-1.5 py-0", heartbeatStatusClass(run.status))}
+                                  >
+                                    {run.status === "running" && (
+                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal mr-0.5" />
+                                    )}
+                                    {run.status}
+                                  </Badge>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="p-0.5 rounded hover:bg-surface transition-colors text-dim hover:text-foreground"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <MoreHorizontal className="h-3 w-3" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="bg-card border-border">
+                                      <DropdownMenuItem
+                                        className="text-xs cursor-pointer"
+                                        onClick={() => setTranscriptRunUuid(run.uuid)}
+                                      >
+                                        <Eye className="h-3 w-3 mr-2" />
+                                        View Transcript
+                                      </DropdownMenuItem>
+                                      {run.status === "running" && (
+                                        <>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            className="text-xs cursor-pointer text-red-threat focus:text-red-threat"
+                                            onClick={() => setShowCancelRunConfirm(run.uuid)}
+                                          >
+                                            <XCircle className="h-3 w-3 mr-2" />
+                                            Cancel Run
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
                               </div>
-                              <div className="flex items-center justify-between gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setTranscriptRunUuid(run.uuid)}
+                                className="flex items-center justify-between gap-2 w-full"
+                              >
                                 <span className="text-[11px] text-muted-foreground">
                                   {run.started_at ? relativeTime(run.started_at) : "—"}
                                 </span>
                                 <span className="font-mono text-[11px] text-dim">
                                   {formatDuration(run.started_at, run.finished_at)}
                                 </span>
-                              </div>
-                            </button>
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
@@ -1540,13 +1597,40 @@ export function AgentDetailPage() {
                         ) : (
                           <>
                             <div className="flex items-center justify-between">
-                              <Badge
-                                variant="outline"
-                                className={cn("text-xs", heartbeatStatusClass(selectedRun.status))}
-                              >
-                                {selectedRun.status}
-                              </Badge>
-                              <span className="font-mono text-[11px] text-dim">#{selectedRun.uuid.slice(-6)}</span>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className={cn("text-xs", heartbeatStatusClass(selectedRun.status))}
+                                >
+                                  {selectedRun.status === "running" && (
+                                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal mr-1" />
+                                  )}
+                                  {selectedRun.status}
+                                </Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setTranscriptRunUuid(selectedRun.uuid)}
+                                  className="h-6 text-[10px] text-dim hover:text-teal-light px-2"
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  Transcript
+                                </Button>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {selectedRun.status === "running" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowCancelRunConfirm(selectedRun.uuid)}
+                                    className="h-6 text-[10px] border-red-threat/30 text-red-threat hover:bg-red-threat/10 px-2"
+                                  >
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                    Cancel
+                                  </Button>
+                                )}
+                                <span className="font-mono text-[11px] text-dim">#{selectedRun.uuid.slice(-6)}</span>
+                              </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
@@ -1590,6 +1674,45 @@ export function AgentDetailPage() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* Run Transcript Panel */}
+            {transcriptRun && (
+              <RunTranscriptPanel
+                runUuid={transcriptRun.uuid}
+                runStatus={transcriptRun.status}
+                runStartedAt={transcriptRun.started_at}
+                runFinishedAt={transcriptRun.finished_at}
+                onClose={() => setTranscriptRunUuid(null)}
+                onStatusChange={() => {
+                  // Invalidate heartbeat runs to get fresh status
+                  void refetch();
+                }}
+              />
+            )}
+
+            {/* Cancel Run Confirm Dialog */}
+            <ConfirmDialog
+              open={showCancelRunConfirm !== null}
+              onOpenChange={(open) => { if (!open) setShowCancelRunConfirm(null); }}
+              title="Cancel Run"
+              description="Are you sure you want to cancel this run? The agent will stop processing immediately."
+              confirmLabel="Cancel Run"
+              variant="destructive"
+              onConfirm={() => {
+                if (!showCancelRunConfirm) return;
+                cancelRun.mutate(showCancelRunConfirm, {
+                  onSuccess: () => {
+                    toast.success("Run cancelled");
+                    setShowCancelRunConfirm(null);
+                    void refetch();
+                  },
+                  onError: (err) => {
+                    toast.error(err instanceof Error ? err.message : "Failed to cancel run");
+                    setShowCancelRunConfirm(null);
+                  },
+                });
+              }}
+            />
 
             {/* Cost Tab */}
             <TabsContent value="cost" className="mt-4 space-y-4">
@@ -2127,11 +2250,19 @@ export function AgentDetailPage() {
                   ) : (
                     <div className="divide-y divide-border">
                       {heartbeatRuns.slice(0, 10).map((run) => (
-                        <div key={run.uuid} className="flex items-center gap-3 px-4 py-2.5">
+                        <button
+                          key={run.uuid}
+                          type="button"
+                          onClick={() => setTranscriptRunUuid(run.uuid)}
+                          className="flex items-center gap-3 px-4 py-2.5 w-full text-left hover:bg-surface/50 transition-colors"
+                        >
                           <Badge
                             variant="outline"
                             className={cn("text-[10px] px-1.5 py-0 shrink-0", heartbeatStatusClass(run.status))}
                           >
+                            {run.status === "running" && (
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal mr-0.5" />
+                            )}
                             {run.status}
                           </Badge>
                           <span className="text-xs text-muted-foreground flex-1">
@@ -2143,7 +2274,7 @@ export function AgentDetailPage() {
                           <span className="font-mono text-[11px] text-dim shrink-0">
                             #{run.uuid.slice(-6)}
                           </span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
