@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 import { severityColor, statusColor, maliceColor } from "@/lib/format";
-import { Shield, ArrowRight, Zap } from "lucide-react";
+import { Shield, ArrowRight, Zap, MessageSquare } from "lucide-react";
 
 interface ActivityEventReferencesProps {
   eventType: string;
@@ -384,6 +384,25 @@ export function ActivityEventReferences({ eventType, references }: ActivityEvent
           )}
           {r.malice_source != null && (
             <span className="text-[10px] text-dim">({String(r.malice_source)})</span>
+          )}
+        </div>
+      );
+
+    case "alert_note_added":
+      return (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <MessageSquare className="h-3 w-3 text-teal-light shrink-0" />
+            {r.agent_triggered === true && (
+              <Badge variant="outline" className="text-[10px] text-teal bg-teal/10 border-teal/30">
+                agent re-triggered
+              </Badge>
+            )}
+          </div>
+          {r.content != null && (
+            <p className="text-xs text-foreground whitespace-pre-wrap pl-5">
+              {String(r.content)}
+            </p>
           )}
         </div>
       );

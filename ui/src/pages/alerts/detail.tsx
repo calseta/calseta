@@ -6,7 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -32,6 +39,7 @@ import {
   useAlertRawPayload,
   usePatchAlert,
   useEnrichAlert,
+  usePostAlertNote,
 } from "@/hooks/use-api";
 import {
   formatDate,
@@ -74,6 +82,8 @@ import {
   Plus,
   RefreshCw,
   FileText,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 
 const SEVERITY_OPTIONS = ["Pending", "Informational", "Low", "Medium", "High", "Critical"];
@@ -119,7 +129,9 @@ export function AlertDetailPage() {
   const { data: rawPayloadResp } = useAlertRawPayload(uuid, activeTab === "raw");
   const patchAlert = usePatchAlert();
   const enrichAlert = useEnrichAlert();
+  const postAlertNote = usePostAlertNote(uuid);
 
+  const [noteContent, setNoteContent] = useState("");
   const [closingWith, setClosingWith] = useState<string>("");
   const [showCloseFlow, setShowCloseFlow] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
@@ -712,38 +724,49 @@ export function AlertDetailPage() {
 
             {/* Activity Timeline */}
             <TabsContent value="activity" className="mt-4">
-              {activities.length > 0 ? (
-                <div className="space-y-0">
-                  {activities.map((ev, i) => (
-                    <div key={ev.uuid} className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className={cn("h-2 w-2 rounded-full mt-2", eventDotColor(ev.event_type))} />
-                        {i < activities.length - 1 && (
-                          <div className="w-px flex-1 bg-border" />
-                        )}
+              <div className="space-y-4">
+                {activities.length > 0 ? (
+                  <div className="space-y-0">
+                    {activities.map((ev, i) => (
+                      <div key={ev.uuid} className="flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className={cn("h-2 w-2 rounded-full mt-2", eventDotColor(ev.event_type))} />
+                          {i < activities.length - 1 && (
+                            <div className="w-px flex-1 bg-border" />
+                          )}
+                        </div>
+                        <div className="pb-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-foreground">
+                              {formatEventType(ev.event_type)}
+                            </span>
+                            <span className="text-[11px] text-dim">
+                              {formatDate(ev.created_at)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <ActorBadge actorType={ev.actor_type} actorKeyPrefix={ev.actor_key_prefix} />
+                          </div>
+                          <div className="mt-1.5">
+                            <ActivityEventReferences eventType={ev.event_type} references={ev.references} />
+                          </div>
+                        </div>
                       </div>
-                      <div className="pb-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-foreground">
-                            {formatEventType(ev.event_type)}
-                          </span>
-                          <span className="text-[11px] text-dim">
-                            {formatDate(ev.created_at)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <ActorBadge actorType={ev.actor_type} actorKeyPrefix={ev.actor_key_prefix} />
-                        </div>
-                        <div className="mt-1.5">
-                          <ActivityEventReferences eventType={ev.event_type} references={ev.references} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <Empty text="No activity recorded yet" />
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <Empty text="No activity recorded yet" />
+                )}
+
+                {/* Add Note */}
+                <AlertNoteForm
+                  noteContent={noteContent}
+                  setNoteContent={setNoteContent}
+                  postAlertNote={postAlertNote}
+                  activities={activities}
+                  alert={alert}
+                />
+              </div>
             </TabsContent>
 
             {/* ADS — Detection Rule Documentation */}
@@ -804,6 +827,101 @@ export function AlertDetailPage() {
         </Tabs>
       </div>
     </AppLayout>
+  );
+}
+
+function AlertNoteForm({
+  noteContent,
+  setNoteContent,
+  postAlertNote,
+  activities,
+  alert,
+}: {
+  noteContent: string;
+  setNoteContent: (v: string) => void;
+  postAlertNote: ReturnType<typeof usePostAlertNote>;
+  activities: { uuid: string; event_type: string }[];
+  alert: { agent_findings: { id: string }[] | null };
+}) {
+  const hasAgentInvolvement =
+    activities.some(
+      (ev) =>
+        ev.event_type.includes("agent") ||
+        ev.event_type.includes("heartbeat") ||
+        ev.event_type.includes("finding"),
+    ) || (alert.agent_findings != null && alert.agent_findings.length > 0);
+
+  function handlePost(triggerAgent: boolean) {
+    if (!noteContent.trim()) return;
+    postAlertNote.mutate(
+      { content: noteContent.trim(), trigger_agent: triggerAgent },
+      {
+        onSuccess: (data) => {
+          setNoteContent("");
+          toast.success(
+            data.data.agent_triggered
+              ? "Note posted. Agent re-triggered."
+              : "Note posted.",
+          );
+        },
+        onError: () => toast.error("Failed to post note"),
+      },
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-3 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs text-dim">
+        <MessageSquare className="h-3.5 w-3.5" />
+        Add a note
+      </div>
+      <Textarea
+        value={noteContent}
+        onChange={(e) => setNoteContent(e.target.value)}
+        placeholder="Add a note to this alert..."
+        rows={3}
+        className="bg-card border-border text-sm resize-y min-h-[72px]"
+        disabled={postAlertNote.isPending}
+      />
+      <div className="flex items-center gap-2 justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handlePost(false)}
+          disabled={postAlertNote.isPending || !noteContent.trim()}
+          className="h-7 text-xs border-border text-foreground hover:bg-surface-hover"
+        >
+          <Send className="h-3 w-3 mr-1" />
+          Post Note
+        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  size="sm"
+                  onClick={() => handlePost(true)}
+                  disabled={
+                    postAlertNote.isPending ||
+                    !noteContent.trim() ||
+                    !hasAgentInvolvement
+                  }
+                  className="h-7 text-xs bg-teal text-white hover:bg-teal-dim disabled:opacity-50"
+                >
+                  <Zap className="h-3 w-3 mr-1" />
+                  Post &amp; Re-trigger Agent
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!hasAgentInvolvement && (
+              <TooltipContent side="top" className="bg-card border-border text-xs">
+                No agent has recently investigated this alert
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    </div>
   );
 }
 
