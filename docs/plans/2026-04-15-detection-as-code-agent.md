@@ -22,6 +22,13 @@ The Detection-as-Code (DaC) agent automates this cycle:
 
 This is the first Calseta agent that **writes code and manages git branches**. It requires the workspace isolation infrastructure designed (schema only) in the runtime hardening PRD (chunk D4) and implemented in this PRD.
 
+**How DaC agents run**: DaC agents are standard Calseta managed agents — they use the existing runtime engine, tool loop, session management, and trigger system. They run via:
+- **Routines** (cron schedule) — e.g., weekly analysis runs using Calseta's existing routine trigger system
+- **On-demand** — manual trigger via API or UI
+- **PR comment wakeups** — GitHub/GitLab webhook → Calseta webhook endpoint → comment-driven re-trigger (depends on runtime hardening C1)
+
+There is no separate execution path. The only difference is that DaC agents have `workspace_mode: "git_worktree"` and get additional git-related tools.
+
 ---
 
 ## Solution
@@ -436,6 +443,8 @@ The DaC agent is registered as a managed agent with `workspace_mode='git_worktre
 ---
 
 ## Open Questions
+
+0. **Persistent volume for agent data**: `CALSETA_DATA_DIR` currently defaults to `/tmp/calseta` (wiped on container restart) and `AGENT_FILES_DIR` to `./data/agents` (not volume-mounted in docker-compose.yml). Git worktree clones live under `CALSETA_DATA_DIR/workspaces/` — these MUST survive container restarts. **Action required before DaC ships**: add a named volume (`calseta_data`) to docker-compose.yml mounted at `/data/calseta` for api/worker services. Update `CALSETA_DATA_DIR` default from `/tmp/calseta` to `/data/calseta`. Update `make lab` and deployment docs. For cloud: EFS (AWS ECS) or Azure Files (ACA). This is a prerequisite for this PRD, not a chunk within it — it should be a small standalone PR.
 
 1. **PR approval mode**: Should `git_create_pr` always require human approval (tier=`requires_approval`), or should there be a "trusted" mode where the agent can open PRs without approval? Proposal: always require approval in v1 to build trust; re-evaluate after 3 months of usage data.
 

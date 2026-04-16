@@ -42,6 +42,9 @@ htmlcov/
 # Docker volumes
 postgres_data/
 
+# Agent runtime data (populated at runtime, not committed)
+data/
+
 # Claude Code local overrides
 .claude/settings.local.json
 .mcp.local.json
