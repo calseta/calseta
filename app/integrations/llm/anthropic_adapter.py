@@ -15,6 +15,7 @@ from app.integrations.llm.base import (
     LLMMessage,
     LLMProviderAdapter,
     LLMResponse,
+    OnLogCallback,
 )
 
 if TYPE_CHECKING:
@@ -61,6 +62,7 @@ class AnthropicAdapter(LLMProviderAdapter):
         tools: list[dict[str, Any]],
         system: str | None = None,
         max_tokens: int | None = None,
+        on_log: OnLogCallback | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         import anthropic
@@ -110,6 +112,17 @@ class AnthropicAdapter(LLMProviderAdapter):
                 content_blocks.append(block.model_dump())
             else:
                 content_blocks.append({"type": getattr(block, "type", "unknown")})
+
+        # Stream events via on_log callback if provided
+        if on_log is not None:
+            for block in content_blocks:
+                block_type = block.get("type", "")
+                if block_type == "text":
+                    await on_log("assistant", block.get("text", ""))
+                elif block_type == "tool_use":
+                    await on_log("tool_call", f"{block.get('name', '')}({block.get('input', {})})")
+                elif block_type == "thinking":
+                    await on_log("thinking", block.get("thinking", ""))
 
         cost = self.extract_cost(
             LLMResponse(

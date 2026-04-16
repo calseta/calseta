@@ -56,3 +56,11 @@ class HeartbeatRunResponse(BaseModel):
     context_snapshot: dict[str, Any] | None
     created_at: datetime
     updated_at: datetime
+    # Runtime hardening fields
+    process_pid: int | None = None
+    error_code: str | None = None
+    log_store: str = "local_file"
+    log_ref: str | None = None
+    log_sha256: str | None = None
+    log_bytes: int | None = None
+    invocation_source: str | None = None

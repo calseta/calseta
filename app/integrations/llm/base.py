@@ -8,8 +8,15 @@ factory.py routes LLMIntegration rows to the correct concrete adapter.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
+
+# Callback type for streaming adapter output.
+# Called with (stream, chunk) where stream is one of:
+#   "stdout", "stderr", "assistant", "tool_call", "tool_result", "thinking", "finding"
+# and chunk is the content string.
+OnLogCallback = Callable[[str, str], Awaitable[None]]
 
 
 @dataclass
@@ -64,6 +71,11 @@ class LLMProviderAdapter(ABC):
     - test_environment() should be safe to call without incurring API charges.
     """
 
+    # Optional class attributes for external adapter identification.
+    # Built-in adapters leave these unset; external adapters MUST set them.
+    provider_name: str | None = None
+    display_name: str | None = None
+
     @abstractmethod
     async def create_message(
         self,
@@ -71,6 +83,7 @@ class LLMProviderAdapter(ABC):
         tools: list[dict[str, Any]],
         system: str | None = None,
         max_tokens: int | None = None,
+        on_log: OnLogCallback | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         """
@@ -81,6 +94,10 @@ class LLMProviderAdapter(ABC):
             tools: Tool definitions in Anthropic tool-use format.
             system: System prompt string.
             max_tokens: Override the default max_tokens for this call.
+            on_log: Optional async callback for streaming output. Called with
+                (stream, chunk) where stream is one of "stdout", "stderr",
+                "assistant", "tool_call", "tool_result", "thinking", "finding"
+                and chunk is the content string. When None, no streaming occurs.
             **kwargs: Provider-specific extras (e.g. session_id for claude_code).
         """
 

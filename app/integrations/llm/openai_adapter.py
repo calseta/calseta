@@ -18,6 +18,7 @@ from app.integrations.llm.base import (
     LLMMessage,
     LLMProviderAdapter,
     LLMResponse,
+    OnLogCallback,
 )
 
 if TYPE_CHECKING:
@@ -77,6 +78,7 @@ class OpenAIAdapter(LLMProviderAdapter):
         tools: list[dict[str, Any]],
         system: str | None = None,
         max_tokens: int | None = None,
+        on_log: OnLogCallback | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         try:
@@ -131,6 +133,15 @@ class OpenAIAdapter(LLMProviderAdapter):
                     "name": tc.function.name,
                     "input": json.loads(tc.function.arguments or "{}"),
                 })
+
+        # Stream events via on_log callback if provided
+        if on_log is not None:
+            for block in content_blocks:
+                block_type = block.get("type", "")
+                if block_type == "text":
+                    await on_log("assistant", block.get("text", ""))
+                elif block_type == "tool_use":
+                    await on_log("tool_call", f"{block.get('name', '')}({block.get('input', {})})")
 
         stop_reason = _map_finish_reason(choice.finish_reason)
 

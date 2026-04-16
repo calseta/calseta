@@ -3,6 +3,7 @@ LLM integration management routes.
 
 POST   /v1/llm-integrations               Register LLM provider+model combo
 GET    /v1/llm-integrations               List all (paginated)
+GET    /v1/llm-integrations/providers     List available providers
 GET    /v1/llm-integrations/{uuid}        Get integration details
 PATCH  /v1/llm-integrations/{uuid}        Update config
 DELETE /v1/llm-integrations/{uuid}        Remove integration (204)
@@ -87,6 +88,35 @@ async def create_llm_integration(
     svc = LLMIntegrationService(db)
     integration = await svc.create(body)
     return DataResponse(data=LLMIntegrationResponse.from_orm(integration))
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/llm-integrations/providers
+# ---------------------------------------------------------------------------
+
+
+@router.get("/providers", response_model=DataResponse[list[dict]])
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def list_llm_providers(
+    request: Request,
+    auth: _Read,
+) -> DataResponse[list[dict]]:
+    """List all available LLM providers (built-in + external)."""
+    from app.integrations.llm.adapter_registry import (
+        list_external_providers,
+    )
+    from app.schemas.llm_integrations import LLMProvider
+
+    builtin = [
+        {
+            "provider_name": p.value,
+            "display_name": p.value,
+            "is_external": False,
+        }
+        for p in LLMProvider
+    ]
+    external = list_external_providers()
+    return DataResponse(data=builtin + external)
 
 
 # ---------------------------------------------------------------------------

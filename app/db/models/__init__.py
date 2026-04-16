@@ -10,6 +10,7 @@ from app.db.models.agent_issue_comment import AgentIssueComment
 from app.db.models.agent_registration import AgentRegistration
 from app.db.models.agent_routine import AgentRoutine
 from app.db.models.agent_run import AgentRun
+from app.db.models.agent_run_event import AgentRunEvent
 from app.db.models.agent_task_session import AgentTaskSession
 from app.db.models.agent_tool import AgentTool
 from app.db.models.alert import Alert
@@ -54,6 +55,7 @@ __all__ = [
     "AgentInstructionFile",
     "AgentRegistration",
     "AgentRun",
+    "AgentRunEvent",
     "AgentTaskSession",
     "AgentTool",
     "Alert",

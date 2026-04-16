@@ -33,3 +33,32 @@ class HeartbeatRun(TimestampMixin, UUIDMixin, Base):
         Integer, nullable=False, server_default=text("0"), default=0
     )
     context_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+
+    # --- Runtime hardening fields ---
+    process_pid: Mapped[int | None] = mapped_column(Integer)
+    process_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+    )
+    error_code: Mapped[str | None] = mapped_column(Text)
+    log_store: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=text("'local_file'"),
+        default="local_file",
+    )
+    log_ref: Mapped[str | None] = mapped_column(Text)
+    log_sha256: Mapped[str | None] = mapped_column(Text)
+    log_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    stdout_excerpt: Mapped[str | None] = mapped_column(Text)
+    stderr_excerpt: Mapped[str | None] = mapped_column(Text)
+    process_loss_retry_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+        default=0,
+    )
+    retry_of_run_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("heartbeat_runs.id", ondelete="SET NULL"),
+    )
+    invocation_source: Mapped[str | None] = mapped_column(Text)

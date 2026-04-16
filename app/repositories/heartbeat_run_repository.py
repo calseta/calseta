@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import uuid as uuid_module
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
 from app.db.models.heartbeat_run import HeartbeatRun
 from app.repositories.base import BaseRepository
+
+
+def _utcnow() -> datetime:
+    """Return the current UTC datetime (timezone-aware)."""
+    return datetime.now(UTC)
 
 
 class HeartbeatRunRepository(BaseRepository[HeartbeatRun]):
@@ -34,6 +40,19 @@ class HeartbeatRunRepository(BaseRepository[HeartbeatRun]):
         "alerts_processed",
         "actions_proposed",
         "context_snapshot",
+        # Runtime hardening fields
+        "process_pid",
+        "process_started_at",
+        "error_code",
+        "log_store",
+        "log_ref",
+        "log_sha256",
+        "log_bytes",
+        "stdout_excerpt",
+        "stderr_excerpt",
+        "process_loss_retry_count",
+        "retry_of_run_id",
+        "invocation_source",
     })
 
     async def update_status(
@@ -75,3 +94,41 @@ class HeartbeatRunRepository(BaseRepository[HeartbeatRun]):
             .limit(1)
         )
         return result.scalar_one_or_none()  # type: ignore[no-any-return]
+
+    # --- State transition helpers ---
+
+    async def cancel(self, run: HeartbeatRun) -> HeartbeatRun:
+        """Transition a run to cancelled status."""
+        run.status = "cancelled"
+        run.error_code = "cancelled"
+        run.finished_at = _utcnow()
+        await self._db.flush()
+        await self._db.refresh(run)
+        return run
+
+    async def mark_timed_out(self, run: HeartbeatRun) -> HeartbeatRun:
+        """Transition a run to timed_out status."""
+        run.status = "timed_out"
+        run.error_code = "timeout"
+        run.finished_at = _utcnow()
+        await self._db.flush()
+        await self._db.refresh(run)
+        return run
+
+    async def mark_orphaned(self, run: HeartbeatRun) -> HeartbeatRun:
+        """Mark a run as failed due to process loss."""
+        run.status = "failed"
+        run.error_code = "process_lost"
+        run.finished_at = _utcnow()
+        await self._db.flush()
+        await self._db.refresh(run)
+        return run
+
+    async def list_running_with_pid(self) -> list[HeartbeatRun]:
+        """Return all running HeartbeatRuns that have a process_pid set."""
+        result = await self._db.execute(
+            select(HeartbeatRun)
+            .where(HeartbeatRun.status == "running")
+            .where(HeartbeatRun.process_pid.isnot(None))
+        )
+        return list(result.scalars().all())

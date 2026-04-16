@@ -277,6 +277,11 @@ class Settings(BaseSettings):
     AGENT_FILES_DIR: str = "./data/agents"
 
     # ------------------------------------------------------------------
+    # External LLM Adapters
+    # ------------------------------------------------------------------
+    CALSETA_EXTERNAL_ADAPTERS: str = ""  # "module:Class,module:Class"
+
+    # ------------------------------------------------------------------
     # Sandbox
     # ------------------------------------------------------------------
     ENRICHMENT_MOCK_MODE: bool = False

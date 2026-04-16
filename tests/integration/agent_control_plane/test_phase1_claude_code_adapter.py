@@ -29,15 +29,57 @@ def _ndjson_bytes(*events: dict[str, Any]) -> bytes:
     return b"\n".join(json.dumps(ev).encode() for ev in events) + b"\n"
 
 
+class _MockStreamReader:
+    """Mock for asyncio.StreamReader that yields lines from canned bytes."""
+
+    def __init__(self, data: bytes) -> None:
+        self._lines = data.split(b"\n")
+        self._index = 0
+
+    async def readline(self) -> bytes:
+        if self._index >= len(self._lines):
+            return b""
+        line = self._lines[self._index]
+        self._index += 1
+        if not line and self._index >= len(self._lines):
+            return b""
+        return line + b"\n"
+
+    async def read(self) -> bytes:
+        return b""
+
+
+class _MockStreamWriter:
+    """Mock for asyncio.StreamWriter (stdin)."""
+
+    def write(self, data: bytes) -> None:
+        pass
+
+    async def drain(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+    async def wait_closed(self) -> None:
+        pass
+
+
 class _MockProcess:
-    """Async subprocess mock that returns canned stdout via communicate()."""
+    """Async subprocess mock that streams canned stdout line-by-line."""
 
     def __init__(self, stdout: bytes, returncode: int = 0) -> None:
-        self._stdout = stdout
+        self._stdout_bytes = stdout
         self.returncode = returncode
+        self.stdin = _MockStreamWriter()
+        self.stdout = _MockStreamReader(stdout)
+        self.stderr = _MockStreamReader(b"")
+
+    async def wait(self) -> int:
+        return self.returncode
 
     async def communicate(self, input: bytes | None = None) -> tuple[bytes, bytes]:  # noqa: A002
-        return self._stdout, b""
+        return self._stdout_bytes, b""
 
 
 # ---------------------------------------------------------------------------

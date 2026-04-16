@@ -85,7 +85,19 @@ def get_adapter(integration: LLMIntegration) -> LLMProviderAdapter:
             "AWS Bedrock support is planned for a future release."
         )
 
+    # Check external adapter registry as a fallback
+    from app.integrations.llm.adapter_registry import (
+        get_external_adapter,
+    )
+
+    external = get_external_adapter(provider, integration=integration)
+    if external is not None:
+        return external
+
     raise ValueError(
         f"Unknown LLM provider '{provider}'. "
-        f"Valid values: anthropic, openai, azure_openai, ollama, claude_code, aws_bedrock"
+        "Valid built-in values: anthropic, openai, azure_openai, "
+        "ollama, claude_code, aws_bedrock. "
+        "External adapters can be registered via "
+        "CALSETA_EXTERNAL_ADAPTERS."
     )

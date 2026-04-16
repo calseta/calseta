@@ -29,6 +29,7 @@ from app.integrations.llm.base import (
     LLMMessage,
     LLMProviderAdapter,
     LLMResponse,
+    OnLogCallback,
 )
 
 if TYPE_CHECKING:
@@ -99,6 +100,7 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
         tools: list[dict[str, Any]],
         system: str | None = None,
         max_tokens: int | None = None,
+        on_log: OnLogCallback | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         session_id: str | None = kwargs.get("session_id")
@@ -117,9 +119,33 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
                 f"Claude Code CLI not found. Ensure 'claude' is installed and on PATH. ({exc})"
             ) from exc
 
-        stdout_bytes, stderr_bytes = await proc.communicate(
-            input=stdin_payload.encode("utf-8")
-        )
+        # Write stdin and close to signal end of input
+        assert proc.stdin is not None
+        proc.stdin.write(stdin_payload.encode("utf-8"))
+        await proc.stdin.drain()
+        proc.stdin.close()
+        await proc.stdin.wait_closed()
+
+        # Stream stdout line-by-line for real-time output
+        stdout_lines: list[str] = []
+        assert proc.stdout is not None
+        while True:
+            line_bytes = await proc.stdout.readline()
+            if not line_bytes:
+                break
+            line = line_bytes.decode("utf-8", errors="replace").rstrip("\n")
+            stdout_lines.append(line)
+            if on_log is not None:
+                stream, chunk = self._classify_line(line)
+                await on_log(stream, chunk)
+
+        # Collect any remaining stderr
+        assert proc.stderr is not None
+        stderr_bytes = await proc.stderr.read()
+        await proc.wait()
+
+        if on_log is not None and stderr_bytes:
+            await on_log("stderr", stderr_bytes.decode("utf-8", errors="replace"))
 
         if proc.returncode != 0:
             stderr_text = stderr_bytes.decode("utf-8", errors="replace")
@@ -127,7 +153,33 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
                 f"claude CLI exited with code {proc.returncode}: {stderr_text[:500]}"
             )
 
-        return self._parse_output(stdout_bytes.decode("utf-8", errors="replace"))
+        raw_output = "\n".join(stdout_lines)
+        return self._parse_output(raw_output)
+
+    @staticmethod
+    def _classify_line(line: str) -> tuple[str, str]:
+        """Classify an NDJSON line into (stream, chunk) for on_log."""
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            return ("stdout", line)
+
+        event_type = event.get("type", "")
+        if event_type == "assistant":
+            message = event.get("message", {})
+            text_parts = []
+            for block in message.get("content", []):
+                if isinstance(block, dict):
+                    if block.get("type") == "text":
+                        text_parts.append(block.get("text", ""))
+                    elif block.get("type") == "tool_use":
+                        text_parts.append(f"[tool_use: {block.get('name', '')}]")
+            return ("assistant", " ".join(text_parts) if text_parts else line)
+        if event_type == "result":
+            return ("stdout", f"[result: stop_reason={event.get('stop_reason', 'unknown')}]")
+        if event_type == "system":
+            return ("stdout", f"[system: session_id={event.get('session_id', '')}]")
+        return ("stdout", line)
 
     def _parse_output(self, raw_output: str) -> LLMResponse:
         """Parse NDJSON stream from claude CLI into an LLMResponse."""
