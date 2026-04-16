@@ -318,6 +318,33 @@ async def poll_health_metrics_task(timestamp: int) -> None:
     await handle_poll_health_metrics()
 
 
+@procrastinate_app.periodic(cron="0 3 * * *")
+@procrastinate_app.task(name="cleanup_health_metrics_task", queue="default")
+async def cleanup_health_metrics_task(timestamp: int) -> None:
+    """Periodic task — delete health_metrics rows older than retention period (daily at 3 AM)."""
+    from datetime import UTC, datetime, timedelta
+
+    import structlog
+
+    from app.queue.handlers.base import task_session
+    from app.repositories.health_metric_repository import HealthMetricRepository
+
+    log = structlog.get_logger()
+    retention_days = settings.HEALTH_METRICS_RETENTION_DAYS
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+
+    async with task_session() as db:
+        repo = HealthMetricRepository(db)
+        deleted = await repo.delete_before(cutoff, batch_size=10_000)
+        await db.commit()
+        log.info(
+            "cleanup_health_metrics_task.completed",
+            retention_days=retention_days,
+            cutoff=cutoff.isoformat(),
+            rows_deleted=deleted,
+        )
+
+
 if settings.SANDBOX_MODE:
 
     @procrastinate_app.periodic(cron="0 0 * * *")

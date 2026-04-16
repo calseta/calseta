@@ -31,6 +31,7 @@ import { RoutineDetailPage } from "@/pages/manage/routines/detail";
 import { KBPage } from "@/pages/manage/kb/index";
 import { KBDetailPage } from "@/pages/manage/kb/detail";
 import { SkillsPage } from "@/pages/skills/index";
+import { HealthPage } from "@/pages/health/index";
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -221,6 +222,15 @@ const skillsRoute = createRoute({
   component: SkillsPage,
 });
 
+const healthRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/health",
+  component: HealthPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || "agents",
+  }),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   alertsRoute,
@@ -249,6 +259,7 @@ const routeTree = rootRoute.addChildren([
   kbRoute,
   kbDetailRoute,
   skillsRoute,
+  healthRoute,
 ]);
 
 export const router = createRouter({ routeTree });

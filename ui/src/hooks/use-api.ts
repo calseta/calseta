@@ -56,6 +56,12 @@ import type {
   SkillFile,
   IssueLabel,
   IssueCategoryDef,
+  RunEvent,
+  HealthSource,
+  HealthMetricConfig,
+  HealthMetricSeries,
+  HealthSourceTestResult as HealthSourceTestResultType,
+  AgentFleetSummary,
 } from "@/lib/types";
 
 // Settings
@@ -197,6 +203,21 @@ export function useEnrichAlert() {
     onSuccess: (_data, uuid) => {
       qc.invalidateQueries({ queryKey: ["alert", uuid] });
       qc.invalidateQueries({ queryKey: ["alert-activity", uuid] });
+    },
+  });
+}
+
+export function usePostAlertNote(alertUuid: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { content: string; trigger_agent: boolean }) =>
+      api.post<DataResponse<{ note_id: string; agent_triggered: boolean }>>(
+        `/alerts/${alertUuid}/notes`,
+        body,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["alert-activity", alertUuid] });
+      qc.invalidateQueries({ queryKey: ["alert", alertUuid] });
     },
   });
 }
@@ -1655,5 +1676,176 @@ export function useDeleteSkillFile() {
       qc.invalidateQueries({ queryKey: ["skill", vars.skillUuid] });
       qc.invalidateQueries({ queryKey: ["skills"] });
     },
+  });
+}
+
+// ============================================================
+// Run Transcript hooks
+// ============================================================
+
+export function useRunEvents(runUuid: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ["run-events", runUuid],
+    queryFn: () => api.get<PaginatedResponse<RunEvent>>(`/runs/${runUuid}/events?limit=500`),
+    enabled: (options?.enabled ?? true) && !!runUuid,
+  });
+}
+
+export function useCancelRun() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runUuid: string) =>
+      api.post<DataResponse<{ status: string }>>(`/runs/${runUuid}/cancel`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent-heartbeat-runs"] });
+    },
+  });
+}
+
+// ============================================================
+// Health Monitoring hooks
+// ============================================================
+
+export function useHealthSources(params?: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") search.set(k, String(v));
+    }
+  }
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["health-sources", qs],
+    queryFn: () => api.get<PaginatedResponse<HealthSource>>(`/health-sources${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export function useCreateHealthSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<DataResponse<HealthSource>>("/health-sources", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["health-sources"] }),
+  });
+}
+
+export function usePatchHealthSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, body }: { uuid: string; body: Record<string, unknown> }) =>
+      api.patch<DataResponse<HealthSource>>(`/health-sources/${uuid}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["health-sources"] }),
+  });
+}
+
+export function useDeleteHealthSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/health-sources/${uuid}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["health-sources"] });
+      qc.invalidateQueries({ queryKey: ["health-metric-configs"] });
+    },
+  });
+}
+
+export function useTestHealthSource() {
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      api.post<DataResponse<HealthSourceTestResultType>>(`/health-sources/${uuid}/test`),
+  });
+}
+
+export function useHealthMetricConfigs(sourceUuid: string) {
+  return useQuery({
+    queryKey: ["health-metric-configs", sourceUuid],
+    queryFn: () =>
+      api.get<PaginatedResponse<HealthMetricConfig>>(`/health-sources/${sourceUuid}/metrics?page_size=200`),
+    enabled: !!sourceUuid,
+  });
+}
+
+export function useAllHealthMetricConfigs(sourceUuids: string[]) {
+  // Fetch metric configs for all sources in parallel via individual queries
+  // This is called from the page level — we use a combined key
+  const params = new URLSearchParams();
+  if (sourceUuids.length > 0) {
+    params.set("source_uuid", sourceUuids[0]);
+  }
+  return useQuery({
+    queryKey: ["health-metric-configs-all", sourceUuids.sort().join(",")],
+    queryFn: async () => {
+      const results = await Promise.all(
+        sourceUuids.map((uuid) =>
+          api.get<PaginatedResponse<HealthMetricConfig>>(`/health-sources/${uuid}/metrics?page_size=200`)
+        )
+      );
+      return results.flatMap((r) => r.data);
+    },
+    enabled: sourceUuids.length > 0,
+  });
+}
+
+export function useCreateHealthMetricConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sourceUuid, body }: { sourceUuid: string; body: Record<string, unknown> }) =>
+      api.post<DataResponse<HealthMetricConfig>>(`/health-sources/${sourceUuid}/metrics`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["health-metric-configs"] });
+      qc.invalidateQueries({ queryKey: ["health-metric-configs-all"] });
+      qc.invalidateQueries({ queryKey: ["health-sources"] });
+    },
+  });
+}
+
+export function useDeleteHealthMetricConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) => api.delete(`/health-metrics-config/${uuid}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["health-metric-configs"] });
+      qc.invalidateQueries({ queryKey: ["health-metric-configs-all"] });
+      qc.invalidateQueries({ queryKey: ["health-sources"] });
+    },
+  });
+}
+
+export function useApplyPreset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sourceUuid, presetName }: { sourceUuid: string; presetName: string }) =>
+      api.post<DataResponse<HealthMetricConfig[]>>(`/health-sources/${sourceUuid}/presets/${presetName}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["health-metric-configs"] });
+      qc.invalidateQueries({ queryKey: ["health-metric-configs-all"] });
+      qc.invalidateQueries({ queryKey: ["health-sources"] });
+    },
+  });
+}
+
+export function useHealthMetrics(params: {
+  sourceUuid?: string;
+  metricConfigUuid?: string;
+  window?: string;
+}) {
+  const search = new URLSearchParams();
+  if (params.sourceUuid) search.set("source_uuid", params.sourceUuid);
+  if (params.metricConfigUuid) search.set("metric_config_uuid", params.metricConfigUuid);
+  if (params.window) search.set("window", params.window);
+  const qs = search.toString();
+  return useQuery({
+    queryKey: ["health-metrics", qs],
+    queryFn: () => api.get<DataResponse<HealthMetricSeries[]>>(`/health/metrics?${qs}`),
+    enabled: !!(params.sourceUuid || params.metricConfigUuid),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useAgentFleetSummary() {
+  return useQuery({
+    queryKey: ["agent-fleet-summary"],
+    queryFn: () => api.get<DataResponse<AgentFleetSummary>>("/health/agents/summary"),
+    refetchInterval: 30_000,
   });
 }

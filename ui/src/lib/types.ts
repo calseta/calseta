@@ -617,6 +617,14 @@ export interface AlertAssignment {
 }
 
 // Heartbeat Runs
+export type HeartbeatRunStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "timed_out";
+
 export interface HeartbeatRun {
   uuid: string;
   agent_registration_id: number;
@@ -630,6 +638,27 @@ export interface HeartbeatRun {
   context_snapshot: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+}
+
+// Run Events (transcript)
+export type RunEventType =
+  | "llm_response"
+  | "assistant"
+  | "tool_call"
+  | "tool_result"
+  | "finding"
+  | "budget_check"
+  | "stdout"
+  | "stderr";
+
+export interface RunEvent {
+  seq: number;
+  event_type: RunEventType | string;
+  stream: string | null;
+  level: string | null;
+  content: string | null;
+  payload: Record<string, unknown> | null;
+  created_at: string;
 }
 
 // Cost Events
@@ -975,4 +1004,73 @@ export interface IssueCategoryDef {
   is_system: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// ============================================================
+// Health Monitoring types
+// ============================================================
+
+export interface HealthSource {
+  uuid: string;
+  name: string;
+  provider: string;
+  is_active: boolean;
+  config: Record<string, unknown>;
+  polling_interval_seconds: number;
+  last_poll_at: string | null;
+  last_poll_error: string | null;
+  created_at: string;
+  updated_at: string;
+  metric_count: number;
+}
+
+export interface HealthMetricConfig {
+  uuid: string;
+  health_source_id: number;
+  display_name: string;
+  namespace: string;
+  metric_name: string;
+  dimensions: Record<string, string>;
+  statistic: string;
+  unit: string;
+  category: string;
+  card_size: string;
+  warning_threshold: number | null;
+  critical_threshold: number | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface HealthMetricDatapoint {
+  value: number;
+  timestamp: string;
+  raw_datapoints: Record<string, unknown> | null;
+}
+
+export interface HealthMetricSeries {
+  metric_config_id: number;
+  display_name: string;
+  datapoints: HealthMetricDatapoint[];
+  latest_value: number | null;
+  latest_timestamp: string | null;
+}
+
+export interface HealthSourceTestResult {
+  success: boolean;
+  message: string;
+  details: Record<string, unknown>;
+}
+
+export interface AgentFleetSummary {
+  total_agents: number;
+  active_agents: number;
+  idle_agents: number;
+  error_agents: number;
+  total_runs_7d: number;
+  successful_runs_7d: number;
+  failed_runs_7d: number;
+  success_rate_7d: number;
+  total_cost_mtd_cents: number;
+  active_investigations: number;
+  stall_detections_7d: number;
 }

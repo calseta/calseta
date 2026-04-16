@@ -18,6 +18,7 @@ import {
   Lock,
   Database,
   Wand2,
+  Activity,
 } from "lucide-react";
 
 const LOGO_PATH = "/logo.png";
@@ -32,6 +33,7 @@ const mainNav = [
   { to: "/approvals", icon: CheckCircle2, label: "Approvals" },
   { to: "/issues", icon: ListTodo, label: "Issues" },
   { to: "/routines", icon: RotateCcw, label: "Routines" },
+  { to: "/health", icon: Activity, label: "Health" },
 ];
 
 const manageNav = [
