@@ -23,7 +23,7 @@ class Skill(TimestampMixin, UUIDMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_global: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    files: Mapped[list["SkillFile"]] = relationship(
+    files: Mapped[list[SkillFile]] = relationship(
         "SkillFile",
         back_populates="skill",
         cascade="all, delete-orphan",

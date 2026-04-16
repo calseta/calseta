@@ -6,7 +6,6 @@ import uuid as uuid_module
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.agent_registration import agent_skill_assignments
 from app.db.models.skill import Skill

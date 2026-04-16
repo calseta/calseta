@@ -17,8 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.schemas.alert import AlertCloseClassification, AlertSeverity, AlertStatus, EnrichmentStatus
 from app.schemas.common import JSONB_SIZE_SMALL, validate_jsonb_size
 from app.schemas.detection_rules import DetectionRuleResponse
-from app.schemas.kb import KBPageContextSummary
 from app.schemas.indicators import EnrichedIndicator, MaliceLevel
+from app.schemas.kb import KBPageContextSummary
 
 
 class AlertMetadata(BaseModel):

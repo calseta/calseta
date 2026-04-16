@@ -204,9 +204,9 @@ POST /v1/alerts/{alert_uuid}/findings
 If the finding warrants action:
 
 1. Check available workflows: these are listed in the alert context or via `GET /v1/workflows`.
-2. If a relevant workflow exists and has `approval_mode: "never"`, you may propose executing it.
-3. If `approval_mode: "always"` or `"agent_only"`, the execute_workflow tool will trigger the approval gate. Do not bypass it.
-4. Note the recommended action in your finding regardless of whether you can execute it.
+2. The `execute_workflow` tool has tier `requires_approval` — it **always** triggers the human approval gate, regardless of the workflow's `approval_mode` setting. You cannot execute workflows without human approval.
+3. Call `execute_workflow` when appropriate. The platform handles the approval flow — a human will approve or reject. You do not need to wait for the result.
+4. Note the recommended action in your finding regardless of whether the workflow execution is approved.
 
 ### Step 8 -- Update Alert Status
 

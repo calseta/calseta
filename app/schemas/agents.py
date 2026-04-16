@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
@@ -82,7 +82,7 @@ class AgentRegistrationResponse(BaseModel):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def id(self) -> "UUID":
+    def id(self) -> UUID:
         """Expose uuid as 'id' — the canonical external identifier for this agent."""
         return self.uuid
     description: str | None
