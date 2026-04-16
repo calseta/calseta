@@ -351,6 +351,13 @@ All configuration is driven by environment variables. Set them in a `.env` file 
 
 Enrichment providers are automatically skipped when their API keys are not configured. This is not an error -- the health endpoint reports them as `unconfigured`.
 
+### Persistent Data Volume
+
+| Variable | Type | Default | Required | Description |
+|---|---|---|---|---|
+| `CALSETA_DATA_DIR` | string | `/data/calseta` | No | Root directory for NDJSON run logs, agent working directories, and workspaces. Must be backed by persistent storage (Docker named volume, EFS, or Azure Files) |
+| `AGENT_FILES_DIR` | string | `{CALSETA_DATA_DIR}/agents` | No | Agent working directories. Derived from `CALSETA_DATA_DIR` by default. Each managed agent gets `{AGENT_FILES_DIR}/{uuid}/` |
+
 ### Deployment URLs
 
 | Variable | Type | Default | Required | Description |
@@ -440,12 +447,16 @@ services:
     ports:
       - "8000:8000"
     env_file: .env.prod
+    volumes:
+      - calseta_data:/data/calseta
 
   worker:
     image: ghcr.io/your-org/calseta-api:v1.0.0
     command: python -m app.worker
     restart: unless-stopped
     env_file: .env.prod
+    volumes:
+      - calseta_data:/data/calseta
 
   mcp:
     image: ghcr.io/your-org/calseta-api:v1.0.0
@@ -454,9 +465,14 @@ services:
     ports:
       - "8001:8001"
     env_file: .env.prod
+    volumes:
+      - calseta_data:/data/calseta
+
+volumes:
+  calseta_data:
 ```
 
-If you are self-hosting PostgreSQL, add the `db` service:
+If you are self-hosting PostgreSQL, add the `db` service and its volume:
 
 ```yaml
   db:
@@ -476,9 +492,21 @@ If you are self-hosting PostgreSQL, add the `db` service:
 
 volumes:
   postgres_data:
+  calseta_data:
 ```
 
 Skip the `db` service if using a managed PostgreSQL instance -- just set `DATABASE_URL` to point at it.
+
+#### Persistent Data Volume
+
+The `calseta_data` named volume stores NDJSON run logs, agent working directories, and detection-as-code workspaces. It must survive container restarts.
+
+| Platform | Storage | Mount Configuration |
+|---|---|---|
+| **Docker Compose** (self-hosted) | Named volume `calseta_data` | Defined in `docker-compose.yml` -- no extra config needed. `docker compose down -v` wipes it alongside Postgres (expected for full reset) |
+| **AWS ECS** | Amazon EFS | Create an EFS file system, add an access point. Mount in the ECS task definition at `/data/calseta`. All containers in the task share the same mount |
+| **Azure Container Apps** | Azure Files | Create an Azure Files share, register as a storage mount in the ACA environment. Mount at `/data/calseta` on each container |
+| **Kubernetes** | PersistentVolumeClaim | Create a PVC with `ReadWriteMany` access mode. Mount at `/data/calseta` in all Deployments (api, worker, mcp) |
 
 ### Step 4: Initialize the Database
 
@@ -585,6 +613,13 @@ Review every item before going live.
 
 - [ ] `CALSETA_BASE_URL` set to the externally reachable URL (e.g. `https://calseta.example.com`) -- used for approval callback links
 - [ ] `CALSETA_API_BASE_URL` set to the externally reachable API URL -- used in agent webhook payloads and as the base URL for agents authenticating with agent API keys (`cak_` prefix) to pull from the alert queue
+
+### Persistent Data Volume
+
+- [ ] `calseta_data` named volume (or EFS/Azure Files mount) is configured and writable at `/data/calseta`
+- [ ] All three services (api, worker, mcp) mount the same volume
+- [ ] `CALSETA_DATA_DIR` defaults to `/data/calseta` unless overridden
+- [ ] `AGENT_FILES_DIR` is derived as `{CALSETA_DATA_DIR}/agents` (no need to set explicitly unless using a separate mount)
 
 ### Monitoring
 

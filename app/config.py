@@ -271,15 +271,28 @@ class Settings(BaseSettings):
     WORKFLOW_MAX_MEMORY_MB: int = 256  # Max virtual memory per workflow execution
 
     # ------------------------------------------------------------------
-    # Agent Home Directories
+    # Persistent Data Volume
     # ------------------------------------------------------------------
-    CALSETA_DATA_DIR: str = "/tmp/calseta"
-    AGENT_FILES_DIR: str = "./data/agents"
+    # Root directory for all persistent agent data (NDJSON run logs,
+    # agent working directories, workspaces).  Must be backed by a
+    # named Docker volume or cloud file share (EFS / Azure Files) so
+    # data survives container restarts.
+    CALSETA_DATA_DIR: str = "/data/calseta"
+
+    # Agent working directories — derived from CALSETA_DATA_DIR by
+    # default.  Each managed agent gets {AGENT_FILES_DIR}/{uuid}/.
+    AGENT_FILES_DIR: str = ""  # resolved in model_post_init
 
     # ------------------------------------------------------------------
     # External LLM Adapters
     # ------------------------------------------------------------------
     CALSETA_EXTERNAL_ADAPTERS: str = ""  # "module:Class,module:Class"
+
+    # ------------------------------------------------------------------
+    # Health Monitoring
+    # ------------------------------------------------------------------
+    HEALTH_METRICS_RETENTION_DAYS: int = 30
+    HEALTH_METRICS_DEFAULT_POLLING_SECONDS: int = 60
 
     # ------------------------------------------------------------------
     # Sandbox
@@ -325,6 +338,16 @@ class Settings(BaseSettings):
                 "ENCRYPTION_KEY is not set. Encryption features "
                 "will fail at runtime if used. %s",
                 _gen_hint,
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _derive_agent_files_dir(self) -> Settings:
+        """Derive AGENT_FILES_DIR from CALSETA_DATA_DIR when not set."""
+        if not self.AGENT_FILES_DIR:
+            object.__setattr__(
+                self, "AGENT_FILES_DIR",
+                f"{self.CALSETA_DATA_DIR}/agents",
             )
         return self
 

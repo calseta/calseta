@@ -31,6 +31,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
+      - calseta_data:/data/calseta
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 30s
@@ -51,6 +52,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
+      - calseta_data:/data/calseta
     healthcheck:
       test: ["CMD-SHELL", "cat /proc/1/cmdline | tr '\\0' ' ' | grep -q 'app.worker'"]
       interval: 30s
@@ -73,6 +75,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
+      - calseta_data:/data/calseta
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/sse')\""]
       interval: 30s
@@ -91,3 +94,4 @@ services:
 
 volumes:
   postgres_data:
+  calseta_data:
