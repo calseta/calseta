@@ -84,6 +84,7 @@ class LLMProviderAdapter(ABC):
         system: str | None = None,
         max_tokens: int | None = None,
         on_log: OnLogCallback | None = None,
+        env: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         """
@@ -98,6 +99,9 @@ class LLMProviderAdapter(ABC):
                 (stream, chunk) where stream is one of "stdout", "stderr",
                 "assistant", "tool_call", "tool_result", "thinking", "finding"
                 and chunk is the content string. When None, no streaming occurs.
+            env: Optional environment variable dict for subprocess-based
+                adapters (e.g. ClaudeCodeAdapter). API-based adapters ignore
+                this parameter.
             **kwargs: Provider-specific extras (e.g. session_id for claude_code).
         """
 

@@ -79,6 +79,7 @@ class OpenAIAdapter(LLMProviderAdapter):
         system: str | None = None,
         max_tokens: int | None = None,
         on_log: OnLogCallback | None = None,
+        env: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         try:

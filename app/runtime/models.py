@@ -14,6 +14,10 @@ class RuntimeContext:
     alert_id: int | None = None       # alerts.id if this is alert work
     assignment_id: int | None = None  # alert_assignments.id if alert work
     run_uuid: UUID | None = None      # heartbeat_runs.uuid — for log store paths
+    # Wake context (C2) — populated when re-triggered by comment or automation
+    wake_reason: str | None = None           # "comment", "automation", "retry", etc.
+    wake_comments: list[dict] | None = None  # [{content, author, timestamp}, ...]
+    execution_stage: str | None = None       # "initial", "re-investigation", etc.
 
 
 @dataclass

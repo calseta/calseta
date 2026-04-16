@@ -7,6 +7,7 @@ GET    /v1/alerts/{uuid}                     — Get alert detail (includes indi
 PATCH  /v1/alerts/{uuid}                     — Update alert (status, severity, tags, classification)
 DELETE /v1/alerts/{uuid}                     — Delete alert
 POST   /v1/alerts/{uuid}/findings           — Add an agent finding to an alert
+POST   /v1/alerts/{uuid}/notes              — Add a note (optionally triggers assigned agent)
 GET    /v1/alerts/{uuid}/indicators         — List indicators for an alert
 POST   /v1/alerts/{uuid}/indicators         — Add indicators to an alert
 GET    /v1/alerts/{uuid}/activity           — List activity events for an alert
@@ -665,6 +666,81 @@ async def list_findings(
         for f in findings
     ]
     return DataResponse(data=result)
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/alerts/{uuid}/notes — comment-driven wakeup
+# ---------------------------------------------------------------------------
+
+
+class AlertNoteCreate(BaseModel):
+    content: str
+    trigger_agent: bool = False
+
+    @field_validator("content")
+    @classmethod
+    def _validate_content(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < 1:
+            raise ValueError("content must not be empty")
+        if len(v) > 5000:
+            raise ValueError("content must be at most 5000 characters")
+        return v
+
+
+class _AlertNoteResponse(BaseModel):
+    note_id: str
+    agent_triggered: bool
+
+
+@router.post(
+    "/{alert_uuid}/notes",
+    response_model=DataResponse[_AlertNoteResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def add_note(
+    request: Request,
+    alert_uuid: UUID,
+    body: AlertNoteCreate,
+    auth: _Write,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    queue: Annotated[TaskQueueBase, Depends(get_queue)],
+) -> DataResponse[_AlertNoteResponse]:
+    """
+    Add a note to an alert.
+
+    When ``trigger_agent`` is true and the alert has an active (or recently
+    checked-out) agent assignment, a comment-driven heartbeat run is created
+    and enqueued. Rate-limited to one agent trigger per alert every 5 minutes.
+    """
+    from app.services.alert_note_service import AlertNoteService
+
+    alert_repo = AlertRepository(db)
+    alert = await alert_repo.get_by_uuid(alert_uuid)
+    if alert is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Alert not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    svc = AlertNoteService(db)
+    result = await svc.add_note(
+        alert_id=alert.id,
+        content=body.content,
+        trigger_agent=body.trigger_agent,
+        actor_type="api",
+        actor_key_prefix=auth.key_prefix,
+        queue=queue,
+    )
+
+    return DataResponse(
+        data=_AlertNoteResponse(
+            note_id=result["note_id"],
+            agent_triggered=result["agent_triggered"],
+        )
+    )
 
 
 # ---------------------------------------------------------------------------

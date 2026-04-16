@@ -101,6 +101,7 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
         system: str | None = None,
         max_tokens: int | None = None,
         on_log: OnLogCallback | None = None,
+        env: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         session_id: str | None = kwargs.get("session_id")
@@ -113,6 +114,7 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=env,
             )
         except FileNotFoundError as exc:
             raise RuntimeError(

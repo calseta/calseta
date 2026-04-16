@@ -53,14 +53,15 @@ class AgentRuntimeEngine:
 
         Steps:
         1. Load LLMIntegration (agent.llm_integration_id)
-        2. Load or create AgentTaskSession (by agent_id + task_key)
-        3. Build prompt via PromptBuilder
-        4. Initialize LLMProviderAdapter via factory.get_adapter()
-        5. Prepare tools list from agent.tool_ids
-        6. Run tool loop
-        7. Persist session state to agent_task_sessions
-        8. Update assignment.investigation_state with findings/actions
-        9. Return RuntimeResult
+        2. Inject skills into ephemeral temp dir (cleaned up in finally)
+        3. Load or create AgentTaskSession (by agent_id + task_key)
+        4. Build prompt via PromptBuilder
+        5. Initialize LLMProviderAdapter via factory.get_adapter()
+        6. Prepare tools list from agent.tool_ids
+        7. Run tool loop
+        8. Persist session state to agent_task_sessions
+        9. Update assignment.investigation_state with findings/actions
+        10. Return RuntimeResult
         """
         log = logger.bind(
             agent_id=agent.id,
@@ -95,150 +96,194 @@ class AgentRuntimeEngine:
             log.error("runtime.llm_integration_not_found")
             return RuntimeResult(success=False, error=msg)
 
-        # --- Step 2: Inject skills into agent working directory ---
-        await self._inject_skills(agent)
+        # --- Step 2: Inject skills into ephemeral temp dir (C6) ---
+        skills_tmpdir = await self._inject_skills_ephemeral(agent)
 
-        # --- Step 3: Resolve session ---
-        session = await self._resolve_session(agent, context)
-
-        # --- Step 4: Build prompt ---
-        builder = PromptBuilder(self._db)
-        built = await builder.build(agent=agent, context=context, session=session)
-
-        # --- Step 5: Initialize adapter ---
-        from app.integrations.llm.factory import get_adapter
-
-        adapter = get_adapter(integration)
-
-        # --- Step 6: Prepare tools ---
-        tools = await self._load_tools(agent)
-
-        # --- Step 6b: Initialize run log store ---
-        log_handle = None
-        log_store = None
-        event_seq = 0
         try:
-            from app.config import settings
-            from app.services.run_log_store import RunLogStore
+            # --- Step 3: Resolve session ---
+            session = await self._resolve_session(agent, context)
 
-            if context.run_uuid is not None:
-                log_store = RunLogStore(settings.CALSETA_DATA_DIR)
-                log_handle = log_store.open(agent.uuid, context.run_uuid)
-        except Exception as exc:
-            log.warning("runtime.log_store_init_failed", error=str(exc))
+            # --- Step 3b: Initialize adapter (needed for compaction) ---
+            from app.integrations.llm.factory import get_adapter
 
-        async def _on_log(stream: str, chunk: str) -> None:
-            """Write event to NDJSON file and DB."""
-            import contextlib
+            adapter = get_adapter(integration)
 
-            nonlocal event_seq
-            event_seq += 1
-            etype = "llm_response" if stream == "assistant" else stream
-            event_data = {
-                "event_type": etype,
-                "stream": stream,
-                "content": chunk[:10_000],
-            }
-            # Write to NDJSON file (non-blocking)
-            if log_handle is not None and log_store is not None:
-                with contextlib.suppress(Exception):
-                    log_store.append(log_handle, event_data)
-            # Write to DB + NOTIFY (non-blocking)
-            with contextlib.suppress(Exception):
-                from app.repositories.run_event_repository import RunEventRepository
-                repo = RunEventRepository(self._db)
-                await repo.create_event(
-                    heartbeat_run_id=context.heartbeat_run_id,
-                    seq=event_seq,
-                    event_type=etype,
-                    stream=stream,
-                    content=chunk[:10_000],
-                )
-                from app.services.run_event_stream import notify_run_event
-                await notify_run_event(
-                    self._db, context.heartbeat_run_id,
-                    event_seq, event_data,
-                )
+            # --- Step 3c: Session compaction (C4) ---
+            session = await self._maybe_compact_session(
+                session, adapter, agent, context,
+            )
 
-        # --- Step 7: Run tool loop ---
-        log.info(
-            "runtime.starting",
-            tool_count=len(tools),
-            estimated_tokens=built.total_tokens_estimated,
-        )
+            # --- Step 4: Build prompt ---
+            builder = PromptBuilder(self._db)
+            built = await builder.build(
+                agent=agent, context=context, session=session,
+            )
 
-        messages = built.messages
-        final_messages, result = await self._run_tool_loop(
-            adapter=adapter,
-            messages=messages,
-            tools=tools,
-            system=built.system_prompt,
-            agent=agent,
-            context=context,
-            integration=integration,
-            on_log=_on_log,
-        )
+            # --- Step 5: adapter already initialized above ---
 
-        # --- Step 7b: Finalize run log ---
-        log_sha256 = None
-        log_bytes = None
-        log_ref = None
-        if log_handle is not None and log_store is not None:
+            # --- Step 6: Prepare tools ---
+            tools = await self._load_tools(agent)
+
+            # --- Step 6b: Initialize run log store ---
+            log_handle = None
+            log_store = None
+            event_seq = 0
             try:
-                log_sha256, log_bytes = log_store.finalize(log_handle)
-                log_ref = str(log_handle.path)
-            except Exception as exc:
-                log.warning("runtime.log_finalize_failed", error=str(exc))
+                from app.config import settings
+                from app.services.run_log_store import RunLogStore
 
-        # Update HeartbeatRun with log metadata
-        if log_sha256 is not None:
-            try:
-                from app.repositories.heartbeat_run_repository import HeartbeatRunRepository
-                hr_repo = HeartbeatRunRepository(self._db)
-                run_obj = await hr_repo.get_by_id(context.heartbeat_run_id)
-                if run_obj is not None:
-                    await hr_repo.update_status(
-                        run_obj,
-                        run_obj.status,
-                        log_ref=log_ref,
-                        log_sha256=log_sha256,
-                        log_bytes=log_bytes,
+                if context.run_uuid is not None:
+                    log_store = RunLogStore(settings.CALSETA_DATA_DIR)
+                    log_handle = log_store.open(
+                        agent.uuid, context.run_uuid,
                     )
             except Exception as exc:
-                log.warning("runtime.log_metadata_update_failed", error=str(exc))
-
-        # --- Step 8: Persist session ---
-        await self._save_session(
-            session=session,
-            messages=final_messages,
-            result=result,
-            heartbeat_run_id=context.heartbeat_run_id,
-            integration=integration,
-        )
-
-        # --- Step 9: Update assignment investigation_state + release ---
-        if context.assignment_id is not None:
-            if result.findings or result.actions_proposed:
-                await self._update_assignment(
-                    assignment_id=context.assignment_id,
-                    findings=result.findings,
-                    actions_proposed=result.actions_proposed,
+                log.warning(
+                    "runtime.log_store_init_failed", error=str(exc),
                 )
-            await self._release_assignment(context.assignment_id)
 
-        # --- Step 9b: Clear cancellation flag ---
-        from app.services.run_cancellation import clear_cancellation
-        clear_cancellation(context.heartbeat_run_id)
+            async def _on_log(stream: str, chunk: str) -> None:
+                """Write event to NDJSON file and DB."""
+                import contextlib
 
-        log.info(
-            "runtime.completed",
-            success=result.success,
-            total_cost_cents=result.total_cost_cents,
-            input_tokens=result.input_tokens,
-            output_tokens=result.output_tokens,
-            findings_count=len(result.findings),
-        )
-        return result
+                nonlocal event_seq
+                event_seq += 1
+                etype = (
+                    "llm_response" if stream == "assistant" else stream
+                )
+                event_data = {
+                    "event_type": etype,
+                    "stream": stream,
+                    "content": chunk[:10_000],
+                }
+                # Write to NDJSON file (non-blocking)
+                if log_handle is not None and log_store is not None:
+                    with contextlib.suppress(Exception):
+                        log_store.append(log_handle, event_data)
+                # Write to DB + NOTIFY (non-blocking)
+                with contextlib.suppress(Exception):
+                    from app.repositories.run_event_repository import (
+                        RunEventRepository,
+                    )
+                    repo = RunEventRepository(self._db)
+                    await repo.create_event(
+                        heartbeat_run_id=context.heartbeat_run_id,
+                        seq=event_seq,
+                        event_type=etype,
+                        stream=stream,
+                        content=chunk[:10_000],
+                    )
+                    from app.services.run_event_stream import (
+                        notify_run_event,
+                    )
+                    await notify_run_event(
+                        self._db, context.heartbeat_run_id,
+                        event_seq, event_data,
+                    )
+
+            # --- Step 7: Run tool loop ---
+            log.info(
+                "runtime.starting",
+                tool_count=len(tools),
+                estimated_tokens=built.total_tokens_estimated,
+            )
+
+            messages = built.messages
+            final_messages, result = await self._run_tool_loop(
+                adapter=adapter,
+                messages=messages,
+                tools=tools,
+                system=built.system_prompt,
+                agent=agent,
+                context=context,
+                integration=integration,
+                on_log=_on_log,
+            )
+
+            # --- Step 7b: Finalize run log ---
+            log_sha256 = None
+            log_bytes = None
+            log_ref = None
+            if log_handle is not None and log_store is not None:
+                try:
+                    log_sha256, log_bytes = log_store.finalize(
+                        log_handle,
+                    )
+                    log_ref = str(log_handle.path)
+                except Exception as exc:
+                    log.warning(
+                        "runtime.log_finalize_failed", error=str(exc),
+                    )
+
+            # Update HeartbeatRun with log metadata
+            if log_sha256 is not None:
+                try:
+                    from app.repositories.heartbeat_run_repository import (
+                        HeartbeatRunRepository,
+                    )
+                    hr_repo = HeartbeatRunRepository(self._db)
+                    run_obj = await hr_repo.get_by_id(
+                        context.heartbeat_run_id,
+                    )
+                    if run_obj is not None:
+                        await hr_repo.update_status(
+                            run_obj,
+                            run_obj.status,
+                            log_ref=log_ref,
+                            log_sha256=log_sha256,
+                            log_bytes=log_bytes,
+                        )
+                except Exception as exc:
+                    log.warning(
+                        "runtime.log_metadata_update_failed",
+                        error=str(exc),
+                    )
+
+            # --- Step 8: Persist session ---
+            await self._save_session(
+                session=session,
+                messages=final_messages,
+                result=result,
+                heartbeat_run_id=context.heartbeat_run_id,
+                integration=integration,
+            )
+
+            # --- Step 9: Update assignment state + release ---
+            if context.assignment_id is not None:
+                if result.findings or result.actions_proposed:
+                    await self._update_assignment(
+                        assignment_id=context.assignment_id,
+                        findings=result.findings,
+                        actions_proposed=result.actions_proposed,
+                    )
+                await self._release_assignment(context.assignment_id)
+
+            # --- Step 9b: Clear cancellation flag ---
+            from app.services.run_cancellation import clear_cancellation
+            clear_cancellation(context.heartbeat_run_id)
+
+            log.info(
+                "runtime.completed",
+                success=result.success,
+                total_cost_cents=result.total_cost_cents,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+                findings_count=len(result.findings),
+            )
+            return result
+
+        finally:
+            # C6: Clean up ephemeral skill temp directory
+            if skills_tmpdir is not None:
+                import shutil
+                try:
+                    shutil.rmtree(skills_tmpdir, ignore_errors=True)
+                    log.debug(
+                        "runtime.skills_tmpdir_cleaned",
+                        tmpdir=skills_tmpdir,
+                    )
+                except Exception:
+                    pass
 
     async def _run_tool_loop(
         self,
@@ -480,24 +525,21 @@ class AgentRuntimeEngine:
             output_tokens=total_output,
         )
 
-    async def _inject_skills(self, agent: AgentRegistration) -> None:
-        """Write assigned skills to the agent's working directory as a file tree.
+    async def _inject_skills_ephemeral(
+        self, agent: AgentRegistration
+    ) -> str | None:
+        """C6: Write assigned skills to an ephemeral temp directory.
 
-        Each skill is written to a subdirectory:
-          {AGENT_FILES_DIR}/{agent.uuid}/skills/{skill.slug}/SKILL.md
-          {AGENT_FILES_DIR}/{agent.uuid}/skills/{skill.slug}/references/playbook.md
-          ...
+        Returns the temp directory path (for Claude Code ``--add-dir``),
+        or None if no skills are assigned. The caller is responsible for
+        cleaning up the temp dir in a ``finally`` block.
 
-        Claude Code picks up skill files from the agent's working directory
-        under the ``skills/`` subdirectory. This runs before the LLM loop so
-        each invocation gets the current skill set.
-
-        Errors are logged and swallowed — a missing skill file does not abort
-        the agent run.
+        For API-based adapters, skill content is injected into the system
+        prompt instead — no temp dir needed.
         """
+        import tempfile
         from pathlib import Path
 
-        from app.config import settings
         from app.repositories.skill_repository import SkillRepository
 
         try:
@@ -514,32 +556,36 @@ class AgentRuntimeEngine:
                     skill_list.append(skill)
 
             if not skill_list:
-                return
+                return None
 
-            base_dir = Path(settings.AGENT_FILES_DIR) / str(agent.uuid) / "skills"
+            tmpdir = tempfile.mkdtemp(prefix="calseta-skills-")
+            base_dir = Path(tmpdir)
 
             total_files = 0
             for skill in skill_list:
-                # skill.files is loaded via selectin — no extra query needed
                 for skill_file in skill.files:
                     file_path = base_dir / skill.slug / skill_file.path
                     file_path.parent.mkdir(parents=True, exist_ok=True)
-                    file_path.write_text(skill_file.content, encoding="utf-8")
+                    file_path.write_text(
+                        skill_file.content, encoding="utf-8"
+                    )
                     total_files += 1
 
             logger.info(
-                "runtime.skills_injected",
+                "runtime.skills_injected_ephemeral",
                 agent_id=agent.id,
                 skill_count=len(skill_list),
                 file_count=total_files,
-                base_dir=str(base_dir),
+                tmpdir=tmpdir,
             )
+            return tmpdir
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "runtime.skills_inject_failed",
                 agent_id=agent.id,
                 error=str(exc),
             )
+            return None
 
     async def _load_tools(self, agent: AgentRegistration) -> list[dict]:
         """Load tools assigned to this agent and format for the LLM API.
@@ -584,6 +630,54 @@ class AgentRuntimeEngine:
                 task_key=context.task_key,
                 alert_id=context.alert_id,
             )
+        return session
+
+    async def _maybe_compact_session(
+        self,
+        session: AgentTaskSession,
+        adapter: LLMProviderAdapter,
+        agent: AgentRegistration,
+        context: RuntimeContext,
+    ) -> AgentTaskSession:
+        """C4: Run session compaction if flagged.
+
+        Returns the (possibly updated) session object. If compaction
+        fails, the original session is returned unchanged.
+        """
+        session_params = session.session_params or {}
+        if not session_params.get("needs_compaction"):
+            return session
+
+        logger.info(
+            "runtime.compaction_starting",
+            agent_id=agent.id,
+            session_id=session.id,
+        )
+
+        from app.services.session_compaction import compact_session
+
+        result = await compact_session(session, adapter)
+
+        if result["compacted"]:
+            # Persist compacted session params
+            from app.repositories.agent_task_session_repository import (
+                AgentTaskSessionRepository,
+            )
+            repo = AgentTaskSessionRepository(self._db)
+            await repo.update(session, session_params=result["session_params"])
+
+            # Record compaction cost if available
+            if result["cost"] is not None:
+                await self._record_cost(
+                    agent=agent,
+                    context=context,
+                    cost=result["cost"],
+                    integration=None,
+                )
+
+            # Refresh session to pick up updated params
+            await self._db.refresh(session)
+
         return session
 
     async def _save_session(

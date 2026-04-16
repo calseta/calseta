@@ -80,19 +80,49 @@ class PromptBuilder:
         context: RuntimeContext,
         session: AgentTaskSession | None,
     ) -> BuiltPrompt:
-        """Build the complete prompt structure for a managed agent invocation."""
+        """Build the complete prompt structure for a managed agent invocation.
+
+        On session resume (existing messages in session), skips Layers 1-3 for
+        token savings. Exception: Layer 3 KB pages updated since session's
+        last run are still included.
+        """
         from app.runtime.models import BuiltPrompt
 
         context_window = getattr(agent, "max_tokens", None) or 200_000
 
-        layer1 = await self._build_layer1(agent)
-        layer2 = self._build_layer2(agent)
-        layer3, layer3_tokens = await self._build_layer3_kb(agent, context_window)
+        # Detect resume: session exists and has conversation history
+        is_resume = bool(
+            session
+            and session.session_params
+            and (
+                session.session_params.get("messages")
+                or session.session_params.get("session_handoff_markdown")
+            )
+        )
+
+        # --- Layer assembly (C3: skip layers 1-3 on resume) ---
+        if is_resume:
+            layer1 = ""
+            layer2 = ""
+            # On resume, only include KB pages updated since session's last run
+            layer3, layer3_tokens = await self._build_layer3_kb(
+                agent, context_window,
+                updated_since=getattr(session, "updated_at", None),
+            )
+        else:
+            layer1 = await self._build_layer1(agent)
+            layer2 = self._build_layer2(agent)
+            layer3, layer3_tokens = await self._build_layer3_kb(
+                agent, context_window,
+            )
+
         layer4_msg = await self._build_layer4_alert_context(context)
         layer6 = await self._build_layer6_checkpoint(agent, context_window)
 
-        # Assemble system prompt: layers 1 + 2 + 3 + 6
-        system_parts = [layer1]
+        # Assemble system prompt
+        system_parts: list[str] = []
+        if layer1:
+            system_parts.append(layer1)
         if layer2:
             system_parts.append(layer2)
         if layer3:
@@ -111,6 +141,12 @@ class PromptBuilder:
             "layer4_context": _estimate_tokens(layer4_msg) if layer4_msg else 0,
             "layer6_checkpoint": _estimate_tokens(layer6),
         }
+
+        # C2: include wake context in layer token accounting
+        wake_ctx = self._build_wake_context(context)
+        if wake_ctx:
+            layer_tokens["wake_context"] = _estimate_tokens(wake_ctx)
+
         total_tokens_estimated = sum(layer_tokens.values())
         # Add existing session tokens if resuming
         if session and session.session_params.get("messages"):
@@ -123,6 +159,20 @@ class PromptBuilder:
                     for block in content:
                         if isinstance(block, dict) and "text" in block:
                             total_tokens_estimated += _estimate_tokens(block["text"])
+
+        # C3: log token savings on resume
+        if is_resume:
+            full_layer1_est = _estimate_tokens(
+                await self._build_layer1(agent)
+            )
+            full_layer2_est = _estimate_tokens(self._build_layer2(agent))
+            saved = full_layer1_est + full_layer2_est
+            logger.info(
+                "prompt_builder.resume_token_savings",
+                saved_tokens=saved,
+                is_resume=True,
+                agent_id=agent.id,
+            )
 
         return BuiltPrompt(
             system_prompt=system_prompt,
@@ -183,12 +233,18 @@ class PromptBuilder:
         return f"<methodology>\n{agent.methodology}\n</methodology>"
 
     async def _build_layer3_kb(
-        self, agent: AgentRegistration, context_window: int
+        self,
+        agent: AgentRegistration,
+        context_window: int,
+        updated_since: datetime | None = None,
     ) -> tuple[str, int]:
         """Layer 3: KB context — global + role-scoped + agent-specific pages.
 
         Returns (xml_block, token_count). Empty string if no injectable pages exist.
         Budget: KB_BUDGET_PCT of context_window. Pinned pages always included.
+
+        If ``updated_since`` is set (session resume), only includes pages
+        updated after that timestamp — saves tokens on resumed sessions.
         """
         try:
             from app.repositories.kb_repository import KBPageRepository
@@ -201,6 +257,25 @@ class PromptBuilder:
 
             if not pages:
                 return "", 0
+
+            # On resume, filter to pages updated since last run
+            if updated_since is not None:
+                cutoff = (
+                    updated_since.replace(tzinfo=UTC)
+                    if updated_since.tzinfo is None
+                    else updated_since
+                )
+
+                def _after_cutoff(p: object) -> bool:
+                    ua = getattr(p, "updated_at", None)
+                    if not ua:
+                        return False
+                    ua_utc = ua.replace(tzinfo=UTC) if ua.tzinfo is None else ua
+                    return bool(ua_utc > cutoff)
+
+                pages = [p for p in pages if _after_cutoff(p)]
+                if not pages:
+                    return "", 0
 
             budget = int(context_window * _KB_BUDGET_PCT)
             parts: list[str] = []
@@ -228,12 +303,59 @@ class PromptBuilder:
             logger.warning("prompt_builder.layer3_kb_failed", error=str(exc))
             return "", 0
 
+    def _build_wake_context(self, context: RuntimeContext) -> str:
+        """C2: Build <wake_context> XML block when the agent is re-triggered.
+
+        Returns empty string if no wake_reason is set.
+        """
+        if not context.wake_reason:
+            return ""
+
+        parts: list[str] = [f'<wake_context reason="{_xml_escape(context.wake_reason)}">']
+
+        # Directive based on wake reason
+        if context.wake_reason == "comment":
+            parts.append(
+                "  <directive>New analyst input since your last run "
+                "— address this first.</directive>"
+            )
+        elif context.wake_reason == "retry":
+            parts.append(
+                "  <directive>This is a retry of a previous run that "
+                "failed — review your earlier findings and continue.</directive>"
+            )
+        else:
+            parts.append(
+                f"  <directive>Agent re-triggered: {_xml_escape(context.wake_reason)}</directive>"
+            )
+
+        # Include analyst comments if present
+        if context.wake_comments:
+            parts.append("  <comments>")
+            for comment in context.wake_comments:
+                author = _xml_escape(str(comment.get("author", "analyst")))
+                ts = _xml_escape(str(comment.get("timestamp", "")))
+                content = _xml_escape(str(comment.get("content", "")))
+                parts.append(
+                    f'    <comment author="{author}" timestamp="{ts}">'
+                    f"{content}</comment>"
+                )
+            parts.append("  </comments>")
+
+        parts.append("</wake_context>")
+        return "\n".join(parts)
+
     async def _build_layer4_alert_context(
         self, context: RuntimeContext
     ) -> str | None:
-        """Layer 4: alert context formatted as a user message."""
+        """Layer 4: alert context formatted as a user message.
+
+        Includes wake context (C2) when the agent is re-triggered.
+        """
         if context.alert_id is None:
-            return None
+            # Still return wake context if present (non-alert tasks)
+            wake_ctx = self._build_wake_context(context)
+            return wake_ctx if wake_ctx else None
 
         from app.repositories.alert_repository import AlertRepository
 
@@ -288,7 +410,17 @@ class PromptBuilder:
         if context.assignment_id is not None:
             alert_data["assignment_id"] = context.assignment_id
 
-        return f"<alert_context>\n{json.dumps(alert_data, indent=2, default=str)}\n</alert_context>"
+        alert_block = (
+            f"<alert_context>\n"
+            f"{json.dumps(alert_data, indent=2, default=str)}\n"
+            f"</alert_context>"
+        )
+
+        # Prepend wake context if this is a re-triggered run
+        wake_ctx = self._build_wake_context(context)
+        if wake_ctx:
+            return f"{wake_ctx}\n\n{alert_block}"
+        return alert_block
 
     async def _load_alert_indicators(self, alert_id: int) -> list[dict]:
         """Load indicators associated with an alert, including enrichment results."""

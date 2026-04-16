@@ -24,6 +24,7 @@ class ActivityEventType(StrEnum):
     ALERT_SEVERITY_UPDATED = "alert_severity_updated"
     ALERT_CLOSED = "alert_closed"
     ALERT_FINDING_ADDED = "alert_finding_added"
+    ALERT_NOTE_ADDED = "alert_note_added"
     ALERT_INDICATORS_ADDED = "alert_indicators_added"
     ALERT_WORKFLOW_TRIGGERED = "alert_workflow_triggered"
     ALERT_MALICE_UPDATED = "alert_malice_updated"
