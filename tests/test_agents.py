@@ -714,7 +714,7 @@ class TestAgentSchemaValidation:
             AgentRegistrationCreate(
                 name="t",
                 endpoint_url="http://localhost/",
-                timeout_seconds=301,  # > le=300
+                timeout_seconds=3601,  # > le=3600
             )
 
     def test_create_schema_retry_count_bounds(self) -> None:

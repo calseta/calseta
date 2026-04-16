@@ -141,31 +141,31 @@ def _mock_detection_rule(
     return rule
 
 
-def _mock_context_document(
+def _mock_kb_page(
     *,
-    doc_uuid: uuid.UUID | None = None,
+    page_uuid: uuid.UUID | None = None,
     title: str = "Phishing Runbook",
-    document_type: str = "runbook",
-    is_global: bool = False,
+    slug: str = "phishing-runbook",
+    folder: str = "/runbooks",
     description: str | None = "Steps to handle phishing alerts.",
-    content: str = "Step 1: Check sender...",
+    body: str = "Step 1: Check sender...",
     tags: list[str] | None = None,
+    inject_scope: dict | None = None,
     targeting_rules: dict | None = None,
-    version: int = 1,
 ) -> MagicMock:
-    doc = MagicMock()
-    doc.uuid = doc_uuid or uuid.uuid4()
-    doc.title = title
-    doc.document_type = document_type
-    doc.is_global = is_global
-    doc.description = description
-    doc.content = content
-    doc.tags = tags or []
-    doc.targeting_rules = targeting_rules
-    doc.version = version
-    doc.created_at = _NOW
-    doc.updated_at = _NOW
-    return doc
+    page = MagicMock()
+    page.uuid = page_uuid or uuid.uuid4()
+    page.title = title
+    page.slug = slug
+    page.folder = folder
+    page.description = description
+    page.body = body
+    page.tags = tags or []
+    page.inject_scope = inject_scope
+    page.targeting_rules = targeting_rules
+    page.created_at = _NOW
+    page.updated_at = _NOW
+    return page
 
 
 def _mock_workflow(
@@ -372,13 +372,13 @@ class TestGetAlert:
         assert len(data["indicators"]) == 1
         assert data["indicators"][0]["value"] == "1.2.3.4"
         assert data["detection_rule"] is None
-        assert data["context_documents"] == []
+        assert data["kb_pages"] == []
 
-    async def test_alert_with_context_documents(self) -> None:
-        """Alert detail includes applicable context documents."""
+    async def test_alert_with_kb_pages(self) -> None:
+        """Alert detail includes applicable KB pages."""
         alert_uuid = uuid.uuid4()
         alert = _mock_alert(alert_uuid=alert_uuid, detection_rule_id=None)
-        doc = _mock_context_document()
+        page = _mock_kb_page()
 
         session_ctx, mock_session = _patch_session()
         mock_alert_repo = MagicMock()
@@ -392,7 +392,7 @@ class TestGetAlert:
             patch("app.mcp.resources.alerts.IndicatorRepository", return_value=mock_indicator_repo),
             patch(
                 "app.mcp.resources.alerts.get_applicable_documents",
-                new_callable=AsyncMock, return_value=[doc],
+                new_callable=AsyncMock, return_value=[page],
             ),
             _patch_scope("alerts"),
         ):
@@ -400,8 +400,8 @@ class TestGetAlert:
             result = await get_alert(str(alert_uuid), _mock_ctx())
 
         data = json.loads(result)
-        assert len(data["context_documents"]) == 1
-        assert data["context_documents"][0]["title"] == "Phishing Runbook"
+        assert len(data["kb_pages"]) == 1
+        assert data["kb_pages"][0]["title"] == "Phishing Runbook"
 
     async def test_alert_not_found_raises_value_error(self) -> None:
         """Unknown UUID raises ValueError."""
@@ -493,7 +493,7 @@ class TestGetAlert:
             "occurred_at", "ingested_at", "enriched_at", "is_enriched",
             "close_classification", "acknowledged_at", "triaged_at",
             "closed_at", "tags", "indicators", "detection_rule",
-            "context_documents", "agent_findings",
+            "kb_pages", "agent_findings",
         }
         assert expected_keys.issubset(set(data.keys()))
 
@@ -504,11 +504,11 @@ class TestGetAlert:
 
 
 class TestGetAlertContext:
-    async def test_returns_context_documents(self) -> None:
-        """calseta://alerts/{uuid}/context returns applicable context documents."""
+    async def test_returns_kb_pages(self) -> None:
+        """calseta://alerts/{uuid}/context returns applicable KB pages."""
         alert_uuid = uuid.uuid4()
         alert = _mock_alert(alert_uuid=alert_uuid)
-        doc = _mock_context_document(is_global=True)
+        page = _mock_kb_page(inject_scope={"global": True})
 
         session_ctx, mock_session = _patch_session()
         mock_alert_repo = MagicMock()
@@ -519,7 +519,7 @@ class TestGetAlertContext:
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
             patch(
                 "app.mcp.resources.alerts.get_applicable_documents",
-                new_callable=AsyncMock, return_value=[doc],
+                new_callable=AsyncMock, return_value=[page],
             ),
             _patch_scope("alerts"),
         ):
@@ -528,14 +528,14 @@ class TestGetAlertContext:
 
         data = json.loads(result)
         assert data["count"] == 1
-        assert data["context_documents"][0]["title"] == "Phishing Runbook"
-        assert data["context_documents"][0]["is_global"] is True
+        assert data["kb_pages"][0]["title"] == "Phishing Runbook"
+        assert data["kb_pages"][0]["slug"] == "phishing-runbook"
 
     async def test_context_fields_present(self) -> None:
-        """Each context document in the response has all expected fields."""
+        """Each KB page in the response has all expected fields."""
         alert_uuid = uuid.uuid4()
         alert = _mock_alert(alert_uuid=alert_uuid)
-        doc = _mock_context_document()
+        page = _mock_kb_page()
 
         session_ctx, mock_session = _patch_session()
         mock_alert_repo = MagicMock()
@@ -546,7 +546,7 @@ class TestGetAlertContext:
             patch("app.mcp.resources.alerts.AlertRepository", return_value=mock_alert_repo),
             patch(
                 "app.mcp.resources.alerts.get_applicable_documents",
-                new_callable=AsyncMock, return_value=[doc],
+                new_callable=AsyncMock, return_value=[page],
             ),
             _patch_scope("alerts"),
         ):
@@ -554,10 +554,10 @@ class TestGetAlertContext:
             result = await get_alert_context(str(alert_uuid), _mock_ctx())
 
         data = json.loads(result)
-        item = data["context_documents"][0]
+        item = data["kb_pages"][0]
         expected_keys = {
-            "uuid", "title", "document_type", "is_global",
-            "description", "content", "tags",
+            "uuid", "slug", "title", "description",
+            "folder", "tags", "body",
         }
         assert expected_keys.issubset(set(item.keys()))
 
@@ -815,140 +815,6 @@ class TestGetDetectionRule:
             from app.mcp.resources.detection_rules import get_detection_rule
             with pytest.raises(ValueError, match="Detection rule not found"):
                 await get_detection_rule(str(rule_uuid), _mock_ctx())
-
-
-# ===========================================================================
-# Resource: calseta://context-documents
-# ===========================================================================
-
-
-class TestListContextDocuments:
-    async def test_returns_document_catalog(self) -> None:
-        doc = _mock_context_document()
-
-        session_ctx, mock_session = _patch_session()
-        mock_repo = MagicMock()
-        mock_repo.list_documents = AsyncMock(return_value=([doc], 1))
-
-        with (
-            patch("app.mcp.resources.context_documents.AsyncSessionLocal", session_ctx),
-            patch(
-                "app.mcp.resources.context_documents.ContextDocumentRepository",
-                return_value=mock_repo,
-            ),
-            _patch_scope("context_documents"),
-        ):
-            from app.mcp.resources.context_documents import list_context_documents
-            result = await list_context_documents(_mock_ctx())
-
-        data = json.loads(result)
-        assert data["count"] == 1
-        item = data["context_documents"][0]
-        assert item["title"] == "Phishing Runbook"
-        # List view should NOT include content (token efficiency)
-        assert "content" not in item
-
-    async def test_list_fields_present(self) -> None:
-        doc = _mock_context_document()
-
-        session_ctx, mock_session = _patch_session()
-        mock_repo = MagicMock()
-        mock_repo.list_documents = AsyncMock(return_value=([doc], 1))
-
-        with (
-            patch("app.mcp.resources.context_documents.AsyncSessionLocal", session_ctx),
-            patch(
-                "app.mcp.resources.context_documents.ContextDocumentRepository",
-                return_value=mock_repo,
-            ),
-            _patch_scope("context_documents"),
-        ):
-            from app.mcp.resources.context_documents import list_context_documents
-            result = await list_context_documents(_mock_ctx())
-
-        data = json.loads(result)
-        item = data["context_documents"][0]
-        expected_keys = {
-            "uuid", "title", "document_type", "is_global",
-            "description", "tags", "version", "created_at", "updated_at",
-        }
-        assert expected_keys.issubset(set(item.keys()))
-
-
-# ===========================================================================
-# Resource: calseta://context-documents/{uuid}
-# ===========================================================================
-
-
-class TestGetContextDocument:
-    async def test_returns_full_document(self) -> None:
-        doc_uuid = uuid.uuid4()
-        doc = _mock_context_document(doc_uuid=doc_uuid)
-
-        session_ctx, mock_session = _patch_session()
-        mock_repo = MagicMock()
-        mock_repo.get_by_uuid = AsyncMock(return_value=doc)
-
-        with (
-            patch("app.mcp.resources.context_documents.AsyncSessionLocal", session_ctx),
-            patch(
-                "app.mcp.resources.context_documents.ContextDocumentRepository",
-                return_value=mock_repo,
-            ),
-            _patch_scope("context_documents"),
-        ):
-            from app.mcp.resources.context_documents import get_context_document
-            result = await get_context_document(str(doc_uuid), _mock_ctx())
-
-        data = json.loads(result)
-        assert data["uuid"] == str(doc_uuid)
-        assert data["content"] == "Step 1: Check sender..."
-        assert data["targeting_rules"] is None
-
-    async def test_full_doc_fields_present(self) -> None:
-        doc_uuid = uuid.uuid4()
-        doc = _mock_context_document(doc_uuid=doc_uuid)
-
-        session_ctx, mock_session = _patch_session()
-        mock_repo = MagicMock()
-        mock_repo.get_by_uuid = AsyncMock(return_value=doc)
-
-        with (
-            patch("app.mcp.resources.context_documents.AsyncSessionLocal", session_ctx),
-            patch(
-                "app.mcp.resources.context_documents.ContextDocumentRepository",
-                return_value=mock_repo,
-            ),
-            _patch_scope("context_documents"),
-        ):
-            from app.mcp.resources.context_documents import get_context_document
-            result = await get_context_document(str(doc_uuid), _mock_ctx())
-
-        data = json.loads(result)
-        expected_keys = {
-            "uuid", "title", "document_type", "is_global",
-            "description", "content", "tags", "targeting_rules",
-            "version", "created_at", "updated_at",
-        }
-        assert expected_keys.issubset(set(data.keys()))
-
-    async def test_doc_not_found_raises(self) -> None:
-        doc_uuid = uuid.uuid4()
-        session_ctx, mock_session = _patch_session()
-        mock_repo = MagicMock()
-        mock_repo.get_by_uuid = AsyncMock(return_value=None)
-
-        with (
-            patch("app.mcp.resources.context_documents.AsyncSessionLocal", session_ctx),
-            patch(
-                "app.mcp.resources.context_documents.ContextDocumentRepository",
-                return_value=mock_repo,
-            ),
-            _patch_scope("context_documents"),
-        ):
-            from app.mcp.resources.context_documents import get_context_document
-            with pytest.raises(ValueError, match="Context document not found"):
-                await get_context_document(str(doc_uuid), _mock_ctx())
 
 
 # ===========================================================================
