@@ -9,6 +9,7 @@ events to the SSE endpoint.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -139,8 +140,6 @@ async def notify_run_event(
     except Exception as exc:
         # NOTIFY failure is non-fatal — SSE clients still work via polling.
         # Rolling back the savepoint leaves the outer transaction healthy.
-        try:
+        with contextlib.suppress(Exception):
             await savepoint.rollback()
-        except Exception:
-            pass
         logger.debug("notify_run_event_failed", error=str(exc), seq=seq)

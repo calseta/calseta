@@ -13,12 +13,15 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pydantic import ValidationError
+
 from app.db.models.alert import Alert
 from app.integrations.tools.dispatcher import (
     _confidence_numeric_to_enum,
     _handle_post_finding,
 )
 from app.schemas.alerts import FindingResponse
+from app.schemas.tool_inputs import PostFindingInput
 from tests.integration.agent_control_plane.conftest import _create_agent_with_key
 from tests.integration.agent_control_plane.fixtures.mock_alerts import (
     create_enriched_alert,
@@ -59,9 +62,7 @@ async def test_handle_post_finding_writes_canonical_shape(
     agent, _ = await _create_agent_with_key(db_session, name="canonical-test-agent")
     alert: Alert = await create_enriched_alert(db_session)
 
-    result = await _handle_post_finding(
-        db_session,
-        agent,
+    tool_input = PostFindingInput.model_validate(
         {
             "alert_uuid": str(alert.uuid),
             "classification": "true_positive",
@@ -70,6 +71,7 @@ async def test_handle_post_finding_writes_canonical_shape(
             "findings": [{"type": "lateral_movement"}],
         },
     )
+    result = await _handle_post_finding(db_session, agent, tool_input, None)
 
     assert result["status"] == "ok", result
     assert result["data"]["confidence"] == "high"
@@ -105,9 +107,7 @@ async def test_handle_post_finding_low_confidence_bucket(
     agent, _ = await _create_agent_with_key(db_session, name="low-conf-agent")
     alert: Alert = await create_enriched_alert(db_session)
 
-    result = await _handle_post_finding(
-        db_session,
-        agent,
+    tool_input = PostFindingInput.model_validate(
         {
             "alert_uuid": str(alert.uuid),
             "classification": "inconclusive",
@@ -115,6 +115,7 @@ async def test_handle_post_finding_low_confidence_bucket(
             "reasoning": "Insufficient signal.",
         },
     )
+    result = await _handle_post_finding(db_session, agent, tool_input, None)
 
     assert result["status"] == "ok"
     assert result["data"]["confidence"] == "low"
@@ -140,15 +141,16 @@ async def test_get_findings_returns_canonical_after_dispatch(
     agent, _ = await _create_agent_with_key(db_session, name="api-readback-agent")
     alert: Alert = await create_enriched_alert(db_session)
 
-    handler_result = await _handle_post_finding(
-        db_session,
-        agent,
+    tool_input = PostFindingInput.model_validate(
         {
             "alert_uuid": str(alert.uuid),
             "classification": "false_positive",
             "confidence": 0.62,
             "reasoning": "Known scanner traffic from approved partner.",
         },
+    )
+    handler_result = await _handle_post_finding(
+        db_session, agent, tool_input, None,
     )
     assert handler_result["status"] == "ok"
 
@@ -173,43 +175,29 @@ async def test_get_findings_returns_canonical_after_dispatch(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_handle_post_finding_invalid_uuid(
-    db_session: AsyncSession,
-) -> None:
-    agent, _ = await _create_agent_with_key(db_session, name="bad-uuid-agent")
-    result = await _handle_post_finding(
-        db_session,
-        agent,
-        {"alert_uuid": "not-a-uuid", "confidence": 0.5, "reasoning": "x"},
-    )
-    assert result["status"] == "error"
-    assert "Invalid alert_uuid" in result["error"]
+def test_post_finding_input_rejects_invalid_uuid() -> None:
+    """S2 catches invalid alert_uuid at the schema layer; handler never runs."""
+    with pytest.raises(ValidationError):
+        PostFindingInput.model_validate(
+            {
+                "alert_uuid": "not-a-uuid",
+                "classification": "benign",
+                "confidence": 0.5,
+                "reasoning": "x",
+            },
+        )
 
 
-@pytest.mark.asyncio
-async def test_handle_post_finding_empty_reasoning_falls_back(
-    db_session: AsyncSession,
-) -> None:
-    agent, _ = await _create_agent_with_key(db_session, name="empty-reasoning-agent")
-    alert: Alert = await create_enriched_alert(db_session)
-
-    result = await _handle_post_finding(
-        db_session,
-        agent,
-        {
-            "alert_uuid": str(alert.uuid),
-            "classification": "benign",
-            "confidence": 0.8,
-            "reasoning": "   ",
-        },
-    )
-    assert result["status"] == "ok"
-
-    await db_session.refresh(alert)
-    persisted = (alert.agent_findings or [])[0]
-    parsed = FindingResponse.model_validate(persisted)
-    # Summary must be non-empty (FindingResponse has min_length on FindingCreate
-    # but FindingResponse itself is more lax — we still want a sensible default).
-    assert parsed.summary  # truthy
-    assert "no reasoning" in parsed.summary.lower()
+def test_post_finding_input_rejects_empty_reasoning() -> None:
+    """S2 enforces non-empty reasoning at the schema layer (str_strip_whitespace
+    + min_length=1); the handler's "no reasoning provided" fallback is now
+    unreachable from the dispatcher path."""
+    with pytest.raises(ValidationError):
+        PostFindingInput.model_validate(
+            {
+                "alert_uuid": "11111111-1111-1111-1111-111111111111",
+                "classification": "benign",
+                "confidence": 0.8,
+                "reasoning": "   ",
+            },
+        )

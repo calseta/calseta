@@ -621,23 +621,23 @@ The existing dashboard has 32 fixed cards. With agent runtime data adding more, 
 | D3: Alert comment re-trigger (UI) | 4 | **complete** | C1 |
 | D4: Workspace schema (plan only) | 4 | **complete** | — |
 | D5: Configurable dashboard cards (UI) | 4 | **complete** | — |
-| S1: Workflow process isolation | 5 | **pending** | — |
-| S2: Tool output validation gate | 5 | **pending** | — |
-| S3: Secret resolver hardening | 5 | **pending** | — |
-| S4: Run log redaction | 5 | **pending** | — |
-| S5: Real budget enforcement path | 5 | **pending** | — |
-| S6: Adapter input validation | 5 | **pending** | — |
-| S7: Prompt injection escaping in Layers 1/3 | 5 | **pending** | — |
+| S1: Workflow process isolation | 5 | **pending** (design) | — |
+| S2: Tool output validation gate | 5 | **complete** (merged 2026-05-04) | — |
+| S3: Secret resolver hardening | 5 | **pending** (design) | — |
+| S4: Run log redaction | 5 | **pending** | S3 |
+| S5: Real budget enforcement path | 5 | **pending** (design) | — |
+| S6: Adapter input validation | 5 | **complete** (merged 2026-05-04) | — |
+| S7: Prompt injection escaping in Layers 1/3 | 5 | **complete — escaping only** (merged 2026-05-04; post-filter deferred) | — |
 | S8: Per-agent runtime rate limit | 5 | **pending** | S5 |
-| S9: Production startup hardening | 5 | **pending** | — |
-| S10: External adapter loading lockdown | 5 | **pending** | — |
-| S11: PID + start-time orphan detection | 5 | **pending** | — |
-| S12: Claude Code adapter error mapping | 5 | **pending** | — |
-| S13: Seed `tool_ids` from `capabilities.tools` on agents | 5 | **lab-complete** (operator create/patch + backfill still pending) | — |
-| S14: Auto-load bundled `app/skills/*` into the skills table | 5 | **lab-complete** (universal startup loader still pending) | — |
-| S15: agent_findings schema canonicalization | 5 | **pending** | — |
-| S16: Backend route audit (UI/API contract drift) | 5 | **pending** | — |
-| S17: API key prefix uniqueness + scope-from-key correctness | 5 | **pending** | — |
+| S9: Production startup hardening | 5 | **pending** | S1, S3 |
+| S10: External adapter loading lockdown | 5 | **complete** (merged 2026-05-04) | — |
+| S11: PID + start-time orphan detection | 5 | **complete** (merged 2026-05-04) | — |
+| S12: Claude Code adapter error mapping | 5 | **complete** (merged 2026-05-04) | — |
+| S13: Seed `tool_ids` from `capabilities.tools` on agents | 5 | **complete** (merged 2026-05-04 — AgentService resolver + backfill script) | — |
+| S14: Auto-load bundled `app/skills/*` into the skills table | 5 | **complete** (merged 2026-05-04 — startup loader + `source` column + SHA256 + `--add-dir`) | — |
+| S15: agent_findings schema canonicalization | 5 | **complete** (merged 2026-05-04) | — |
+| S16: Backend route audit (UI/API contract drift) | 5 | **complete** (merged 2026-05-04) | — |
+| S17: API key prefix uniqueness + scope-from-key correctness | 5 | **complete** (merged 2026-05-04) | — |
 
 ### Wave 1 — Foundation (Schema + Interfaces)
 
@@ -1787,3 +1787,15 @@ The two pieces of state that previously had to be hand-seeded after `make lab-re
 - **`app/seed/sandbox_control_plane.py:_seed_bundled_skills`** — walks `app/skills/<slug>/` directories, upserts `Skill` rows (`is_global=true`) and `SkillFile` rows from disk content. Runs before `_seed_agents` so the global skill is available on the first dispatched run. The bundled skill catalog `_BUNDLED_SKILLS = {"calseta": (...)}` is the only place to register a new bundled skill — drop new skill directories into `app/skills/` and add a one-line entry there.
 
 Both are idempotent and survive `lab-reset`. Verified end-to-end: post-seed, lead-investigator dispatches against an alert and posts a structured finding via `post_finding`. The chunks themselves stay open in the backlog — see the "Still open" notes on S13 and S14.
+
+#### 2026-05-04 — Wave 5 parallel-agent shipment
+
+Eleven Wave 5 chunks were shipped in parallel via isolated git worktrees (one agent per chunk), then merged into `feat/calseta-v2`. **Complete: S2, S6, S7 (escaping only — post-filter deferred), S10, S11, S12, S13 (operator + backfill paths), S14 (universal startup loader, `source` column, SHA256, plus the `--add-dir` adapter wiring), S15, S16, S17.** Branches: `wave5/sX-...`. Three migrations from S14/S15/S17 were consolidated into a single `alembic/versions/0018_wave5_hardening.py` to keep the chain linear; round-trip verified against `calseta_test`.
+
+Two merge-time resolutions worth flagging for future readers:
+- **dispatcher.py — S2 ↔ S15 conflict.** Both rewrote `_handle_post_finding`. Resolution: take S2's validated `PostFindingInput` input + `_resolve_scoped_alert` for the canonical-target write, then build S15's canonical `FindingResponse` shape from the validated fields. `recommended_action: str | None = None` was added to `PostFindingInput` since S2's `extra="forbid"` would otherwise reject it.
+- **agent_findings shape coordination.** S2's strict input gate eliminates two paths the original S15 tests assumed: invalid alert_uuid and empty/whitespace reasoning. Both are now caught at the Pydantic layer; the corresponding S15 tests were converted into schema-level rejection tests.
+
+**Open spec question (deferred to follow-up):** S2 picked the `post_finding` classification enum to match the live `app/seed/builtin_tools.py` schema (`true_positive` / `false_positive` / `benign` / `inconclusive`), not the spec's `benign` / `suspicious` / `malicious` / `inconclusive`. If the spec values are preferred, both `app/seed/builtin_tools.py` AND `POST_FINDING_CLASSIFICATIONS` must change in lockstep with a finding data-fix migration.
+
+**Three Wave 5 chunks remain pending design discussion:** S1 (workflow process isolation — seccomp + IPC), S3 (secret resolver hardening — migration story for existing literal `api_key_ref` rows), S5 (real budget enforcement — `FOR UPDATE` lock semantics). S4/S8/S9 each depend on one of these.

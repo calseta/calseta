@@ -263,14 +263,27 @@ class TestS16ContractFixes:
         test_client: AsyncClient,
         api_key: str,
     ) -> None:
-        """The dead ``/v1/agents/{uuid}/activity`` hook was removed; no route was added."""
+        """The dead ``/v1/agents/{uuid}/activity`` hook was removed; no route was added.
+
+        The app mounts a SPA catch-all that serves ``index.html`` for any
+        unmatched path, so the assertion is "no JSON API endpoint here" —
+        either a 404 from the API router OR an HTML response from the SPA
+        catch-all is acceptable. What we forbid is a real JSON envelope at
+        this path.
+        """
         resp = await test_client.get(
             f"/v1/agents/{_NONEXISTENT_UUID}/activity",
             headers=auth_header(api_key),
         )
-        # Confirm there is no such route — bare FastAPI 404.
-        assert resp.status_code == 404
-        body = resp.json()
-        # Either no error envelope OR a non-route-level 404 — but per the task
-        # we explicitly do NOT add this route, so we expect the FastAPI default.
-        assert body.get("detail") == "Not Found" or "error" in body
+        if resp.status_code == 404:
+            return  # Bare FastAPI 404 — no such route.
+        # Otherwise, the catch-all served the SPA. Confirm it is NOT a JSON
+        # envelope (the canonical API shape is `{"data": ...}` or
+        # `{"error": {...}}`).
+        content_type = resp.headers.get("content-type", "")
+        if content_type.startswith("application/json"):
+            body = resp.json()
+            assert "data" not in body, (
+                "Unexpected JSON API envelope at /v1/agents/{uuid}/activity — "
+                "the dead useAgentActivity route should not have been re-added."
+            )

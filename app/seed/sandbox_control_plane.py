@@ -281,7 +281,11 @@ async def _seed_agents(
         # through the LLM but tool_count is 0 — the agent has no API surface.
         # Idempotent: rewrites tool_ids on every seed, picking up any new tools.
         capabilities = spec.get("capabilities") or {}
-        requested_tools = list(capabilities.get("tools") or []) if isinstance(capabilities, dict) else []
+        requested_tools = (
+            list(capabilities.get("tools") or [])
+            if isinstance(capabilities, dict)
+            else []
+        )
         resolved = await _resolve_tool_ids(db, requested_tools)
         if list(agent.tool_ids or []) != resolved:
             agent.tool_ids = resolved
