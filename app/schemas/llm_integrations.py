@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
 from enum import StrEnum
@@ -10,6 +11,30 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.common import JSONB_SIZE_SMALL, validate_jsonb_size
+
+# S6: model identifier whitelist — accepts vendor model strings like
+# "claude-sonnet-4-6", "gpt-4o", "anthropic/claude-3.5", "us.anthropic:claude-3"
+# Rejects leading "-" (so a value can never be confused with a CLI flag) and
+# rejects whitespace / shell metacharacters that could affect downstream
+# subprocess arg construction.
+_MODEL_SLUG_RE = re.compile(r"^[A-Za-z0-9._:\-/]{1,128}$")
+
+
+def _validate_model_slug(v: str | None) -> str | None:
+    """Reject empty/None-or-whitespace, leading "-", and out-of-charset values."""
+    if v is None:
+        return v
+    # Whitespace anywhere is invalid (catches " foo", "foo ", "foo\nbar")
+    if v != v.strip() or any(ch.isspace() for ch in v):
+        raise ValueError("model must not contain whitespace")
+    if v.startswith("-"):
+        raise ValueError("model must not start with '-'")
+    if not _MODEL_SLUG_RE.fullmatch(v):
+        raise ValueError(
+            "model must match ^[A-Za-z0-9._:\\-/]{1,128}$ "
+            "(letters, digits, '.', '_', ':', '-', '/')"
+        )
+    return v
 
 
 class LLMProvider(StrEnum):
@@ -37,6 +62,15 @@ class LLMIntegrationCreate(BaseModel):
     def _validate_config_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
         return validate_jsonb_size(v, JSONB_SIZE_SMALL, "config")  # type: ignore[return-value]
 
+    @field_validator("model")
+    @classmethod
+    def _validate_model(cls, v: str) -> str:
+        # S6: adapter input validation — reject leading '-', whitespace, and
+        # out-of-charset characters before the value reaches any subprocess.
+        result = _validate_model_slug(v)
+        assert result is not None  # required field, never None at this point
+        return result
+
     @model_validator(mode="after")
     def _validate_base_url_for_azure(self) -> LLMIntegrationCreate:
         if self.provider == LLMProvider.AZURE_OPENAI and not self.base_url:
@@ -59,6 +93,12 @@ class LLMIntegrationPatch(BaseModel):
     @classmethod
     def _validate_config_size(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
         return validate_jsonb_size(v, JSONB_SIZE_SMALL, "config")  # type: ignore[return-value]
+
+    @field_validator("model")
+    @classmethod
+    def _validate_model(cls, v: str | None) -> str | None:
+        # S6: same regex on patch (None = not provided, keep existing value)
+        return _validate_model_slug(v)
 
 
 class LLMIntegrationResponse(BaseModel):

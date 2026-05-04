@@ -429,3 +429,94 @@ class TestClaudeCodeAdapterFailure:
         # First positional arg should be the claude binary
         first_arg = call_args[0][0]
         assert "claude" in str(first_arg)
+
+
+# ---------------------------------------------------------------------------
+# Tests: S6 — stdout byte cap
+# ---------------------------------------------------------------------------
+
+
+class _OverflowingStreamReader:
+    """Mock StreamReader that emits ~64KiB lines until total > the cap."""
+
+    def __init__(self, cap_bytes: int) -> None:
+        self._cap = cap_bytes
+        self._emitted = 0
+        # Each line is just under 64 KiB. Sized so that even with the real
+        # 50 MiB production cap the loop terminates quickly enough for CI,
+        # while still being deterministic when the cap is monkeypatched lower.
+        self._chunk = (b"x" * ((64 * 1024) - 1)) + b"\n"
+        self._closed = False
+
+    async def readline(self) -> bytes:
+        if self._closed:
+            return b""
+        if self._emitted > self._cap + len(self._chunk):
+            self._closed = True
+            return b""
+        self._emitted += len(self._chunk)
+        return self._chunk
+
+    async def read(self) -> bytes:
+        return b""
+
+
+class _OverflowingProcess:
+    """Subprocess mock whose stdout exceeds MAX_CLAUDE_STDOUT_BYTES."""
+
+    def __init__(self, cap_bytes: int) -> None:
+        self.returncode: int | None = None
+        self.stdin = _MockStreamWriter()
+        self.stdout = _OverflowingStreamReader(cap_bytes)
+        self.stderr = _MockStreamReader(b"")
+        self.terminated = False
+        self.killed = False
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.returncode = -15
+
+    def kill(self) -> None:
+        self.killed = True
+        self.returncode = -9
+
+    async def wait(self) -> int:
+        if self.returncode is None:
+            self.returncode = 0
+        return self.returncode
+
+
+class TestClaudeCodeAdapterStdoutCap:
+    """S6: subprocess is killed and RuntimeError raised when stdout exceeds the cap."""
+
+    async def test_stdout_cap_aborts_subprocess(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app.integrations.llm import claude_code_adapter as cc_mod
+
+        # Shrink the cap so the test runs quickly without allocating 50 MiB.
+        # The cap value being raised is what we're testing — its size is not.
+        small_cap = 256 * 1024  # 256 KiB
+        monkeypatch.setattr(cc_mod, "MAX_CLAUDE_STDOUT_BYTES", small_cap)
+
+        adapter = _make_adapter()
+        proc = _OverflowingProcess(cap_bytes=small_cap)
+
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = proc
+            # Error message is hard-coded to "50MB" regardless of the cap value;
+            # only the comparison threshold is monkeypatched.
+            with pytest.raises(RuntimeError, match="claude stdout exceeded 50MB"):
+                await adapter.create_message(
+                    messages=[LLMMessage(role="user", content="overflow test")],
+                    tools=[],
+                )
+
+        # The adapter must have terminated (or killed) the subprocess.
+        assert proc.terminated or proc.killed
+
+    async def test_stdout_cap_constant_is_50mb(self) -> None:
+        """Module-level constant must be exactly 50 MiB (acceptance criterion)."""
+        from app.integrations.llm import claude_code_adapter as cc_mod
+
+        assert cc_mod.MAX_CLAUDE_STDOUT_BYTES == 50 * 1024 * 1024
