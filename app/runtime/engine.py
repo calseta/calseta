@@ -22,7 +22,10 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from app.integrations.tools.dispatcher import ToolDispatcher
+from app.integrations.tools.dispatcher import (
+    ToolDispatcher,
+    map_exception_to_error_code,
+)
 from app.runtime.models import RuntimeContext, RuntimeResult
 from app.runtime.prompt_builder import PromptBuilder
 
@@ -310,7 +313,7 @@ class AgentRuntimeEngine:
         findings: list[dict] = []
         actions_proposed: list[dict] = []
 
-        dispatcher = ToolDispatcher(db=self._db, agent=agent)
+        dispatcher = ToolDispatcher(db=self._db, agent=agent, context=context)
 
         for iteration in range(self.MAX_TOOL_ITERATIONS):
             logger.debug(
@@ -529,16 +532,25 @@ class AgentRuntimeEngine:
                                             json.dumps(finding, default=str),
                                         )
                 except Exception as exc:
+                    # S2: never echo str(exc) back to the LLM. Map to a coarse
+                    # error code so the model can branch on category without
+                    # leaking stack traces, entity IDs, or secrets.
+                    error_code = map_exception_to_error_code(exc)
                     logger.warning(
                         "runtime.tool_error",
                         tool_id=tool_id,
+                        error_code=error_code,
+                        # Full exception is captured server-side only.
                         error=str(exc),
                         agent_id=agent.id,
                     )
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": tool_use_id,
-                        "content": f"Tool error: {exc!s}",
+                        "content": json.dumps({
+                            "status": "error",
+                            "error_code": error_code,
+                        }),
                         "is_error": True,
                     })
 
