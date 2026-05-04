@@ -300,14 +300,55 @@ async def _handle_get_enrichment(
     }
 
 
+def _confidence_numeric_to_enum(raw: float | int | None) -> str | None:
+    """Map numeric confidence in [0,1] to FindingConfidence enum value.
+
+    Buckets:
+      >= 0.75  → 'high'
+      0.4–0.74 → 'medium'
+      <  0.4   → 'low'
+    Returns None if input is not a number.
+    """
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if value >= 0.75:
+        return "high"
+    if value >= 0.4:
+        return "medium"
+    return "low"
+
+
 async def _handle_post_finding(
     db: AsyncSession,
     agent: AgentRegistration,
     tool_input: dict[str, Any],
 ) -> dict[str, Any]:
-    from uuid import UUID
+    """Persist an agent finding in the canonical FindingResponse shape.
+
+    Canonical fields written into ``alerts.agent_findings`` JSONB:
+      - id              UUID string (per-finding identity)
+      - agent_name      str — resolved from AgentRegistration.name
+      - summary         str — what the agent passed as ``reasoning``
+      - confidence      enum: 'low' | 'medium' | 'high' (or None)
+      - recommended_action  str | None
+      - evidence        dict | None — agent-only extras live here
+      - posted_at       ISO 8601 timestamp string
+
+    Agent-only extras (``classification``, ``findings`` array, raw numeric
+    ``confidence``, original ``reasoning`` if distinct from summary) are
+    stashed under ``evidence.*`` so nothing the agent provides is lost.
+
+    Round-trips through ``FindingResponse.model_validate(...)``.
+    """
+    from datetime import UTC, datetime
+    from uuid import UUID, uuid4
 
     from app.repositories.alert_repository import AlertRepository
+    from app.schemas.alerts import FindingResponse
 
     alert_uuid_str = tool_input.get("alert_uuid", "")
     try:
@@ -320,16 +361,41 @@ async def _handle_post_finding(
     if alert is None:
         return {"status": "error", "error": f"Alert {alert_uuid} not found."}
 
-    from datetime import UTC, datetime
+    # --- Build canonical finding payload ---
+    raw_reasoning = tool_input.get("reasoning")
+    summary = (raw_reasoning or "").strip() or "(no reasoning provided)"
+    raw_confidence = tool_input.get("confidence")
+    confidence_enum = _confidence_numeric_to_enum(raw_confidence)
+    classification = tool_input.get("classification")
+    extra_findings = tool_input.get("findings") or []
+    recommended_action = tool_input.get("recommended_action")
 
-    finding = {
-        "classification": tool_input.get("classification"),
-        "confidence": tool_input.get("confidence"),
-        "reasoning": tool_input.get("reasoning"),
-        "findings": tool_input.get("findings", []),
-        "recorded_at": datetime.now(UTC).isoformat(),
-        "agent_id": agent.id,
+    evidence: dict[str, Any] = {}
+    if classification is not None:
+        evidence["classification"] = classification
+    if extra_findings:
+        evidence["findings"] = extra_findings
+    if raw_confidence is not None:
+        evidence["confidence_raw"] = raw_confidence
+    # Preserve the original reasoning text only if distinct from summary
+    if raw_reasoning is not None and raw_reasoning != summary:
+        evidence["reasoning"] = raw_reasoning
+    # Tag who recorded this so future readers can correlate to an agent
+    evidence["agent_id"] = agent.id
+
+    finding: dict[str, Any] = {
+        "id": str(uuid4()),
+        "agent_name": agent.name,
+        "summary": summary,
+        "confidence": confidence_enum,
+        "recommended_action": recommended_action,
+        "evidence": evidence or None,
+        "posted_at": datetime.now(UTC).isoformat(),
     }
+
+    # Validate canonical shape before persistence — fail loudly if drifted.
+    FindingResponse.model_validate(finding)
+
     await repo.add_finding(alert, finding)
     await db.flush()
 
@@ -337,8 +403,8 @@ async def _handle_post_finding(
         "status": "ok",
         "data": {
             "alert_uuid": str(alert.uuid),
-            "classification": finding["classification"],
-            "confidence": finding["confidence"],
+            "finding_id": finding["id"],
+            "confidence": confidence_enum,
             "recorded": True,
         },
     }
