@@ -3,12 +3,15 @@ AgentAPIKeyAuthBackend — bcrypt-based authentication for agent API keys.
 
 Auth flow:
   1. Extract `Authorization: Bearer cak_xxx` header
-  2. Slice `key_prefix` = first 8 chars
-  3. Look up AgentAPIKey row by prefix (non-revoked only)
-  4. Verify bcrypt hash
+  2. Slice `key_prefix` = first 16 chars (defense-in-depth: longer prefix
+     means fewer candidate rows, but we still iterate-and-bcrypt — see
+     S17 hardening notes)
+  3. List AgentAPIKey rows whose key_prefix matches (non-revoked only)
+  4. Iterate candidates and verify bcrypt hash; pick the matching row
   5. Check revoked_at (raises KEY_REVOKED if set — belt-and-suspenders)
   6. Update last_used_at in the session (committed with the request)
-  7. Return AuthContext with key_type="agent" and agent_registration_id populated
+  7. Return AuthContext with key_type="agent" and agent_registration_id
+     populated; scopes come from the resolved record only.
 
 Agent keys use the `cak_` prefix to distinguish them from human `cai_` keys.
 Every failure path calls log_auth_failure() before raising.
@@ -23,15 +26,15 @@ from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
-from app.db.models.agent_api_key import AgentAPIKey
-
 from app.api.errors import CalsetaException
 from app.auth.audit import log_auth_failure
 from app.auth.base import AuthBackendBase, AuthContext
 from app.repositories.agent_api_key_repository import AgentAPIKeyRepository
 
 _BEARER_PREFIX = "Bearer "
-_KEY_PREFIX_LEN = 8  # first 8 chars of the full key (e.g. "cak_xxxx")
+# First 16 chars of the full key (e.g. "cak_xxxxxxxxxxxx"). See
+# api_key_backend._KEY_PREFIX_LEN for rationale.
+_KEY_PREFIX_LEN = 16
 
 
 class AgentAPIKeyAuthBackend(AuthBackendBase):
@@ -64,15 +67,21 @@ class AgentAPIKeyAuthBackend(AuthBackendBase):
             )
 
         key_prefix = plain_key[:_KEY_PREFIX_LEN]
-        # key_prefix is non-unique by design (lab keys all share ``cak_lab_``).
-        # Fetch every candidate that shares the prefix and bcrypt-check each.
-        # Wrong/extra candidates fail the bcrypt compare in constant time.
         candidates = await self._repo.list_by_prefix(key_prefix)
-        record: AgentAPIKey | None = None
+        if not candidates:
+            log_auth_failure("invalid_key", request, key_prefix=key_prefix)
+            raise CalsetaException(
+                code="UNAUTHORIZED",
+                message="Invalid agent API key.",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        record = None
         for candidate in candidates:
             if bcrypt.checkpw(plain_key.encode(), candidate.key_hash.encode()):
                 record = candidate
                 break
+
         if record is None:
             log_auth_failure("invalid_key", request, key_prefix=key_prefix)
             raise CalsetaException(
@@ -93,8 +102,9 @@ class AgentAPIKeyAuthBackend(AuthBackendBase):
         # Update last_used_at — committed with the session at request end
         record.last_used_at = datetime.now(UTC)
 
+        # IMPORTANT: scopes are read from the AUTHENTICATED record only.
         return AuthContext(
-            key_prefix=key_prefix,
+            key_prefix=record.key_prefix,
             scopes=list(record.scopes),
             key_id=record.id,
             key_type="agent",

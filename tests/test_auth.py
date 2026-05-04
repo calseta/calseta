@@ -33,11 +33,12 @@ class TestAPIKeyFormat:
             key = self._generate_key()
             assert pattern.match(key), f"Key {key!r} does not match expected format"
 
-    def test_key_prefix_is_first_8_chars(self) -> None:
+    def test_key_prefix_is_first_16_chars(self) -> None:
+        # S17: prefix length bumped from 8 → 16 chars for defense-in-depth.
         key = self._generate_key()
-        prefix = key[:8]
+        prefix = key[:16]
         assert prefix.startswith("cai_")
-        assert len(prefix) == 8
+        assert len(prefix) == 16
 
     def test_key_uniqueness(self) -> None:
         keys = {self._generate_key() for _ in range(100)}
@@ -185,10 +186,12 @@ class TestAPIKeyAuthBackend:
 
         mock_record = MagicMock()
         mock_record.id = 1
+        mock_record.key_prefix = plain_key[:16]
         mock_record.key_hash = key_hash
         mock_record.scopes = ["alerts:read"]
         mock_record.allowed_sources = None
         mock_record.expires_at = None  # Not expired
+        mock_record.key_type = "human"
 
         # Use AsyncMock for db so that db.flush() is awaitable
         from unittest.mock import AsyncMock as AsyncMockCls
@@ -199,13 +202,13 @@ class TestAPIKeyAuthBackend:
             "app.auth.api_key_backend.APIKeyRepository"
         ) as MockRepo:
             mock_repo = MockRepo.return_value
-            mock_repo.get_by_prefix = AsyncMock(return_value=mock_record)
+            mock_repo.list_by_prefix = AsyncMock(return_value=[mock_record])
 
             backend = APIKeyAuthBackend(db)
             request = self._make_request(auth_header=f"Bearer {plain_key}")
             ctx = await backend.authenticate(request)  # type: ignore[arg-type]
 
-        assert ctx.key_prefix == plain_key[:8]
+        assert ctx.key_prefix == plain_key[:16]
         assert ctx.scopes == ["alerts:read"]
         assert ctx.key_id == 1
 
@@ -233,7 +236,7 @@ class TestAPIKeyAuthBackend:
 
         with patch("app.auth.api_key_backend.APIKeyRepository") as MockRepo:
             mock_repo = MockRepo.return_value
-            mock_repo.get_by_prefix = AsyncMock(return_value=mock_record)
+            mock_repo.list_by_prefix = AsyncMock(return_value=[mock_record])
 
             backend = APIKeyAuthBackend(db)
             request = self._make_request(auth_header=f"Bearer {plain_key}")

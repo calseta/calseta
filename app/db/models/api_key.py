@@ -14,7 +14,10 @@ class APIKey(TimestampMixin, UUIDMixin, Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    key_prefix: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    # Not unique: see migration 0018. Two keys CAN share a 16-char plaintext
+    # prefix; the bcrypt hash is what makes them distinguishable. The auth
+    # backend iterates candidates with bcrypt.checkpw to pick the real key.
+    key_prefix: Mapped[str] = mapped_column(Text, nullable=False)
     key_hash: Mapped[str] = mapped_column(Text, nullable=False)
     scopes: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")

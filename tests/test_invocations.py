@@ -349,7 +349,7 @@ async def test_delegate_task_creates_invocation(
         uuid=uuid.uuid4(),
         agent_registration_id=orchestrator.id,
         name="test-key",
-        key_prefix=plain_key[:8],
+        key_prefix=plain_key[:16],  # S17
         key_hash=key_hash,
         scopes=["agents:read", "agents:write"],
     )

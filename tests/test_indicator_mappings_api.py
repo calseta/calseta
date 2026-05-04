@@ -43,7 +43,7 @@ async def alerts_read_key(db_session: AsyncSession) -> str:
     key_hash = bcrypt.hashpw(plain_key.encode(), bcrypt.gensalt()).decode()
     record = APIKey(
         name="test-alerts-read-key",
-        key_prefix=plain_key[:8],
+        key_prefix=plain_key[:16],  # S17
         key_hash=key_hash,
         scopes=["alerts:read"],
         is_active=True,

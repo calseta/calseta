@@ -37,12 +37,12 @@ class AgentAPIKeyRepository(BaseRepository[AgentAPIKey]):
         return record
 
     async def list_by_prefix(self, key_prefix: str) -> list[AgentAPIKey]:
-        """Return all non-revoked AgentAPIKey rows whose key_prefix matches.
+        """
+        Return all non-revoked AgentAPIKey rows whose key_prefix matches.
 
-        key_prefix is NOT unique — multiple keys can share a prefix (e.g. lab
-        keys all start with ``cak_lab_``). The authoritative match is bcrypt
-        against ``key_hash``; the prefix is just a lookup hint. Callers must
-        iterate and bcrypt-check each candidate.
+        Returns a list (possibly empty) so the auth backend can iterate
+        candidates and bcrypt-check each one. Two keys MAY share the same
+        plaintext prefix; only the bcrypt hash distinguishes them.
         """
         result = await self._db.execute(
             select(AgentAPIKey).where(
@@ -51,6 +51,15 @@ class AgentAPIKeyRepository(BaseRepository[AgentAPIKey]):
             )
         )
         return list(result.scalars().all())
+
+    async def get_by_prefix(self, key_prefix: str) -> AgentAPIKey | None:
+        """
+        DEPRECATED — use ``list_by_prefix`` and iterate-and-bcrypt instead.
+
+        Returns the first matching non-revoked row, or None.
+        """
+        candidates = await self.list_by_prefix(key_prefix)
+        return candidates[0] if candidates else None
 
     async def list_for_agent(self, agent_id: int) -> list[AgentAPIKey]:
         """Return all keys for a given agent registration, ordered by created_at desc."""

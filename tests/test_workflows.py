@@ -77,7 +77,8 @@ async def agent_api_key(db_session: Any) -> str:
 
     plain_key = "cai_" + _secrets.token_urlsafe(32)
     key_hash = bcrypt.hashpw(plain_key.encode(), bcrypt.gensalt()).decode()
-    key_prefix = plain_key[:8]
+    # S17: prefix length bumped from 8 → 16 chars.
+    key_prefix = plain_key[:16]
 
     record = APIKey(
         name="test-agent-key",

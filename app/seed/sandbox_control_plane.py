@@ -199,7 +199,9 @@ async def _seed_agent_api_key(
     db: AsyncSession, agent: AgentRegistration, key_value: str
 ) -> None:
     """Seed a cak_* agent API key if it doesn't already exist."""
-    key_prefix = key_value[:8]
+    # S17: prefix bumped from 8 → 16 chars for defense-in-depth against
+    # prefix collisions. Mirrors app.auth.agent_api_key_backend._KEY_PREFIX_LEN.
+    key_prefix = key_value[:16]
     existing = await db.execute(
         select(AgentAPIKey).where(
             AgentAPIKey.agent_registration_id == agent.id,

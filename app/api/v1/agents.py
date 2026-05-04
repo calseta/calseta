@@ -59,7 +59,9 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 _Read = Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_READ))]
 _Write = Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_WRITE))]
 
-_KEY_PREFIX_LEN = 8
+# Mirrors app.auth.api_key_backend._KEY_PREFIX_LEN — bumped to 16 in S17
+# for defense-in-depth against prefix collisions on issuance.
+_KEY_PREFIX_LEN = 16
 
 
 def _maybe_encrypt(plaintext: str) -> str:

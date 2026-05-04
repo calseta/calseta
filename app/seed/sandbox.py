@@ -21,9 +21,10 @@ from app.seed.sandbox_kb_pages import seed_sandbox_kb_pages
 logger = structlog.get_logger(__name__)
 
 # Well-known sandbox API key — public, read-only, never used in production.
-# Prefix: "cai_sand" (first 8 chars of the full key).
+# Prefix: first 16 chars of the full key (S17: bumped from 8 → 16 for
+# defense-in-depth against prefix collisions).
 _SANDBOX_API_KEY = "cai_sandbox_demo_key_not_for_production"
-_SANDBOX_KEY_PREFIX = _SANDBOX_API_KEY[:8]
+_SANDBOX_KEY_PREFIX = _SANDBOX_API_KEY[:16]
 _SANDBOX_KEY_SCOPES = [
     "alerts:read",
     "enrichments:read",
@@ -33,7 +34,7 @@ _SANDBOX_KEY_SCOPES = [
 
 # Lab API key — full access for testing all functionality.
 _LAB_API_KEY = "cai_lab_demo_full_access_key_not_for_prod"
-_LAB_KEY_PREFIX = _LAB_API_KEY[:8]
+_LAB_KEY_PREFIX = _LAB_API_KEY[:16]
 _LAB_KEY_SCOPES = [
     "alerts:read",
     "alerts:write",

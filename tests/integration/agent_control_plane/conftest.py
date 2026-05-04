@@ -60,7 +60,8 @@ async def _create_agent_with_key(
     await db.refresh(agent)
 
     plain_key = "cak_" + secrets.token_urlsafe(32)
-    key_prefix = plain_key[:8]
+    # S17: prefix length bumped from 8 → 16 chars.
+    key_prefix = plain_key[:16]
     key_hash = bcrypt.hashpw(plain_key.encode(), bcrypt.gensalt(rounds=4)).decode()
 
     api_key_record = AgentAPIKey(
