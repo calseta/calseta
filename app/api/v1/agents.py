@@ -52,6 +52,7 @@ from app.schemas.agents import (
     AgentTestResponse,
 )
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
+from app.services.agent_service import AgentService
 from app.services.url_validation import is_safe_outbound_url
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -156,8 +157,10 @@ async def create_agent(
     if body.auth_header_value is not None:
         auth_header_value_encrypted = _maybe_encrypt(body.auth_header_value)
 
-    repo = AgentRepository(db)
-    agent = await repo.create(body, auth_header_value_encrypted)
+    # AgentService.create resolves capabilities.tools slugs into tool_ids
+    # and rejects unknown slugs with 422 — see app/services/agent_service.py.
+    service = AgentService(db)
+    agent = await service.create(body, auth_header_value_encrypted)
 
     # Create agent home directory: $CALSETA_DATA_DIR/agents/{agent.uuid}/
     agent_home = os.path.join(settings.CALSETA_DATA_DIR, "agents", str(agent.uuid))
@@ -317,7 +320,13 @@ async def patch_agent(
     if body.memory_promotion_requires_approval is not None:
         updates["memory_promotion_requires_approval"] = body.memory_promotion_requires_approval
 
-    updated = await repo.patch(agent, **updates)
+    # AgentService.patch resolves capabilities.tools (when present in this
+    # patch) into tool_ids and rejects unknown slugs with 422. It will
+    # overwrite any tool_ids entry already in `updates` because operator
+    # intent encoded in capabilities wins over a stale tool_ids value
+    # the same caller may have included.
+    service = AgentService(db)
+    updated = await service.patch(agent, body, updates)
     return DataResponse(data=AgentRegistrationResponse.model_validate(updated))
 
 
