@@ -1,7 +1,7 @@
 # Testing & Validation + Implementation Phases
 
 > **Split PRD navigation:**
-> [Overview](_overview.md) | [Part 1: Core Runtime](part-1-core-runtime.md) | [Part 2: Actions & Orchestration](part-2-actions-orchestration.md) | [Part 3: Knowledge & Memory](part-3-knowledge-memory.md) | [Part 4: Operational](part-4-operational.md) | [Part 5: Platform Ops](part-5-platform-ops.md) | [API & MCP](appendix-api-mcp.md) | [Implementation Phases](implementation-phases.md)
+> [Overview](_overview.md) | [Part 1: Core Runtime](part-1-core-runtime.md) | [Part 2: Actions & Orchestration](part-2-actions-orchestration.md) | [Part 3: Knowledge & Memory](part-3-knowledge-memory.md) | [Part 3a: Skills](part-3-skills.md) | [Part 4: Operational](part-4-operational.md) | [Part 5: Platform Ops](part-5-platform-ops.md) | [API & MCP](appendix-api-mcp.md) | [Implementation Phases](implementation-phases.md)
 
 ## Testing & Validation
 
@@ -121,7 +121,7 @@ The E2E smoke test is intentionally excluded from automated CI — it requires a
 > [!important] Enterprise-First Phasing
 > LLM provider registration, the agent runtime engine, and the tool system are foundational. The `process` adapter (subprocess spawning) is deferred to Phase 7+ as a dev/demo convenience. Managed agents run inside Calseta; external agents communicate via HTTP.
 
-### Phase 1 — LLM Providers + Agent Registry + Agent Runtime + Tool System (Foundation) `[Part 1]` `[Part 5: Secrets, Auth]`
+### Phase 1 — LLM Providers + Agent Registry + Agent Runtime + Tool System (Foundation) `[Part 1]` `[Part 5: Secrets, Auth]` ✅ COMPLETE
 
 **Goal:** Operators register LLM providers, define managed agents (prompt + tools + LLM), and Calseta executes them. Also supports external agents via pull-based queue. This is the biggest phase — it ships the core platform.
 
@@ -223,7 +223,7 @@ Key constraints:
 
 All indexes from the "Required Indexes (Part 1)" section above apply to this migration.
 
-### Phase 2 — Actions + Approval Gates (Human-in-the-Loop) `[Part 2]`
+### Phase 2 — Actions + Approval Gates (Human-in-the-Loop) `[Part 2]` ✅ COMPLETE
 
 **Goal:** Agents can propose actions, humans approve via existing Slack/Teams/browser flows, Calseta tracks everything.
 
@@ -239,7 +239,7 @@ All indexes from the "Required Indexes (Part 1)" section above apply to this mig
 
 **Exit criteria:** Agent proposes "block IP" action → existing approval system creates `WorkflowApprovalRequest` → operator approves via Slack button → `execute_response_action_task` fires → action status transitions to completed. Auto-execute works for notification/enrichment actions.
 
-### Phase 3 — Integration Execution Engine (Close the Loop) `[Part 2]`
+### Phase 3 — Integration Execution Engine (Close the Loop) `[Part 2]` ✅ COMPLETE
 
 **Goal:** Approved actions actually execute against security tools. Integration = workflow (same pattern operators already know).
 
@@ -258,7 +258,7 @@ All indexes from the "Required Indexes (Part 1)" section above apply to this mig
 
 **Exit criteria:** Agent proposes "isolate host" → operator approves → CrowdStrike integration isolates the host → result recorded → alert marked resolved. User validation flow: alert matches `user_validation_rule` → DM sent via configured template → user confirms → `on_confirm` action executes (alert auto-closed with response attached).
 
-### Phase 4 — Heartbeat + Budget Controls + Supervision (Operational Maturity) `[Part 1]`
+### Phase 4 — Heartbeat + Budget Controls + Supervision (Operational Maturity) `[Part 1]` ✅ COMPLETE
 
 **Goal:** Monitor agent health, enforce cost limits per-agent and per-LLM-provider, detect stuck/stalling investigations.
 
@@ -302,7 +302,7 @@ All indexes from the "Required Indexes (Part 1)" section above apply to this mig
 - Invocation depth limit enforcement — Phase 5.5+
 - Per-LLM-provider cost rollup on invocations — Phase 5.5+
 
-### Phase 5.5 — Issue/Task System + Routine Scheduler + Agent Topology `[Part 4]`
+### Phase 5.5 — Issue/Task System + Routine Scheduler + Agent Topology `[Part 4]` ✅ COMPLETE
 
 **Goal:** Non-alert work management, scheduled agent invocations, and fleet visibility.
 
@@ -343,7 +343,7 @@ All indexes from the "Required Indexes (Part 1)" section above apply to this mig
 
 **Exit criteria:** Agent creates a remediation issue during an investigation → issue tracked with subtasks → assignee agent picks it up on next heartbeat. Scheduled routine fires daily → creates issue via normal routing → agent processes. Campaign created with MTTD target → Calseta auto-computes current MTTD from alert/assignment timestamps and updates `current_value`. Topology API returns agent fleet graph with routing + delegation paths.
 
-### Phase 6 — Pre-flight Cleanup (Technical Debt) `[All Parts]`
+### Phase 6 — Pre-flight Cleanup (Technical Debt) `[All Parts]` ✅ COMPLETE
 
 **Goal:** Resolve known technical debt and API inconsistencies before adding KB, memory, and UI on top. Cleaning now prevents these issues from calcifying across future phases.
 
@@ -489,7 +489,7 @@ GET /v1/enrichments/providers     ← lightweight list (enrichments.py)
 
 ---
 
-### Phase 6 — Knowledge Base + Agent Memory (Organizational Knowledge) `[Part 3]`
+### Phase 6 — Knowledge Base + Agent Memory (Organizational Knowledge) `[Part 3]` ✅ COMPLETE
 
 **Goal:** Ship the knowledge base system and agent persistent memory. Agents and operators can create, search, and inject knowledge into agent prompts.
 
@@ -529,7 +529,7 @@ GET /v1/enrichments/providers     ← lightweight list (enrichments.py)
 
 **Exit criteria:** Operator creates a KB page "Credential Theft Runbook", tags it with `inject_scope: { roles: ["investigation"] }`. All investigation agents automatically receive this page in their prompt. Agent creates a memory entry after scanning a codebase; on next heartbeat, the memory is injected. KB page synced from GitHub wiki updates automatically every 6 hours.
 
-### Phase 6.5 — Full Operator UI (Visibility) `[Part 5]`
+### Phase 6.5 — Full Operator UI (Visibility) `[Part 5]` 🟡 IN PROGRESS (most pages shipped; ongoing UX polish + a backlog of UI/API contract items captured in Wave 5 chunk S16)
 
 > [!important] UI Working Session Required Before Implementation
 > Every page below requires a dedicated design working session to spec layout, components, interactions, data requirements, error/empty/loading states, and real-time update strategy. The UI must be enterprise-grade — SOC operators use this in high-pressure situations. See the "Page Detail Specs" note in the Operator UI architecture section.
@@ -575,7 +575,7 @@ GET /v1/enrichments/providers     ← lightweight list (enrichments.py)
 
 **Exit criteria:** Operator can manage the full control plane through the web UI: agents, alerts, issues, KB, routines, campaigns, secrets, topology, costs, approvals, and activity. All new features have dedicated, well-designed UI surfaces. Agent detail page includes PM view showing tasks by status.
 
-### Phase 7 — Reference Agents + Dev Tooling (Option B) `[Part 1]`
+### Phase 7 — Reference Agents + Dev Tooling (Option B) `[Part 1]` 🟡 PARTIAL (lab seeder ships 4 reference agents wired to `claude_code` adapter; bundled `calseta` skill loaded by lab seeder; the `process` adapter for hosted reference agents is still pending)
 
 **Goal:** Ship reference agent implementations and dev convenience tooling. Users fork and customize for their environment.
 

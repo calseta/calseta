@@ -1,7 +1,9 @@
 # Agent Control Plane — Overview
 
 > **Split PRD navigation:**
-> [Overview](_overview.md) | [Part 1: Core Runtime](part-1-core-runtime.md) | [Part 2: Actions & Orchestration](part-2-actions-orchestration.md) | [Part 3: Knowledge & Memory](part-3-knowledge-memory.md) | [Part 4: Operational](part-4-operational.md) | [Part 5: Platform Ops](part-5-platform-ops.md) | [API & MCP](appendix-api-mcp.md) | [Implementation Phases](implementation-phases.md)
+> [Overview](_overview.md) | [Part 1: Core Runtime](part-1-core-runtime.md) | [Part 2: Actions & Orchestration](part-2-actions-orchestration.md) | [Part 3: Knowledge & Memory](part-3-knowledge-memory.md) | [Part 3a: Skills](part-3-skills.md) | [Part 4: Operational](part-4-operational.md) | [Part 5: Platform Ops](part-5-platform-ops.md) | [API & MCP](appendix-api-mcp.md) | [Implementation Phases](implementation-phases.md)
+>
+> **Companion follow-up plan:** [Agent Runtime Hardening (Wave 5)](../2026-04-15-agent-runtime-hardening.md) — operational maturity items + security hardening discovered during the Phase 6/6.5/7 manual test pass. Read the Wave 5 status table and discovery log for the most recent surface-area work; the chunks there are sequenced for a fresh LLM session.
 
 ---
 
