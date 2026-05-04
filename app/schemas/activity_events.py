@@ -58,6 +58,10 @@ class ActivityEventType(StrEnum):
     INVOCATION_FAILED = "invocation.failed"
     INVOCATION_TIMED_OUT = "invocation.timed_out"
 
+    # Tool dispatcher events (Wave 5 / S2)
+    TOOL_SCOPE_VIOLATION = "tool.scope_violation"
+    TOOL_INPUT_REJECTED = "tool.input_rejected"
+
 
 class ActivityEventResponse(BaseModel):
     """Activity event as returned by GET /v1/alerts/{uuid}/activity."""
