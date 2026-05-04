@@ -49,6 +49,68 @@ _DEFAULT_MAX_TOKENS = 8096
 MAX_CLAUDE_STDOUT_BYTES = 50 * 1024 * 1024  # 50 MiB
 
 
+class ClaudeCodeError(RuntimeError):
+    """Structured error raised by ClaudeCodeAdapter on subprocess failures.
+
+    Carries an ``error_code`` (matching ``RunErrorCode``) and the most useful
+    diagnostic context — the most recent assistant text block from the NDJSON
+    stream (if any) and a tail of stderr. Callers (e.g. the runtime engine)
+    use ``error_code`` to populate ``HeartbeatRun.error_code`` and the
+    short message (str(exc)) to populate ``HeartbeatRun.error`` — without
+    dumping the raw CLI output into the user-visible error field.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str,
+        last_assistant: str | None = None,
+        stderr_tail: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.error_code = error_code
+        self.last_assistant = last_assistant
+        self.stderr_tail = stderr_tail
+
+
+# --- Error pattern dispatch ---------------------------------------------------
+#
+# Order matters: more specific patterns first. All checks operate on the
+# concatenation of the most recent assistant text block + stderr tail so that
+# we catch errors regardless of where the CLI surfaces them.
+
+# Quota: case-sensitive substring "Credit balance is too low" OR case-
+# insensitive "credit balance".
+_QUOTA_PATTERNS_CI: tuple[str, ...] = ("credit balance",)
+_RATE_LIMIT_PATTERNS_CI: tuple[str, ...] = ("rate limit", "too many requests")
+_AUTH_PATTERNS_CI: tuple[str, ...] = (
+    "authentication",
+    "not logged in",
+    "invalid api key",
+)
+_CLI_MISSING_PATTERNS_CI: tuple[str, ...] = ("command not found",)
+
+
+def _classify_failure(text: str) -> tuple[str, str]:
+    """Classify a failure-text blob into (error_code, short_human_message).
+
+    The blob is the concatenation of the last assistant text block (if any)
+    and a stderr tail. Matching is case-insensitive for all patterns.
+    """
+    haystack = text.lower()
+
+    if any(p in haystack for p in _QUOTA_PATTERNS_CI):
+        return ("llm_quota_exceeded", "LLM quota exceeded — credit balance is too low.")
+    if any(p in haystack for p in _RATE_LIMIT_PATTERNS_CI):
+        return ("llm_rate_limited", "LLM provider rate-limited the request.")
+    if any(p in haystack for p in _AUTH_PATTERNS_CI):
+        return ("llm_auth_failed", "LLM authentication failed.")
+    if any(p in haystack for p in _CLI_MISSING_PATTERNS_CI):
+        return ("llm_cli_missing", "Claude Code CLI not found on PATH.")
+    return ("llm_provider_error", "Claude Code CLI returned a non-zero exit code.")
+
+
 class ClaudeCodeAdapter(LLMProviderAdapter):
     """
     LLM adapter that drives the Claude Code CLI as a subprocess.
@@ -159,8 +221,10 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
                 env=subprocess_env,
             )
         except FileNotFoundError as exc:
-            raise RuntimeError(
-                f"Claude Code CLI not found. Ensure 'claude' is installed and on PATH. ({exc})"
+            raise ClaudeCodeError(
+                "Claude Code CLI not found. Ensure 'claude' is installed and on PATH.",
+                error_code="llm_cli_missing",
+                stderr_tail=str(exc),
             ) from exc
 
         # Write stdin and close to signal end of input
@@ -209,17 +273,77 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
         stderr_bytes = await proc.stderr.read()
         await proc.wait()
 
-        if on_log is not None and stderr_bytes:
+        # Only forward stderr when the process actually failed — when
+        # returncode == 0, sandbox-disabled noise and other harmless
+        # warnings should not pollute the run log.
+        if (
+            on_log is not None
+            and stderr_bytes
+            and proc.returncode != 0
+        ):
             await on_log("stderr", stderr_bytes.decode("utf-8", errors="replace"))
 
         if proc.returncode != 0:
             stderr_text = stderr_bytes.decode("utf-8", errors="replace")
-            raise RuntimeError(
-                f"claude CLI exited with code {proc.returncode}: {stderr_text[:500]}"
+            stderr_tail = stderr_text[-500:] if stderr_text else None
+
+            # Parse already-collected NDJSON to recover the most recent
+            # assistant text block — error details from the upstream API
+            # (e.g. "Credit balance is too low") arrive there, not on stderr.
+            raw_output = "\n".join(stdout_lines)
+            last_assistant = self._extract_last_assistant_text(raw_output)
+
+            blob = " ".join(filter(None, [last_assistant or "", stderr_text or ""]))
+            error_code, human_msg = _classify_failure(blob)
+
+            message = f"claude CLI exited with code {proc.returncode}: {human_msg}"
+            logger.warning(
+                "claude_code_subprocess_failed",
+                returncode=proc.returncode,
+                error_code=error_code,
+                last_assistant=(last_assistant or "")[:200],
+                stderr_tail=(stderr_tail or "")[:200],
+            )
+            raise ClaudeCodeError(
+                message,
+                error_code=error_code,
+                last_assistant=last_assistant,
+                stderr_tail=stderr_tail,
             )
 
         raw_output = "\n".join(stdout_lines)
         return self._parse_output(raw_output)
+
+    @staticmethod
+    def _extract_last_assistant_text(raw_output: str) -> str | None:
+        """Return the most recent assistant text content from NDJSON, or None.
+
+        Concatenates all text blocks within the most recent ``assistant``
+        event. Tool-use blocks are skipped. Returns None when no assistant
+        event is present (e.g. failure happened before the model produced
+        any output).
+        """
+        last_text: str | None = None
+        for line in raw_output.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("type") != "assistant":
+                continue
+            message = event.get("message", {})
+            text_parts: list[str] = []
+            for block in message.get("content", []):
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text = block.get("text", "")
+                    if text:
+                        text_parts.append(text)
+            if text_parts:
+                last_text = " ".join(text_parts)
+        return last_text
 
     @staticmethod
     def _classify_line(line: str) -> tuple[str, str]:

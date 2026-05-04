@@ -219,14 +219,15 @@ async def run_managed_agent_task(
         result = await engine.run(agent=agent, context=context)
         if run is not None:
             run_status = "succeeded" if result.success else "failed"
-            await hr_repo.update_status(
-                run,
-                run_status,
+            update_kwargs: dict[str, object] = dict(
                 finished_at=datetime.now(UTC),
                 error=result.error,
                 alerts_processed=1 if result.success else 0,
                 actions_proposed=len(result.actions_proposed),
             )
+            if result.error_code is not None:
+                update_kwargs["error_code"] = result.error_code
+            await hr_repo.update_status(run, run_status, **update_kwargs)
 
         log.info(
             "run_managed_agent_task.completed",

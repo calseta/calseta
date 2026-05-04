@@ -29,3 +29,9 @@ class RunErrorCode(StrEnum):
     BUDGET_EXCEEDED = "budget_exceeded"
     ADAPTER_FAILED = "adapter_failed"
     CANCELLED = "cancelled"
+    # LLM provider / CLI failure codes (S12)
+    LLM_QUOTA_EXCEEDED = "llm_quota_exceeded"
+    LLM_RATE_LIMITED = "llm_rate_limited"
+    LLM_AUTH_FAILED = "llm_auth_failed"
+    LLM_PROVIDER_ERROR = "llm_provider_error"
+    LLM_CLI_MISSING = "llm_cli_missing"
