@@ -43,6 +43,9 @@ router = APIRouter(prefix="/llm-integrations", tags=["llm-integrations"])
 
 _Read = Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_READ))]
 _Write = Annotated[AuthContext, Depends(require_scope(Scope.AGENTS_WRITE))]
+# Provider listing leaks the deployment-level set of installed external
+# adapters, which is operator-sensitive (S10). Lock to admin only.
+_Admin = Annotated[AuthContext, Depends(require_scope(Scope.ADMIN))]
 
 
 # ---------------------------------------------------------------------------
@@ -99,9 +102,14 @@ async def create_llm_integration(
 @limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def list_llm_providers(
     request: Request,
-    auth: _Read,
+    auth: _Admin,
 ) -> DataResponse[list[dict]]:
-    """List all available LLM providers (built-in + external)."""
+    """List all available LLM providers (built-in + external).
+
+    Requires ``admin`` scope: the response enumerates installed external
+    adapters, which is operator-sensitive deployment topology. See
+    ``docs/security/external-adapters.md`` for the threat model.
+    """
     from app.integrations.llm.adapter_registry import (
         list_external_providers,
     )

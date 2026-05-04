@@ -66,6 +66,13 @@ async def _on_startup() -> None:
     """Run all startup tasks. Failures are logged but never crash the server."""
     from app.db.session import AsyncSessionLocal
     from app.integrations.enrichment.registry import enrichment_registry
+
+    # Load external LLM adapters (graceful — failures are logged).
+    # Always invoked so entry-point discovery runs (S10 recommended path);
+    # the deprecated CALSETA_EXTERNAL_ADAPTERS env var is also honored.
+    from app.integrations.llm.adapter_registry import (
+        load_external_adapters,
+    )
     from app.seed.builtin_tools import seed_builtin_tools
     from app.seed.builtin_workflows import seed_builtin_workflows
     from app.seed.enrichment_providers import (
@@ -75,13 +82,7 @@ async def _on_startup() -> None:
     from app.seed.indicator_mappings import seed_system_mappings
     from app.services.indicator_mapping_cache import load_normalized_mappings
 
-    # Load external LLM adapters (graceful — failures are logged)
-    if settings.CALSETA_EXTERNAL_ADAPTERS:
-        from app.integrations.llm.adapter_registry import (
-            load_external_adapters,
-        )
-
-        load_external_adapters(settings.CALSETA_EXTERNAL_ADAPTERS)
+    load_external_adapters(settings.CALSETA_EXTERNAL_ADAPTERS or "")
 
     try:
         async with AsyncSessionLocal() as db:

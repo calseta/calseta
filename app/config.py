@@ -286,6 +286,10 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # External LLM Adapters
     # ------------------------------------------------------------------
+    # DEPRECATED (S10): prefer packaging adapters and registering them via
+    # the ``calseta.llm_adapters`` entry-point group. This env var is kept
+    # for back-compat and emits a per-entry deprecation warning at load.
+    # See docs/security/external-adapters.md for the threat model.
     CALSETA_EXTERNAL_ADAPTERS: str = ""  # "module:Class,module:Class"
 
     # ------------------------------------------------------------------
