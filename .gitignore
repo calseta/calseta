@@ -3,6 +3,11 @@
 .env.local
 .env.*.local
 
+# Session and runtime cruft
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+tmp/
+
 # Python
 __pycache__/
 *.py[cod]
