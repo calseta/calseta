@@ -198,6 +198,7 @@ class AgentRuntimeEngine:
                 context=context,
                 integration=integration,
                 on_log=_on_log,
+                skills_tmpdir=skills_tmpdir,
             )
 
             # --- Step 7b: Finalize run log ---
@@ -295,6 +296,7 @@ class AgentRuntimeEngine:
         context: RuntimeContext,
         integration: Any,
         on_log: Any = None,
+        skills_tmpdir: str | None = None,
     ) -> tuple[list[dict], RuntimeResult]:
         """The core LLM → tool → LLM loop.
 
@@ -342,6 +344,11 @@ class AgentRuntimeEngine:
                 LLMMessage(role=m["role"], content=m["content"])
                 for m in messages
             ]
+            adapter_kwargs: dict[str, Any] = {}
+            if skills_tmpdir is not None:
+                # Subprocess adapters (claude_code) need explicit read access to
+                # the ephemeral skills tmpdir; API adapters ignore this kwarg.
+                adapter_kwargs["add_dirs"] = [skills_tmpdir]
             try:
                 response = await adapter.create_message(
                     messages=llm_messages,
@@ -349,6 +356,7 @@ class AgentRuntimeEngine:
                     system=system,
                     max_tokens=agent.max_tokens,
                     on_log=on_log,
+                    **adapter_kwargs,
                 )
             except Exception as exc:
                 error_msg = f"LLM API call failed on iteration {iteration}: {exc}"

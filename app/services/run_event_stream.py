@@ -19,6 +19,12 @@ logger = structlog.get_logger(__name__)
 
 CHANNEL = "calseta_run_events"
 
+# Postgres caps NOTIFY payloads at 8000 bytes. We leave headroom for the
+# "{run_id}:{seq}:" prefix and any UTF-8 expansion; events whose serialized
+# form exceeds this cap are sent as a compact stub and clients backfill via
+# GET /v1/runs/{uuid}/events?after_seq=...
+_MAX_NOTIFY_PAYLOAD_BYTES = 6000
+
 
 async def listen_for_run_events(
     database_url: str,
@@ -97,18 +103,44 @@ async def notify_run_event(
 ) -> None:
     """Emit a NOTIFY on the run events channel.
 
-    Called by the engine after writing each event to the DB.
-    """
-    payload = f"{run_id}:{seq}:{json.dumps(event_data, default=str)}"
-    try:
-        from sqlalchemy import text
+    Called by the engine after writing each event to the DB. Two safeguards:
 
+    1.  Payload cap. Postgres rejects NOTIFY payloads ≥ 8000 bytes. Large LLM
+        responses easily exceed that, so we replace oversized payloads with a
+        compact stub ({event_type, stream, _truncated: true}). SSE clients can
+        backfill the full event via GET /v1/runs/{uuid}/events?after_seq=...
+    2.  Savepoint isolation. The pg_notify call shares the engine's session;
+        without a SAVEPOINT, any failure here aborts the outer transaction
+        and poisons the just-written agent_run_events INSERT plus every
+        subsequent ORM access on this session. We wrap pg_notify in
+        ``begin_nested()`` so a NOTIFY failure rolls back only the savepoint.
+    """
+    encoded_event = json.dumps(event_data, default=str)
+    full_payload = f"{run_id}:{seq}:{encoded_event}"
+
+    if len(full_payload.encode("utf-8")) > _MAX_NOTIFY_PAYLOAD_BYTES:
+        stub = {
+            "event_type": event_data.get("event_type"),
+            "stream": event_data.get("stream"),
+            "_truncated": True,
+            "content_bytes": len(encoded_event),
+        }
+        full_payload = f"{run_id}:{seq}:{json.dumps(stub)}"
+
+    from sqlalchemy import text
+
+    savepoint = await db_session.begin_nested()
+    try:
         await db_session.execute(
-            text(
-                f"SELECT pg_notify('{CHANNEL}', :payload)"
-            ),
-            {"payload": payload},
+            text(f"SELECT pg_notify('{CHANNEL}', :payload)"),
+            {"payload": full_payload},
         )
+        await savepoint.commit()
     except Exception as exc:
-        # NOTIFY failure is non-fatal — SSE clients still work via polling
-        logger.debug("notify_run_event_failed", error=str(exc))
+        # NOTIFY failure is non-fatal — SSE clients still work via polling.
+        # Rolling back the savepoint leaves the outer transaction healthy.
+        try:
+            await savepoint.rollback()
+        except Exception:
+            pass
+        logger.debug("notify_run_event_failed", error=str(exc), seq=seq)

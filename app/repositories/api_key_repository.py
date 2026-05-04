@@ -22,12 +22,17 @@ _UNSET = object()  # sentinel for "field not provided"
 class APIKeyRepository(BaseRepository[APIKey]):
     model = APIKey
 
-    async def get_by_prefix(self, key_prefix: str) -> APIKey | None:
-        """Return the APIKey row whose key_prefix matches, or None."""
+    async def list_by_prefix(self, key_prefix: str) -> list[APIKey]:
+        """Return all active APIKey rows whose key_prefix matches.
+
+        key_prefix is NOT unique (e.g. all lab demo keys begin with ``cai_lab_``);
+        bcrypt against ``key_hash`` is the authoritative check. Callers must
+        iterate and verify each candidate.
+        """
         result = await self._db.execute(
             select(APIKey).where(APIKey.key_prefix == key_prefix, APIKey.is_active.is_(True))
         )
-        return result.scalar_one_or_none()
+        return list(result.scalars().all())
 
     async def create(
         self,

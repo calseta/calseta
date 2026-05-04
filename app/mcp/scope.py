@@ -65,14 +65,22 @@ async def check_scope(
         return json.dumps({"error": "Authentication required."})
 
     repo = APIKeyRepository(session)
-    record = await repo.get_by_prefix(client_id)
-    if record is None:
+    # client_id is the (non-unique) key prefix. The token was already bcrypt-
+    # validated by CalsetaTokenVerifier; here we just resolve scopes. Allow if
+    # ANY candidate sharing the prefix has the required scope. This matches
+    # pre-fix behavior but does not crash on prefix collisions. The broader
+    # "scope check should be tied to the authenticated key, not the prefix"
+    # issue is tracked separately — see Wave 5 backlog.
+    candidates = await repo.list_by_prefix(client_id)
+    if not candidates:
         return json.dumps({"error": "Invalid API key."})
 
-    scopes = set(record.scopes)
-    if "admin" in scopes:
+    aggregate_scopes: set[str] = set()
+    for record in candidates:
+        aggregate_scopes.update(record.scopes)
+    if "admin" in aggregate_scopes:
         return None
-    if any(s in scopes for s in required_scopes):
+    if any(s in aggregate_scopes for s in required_scopes):
         return None
 
     required = " or ".join(required_scopes)

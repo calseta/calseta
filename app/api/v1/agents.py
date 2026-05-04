@@ -801,3 +801,117 @@ async def patch_agent_budget(
 
     updated = await repo.patch(agent, **updates)
     return DataResponse(data=AgentRegistrationResponse.model_validate(updated))
+
+
+# ---------------------------------------------------------------------------
+# Agent-scoped subresource routes — added so the UI's REST-style hooks resolve
+# instead of falling through the SPA static handler. Thin proxies; no new
+# business logic.
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{agent_uuid}/heartbeat-runs",
+    response_model=PaginatedResponse[dict],
+)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def list_agent_heartbeat_runs(
+    request: Request,
+    agent_uuid: UUID,
+    auth: _Read,
+    pagination: Annotated[PaginationParams, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PaginatedResponse[dict]:
+    """List heartbeat runs for one agent, newest first."""
+    from app.repositories.heartbeat_run_repository import HeartbeatRunRepository
+    from app.schemas.heartbeat import HeartbeatRunResponse
+
+    agent = await AgentRepository(db).get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    repo = HeartbeatRunRepository(db)
+    runs, total = await repo.list_for_agent(
+        agent_id=agent.id,
+        page=pagination.page,
+        page_size=pagination.page_size,
+    )
+    return PaginatedResponse(
+        data=[HeartbeatRunResponse.model_validate(r).model_dump(mode="json") for r in runs],
+        meta=PaginationMeta.from_total(
+            total=total, page=pagination.page, page_size=pagination.page_size
+        ),
+    )
+
+
+@router.get(
+    "/{agent_uuid}/cost-events",
+    response_model=PaginatedResponse[dict],
+)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def list_agent_cost_events(
+    request: Request,
+    agent_uuid: UUID,
+    auth: _Read,
+    pagination: Annotated[PaginationParams, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PaginatedResponse[dict]:
+    """List cost events for one agent, newest first."""
+    from app.repositories.cost_event_repository import CostEventRepository
+    from app.schemas.cost_events import CostEventResponse
+
+    agent = await AgentRepository(db).get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    repo = CostEventRepository(db)
+    events, total = await repo.list_for_agent(
+        agent_id=agent.id,
+        page=pagination.page,
+        page_size=pagination.page_size,
+    )
+    return PaginatedResponse(
+        data=[CostEventResponse.model_validate(e).model_dump(mode="json") for e in events],
+        meta=PaginationMeta.from_total(
+            total=total, page=pagination.page, page_size=pagination.page_size
+        ),
+    )
+
+
+@router.get(
+    "/{agent_uuid}/cost-summary",
+    response_model=DataResponse[dict],
+)
+@limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
+async def get_agent_cost_summary(
+    request: Request,
+    agent_uuid: UUID,
+    auth: _Read,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DataResponse[dict]:
+    """Aggregate cost summary for one agent (current month by default)."""
+    from app.repositories.cost_event_repository import CostEventRepository
+
+    agent = await AgentRepository(db).get_by_uuid(agent_uuid)
+    if agent is None:
+        raise CalsetaException(
+            code="NOT_FOUND",
+            message="Agent not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    now = datetime.now(UTC)
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    repo = CostEventRepository(db)
+    summary = await repo.get_summary_for_agent(
+        agent_id=agent.id, from_dt=start, to_dt=now,
+    )
+    return DataResponse(data=summary)

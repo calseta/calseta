@@ -23,6 +23,8 @@ from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
+from app.db.models.agent_api_key import AgentAPIKey
+
 from app.api.errors import CalsetaException
 from app.auth.audit import log_auth_failure
 from app.auth.base import AuthBackendBase, AuthContext
@@ -62,17 +64,16 @@ class AgentAPIKeyAuthBackend(AuthBackendBase):
             )
 
         key_prefix = plain_key[:_KEY_PREFIX_LEN]
-        record = await self._repo.get_by_prefix(key_prefix)
+        # key_prefix is non-unique by design (lab keys all share ``cak_lab_``).
+        # Fetch every candidate that shares the prefix and bcrypt-check each.
+        # Wrong/extra candidates fail the bcrypt compare in constant time.
+        candidates = await self._repo.list_by_prefix(key_prefix)
+        record: AgentAPIKey | None = None
+        for candidate in candidates:
+            if bcrypt.checkpw(plain_key.encode(), candidate.key_hash.encode()):
+                record = candidate
+                break
         if record is None:
-            log_auth_failure("invalid_key", request, key_prefix=key_prefix)
-            raise CalsetaException(
-                code="UNAUTHORIZED",
-                message="Invalid agent API key.",
-                status_code=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        match = bcrypt.checkpw(plain_key.encode(), record.key_hash.encode())
-        if not match:
             log_auth_failure("invalid_key", request, key_prefix=key_prefix)
             raise CalsetaException(
                 code="UNAUTHORIZED",

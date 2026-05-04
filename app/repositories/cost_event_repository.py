@@ -44,6 +44,30 @@ class CostEventRepository(BaseRepository[CostEvent]):
         await self._db.refresh(event)
         return event
 
+    async def list_for_agent(
+        self,
+        agent_id: int,
+        *,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> tuple[list[CostEvent], int]:
+        """Return paginated cost events for one agent, newest first."""
+        count_stmt = select(func.count(CostEvent.id)).where(
+            CostEvent.agent_registration_id == agent_id
+        )
+        total = int((await self._db.execute(count_stmt)).scalar_one())
+
+        offset = max(0, (page - 1) * page_size)
+        stmt = (
+            select(CostEvent)
+            .where(CostEvent.agent_registration_id == agent_id)
+            .order_by(CostEvent.occurred_at.desc())
+            .offset(offset)
+            .limit(page_size)
+        )
+        rows = (await self._db.execute(stmt)).scalars().all()
+        return list(rows), total
+
     async def sum_for_agent_current_period(
         self,
         agent_id: int,

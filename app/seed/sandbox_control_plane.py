@@ -8,6 +8,7 @@ Idempotent: every sub-seeder checks before inserting.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import bcrypt
 import structlog
@@ -18,9 +19,12 @@ from app.db.models.agent_api_key import AgentAPIKey
 from app.db.models.agent_issue import AgentIssue
 from app.db.models.agent_registration import AgentRegistration
 from app.db.models.agent_routine import AgentRoutine
+from app.db.models.agent_tool import AgentTool
 from app.db.models.kb_page import KnowledgeBasePage
 from app.db.models.llm_integration import LLMIntegration
 from app.db.models.routine_trigger import RoutineTrigger
+from app.db.models.skill import Skill
+from app.db.models.skill_file import SkillFile
 
 logger = structlog.get_logger(__name__)
 
@@ -67,6 +71,10 @@ _AGENT_SCOPES = [
     "workflows:read",
     "workflows:execute",
     "agents:read",
+    # agents:write is required for orchestrator delegation
+    # (POST /v1/invocations). Lab keys default to it for convenience;
+    # production keys should be issued with the minimum scope set.
+    "agents:write",
 ]
 
 _AGENT_SPECS = [
@@ -103,9 +111,10 @@ _AGENT_SPECS = [
             "tools": [
                 "get_alert",
                 "search_alerts",
+                "get_detection_rule",
+                "get_enrichment",
                 "post_finding",
-                "propose_action",
-                "delegate_task",
+                "update_alert_status",
             ],
         },
         "trigger_on_severities": ["High", "Critical"],
@@ -128,7 +137,7 @@ _AGENT_SPECS = [
         ),
         "capabilities": {
             "indicator_types": ["ip", "domain", "hash_md5", "hash_sha256", "url"],
-            "tools": ["get_alert", "enrich_indicator", "search_alerts"],
+            "tools": ["get_alert", "search_alerts", "get_enrichment", "get_detection_rule"],
         },
         "trigger_on_severities": [],
         "max_concurrent_alerts": 5,
@@ -150,7 +159,7 @@ _AGENT_SPECS = [
         ),
         "capabilities": {
             "indicator_types": ["account", "email"],
-            "tools": ["get_alert", "enrich_indicator"],
+            "tools": ["get_alert", "search_alerts", "get_enrichment", "get_detection_rule"],
         },
         "trigger_on_severities": [],
         "max_concurrent_alerts": 5,
@@ -171,7 +180,7 @@ _AGENT_SPECS = [
             "known-benign sources, and escalating threat activity over time."
         ),
         "capabilities": {
-            "tools": ["get_alert", "search_alerts"],
+            "tools": ["get_alert", "search_alerts", "get_enrichment", "get_detection_rule"],
         },
         "trigger_on_severities": [],
         "max_concurrent_alerts": 5,
@@ -213,6 +222,24 @@ async def _seed_agent_api_key(
     logger.info("lab_agent_api_key_seeded", agent_name=agent.name, key_prefix=key_prefix)
 
 
+async def _resolve_tool_ids(
+    db: AsyncSession, requested_slugs: list[str]
+) -> list[str]:
+    """Filter requested tool slugs down to those that actually exist in agent_tools.
+
+    The agent specs name aspirational tools (e.g. ``enrich_indicator``,
+    ``delegate_task``) that may not be seeded yet. Resolve to existing IDs
+    so the runtime engine sees a valid tool list.
+    """
+    if not requested_slugs:
+        return []
+    result = await db.execute(
+        select(AgentTool.id).where(AgentTool.id.in_(requested_slugs))
+    )
+    existing = {row[0] for row in result.all()}
+    return [s for s in requested_slugs if s in existing]
+
+
 async def _seed_agents(
     db: AsyncSession, llm_integration: LLMIntegration
 ) -> dict[str, AgentRegistration]:
@@ -246,6 +273,23 @@ async def _seed_agents(
             db.add(agent)
             await db.flush()
             logger.info("lab_agent_seeded", name=agent.name)
+
+        # Resolve tool slugs declared on capabilities into agent.tool_ids so
+        # the runtime engine can actually load tools. Without this, runs go
+        # through the LLM but tool_count is 0 — the agent has no API surface.
+        # Idempotent: rewrites tool_ids on every seed, picking up any new tools.
+        capabilities = spec.get("capabilities") or {}
+        requested_tools = list(capabilities.get("tools") or []) if isinstance(capabilities, dict) else []
+        resolved = await _resolve_tool_ids(db, requested_tools)
+        if list(agent.tool_ids or []) != resolved:
+            agent.tool_ids = resolved
+            await db.flush()
+            logger.info(
+                "lab_agent_tool_ids_set",
+                name=agent.name,
+                tool_count=len(resolved),
+                requested_count=len(requested_tools),
+            )
 
         agents[str(spec["name"])] = agent
 
@@ -689,6 +733,103 @@ async def _seed_kb(db: AsyncSession) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Skills — bundled in repo at app/skills/<slug>/SKILL.md
+# ---------------------------------------------------------------------------
+
+# {slug: (display name, description)} — extend as new bundled skills land.
+_BUNDLED_SKILLS: dict[str, tuple[str, str]] = {
+    "calseta": (
+        "Calseta SOC Agent Operating Manual",
+        (
+            "Core operating manual for managed agents — environment variables, "
+            "API reference, tool usage, finding format, and operational rules. "
+            "Always injected as a global skill."
+        ),
+    ),
+}
+
+
+def _bundled_skills_root() -> Path:
+    """Return the repo path that holds bundled skill directories."""
+    # app/seed/sandbox_control_plane.py → app/skills/
+    return Path(__file__).resolve().parent.parent / "skills"
+
+
+async def _seed_bundled_skills(db: AsyncSession) -> None:
+    """Upsert each bundled skill in app/skills/<slug>/ as a global skill.
+
+    Idempotent: rewrites SKILL.md (and any other file under the directory) on
+    every seed so changes to the bundled skill take effect on lab-reset. Other
+    skill rows (operator-created, non-bundled) are not touched.
+    """
+    root = _bundled_skills_root()
+    if not root.is_dir():
+        logger.warning("lab_skills_dir_missing", path=str(root))
+        return
+
+    for slug, (name, description) in _BUNDLED_SKILLS.items():
+        skill_dir = root / slug
+        if not skill_dir.is_dir():
+            logger.warning("lab_skill_dir_missing", slug=slug, path=str(skill_dir))
+            continue
+        entry_path = skill_dir / "SKILL.md"
+        if not entry_path.is_file():
+            logger.warning("lab_skill_entry_missing", slug=slug, path=str(entry_path))
+            continue
+
+        skill = (
+            await db.execute(select(Skill).where(Skill.slug == slug))
+        ).scalar_one_or_none()
+        if skill is None:
+            skill = Skill(slug=slug, name=name, description=description, is_global=True)
+            db.add(skill)
+            await db.flush()
+            logger.info("lab_skill_created", slug=slug)
+        else:
+            # Keep metadata in sync with the bundled definition.
+            changed = False
+            if skill.name != name:
+                skill.name = name
+                changed = True
+            if skill.description != description:
+                skill.description = description
+                changed = True
+            if not skill.is_global:
+                skill.is_global = True
+                changed = True
+            if changed:
+                await db.flush()
+
+        # Walk the skill directory and upsert every file (always overwrite —
+        # the file in the repo is the source of truth for bundled skills).
+        for path in sorted(skill_dir.rglob("*")):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(skill_dir).as_posix()
+            content = path.read_text(encoding="utf-8")
+            sf = (
+                await db.execute(
+                    select(SkillFile).where(
+                        SkillFile.skill_id == skill.id, SkillFile.path == rel
+                    )
+                )
+            ).scalar_one_or_none()
+            if sf is None:
+                db.add(
+                    SkillFile(
+                        skill_id=skill.id,
+                        path=rel,
+                        content=content,
+                        is_entry=(rel == "SKILL.md"),
+                    )
+                )
+            elif sf.content != content:
+                sf.content = content
+        await db.flush()
+        logger.info("lab_skill_upserted", slug=slug)
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -696,6 +837,9 @@ async def _seed_kb(db: AsyncSession) -> None:
 async def seed_control_plane(db: AsyncSession) -> None:
     """Seed control plane lab data. Idempotent."""
     llm_integration = await _seed_llm_integration(db)
+    # Skills must seed BEFORE agents so the runtime engine sees them as
+    # injectable globals on the very first run.
+    await _seed_bundled_skills(db)
     agents = await _seed_agents(db, llm_integration)
     await _seed_issues(db)
     await _seed_routines(db, agents)

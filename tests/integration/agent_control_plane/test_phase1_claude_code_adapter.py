@@ -316,6 +316,82 @@ class TestClaudeCodeAdapterSessionResume:
         assert "--resume" not in all_args_str
 
 
+class TestClaudeCodeAdapterAddDirs:
+    """The add_dirs kwarg surfaces as --add-dir <path> in CLI invocation."""
+
+    async def test_add_dirs_appended_to_cli_args(self) -> None:
+        """A list of paths produces one --add-dir flag per entry."""
+        adapter = _make_adapter()
+
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = _MockProcess(_SIMPLE_BYTES)
+            await adapter.create_message(
+                messages=[LLMMessage(role="user", content="Use the operating manual.")],
+                tools=[],
+                add_dirs=["/tmp/skills-abc", "/tmp/extra"],
+            )
+
+        argv = list(mock_exec.call_args[0])
+        # Two --add-dir flags, each followed by its path
+        pairs = [
+            (argv[i], argv[i + 1])
+            for i in range(len(argv) - 1)
+            if argv[i] == "--add-dir"
+        ]
+        assert ("--add-dir", "/tmp/skills-abc") in pairs
+        assert ("--add-dir", "/tmp/extra") in pairs
+
+    async def test_add_dirs_absent_when_not_provided(self) -> None:
+        """No add_dirs kwarg → no --add-dir flag in argv."""
+        adapter = _make_adapter()
+
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = _MockProcess(_SIMPLE_BYTES)
+            await adapter.create_message(
+                messages=[LLMMessage(role="user", content="No skills dir.")],
+                tools=[],
+            )
+
+        argv = list(mock_exec.call_args[0])
+        assert "--add-dir" not in argv
+
+    async def test_add_dirs_accepts_single_string(self) -> None:
+        """A bare string is treated as a single-entry list."""
+        adapter = _make_adapter()
+
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = _MockProcess(_SIMPLE_BYTES)
+            await adapter.create_message(
+                messages=[LLMMessage(role="user", content="One dir.")],
+                tools=[],
+                add_dirs="/tmp/just-one",
+            )
+
+        argv = list(mock_exec.call_args[0])
+        idx = argv.index("--add-dir")
+        assert argv[idx + 1] == "/tmp/just-one"
+
+    async def test_add_dirs_skips_empty_entries(self) -> None:
+        """Empty/None entries in the list are filtered out."""
+        adapter = _make_adapter()
+
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = _MockProcess(_SIMPLE_BYTES)
+            await adapter.create_message(
+                messages=[LLMMessage(role="user", content="Skip empties.")],
+                tools=[],
+                add_dirs=["", "/tmp/keep"],
+            )
+
+        argv = list(mock_exec.call_args[0])
+        pairs = [
+            (argv[i], argv[i + 1])
+            for i in range(len(argv) - 1)
+            if argv[i] == "--add-dir"
+        ]
+        assert pairs == [("--add-dir", "/tmp/keep")]
+
+
 # ---------------------------------------------------------------------------
 # Tests: Error handling
 # ---------------------------------------------------------------------------

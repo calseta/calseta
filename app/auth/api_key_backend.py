@@ -61,17 +61,15 @@ class APIKeyAuthBackend(AuthBackendBase):
             )
 
         key_prefix = plain_key[:_KEY_PREFIX_LEN]
-        record = await self._repo.get_by_prefix(key_prefix)
+        # key_prefix is non-unique by design — fetch every candidate that
+        # shares the prefix and bcrypt-check each.
+        candidates = await self._repo.list_by_prefix(key_prefix)
+        record = None
+        for candidate in candidates:
+            if bcrypt.checkpw(plain_key.encode(), candidate.key_hash.encode()):
+                record = candidate
+                break
         if record is None:
-            log_auth_failure("invalid_key", request, key_prefix=key_prefix)
-            raise CalsetaException(
-                code="UNAUTHORIZED",
-                message="Invalid API key.",
-                status_code=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        match = bcrypt.checkpw(plain_key.encode(), record.key_hash.encode())
-        if not match:
             log_auth_failure("invalid_key", request, key_prefix=key_prefix)
             raise CalsetaException(
                 code="UNAUTHORIZED",

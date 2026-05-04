@@ -60,13 +60,15 @@ class CalsetaTokenVerifier(TokenVerifier):
     ) -> AccessToken | None:
         """Run the full verification pipeline within a DB session."""
         repo = APIKeyRepository(session)
-        record = await repo.get_by_prefix(key_prefix)
+        # key_prefix is non-unique — bcrypt-check every candidate.
+        candidates = await repo.list_by_prefix(key_prefix)
+        record = None
+        for candidate in candidates:
+            if bcrypt.checkpw(token.encode(), candidate.key_hash.encode()):
+                record = candidate
+                break
 
         if record is None:
-            logger.warning("mcp_auth_failure", reason="invalid_key", key_prefix=key_prefix)
-            return None
-
-        if not bcrypt.checkpw(token.encode(), record.key_hash.encode()):
             logger.warning("mcp_auth_failure", reason="invalid_key", key_prefix=key_prefix)
             return None
 

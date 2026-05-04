@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -58,7 +59,11 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
         self._integration = integration
         self._model = integration.model
 
-    def _build_cli_args(self, session_id: str | None = None) -> list[str]:
+    def _build_cli_args(
+        self,
+        session_id: str | None = None,
+        add_dirs: list[str] | None = None,
+    ) -> list[str]:
         args = [
             _CLAUDE_CLI,
             "--print", "-",
@@ -66,6 +71,14 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
             "--verbose",
             "--model", self._model,
         ]
+        # --add-dir grants the CLI read access to additional directories beyond
+        # cwd. The engine writes assigned + global skills (e.g. the bundled
+        # `calseta` operating manual) into an ephemeral tmpdir per run; without
+        # this flag, claude can't `Read` those files and runs without the
+        # operating manual.
+        for d in add_dirs or []:
+            if d:
+                args.extend(["--add-dir", d])
         if session_id:
             args.extend(["--resume", session_id])
         return args
@@ -105,8 +118,30 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
         **kwargs: Any,
     ) -> LLMResponse:
         session_id: str | None = kwargs.get("session_id")
-        cli_args = self._build_cli_args(session_id=session_id)
+        add_dirs_raw = kwargs.get("add_dirs")
+        add_dirs: list[str] | None
+        if isinstance(add_dirs_raw, str):
+            add_dirs = [add_dirs_raw]
+        elif isinstance(add_dirs_raw, (list, tuple)):
+            add_dirs = [str(d) for d in add_dirs_raw if d]
+        else:
+            add_dirs = None
+        cli_args = self._build_cli_args(session_id=session_id, add_dirs=add_dirs)
         stdin_payload = self._serialize_prompt(messages, tools, system)
+
+        # The claude_code provider uses subscription billing (the user's
+        # Claude.ai login). If ANTHROPIC_API_KEY is set in the host env, the
+        # CLI prefers it and bills against an Anthropic API account instead —
+        # silently switching the active provider. Strip the key (and related
+        # auth env vars) so subscription billing is honored.
+        subprocess_env = dict(env) if env is not None else dict(os.environ)
+        for var in (
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_BASE_URL",
+            "CLAUDE_API_KEY",
+        ):
+            subprocess_env.pop(var, None)
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -114,7 +149,7 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=env,
+                env=subprocess_env,
             )
         except FileNotFoundError as exc:
             raise RuntimeError(
@@ -255,11 +290,22 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
 
     async def test_environment(self) -> EnvironmentTestResult:
         """Run ``claude auth status`` to verify the CLI is installed and authenticated."""
+        # Same env-scrubbing as create_message — auth status reflects which
+        # provider the CLI will actually use, so it must not see the API key.
+        scrub_env = dict(os.environ)
+        for var in (
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_BASE_URL",
+            "CLAUDE_API_KEY",
+        ):
+            scrub_env.pop(var, None)
         try:
             proc = await asyncio.create_subprocess_exec(
                 _CLAUDE_CLI, "auth", "status",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=scrub_env,
             )
             stdout_bytes, _ = await proc.communicate()
         except FileNotFoundError:

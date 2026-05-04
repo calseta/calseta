@@ -652,19 +652,49 @@ async def list_findings(
         )
 
     raw_findings = alert.agent_findings or []
-    findings = sorted(raw_findings, key=lambda f: f.get("posted_at", ""))
-    result = [
-        FindingResponse(
-            id=f["id"],
-            agent_name=f["agent_name"],
-            summary=f["summary"],
-            confidence=FindingConfidence(f["confidence"]) if f.get("confidence") else None,
-            recommended_action=f.get("recommended_action"),
+    # Two writers produce into agent_findings JSONB with different shapes:
+    #   - POST /v1/alerts/{uuid}/findings (legacy/external):
+    #       agent_name, summary, posted_at, confidence (low|medium|high), ...
+    #   - tools/dispatcher.py:_handle_post_finding (agent tool calls):
+    #       agent_id, reasoning, recorded_at, classification, confidence (str)
+    # Until S16 canonicalizes at write time, normalize defensively at read.
+    def _normalize(idx: int, f: dict[str, Any]) -> FindingResponse | None:
+        agent_name = f.get("agent_name")
+        if not agent_name and f.get("agent_id") is not None:
+            agent_name = f"Agent #{f.get('agent_id')}"
+        summary = f.get("summary") or f.get("reasoning") or ""
+        posted_at_raw = f.get("posted_at") or f.get("recorded_at")
+        if not agent_name or not summary or not posted_at_raw:
+            return None  # malformed — skip rather than 500
+        try:
+            posted_at = datetime.fromisoformat(posted_at_raw)
+        except (TypeError, ValueError):
+            return None
+        confidence_raw = f.get("confidence")
+        confidence: FindingConfidence | None = None
+        if isinstance(confidence_raw, str):
+            try:
+                # legacy values are "low"/"medium"/"high"
+                confidence = FindingConfidence(confidence_raw.lower())
+            except ValueError:
+                # tool-shape uses numeric strings like "0.97" — drop into
+                # evidence rather than rejecting; UI falls back to display
+                confidence = None
+        return FindingResponse(
+            id=str(f.get("id") or f"finding-{idx}"),
+            agent_name=agent_name,
+            summary=summary,
+            confidence=confidence,
+            recommended_action=f.get("recommended_action") or f.get("classification"),
             evidence=f.get("evidence"),
-            posted_at=datetime.fromisoformat(f["posted_at"]),
+            posted_at=posted_at,
         )
-        for f in findings
-    ]
+
+    findings = sorted(
+        raw_findings,
+        key=lambda f: f.get("posted_at") or f.get("recorded_at") or "",
+    )
+    result = [r for r in (_normalize(i, f) for i, f in enumerate(findings)) if r is not None]
     return DataResponse(data=result)
 
 
