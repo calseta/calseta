@@ -116,14 +116,21 @@ class TestBuildWakeContext:
 
         assert "<comments>" not in result
 
-    def test_xml_escapes_special_characters_in_content(self) -> None:
-        """Special XML chars in comment content are escaped."""
+    def test_comment_content_wrapped_in_cdata(self) -> None:
+        """S7: Comment content is wrapped in CDATA so injected tags can't escape.
+
+        Previously this test asserted XML-entity escaping; under S7 we use CDATA
+        as the safer-and-simpler approach. The model still cannot break out of
+        the surrounding ``<comment>`` tag because everything between
+        ``<![CDATA[`` and ``]]>`` is opaque text.
+        """
         builder = _make_builder()
+        raw_content = 'Alert title has <script> & "quotes"'
         ctx = _make_context(
             wake_reason="comment",
             wake_comments=[
                 {
-                    "content": 'Alert title has <script> & "quotes"',
+                    "content": raw_content,
                     "author": "test",
                     "timestamp": "2026-04-15T12:00:00",
                 },
@@ -132,10 +139,13 @@ class TestBuildWakeContext:
 
         result = builder._build_wake_context(ctx)
 
-        # Content should be XML-escaped
-        assert "&lt;script&gt;" in result
-        assert "&amp;" in result
-        assert "&quot;quotes&quot;" in result
+        # Body is CDATA-wrapped — raw content survives byte-for-byte inside.
+        assert f"<![CDATA[{raw_content}]]>" in result
+        # And critically: there is no freestanding (raw) <script> tag — it's
+        # safely inside the CDATA section, which is opaque to the model.
+        assert result.count("<script>") == 1  # only the one inside CDATA
+        assert "<comment author=" in result
+        assert "</comment>" in result
 
     def test_xml_escapes_special_characters_in_author(self) -> None:
         """Special XML chars in author name are escaped."""
