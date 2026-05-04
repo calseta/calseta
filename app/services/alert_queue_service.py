@@ -346,6 +346,9 @@ class AlertQueueService:
             "costs_mtd": {
                 "total_cents": total_cost_cents_mtd,
                 "total_usd": round(total_cost_cents_mtd / 100, 2),
-                "period_start": month_start.isoformat(),
+                # Pass the raw datetime — the response Pydantic model handles
+                # serialization to ISO 8601. Returning a hand-built string here
+                # let drift creep in and bypassed timezone handling.
+                "period_start": month_start,
             },
         }

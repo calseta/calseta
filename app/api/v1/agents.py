@@ -396,7 +396,7 @@ async def get_agent_file(
 
     with open(abs_path) as f:
         content = f.read()
-    return DataResponse(data={"path": file_path, "content": content})
+    return DataResponse(data={"name": file_path, "content": content})
 
 
 @router.put("/{uuid}/files/{file_path:path}")
@@ -419,7 +419,7 @@ async def save_agent_file(
     content = body.get("content", "")
     with open(abs_path, "w") as f:
         f.write(content)
-    return DataResponse(data={"path": file_path, "content": content})
+    return DataResponse(data={"name": file_path, "content": content})
 
 
 # ---------------------------------------------------------------------------

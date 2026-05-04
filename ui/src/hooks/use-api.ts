@@ -1472,16 +1472,6 @@ export function useTools(params?: Record<string, string | number | boolean | und
   });
 }
 
-// Agent activity (404 if endpoint not yet deployed)
-export function useAgentActivity(agentUuid: string) {
-  return useQuery({
-    queryKey: ["agent-activity", agentUuid],
-    queryFn: () => api.get<PaginatedResponse<ActivityEvent>>(`/agents/${agentUuid}/activity?page_size=10`),
-    enabled: !!agentUuid,
-    retry: false,
-  });
-}
-
 // Agent instruction files
 export function useAgentFiles(agentUuid: string) {
   return useQuery({
@@ -1638,7 +1628,7 @@ export function useDeleteSkill() {
 export function useAgentSkills(agentUuid: string | undefined) {
   return useQuery({
     queryKey: ["agent-skills", agentUuid],
-    queryFn: () => api.get<DataResponse<Skill[]>>(`/agents/${agentUuid}/skills`),
+    queryFn: () => api.get<PaginatedResponse<Skill>>(`/agents/${agentUuid}/skills`),
     enabled: !!agentUuid,
     retry: false,
   });
@@ -1648,7 +1638,7 @@ export function useSyncAgentSkills() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ agentUuid, skillUuids }: { agentUuid: string; skillUuids: string[] }) =>
-      api.post<DataResponse<Skill[]>>(`/agents/${agentUuid}/skills/sync`, { skill_uuids: skillUuids }),
+      api.post<PaginatedResponse<Skill>>(`/agents/${agentUuid}/skills/sync`, { skill_uuids: skillUuids }),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["agent-skills", vars.agentUuid] });
     },
