@@ -33,6 +33,7 @@ import {
 } from "@/components/detail-page";
 import { CopyableText } from "@/components/copyable-text";
 import {
+  useAgents,
   useAlert,
   useAlertActivity,
   useAlertKBContext,
@@ -127,6 +128,10 @@ export function AlertDetailPage() {
   const { data: activityResp, refetch: refetchActivity } = useAlertActivity(uuid);
   const { data: contextResp, refetch: refetchContext } = useAlertKBContext(uuid);
   const { data: rawPayloadResp } = useAlertRawPayload(uuid, activeTab === "raw");
+  // Used to resolve agent_findings[].agent_id (int) → agent uuid + name for the
+  // findings-card link. Cached at the query layer, so no per-finding fetch.
+  const { data: agentsResp } = useAgents();
+  const agents = agentsResp?.data ?? [];
   const patchAlert = usePatchAlert();
   const enrichAlert = useEnrichAlert();
   const postAlertNote = usePostAlertNote(uuid);
@@ -654,44 +659,98 @@ export function AlertDetailPage() {
             <TabsContent value="findings" className="mt-4">
               {alert.agent_findings && alert.agent_findings.length > 0 ? (
                 <div className="space-y-3">
-                  {alert.agent_findings.map((f) => (
-                    <Card key={f.id} className="card-finding">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <Link
-                              to="/agents"
-                              className="text-xs font-medium text-teal-light hover:underline"
-                            >
-                              {f.agent_name}
-                            </Link>
-                            {f.confidence && (
-                              <Badge
-                                variant="outline"
-                                className="ml-2 text-[10px] border-border"
+                  {alert.agent_findings.map((f, i) => {
+                    // Normalize field names: dispatcher writes `agent_id`,
+                    // `recorded_at`, `reasoning`, `classification`; older code
+                    // expected `agent_name`, `posted_at`, `summary`,
+                    // `recommended_action`. Read both shapes.
+                    const finding = f as Record<string, unknown>;
+                    const reasoning =
+                      (finding.summary as string | undefined) ??
+                      (finding.reasoning as string | undefined) ??
+                      "";
+                    const recordedAt =
+                      (finding.posted_at as string | undefined) ??
+                      (finding.recorded_at as string | undefined);
+                    const agentIdNum =
+                      typeof finding.agent_id === "number"
+                        ? (finding.agent_id as number)
+                        : null;
+                    const matchedAgent = agentIdNum != null
+                      ? (agents as { id: number; uuid: string; name: string }[])
+                          .find((a) => a.id === agentIdNum)
+                      : undefined;
+                    const agentLabel =
+                      (finding.agent_name as string | undefined) ??
+                      matchedAgent?.name ??
+                      (agentIdNum != null
+                        ? `Agent #${agentIdNum}`
+                        : "Agent");
+                    const agentLinkTo = matchedAgent
+                      ? `/agents/${matchedAgent.uuid}`
+                      : "/agents";
+                    const classification = finding.classification as
+                      | string
+                      | undefined;
+                    const confidence = finding.confidence as
+                      | string
+                      | number
+                      | undefined;
+                    const recommendedAction = finding.recommended_action as
+                      | string
+                      | undefined;
+                    const findingKey =
+                      (finding.id as string | number | undefined) ??
+                      `${recordedAt ?? "f"}-${i}`;
+                    return (
+                      <Card key={findingKey} className="card-finding">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Link
+                                to={agentLinkTo}
+                                className="text-xs font-medium text-teal-light hover:underline"
                               >
-                                {f.confidence} confidence
-                              </Badge>
+                                {agentLabel}
+                              </Link>
+                              {classification && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] border-border"
+                                >
+                                  {classification}
+                                </Badge>
+                              )}
+                              {confidence != null && confidence !== "" && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] border-border"
+                                >
+                                  {confidence} confidence
+                                </Badge>
+                              )}
+                            </div>
+                            {recordedAt && (
+                              <span className="text-[11px] text-dim">
+                                {formatDate(recordedAt)}
+                              </span>
                             )}
                           </div>
-                          <span className="text-[11px] text-dim">
-                            {formatDate(f.posted_at)}
-                          </span>
-                        </div>
-                        <div className="mt-2 text-foreground">
-                          <MarkdownPreview content={f.summary} />
-                        </div>
-                        {f.recommended_action && (
-                          <div className="mt-2 flex items-start gap-2 rounded bg-teal/5 p-2">
-                            <CheckCircle className="h-3.5 w-3.5 mt-0.5 text-teal" />
-                            <p className="text-xs text-foreground">
-                              {f.recommended_action}
-                            </p>
+                          <div className="mt-2 text-foreground">
+                            <MarkdownPreview content={reasoning} />
                           </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
+                          {recommendedAction && (
+                            <div className="mt-2 flex items-start gap-2 rounded bg-teal/5 p-2">
+                              <CheckCircle className="h-3.5 w-3.5 mt-0.5 text-teal" />
+                              <p className="text-xs text-foreground">
+                                {recommendedAction}
+                              </p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               ) : (
                 <Empty text="No agent findings yet" />

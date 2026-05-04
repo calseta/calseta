@@ -219,9 +219,18 @@ export function LLMIntegrationDetailPage() {
                 onClick={() => {
                   testIntegration.mutate(uuid, {
                     onSuccess: (res) => {
-                      const r = res as unknown as { success: boolean; latency_ms: number; message: string };
+                      // API returns the standard envelope { data: {...}, meta: {} }.
+                      // Older versions of this hook were typed as a flat object,
+                      // which would silently fall through to the error branch.
+                      const envelope = res as unknown as {
+                        data?: { success?: boolean; latency_ms?: number; message?: string };
+                        success?: boolean;
+                        latency_ms?: number;
+                        message?: string;
+                      };
+                      const r = envelope.data ?? envelope;
                       if (r.success) {
-                        toast.success(`Connected — ${r.latency_ms}ms`);
+                        toast.success(`Connected — ${r.latency_ms ?? "?"}ms`);
                       } else {
                         toast.error(r.message || "Connection failed");
                       }

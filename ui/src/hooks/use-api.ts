@@ -931,20 +931,11 @@ export function useAgentInvocations(agentUuid: string, params?: Record<string, s
 }
 
 // Cost Events
-export function useCostEvents(params?: Record<string, string | number | boolean | undefined>) {
-  const search = new URLSearchParams();
-  if (params) {
-    for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined && v !== "") search.set(k, String(v));
-    }
-  }
-  const qs = search.toString();
-  return useQuery({
-    queryKey: ["cost-events", qs],
-    queryFn: () => api.get<PaginatedResponse<CostEvent>>(`/cost-events${qs ? `?${qs}` : ""}`),
-  });
-}
-
+//
+// Note: the previous instance-wide GET /cost-events hook was removed because
+// no such route exists server-side (only POST). Use /v1/costs/by-agent or
+// /v1/costs/summary for instance-wide views; useAgentCostEvents below for
+// per-agent paginated lists.
 export function useAgentCostEvents(agentUuid: string, params?: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams();
   if (params) {
@@ -1110,8 +1101,15 @@ export function usePatchTrigger() {
 export function useTriggerRoutine() {
   const qc = useQueryClient();
   return useMutation({
+    // Server schema is RoutineInvokeRequest{ payload: dict | None }.
+    // Sending the payload at the body root (or just {}) accidentally works
+    // today because every UI caller passes undefined; the moment a caller
+    // passes real data Pydantic 422s. Always wrap.
     mutationFn: ({ uuid, payload }: { uuid: string; payload?: Record<string, unknown> }) =>
-      api.post<DataResponse<{ message: string }>>(`/routines/${uuid}/invoke`, payload ?? {}),
+      api.post<DataResponse<{ message: string }>>(
+        `/routines/${uuid}/invoke`,
+        { payload: payload ?? null },
+      ),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["routine-runs", vars.uuid] });
       qc.invalidateQueries({ queryKey: ["routine", vars.uuid] });

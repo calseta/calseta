@@ -123,14 +123,20 @@ export function AgentsPage() {
     e.preventDefault();
     if (!validate()) return;
 
+    // capabilities: backend schema is dict[str, Any] | None — store the
+    // form's tool slug list under capabilities.tools to match how the lab
+    // seeder writes it. Empty list → omit so backend treats as null.
+    const capabilitiesPayload =
+      form.capabilities.length > 0
+        ? { tools: form.capabilities }
+        : undefined;
     const body: Record<string, unknown> = {
       name: form.name.trim(),
       description: form.description.trim() || undefined,
       agent_type: form.agent_type,
       role: form.role.trim() || undefined,
       execution_mode: form.execution_mode,
-      capabilities: form.capabilities.length > 0 ? form.capabilities : undefined,
-      is_active: true,
+      capabilities: capabilitiesPayload,
       trigger_on_sources: [],
       trigger_on_severities: [],
     };

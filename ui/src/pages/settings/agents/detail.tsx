@@ -1514,8 +1514,17 @@ export function AgentDetailPage() {
                           return (
                             <div
                               key={run.uuid}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setSelectedRunUuid(isSelected ? null : run.uuid)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  setSelectedRunUuid(isSelected ? null : run.uuid);
+                                }
+                              }}
                               className={cn(
-                                "w-full text-left px-3 py-2.5 border-b border-border transition-colors",
+                                "w-full text-left px-3 py-2.5 border-b border-border transition-colors cursor-pointer",
                                 isSelected
                                   ? "bg-teal/10"
                                   : cn(
@@ -1528,13 +1537,9 @@ export function AgentDetailPage() {
                               )}
                             >
                               <div className="flex items-center justify-between gap-2 mb-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedRunUuid(isSelected ? null : run.uuid)}
-                                  className="flex items-center gap-2 min-w-0 flex-1"
-                                >
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
                                   <span className="font-mono text-[11px] text-dim">#{run.uuid.slice(-6)}</span>
-                                </button>
+                                </div>
                                 <div className="flex items-center gap-1">
                                   <Badge
                                     variant="outline"
@@ -1558,7 +1563,10 @@ export function AgentDetailPage() {
                                     <DropdownMenuContent align="end" className="bg-card border-border">
                                       <DropdownMenuItem
                                         className="text-xs cursor-pointer"
-                                        onClick={() => setTranscriptRunUuid(run.uuid)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setTranscriptRunUuid(run.uuid);
+                                        }}
                                       >
                                         <Eye className="h-3 w-3 mr-2" />
                                         View Transcript
@@ -1568,7 +1576,10 @@ export function AgentDetailPage() {
                                           <DropdownMenuSeparator />
                                           <DropdownMenuItem
                                             className="text-xs cursor-pointer text-red-threat focus:text-red-threat"
-                                            onClick={() => setShowCancelRunConfirm(run.uuid)}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setShowCancelRunConfirm(run.uuid);
+                                            }}
                                           >
                                             <XCircle className="h-3 w-3 mr-2" />
                                             Cancel Run
@@ -1579,18 +1590,14 @@ export function AgentDetailPage() {
                                   </DropdownMenu>
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => setTranscriptRunUuid(run.uuid)}
-                                className="flex items-center justify-between gap-2 w-full"
-                              >
+                              <div className="flex items-center justify-between gap-2 w-full">
                                 <span className="text-[11px] text-muted-foreground">
                                   {run.started_at ? relativeTime(run.started_at) : "—"}
                                 </span>
                                 <span className="font-mono text-[11px] text-dim">
                                   {formatDuration(run.started_at, run.finished_at)}
                                 </span>
-                              </button>
+                              </div>
                             </div>
                           );
                         })}
