@@ -1,26 +1,28 @@
 """
 MCP scope enforcement helper.
 
-The MCP SDK validates API keys at connection time via CalsetaTokenVerifier,
-but doesn't expose the AccessToken scopes on the tool/resource request context.
-This module provides a lightweight helper to enforce scope requirements per
-tool call by looking up the key's scopes from the client_id (key_prefix).
+The MCP SDK validates API keys at connection time via ``CalsetaTokenVerifier``.
+On success it stores an ``AuthenticatedUser`` (with the resolved
+``AccessToken``) on the Starlette request scope as ``request["user"]``. Per
+the SDK's ``BearerAuthBackend`` (mcp.server.auth.middleware.bearer_auth),
+``user.scopes`` are exactly the scopes returned by ``verify_token()`` for
+the AUTHENTICATED record — i.e. the row whose bcrypt hash matched.
 
-The SDK stores the authenticated user on the Starlette request object (via
-BearerAuthBackend), but does NOT inject the client_id into the JSON-RPC
-``_meta`` field that ``ctx.client_id`` reads from. We fall back to extracting
-the client_id from the Starlette request's auth scope when ``ctx.client_id``
-is unavailable.
+S17 fix: ``check_scope`` now reads scopes from that authenticated record
+(via ``request["user"].scopes``) instead of re-querying the DB by
+``client_id`` (the key prefix). Re-querying by prefix is wrong on principle
+because two keys can share a 16-char plaintext prefix — granting access to
+ANY candidate sharing the prefix would let a low-scope key inherit the
+scopes of a high-scope key whose prefix happened to collide.
 """
 
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from mcp.server.fastmcp import Context
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.repositories.api_key_repository import APIKeyRepository
 
 
 def _resolve_client_id(ctx: Context) -> str | None:
@@ -47,9 +49,35 @@ def _resolve_client_id(ctx: Context) -> str | None:
     return None
 
 
+def _resolve_authenticated_scopes(ctx: Context) -> list[str] | None:
+    """
+    Read the scopes of the authenticated user off the Starlette request.
+
+    Returns the list of scopes from the AccessToken that ``CalsetaTokenVerifier``
+    issued for this connection — i.e. scopes from the row whose bcrypt hash
+    matched, NOT from a re-query by prefix.
+
+    Returns None when no authenticated user is present (e.g. unit tests that
+    construct ``Context`` without going through the MCP middleware stack).
+    """
+    try:
+        request = ctx.request_context.request
+        if request is None or "user" not in request:
+            return None
+        user: Any = request["user"]
+    except Exception:
+        return None
+
+    scopes = getattr(user, "scopes", None)
+    if scopes is None:
+        return None
+    # Defensive copy — never let downstream code mutate the AuthenticatedUser.
+    return list(scopes)
+
+
 async def check_scope(
     ctx: Context,
-    session: AsyncSession,
+    session: AsyncSession,  # noqa: ARG001 — kept for back-compat with callers
     *required_scopes: str,
 ) -> str | None:
     """
@@ -59,17 +87,23 @@ async def check_scope(
     Tools should return the error string directly if non-None.
 
     The ``admin`` scope is a superscope and passes every check.
+
+    The ``session`` argument is unused (scopes are read from the authenticated
+    user record, not via a DB lookup) but kept in the signature so existing
+    callers don't have to change. Removing it would be a wide API churn for
+    no functional gain.
     """
     client_id = _resolve_client_id(ctx)
     if not client_id:
         return json.dumps({"error": "Authentication required."})
 
-    repo = APIKeyRepository(session)
-    record = await repo.get_by_prefix(client_id)
-    if record is None:
+    scopes_list = _resolve_authenticated_scopes(ctx)
+    if scopes_list is None:
+        # No authenticated user attached to the request — treat as invalid.
+        # Don't fall back to a DB re-query: that's the bug S17 is fixing.
         return json.dumps({"error": "Invalid API key."})
 
-    scopes = set(record.scopes)
+    scopes = set(scopes_list)
     if "admin" in scopes:
         return None
     if any(s in scopes for s in required_scopes):

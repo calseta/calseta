@@ -3,12 +3,15 @@ APIKeyAuthBackend — bcrypt-based API key authentication.
 
 Auth flow:
   1. Extract `Authorization: Bearer cai_xxx` header
-  2. Slice `key_prefix` = first 8 chars
-  3. Look up APIKey row by prefix
-  4. Verify bcrypt hash
+  2. Slice `key_prefix` = first 16 chars (defense-in-depth: longer prefix
+     means fewer candidate rows on lookup, but we still iterate-and-bcrypt
+     because two keys CAN share a prefix — see S17 hardening notes)
+  3. List APIKey rows whose key_prefix matches
+  4. Iterate candidates and verify bcrypt hash; pick the matching row
   5. Check expiry (raises KEY_EXPIRED if past)
   6. Update last_used_at in the session (committed with the request)
-  7. Return AuthContext on success
+  7. Return AuthContext on success — scopes are read from the resolved
+     record only, never from the prefix lookup result set
 
 Every failure path calls log_auth_failure() before raising.
 """
@@ -28,7 +31,10 @@ from app.auth.base import AuthBackendBase, AuthContext
 from app.repositories.api_key_repository import APIKeyRepository
 
 _BEARER_PREFIX = "Bearer "
-_KEY_PREFIX_LEN = 8  # first 8 chars of the full key (e.g. "cai_xxxx")
+# First 16 chars of the full key (e.g. "cai_xxxxxxxxxxxx"). 16 chars makes
+# accidental prefix collisions astronomically unlikely while still leaving
+# the iterate-and-bcrypt pattern in place for safety.
+_KEY_PREFIX_LEN = 16
 
 
 class APIKeyAuthBackend(AuthBackendBase):
@@ -61,7 +67,23 @@ class APIKeyAuthBackend(AuthBackendBase):
             )
 
         key_prefix = plain_key[:_KEY_PREFIX_LEN]
-        record = await self._repo.get_by_prefix(key_prefix)
+        candidates = await self._repo.list_by_prefix(key_prefix)
+        if not candidates:
+            log_auth_failure("invalid_key", request, key_prefix=key_prefix)
+            raise CalsetaException(
+                code="UNAUTHORIZED",
+                message="Invalid API key.",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # Iterate-and-bcrypt: at most a handful of candidates share a 16-char
+        # prefix in pathological cases. Pick the first one whose hash matches.
+        record = None
+        for candidate in candidates:
+            if bcrypt.checkpw(plain_key.encode(), candidate.key_hash.encode()):
+                record = candidate
+                break
+
         if record is None:
             log_auth_failure("invalid_key", request, key_prefix=key_prefix)
             raise CalsetaException(
@@ -70,16 +92,7 @@ class APIKeyAuthBackend(AuthBackendBase):
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
 
-        match = bcrypt.checkpw(plain_key.encode(), record.key_hash.encode())
-        if not match:
-            log_auth_failure("invalid_key", request, key_prefix=key_prefix)
-            raise CalsetaException(
-                code="UNAUTHORIZED",
-                message="Invalid API key.",
-                status_code=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        # Expiry check
+        # Expiry check — read from the resolved record only.
         if record.expires_at is not None:
             now = datetime.now(UTC)
             # expires_at may be timezone-naive from the DB; normalise to UTC
@@ -98,8 +111,10 @@ class APIKeyAuthBackend(AuthBackendBase):
         record.last_used_at = datetime.now(UTC)
         await self._db.flush()
 
+        # IMPORTANT: scopes are read from the AUTHENTICATED record (the row
+        # whose bcrypt hash matched) — never from the candidate set.
         return AuthContext(
-            key_prefix=key_prefix,
+            key_prefix=record.key_prefix,
             scopes=list(record.scopes),
             key_id=record.id,
             key_type=record.key_type,

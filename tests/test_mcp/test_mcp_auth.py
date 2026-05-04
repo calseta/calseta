@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import bcrypt
@@ -36,7 +37,8 @@ def _make_api_key_record(
 
     record = MagicMock()
     record.id = 1
-    record.key_prefix = plain_key[:8]
+    # S17: prefix length bumped from 8 → 16 chars.
+    record.key_prefix = plain_key[:16]
     record.key_hash = key_hash
     record.scopes = scopes or ["admin"]
     record.expires_at = expires_at
@@ -65,7 +67,7 @@ class TestCalsetaTokenVerifier:
         plain_key, record = _make_api_key_record(scopes=["alerts:read", "alerts:write"])
 
         mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
+        mock_repo.list_by_prefix = AsyncMock(return_value=[record])
 
         mock_session = AsyncMock()
         mock_session.commit = AsyncMock()
@@ -81,7 +83,7 @@ class TestCalsetaTokenVerifier:
             token = await verifier.verify_token(plain_key)
 
         assert token is not None
-        assert token.client_id == plain_key[:8]
+        assert token.client_id == plain_key[:16]
         assert set(token.scopes) == {"alerts:read", "alerts:write"}
         assert token.token == plain_key
 
@@ -108,7 +110,7 @@ class TestCalsetaTokenVerifier:
         plain_key = "cai_" + secrets.token_urlsafe(32)
 
         mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=None)
+        mock_repo.list_by_prefix = AsyncMock(return_value=[])
 
         with (
             patch("app.mcp.auth.AsyncSessionLocal") as mock_session_ctx,
@@ -129,10 +131,10 @@ class TestCalsetaTokenVerifier:
         wrong_key = "cai_" + secrets.token_urlsafe(32)
 
         # Override key_prefix to match wrong_key's prefix so DB lookup succeeds
-        record.key_prefix = wrong_key[:8]
+        record.key_prefix = wrong_key[:16]
 
         mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
+        mock_repo.list_by_prefix = AsyncMock(return_value=[record])
 
         with (
             patch("app.mcp.auth.AsyncSessionLocal") as mock_session_ctx,
@@ -152,7 +154,7 @@ class TestCalsetaTokenVerifier:
         plain_key, record = _make_api_key_record(expires_at=expired_at)
 
         mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
+        mock_repo.list_by_prefix = AsyncMock(return_value=[record])
 
         mock_session = AsyncMock()
         mock_session.commit = AsyncMock()
@@ -175,7 +177,7 @@ class TestCalsetaTokenVerifier:
         plain_key, record = _make_api_key_record(expires_at=future)
 
         mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
+        mock_repo.list_by_prefix = AsyncMock(return_value=[record])
 
         mock_session = AsyncMock()
         mock_session.commit = AsyncMock()
@@ -197,7 +199,7 @@ class TestCalsetaTokenVerifier:
         plain_key, record = _make_api_key_record()
 
         mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
+        mock_repo.list_by_prefix = AsyncMock(return_value=[record])
 
         mock_session = AsyncMock()
         mock_session.commit = AsyncMock()
@@ -223,7 +225,7 @@ class TestCalsetaTokenVerifier:
         plain_key, record = _make_api_key_record(expires_at=expired_at)
 
         mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
+        mock_repo.list_by_prefix = AsyncMock(return_value=[record])
 
         with (
             patch("app.mcp.auth.AsyncSessionLocal") as mock_session_ctx,
@@ -244,17 +246,44 @@ class TestCalsetaTokenVerifier:
 
 
 class TestCheckScope:
-    """Tests for the MCP scope enforcement helper."""
+    """
+    Tests for the MCP scope enforcement helper.
 
-    def _make_ctx(self, client_id: str | None = "cai_test") -> MagicMock:
-        """Return a mock MCP Context with the given client_id."""
+    S17: ``check_scope`` now reads scopes from the AuthenticatedUser stored
+    on the Starlette request scope (set by the MCP SDK's BearerAuthBackend
+    after CalsetaTokenVerifier returns an AccessToken). It NEVER re-queries
+    the DB by key prefix.
+    """
+
+    def _make_ctx(
+        self,
+        *,
+        client_id: str | None = "cai_test_prefix_16",
+        scopes: list[str] | None = None,
+        attach_user: bool = True,
+    ) -> MagicMock:
+        """Return a mock MCP Context with an attached AuthenticatedUser."""
         ctx = MagicMock()
         ctx.client_id = client_id
+
+        if not attach_user:
+            ctx.request_context.request = None
+            return ctx
+
+        user = MagicMock()
+        user.scopes = scopes or []
+        user.username = client_id
+
+        request_mapping: dict[str, Any] = {"user": user}
+        fake_request = MagicMock()
+        fake_request.__contains__ = lambda self, key: key in request_mapping
+        fake_request.__getitem__ = lambda self, key: request_mapping[key]
+        ctx.request_context.request = fake_request
         return ctx
 
     async def test_missing_client_id_returns_error(self) -> None:
         """No client_id on context returns an auth error."""
-        ctx = self._make_ctx(client_id=None)
+        ctx = self._make_ctx(client_id=None, attach_user=False)
         session = AsyncMock()
 
         result = await check_scope(ctx, session, "alerts:read")
@@ -262,61 +291,36 @@ class TestCheckScope:
         assert result is not None
         assert "Authentication required" in result
 
-    async def test_unknown_key_prefix_returns_error(self) -> None:
-        """client_id that matches no DB record returns error."""
-        ctx = self._make_ctx()
+    async def test_no_authenticated_user_returns_error(self) -> None:
+        """A client_id present but no authenticated user on the request fails."""
+        ctx = self._make_ctx(attach_user=False)
 
-        mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=None)
-
-        with patch("app.mcp.scope.APIKeyRepository", return_value=mock_repo):
-            result = await check_scope(ctx, AsyncMock(), "alerts:read")
+        result = await check_scope(ctx, AsyncMock(), "alerts:read")
 
         assert result is not None
         assert "Invalid API key" in result
 
     async def test_admin_scope_passes_any_check(self) -> None:
         """admin scope is a superscope -- passes every check."""
-        ctx = self._make_ctx()
+        ctx = self._make_ctx(scopes=["admin"])
 
-        record = MagicMock()
-        record.scopes = ["admin"]
-
-        mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
-
-        with patch("app.mcp.scope.APIKeyRepository", return_value=mock_repo):
-            result = await check_scope(ctx, AsyncMock(), "workflows:execute")
+        result = await check_scope(ctx, AsyncMock(), "workflows:execute")
 
         assert result is None
 
     async def test_correct_scope_passes(self) -> None:
         """Having the required scope returns None (pass)."""
-        ctx = self._make_ctx()
+        ctx = self._make_ctx(scopes=["alerts:read", "alerts:write"])
 
-        record = MagicMock()
-        record.scopes = ["alerts:read", "alerts:write"]
-
-        mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
-
-        with patch("app.mcp.scope.APIKeyRepository", return_value=mock_repo):
-            result = await check_scope(ctx, AsyncMock(), "alerts:read")
+        result = await check_scope(ctx, AsyncMock(), "alerts:read")
 
         assert result is None
 
     async def test_wrong_scope_returns_error(self) -> None:
         """Having only different scopes returns an insufficiency error."""
-        ctx = self._make_ctx()
+        ctx = self._make_ctx(scopes=["alerts:read"])
 
-        record = MagicMock()
-        record.scopes = ["alerts:read"]
-
-        mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
-
-        with patch("app.mcp.scope.APIKeyRepository", return_value=mock_repo):
-            result = await check_scope(ctx, AsyncMock(), "workflows:execute")
+        result = await check_scope(ctx, AsyncMock(), "workflows:execute")
 
         assert result is not None
         assert "Insufficient scope" in result
@@ -324,31 +328,44 @@ class TestCheckScope:
 
     async def test_one_of_multiple_scopes_passes(self) -> None:
         """Having any one of multiple required scopes passes (OR logic)."""
-        ctx = self._make_ctx()
+        ctx = self._make_ctx(scopes=["workflows:read"])
 
-        record = MagicMock()
-        record.scopes = ["workflows:read"]
-
-        mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
-
-        with patch("app.mcp.scope.APIKeyRepository", return_value=mock_repo):
-            result = await check_scope(ctx, AsyncMock(), "alerts:read", "workflows:read")
+        result = await check_scope(ctx, AsyncMock(), "alerts:read", "workflows:read")
 
         assert result is None
 
     async def test_none_of_multiple_scopes_fails(self) -> None:
         """Having none of the required scopes returns error."""
-        ctx = self._make_ctx()
+        ctx = self._make_ctx(scopes=["enrichments:read"])
 
-        record = MagicMock()
-        record.scopes = ["enrichments:read"]
+        result = await check_scope(ctx, AsyncMock(), "alerts:read", "workflows:read")
 
-        mock_repo = MagicMock()
-        mock_repo.get_by_prefix = AsyncMock(return_value=record)
+        assert result is not None
+        assert "Insufficient scope" in result
 
-        with patch("app.mcp.scope.APIKeyRepository", return_value=mock_repo):
-            result = await check_scope(ctx, AsyncMock(), "alerts:read", "workflows:read")
+    async def test_scope_does_not_re_query_db(self) -> None:
+        """
+        S17 regression — ``check_scope`` must NOT call the APIKeyRepository.
 
+        Re-querying by prefix was the bug: it could grant access if ANY key
+        sharing the prefix had the required scope. Scopes must come from the
+        authenticated record only.
+        """
+        ctx = self._make_ctx(scopes=["alerts:read"])
+
+        with patch("app.mcp.scope.APIKeyRepository", create=True) as MockRepo:
+            await check_scope(ctx, AsyncMock(), "alerts:read")
+            MockRepo.assert_not_called()
+
+    async def test_scope_collision_only_grants_authenticated_record(self) -> None:
+        """
+        Authenticated as the low-scope key — even if a sibling key shares
+        the prefix and has admin, this request must NOT be granted
+        workflows:execute. (Verifier issues the AccessToken with only the
+        matched record's scopes.)
+        """
+        low_scope_ctx = self._make_ctx(scopes=["alerts:read"])
+
+        result = await check_scope(low_scope_ctx, AsyncMock(), "workflows:execute")
         assert result is not None
         assert "Insufficient scope" in result

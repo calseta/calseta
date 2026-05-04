@@ -22,12 +22,31 @@ _UNSET = object()  # sentinel for "field not provided"
 class APIKeyRepository(BaseRepository[APIKey]):
     model = APIKey
 
-    async def get_by_prefix(self, key_prefix: str) -> APIKey | None:
-        """Return the APIKey row whose key_prefix matches, or None."""
+    async def list_by_prefix(self, key_prefix: str) -> list[APIKey]:
+        """
+        Return all active APIKey rows whose key_prefix matches.
+
+        Returns a list (possibly empty) so the auth backend can iterate
+        candidates and bcrypt-check each one. Two keys MAY share the same
+        plaintext prefix (the bcrypt hash is what makes them distinct), so
+        callers must always verify the hash before trusting any candidate.
+        """
         result = await self._db.execute(
             select(APIKey).where(APIKey.key_prefix == key_prefix, APIKey.is_active.is_(True))
         )
-        return result.scalar_one_or_none()
+        return list(result.scalars().all())
+
+    async def get_by_prefix(self, key_prefix: str) -> APIKey | None:
+        """
+        DEPRECATED — use ``list_by_prefix`` and iterate-and-bcrypt instead.
+
+        Returns the first matching APIKey row, or None. Kept for back-compat
+        with tests that mock this method directly. New code MUST go through
+        ``list_by_prefix`` so prefix collisions cannot grant the wrong key's
+        scopes.
+        """
+        candidates = await self.list_by_prefix(key_prefix)
+        return candidates[0] if candidates else None
 
     async def create(
         self,
@@ -44,7 +63,9 @@ class APIKeyRepository(BaseRepository[APIKey]):
         callers must surface it to the user immediately and discard it.
         """
         plain_key = "cai_" + secrets.token_urlsafe(32)
-        key_prefix = plain_key[:8]
+        # Mirror the auth backend's _KEY_PREFIX_LEN. Bumped from 8 to 16 in
+        # S17 for defense-in-depth against prefix collisions.
+        key_prefix = plain_key[:16]
         key_hash = bcrypt.hashpw(plain_key.encode(), bcrypt.gensalt(rounds=12)).decode()
 
         record = APIKey(
