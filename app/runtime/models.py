@@ -30,6 +30,7 @@ class RuntimeResult:
     output_tokens: int = 0
     session_id: str | None = None   # ClaudeCodeAdapter session continuity
     error: str | None = None
+    error_code: str | None = None   # RunErrorCode value (S12)
 
 
 @dataclass

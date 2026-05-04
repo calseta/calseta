@@ -351,16 +351,37 @@ class AgentRuntimeEngine:
                     on_log=on_log,
                 )
             except Exception as exc:
-                error_msg = f"LLM API call failed on iteration {iteration}: {exc}"
-                logger.error(
-                    "runtime.llm_call_failed",
-                    iteration=iteration,
-                    error=str(exc),
-                    agent_id=agent.id,
-                )
+                # ClaudeCodeError (S12) carries a structured error_code and a
+                # human-friendly message; surface that directly. Generic
+                # exceptions fall back to "adapter_failed".
+                from app.integrations.llm.claude_code_adapter import ClaudeCodeError
+
+                if isinstance(exc, ClaudeCodeError):
+                    error_msg = str(exc)
+                    error_code = exc.error_code
+                    logger.error(
+                        "runtime.llm_call_failed",
+                        iteration=iteration,
+                        error=error_msg,
+                        error_code=error_code,
+                        last_assistant=(exc.last_assistant or "")[:200],
+                        agent_id=agent.id,
+                    )
+                else:
+                    error_msg = (
+                        f"LLM API call failed on iteration {iteration}: {exc}"
+                    )
+                    error_code = "adapter_failed"
+                    logger.error(
+                        "runtime.llm_call_failed",
+                        iteration=iteration,
+                        error=str(exc),
+                        agent_id=agent.id,
+                    )
                 return messages, RuntimeResult(
                     success=False,
                     error=error_msg,
+                    error_code=error_code,
                     findings=findings,
                     actions_proposed=actions_proposed,
                     total_cost_cents=total_cost_cents,
