@@ -18,6 +18,7 @@ NDJSON event types parsed:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from typing import TYPE_CHECKING, Any
 
@@ -39,6 +40,12 @@ logger = structlog.get_logger(__name__)
 
 _CLAUDE_CLI = "claude"
 _DEFAULT_MAX_TOKENS = 8096
+
+# S6: hard cap on combined stdout/stderr bytes from the claude CLI subprocess.
+# A pathological / runaway CLI must not be allowed to exhaust API memory by
+# streaming unbounded NDJSON. When exceeded, the subprocess is killed and a
+# RuntimeError is raised.
+MAX_CLAUDE_STDOUT_BYTES = 50 * 1024 * 1024  # 50 MiB
 
 
 class ClaudeCodeAdapter(LLMProviderAdapter):
@@ -128,13 +135,34 @@ class ClaudeCodeAdapter(LLMProviderAdapter):
         proc.stdin.close()
         await proc.stdin.wait_closed()
 
-        # Stream stdout line-by-line for real-time output
+        # Stream stdout line-by-line for real-time output.
+        # S6: cap total stdout bytes at MAX_CLAUDE_STDOUT_BYTES — on overflow,
+        # terminate the subprocess cleanly and raise RuntimeError.
         stdout_lines: list[str] = []
+        total_stdout_bytes = 0
         assert proc.stdout is not None
         while True:
             line_bytes = await proc.stdout.readline()
             if not line_bytes:
                 break
+            total_stdout_bytes += len(line_bytes)
+            if total_stdout_bytes > MAX_CLAUDE_STDOUT_BYTES:
+                # Terminate cleanly: try terminate() first, escalate to kill().
+                with contextlib.suppress(ProcessLookupError):
+                    proc.terminate()
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=2.0)
+                except TimeoutError:
+                    with contextlib.suppress(ProcessLookupError):
+                        proc.kill()
+                    with contextlib.suppress(Exception):
+                        await proc.wait()
+                logger.error(
+                    "claude_code_stdout_overflow",
+                    bytes_read=total_stdout_bytes,
+                    cap=MAX_CLAUDE_STDOUT_BYTES,
+                )
+                raise RuntimeError("claude stdout exceeded 50MB")
             line = line_bytes.decode("utf-8", errors="replace").rstrip("\n")
             stdout_lines.append(line)
             if on_log is not None:

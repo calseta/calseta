@@ -12,6 +12,7 @@ when AgentRuntimeEngine is implemented in a subsequent chunk.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -23,6 +24,11 @@ if TYPE_CHECKING:
     from app.db.models.agent_tool import AgentTool
 
 logger = structlog.get_logger(__name__)
+
+# S6: tool slug validation — tool names that come back from a model in a
+# tool_use block are user/model-controlled strings and must not be passed
+# unvetted into DB lookups, file paths, log keys, or anywhere else.
+_TOOL_SLUG_RE = re.compile(r"^[a-z0-9_]{1,64}$")
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +74,18 @@ class ToolNotAssignedError(Exception):
         )
 
 
+class InvalidToolSlugError(Exception):
+    """Raised when a tool_use block's name fails the slug regex (S6)."""
+
+    error_code = "invalid_tool_slug"
+
+    def __init__(self, tool_id: str) -> None:
+        self.tool_id = tool_id
+        super().__init__(
+            f"Tool name '{tool_id}' is invalid: must match ^[a-z0-9_]{{1,64}}$."
+        )
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
@@ -109,6 +127,19 @@ class ToolDispatcher:
           ToolForbiddenError      — tier is 'forbidden'
           ToolRequiresApprovalError — tier is 'requires_approval'
         """
+        # S6: tool slug validation — gate the model-controlled tool name
+        # before any DB lookup or path manipulation. Broader Pydantic input
+        # gating for tool_input is owned by S2 and not implemented here.
+        if not isinstance(tool_id, str) or not _TOOL_SLUG_RE.fullmatch(tool_id):
+            logger.warning(
+                "invalid_tool_slug",
+                tool_id=tool_id if isinstance(tool_id, str) else repr(tool_id),
+                agent_id=self._agent.id,
+            )
+            raise InvalidToolSlugError(
+                tool_id if isinstance(tool_id, str) else repr(tool_id)
+            )
+
         from app.repositories.agent_tool_repository import AgentToolRepository
 
         repo = AgentToolRepository(self._db)
