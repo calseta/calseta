@@ -98,6 +98,7 @@ def get_adapter(integration: LLMIntegration) -> LLMProviderAdapter:
         f"Unknown LLM provider '{provider}'. "
         "Valid built-in values: anthropic, openai, azure_openai, "
         "ollama, claude_code, aws_bedrock. "
-        "External adapters can be registered via "
-        "CALSETA_EXTERNAL_ADAPTERS."
+        "External adapters can be registered via the "
+        "'calseta.llm_adapters' entry-point group "
+        "(see docs/security/external-adapters.md)."
     )
