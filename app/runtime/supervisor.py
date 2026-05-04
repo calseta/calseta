@@ -324,10 +324,16 @@ class AgentSupervisor:
         return True
 
     async def _check_orphans(self, report: SupervisionReport) -> None:
-        """Check running HeartbeatRuns for dead PIDs and auto-retry."""
-        import os
+        """Check running HeartbeatRuns for dead PIDs and auto-retry.
 
+        Liveness is decided by ``app.services.process_health.is_process_alive``,
+        which combines the kernel ``os.kill(pid, 0)`` probe with a start-time
+        match against ``HeartbeatRun.process_started_at``. The start-time
+        check defeats PID reuse: a recycled PID owned by an unrelated process
+        will fail the start-time match and be treated as orphaned.
+        """
         from app.repositories.heartbeat_run_repository import HeartbeatRunRepository
+        from app.services.process_health import is_process_alive
 
         hr_repo = HeartbeatRunRepository(self._db)
         running_runs = await hr_repo.list_running_with_pid()
@@ -337,14 +343,8 @@ class AgentSupervisor:
             if pid is None:
                 continue
 
-            # Check if PID is alive
-            try:
-                os.kill(pid, 0)
-                continue  # Process is alive, skip
-            except ProcessLookupError:
-                pass  # Process is dead
-            except PermissionError:
-                continue  # Process exists but we lack permission — alive
+            if is_process_alive(pid, run.process_started_at):
+                continue  # Same process we spawned is still alive
 
             logger.warning(
                 "supervisor.orphan_detected",

@@ -7,10 +7,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.runtime.models import SupervisionReport
 from app.runtime.supervisor import AgentSupervisor
 
-# The deferred import in _check_orphans reads from this module path
+# The deferred imports in _check_orphans read from these module paths
 _HR_REPO_PATH = (
     "app.repositories.heartbeat_run_repository.HeartbeatRunRepository"
 )
+_IS_ALIVE_PATH = "app.services.process_health.is_process_alive"
 
 
 class TestCheckOrphans:
@@ -33,7 +34,7 @@ class TestCheckOrphans:
 
         with (
             patch(_HR_REPO_PATH) as mock_repo_cls,
-            patch("os.kill", side_effect=ProcessLookupError),
+            patch(_IS_ALIVE_PATH, return_value=False),
             patch.object(
                 supervisor, "_log_orphan_event",
                 new_callable=AsyncMock,
@@ -53,7 +54,7 @@ class TestCheckOrphans:
         assert report.timed_out == 1
 
     async def test_alive_pid_skipped(self) -> None:
-        """Alive PID (os.kill succeeds) -> no action."""
+        """Alive PID -> no action."""
         db = AsyncMock()
         supervisor = AgentSupervisor(db)
         report = SupervisionReport()
@@ -65,7 +66,7 @@ class TestCheckOrphans:
 
         with (
             patch(_HR_REPO_PATH) as mock_repo_cls,
-            patch("os.kill"),  # Succeeds = process alive
+            patch(_IS_ALIVE_PATH, return_value=True),
         ):
             mock_repo = AsyncMock()
             mock_repo.list_running_with_pid.return_value = [run]
@@ -77,7 +78,7 @@ class TestCheckOrphans:
         assert report.timed_out == 0
 
     async def test_permission_error_treated_as_alive(self) -> None:
-        """PermissionError -> process exists, skip."""
+        """Helper reports alive (PermissionError path) -> skip."""
         db = AsyncMock()
         supervisor = AgentSupervisor(db)
         report = SupervisionReport()
@@ -89,7 +90,7 @@ class TestCheckOrphans:
 
         with (
             patch(_HR_REPO_PATH) as mock_repo_cls,
-            patch("os.kill", side_effect=PermissionError),
+            patch(_IS_ALIVE_PATH, return_value=True),
         ):
             mock_repo = AsyncMock()
             mock_repo.list_running_with_pid.return_value = [run]
@@ -116,7 +117,7 @@ class TestCheckOrphans:
 
         with (
             patch(_HR_REPO_PATH) as mock_repo_cls,
-            patch("os.kill", side_effect=ProcessLookupError),
+            patch(_IS_ALIVE_PATH, return_value=False),
             patch.object(
                 supervisor, "_log_orphan_event",
                 new_callable=AsyncMock,
@@ -148,7 +149,7 @@ class TestCheckOrphans:
 
         with (
             patch(_HR_REPO_PATH) as mock_repo_cls,
-            patch("os.kill", side_effect=ProcessLookupError),
+            patch(_IS_ALIVE_PATH, return_value=False),
             patch.object(
                 supervisor, "_log_orphan_event",
                 new_callable=AsyncMock,
