@@ -30,6 +30,7 @@ from app.repositories.agent_repository import AgentRepository
 from app.schemas.alert_assignments import AlertAssignmentResponse, AssignmentUpdate
 from app.schemas.alerts import AlertResponse
 from app.schemas.common import DataResponse, PaginatedResponse, PaginationMeta
+from app.schemas.dashboard import ControlPlaneDashboardResponse
 from app.services.alert_queue_service import AlertQueueService
 
 queue_router = APIRouter(prefix="/queue", tags=["alert-queue"])
@@ -231,14 +232,18 @@ async def update_assignment(
 # ---------------------------------------------------------------------------
 
 
-@dashboard_router.get("/dashboard", tags=["dashboard"])
+@dashboard_router.get(
+    "/dashboard",
+    tags=["dashboard"],
+    response_model=DataResponse[ControlPlaneDashboardResponse],
+)
 @limiter.limit(f"{settings.RATE_LIMIT_AUTHED_PER_MINUTE}/minute")
 async def get_dashboard(
     request: Request,
     auth: _Read,
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> DataResponse[dict]:
+) -> DataResponse[ControlPlaneDashboardResponse]:
     """Control plane dashboard — agent counts, queue depths, costs MTD."""
     svc = AlertQueueService(db)
     data = await svc.get_dashboard_data()
-    return DataResponse(data=data)
+    return DataResponse(data=ControlPlaneDashboardResponse.model_validate(data))
