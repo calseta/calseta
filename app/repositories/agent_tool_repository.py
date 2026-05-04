@@ -101,6 +101,22 @@ class AgentToolRepository:
         )
         return list(result.scalars().all())
 
+    async def get_by_slugs(self, slugs: list[str]) -> list[AgentTool]:
+        """Fetch tools by slug list.
+
+        For agent tools, ``slug == id`` — the text primary key on
+        ``agent_tools`` IS the slug (see lab seeder note in S13). This
+        method is a semantic alias used by the tool-id resolver in
+        ``AgentService`` so callers can express intent ("resolve these
+        slugs") without coupling to the underlying PK shape.
+        """
+        if not slugs:
+            return []
+        result = await self._db.execute(
+            select(AgentTool).where(AgentTool.id.in_(slugs))
+        )
+        return list(result.scalars().all())
+
     async def upsert(self, data: AgentToolCreate) -> AgentTool:
         """Insert or update a tool — used for auto-registration of built-ins.
 
