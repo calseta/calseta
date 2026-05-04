@@ -299,6 +299,14 @@ class Settings(BaseSettings):
     HEALTH_METRICS_DEFAULT_POLLING_SECONDS: int = 60
 
     # ------------------------------------------------------------------
+    # Bundled Skills (S14 — universal startup loader)
+    # ------------------------------------------------------------------
+    # Path to the directory containing bundled skill subdirectories. Each
+    # immediate child that contains a SKILL.md is loaded as a global skill
+    # (source='bundled') at API startup. Override for tests or alt layouts.
+    BUNDLED_SKILLS_DIR: str = "app/skills"
+
+    # ------------------------------------------------------------------
     # Sandbox
     # ------------------------------------------------------------------
     ENRICHMENT_MOCK_MODE: bool = False

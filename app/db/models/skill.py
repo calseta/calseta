@@ -22,6 +22,15 @@ class Skill(TimestampMixin, UUIDMixin, Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_global: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # 'manual' (operator-edited; loader will not touch) or 'bundled' (managed
+    # by the universal startup loader from ``app/skills/<slug>/``).
+    source: Mapped[str] = mapped_column(
+        Text, nullable=False, default="manual", server_default="manual"
+    )
+    # SHA256 over the concatenated file contents of the bundled skill — used by
+    # the loader to skip re-writing SkillFile rows when nothing changed on disk.
+    # Always NULL for source='manual' rows.
+    content_sha256: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     files: Mapped[list[SkillFile]] = relationship(
         "SkillFile",

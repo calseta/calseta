@@ -92,6 +92,90 @@ class SkillRepository(BaseRepository[Skill]):
         await self._db.refresh(skill)
         return skill
 
+    # --- Bundled-skill loader operations ---
+
+    async def upsert_bundled_skill(
+        self,
+        *,
+        slug: str,
+        name: str,
+        description: str | None,
+        content_sha256: str,
+    ) -> tuple[Skill, bool]:
+        """Insert or update a global bundled skill (``source='bundled'``).
+
+        Returns ``(skill, changed)`` where ``changed`` is True if the row was
+        created OR if the stored ``content_sha256`` differs from the value
+        passed in (callers should re-write SkillFile rows in that case).
+
+        Operator-edited skills (``source='manual'``) are NEVER touched. If a
+        manual row already exists with the same slug it is returned with
+        ``changed=False`` so the loader will skip it.
+        """
+        existing = await self.get_by_slug(slug)
+        if existing is not None:
+            if existing.source != "bundled":
+                # Operator owns this row — do not clobber.
+                return existing, False
+            changed = existing.content_sha256 != content_sha256
+            # Always reconcile metadata for bundled rows so the YAML
+            # frontmatter on disk stays the source of truth.
+            existing.name = name
+            existing.description = description
+            existing.is_global = True
+            existing.is_active = True
+            if changed:
+                existing.content_sha256 = content_sha256
+            await self._db.flush()
+            await self._db.refresh(existing)
+            return existing, changed
+
+        skill = Skill(
+            uuid=uuid_module.uuid4(),
+            slug=slug,
+            name=name,
+            description=description,
+            is_active=True,
+            is_global=True,
+            source="bundled",
+            content_sha256=content_sha256,
+        )
+        self._db.add(skill)
+        await self._db.flush()
+        await self._db.refresh(skill)
+        return skill, True
+
+    async def replace_bundled_files(
+        self,
+        skill_id: int,
+        files: list[tuple[str, str]],
+    ) -> None:
+        """Replace ALL ``skill_files`` rows for a bundled skill.
+
+        ``files`` is a list of ``(relative_path, content)`` tuples. The entry
+        file (path == ``SKILL.md``) is auto-flagged ``is_entry=True``.
+
+        Used only by the bundled-skills loader — drops every existing file row
+        and inserts the on-disk set verbatim. Safe because callers gate this
+        behind a SHA256 mismatch and because ``source='manual'`` rows never
+        reach this method.
+        """
+        await self._db.execute(
+            delete(SkillFile).where(SkillFile.skill_id == skill_id)
+        )
+        await self._db.flush()
+        for path, content in files:
+            self._db.add(
+                SkillFile(
+                    uuid=uuid_module.uuid4(),
+                    skill_id=skill_id,
+                    path=path,
+                    content=content,
+                    is_entry=(path == "SKILL.md"),
+                )
+            )
+        await self._db.flush()
+
     # --- File management operations ---
 
     async def get_file_by_path(self, skill_id: int, path: str) -> SkillFile | None:
@@ -115,7 +199,19 @@ class SkillRepository(BaseRepository[Skill]):
         """Insert or update a skill file by (skill_id, path).
 
         Sets is_entry=True automatically if path == "SKILL.md".
+
+        Operator path: writing through this method flips the parent skill's
+        ``source`` to ``'manual'`` and clears ``content_sha256``. After that
+        the bundled-skills loader will skip the row forever, preserving the
+        operator's edits across restarts.
         """
+        # Promote the parent skill to 'manual' so the universal loader
+        # never overwrites operator edits.
+        skill_row = await self._db.get(Skill, skill_id)
+        if skill_row is not None and skill_row.source != "manual":
+            skill_row.source = "manual"
+            skill_row.content_sha256 = None
+
         existing = await self.get_file_by_path(skill_id, path)
         if existing is not None:
             existing.content = content
