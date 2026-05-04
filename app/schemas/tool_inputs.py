@@ -73,6 +73,7 @@ class PostFindingInput(_StrictToolInput):
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(min_length=1, max_length=MAX_REASONING_CHARS)
     findings: list[dict[str, Any]] = Field(default_factory=list, max_length=MAX_FINDINGS_ITEMS)
+    recommended_action: str | None = Field(default=None, max_length=2000)
 
     @field_validator("classification")
     @classmethod

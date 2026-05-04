@@ -519,6 +519,28 @@ async def _handle_get_enrichment(
     }
 
 
+def _confidence_numeric_to_enum(raw: float | int | None) -> str | None:
+    """Map numeric confidence in [0,1] to FindingConfidence enum value.
+
+    Buckets:
+      >= 0.75  → 'high'
+      0.4–0.74 → 'medium'
+      <  0.4   → 'low'
+    Returns None if input is not a number.
+    """
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if value >= 0.75:
+        return "high"
+    if value >= 0.4:
+        return "medium"
+    return "low"
+
+
 async def _handle_post_finding(
     db: AsyncSession,
     agent: AgentRegistration,
@@ -527,19 +549,26 @@ async def _handle_post_finding(
 ) -> dict[str, Any]:
     """Record a structured agent finding on the active alert.
 
-    Validation guarantees (Pydantic):
-      - classification is a canonical enum value
-      - confidence ∈ [0, 1]
-      - reasoning is non-empty and ≤ 4000 chars
-      - extras are rejected — no smuggled fields reach the DB
+    Input validation (S2):
+      - tool_input is a validated PostFindingInput instance
+      - classification ∈ canonical enum, confidence ∈ [0, 1], reasoning ≤ 4000 chars
+      - extras rejected — no smuggled fields reach the DB
 
-    Scope guarantees (S2):
-      - The target alert is always ``context.alert_id``. The LLM-provided
+    Scope (S2):
+      - Target alert is always ``context.alert_id``. The LLM-provided
         ``alert_uuid`` is cross-checked; mismatch → ``alert_scope_violation``.
+
+    Output canonicalization (S15):
+      - Persisted shape matches ``FindingResponse``: id / agent_name / summary /
+        confidence (low|medium|high) / recommended_action / evidence / posted_at.
+      - Agent-only extras (classification, findings array, raw numeric confidence)
+        are stashed under ``evidence.*`` so nothing is lost.
     """
     from datetime import UTC, datetime
+    from uuid import uuid4
 
     from app.repositories.alert_repository import AlertRepository
+    from app.schemas.alerts import FindingResponse
 
     assert isinstance(tool_input, PostFindingInput), (
         "post_finding handler expects validated PostFindingInput"
@@ -558,14 +587,32 @@ async def _handle_post_finding(
         # Scope/lookup error — already a coarse-coded envelope.
         return alert
 
-    finding = {
+    # --- Build canonical finding payload (S15) from validated input (S2) ---
+    summary = tool_input.reasoning.strip() or "(no reasoning provided)"
+    raw_confidence = tool_input.confidence
+    confidence_enum = _confidence_numeric_to_enum(raw_confidence)
+
+    evidence: dict[str, Any] = {
         "classification": tool_input.classification,
-        "confidence": tool_input.confidence,
-        "reasoning": tool_input.reasoning,
-        "findings": tool_input.findings,
-        "recorded_at": datetime.now(UTC).isoformat(),
+        "confidence_raw": raw_confidence,
         "agent_id": agent.id,
     }
+    if tool_input.findings:
+        evidence["findings"] = tool_input.findings
+
+    finding: dict[str, Any] = {
+        "id": str(uuid4()),
+        "agent_name": agent.name,
+        "summary": summary,
+        "confidence": confidence_enum,
+        "recommended_action": tool_input.recommended_action,
+        "evidence": evidence,
+        "posted_at": datetime.now(UTC).isoformat(),
+    }
+
+    # Validate canonical shape before persistence — fail loudly if drifted.
+    FindingResponse.model_validate(finding)
+
     await repo.add_finding(alert, finding)
     await db.flush()
 
@@ -573,8 +620,8 @@ async def _handle_post_finding(
         "status": "ok",
         "data": {
             "alert_uuid": str(alert.uuid),
-            "classification": finding["classification"],
-            "confidence": finding["confidence"],
+            "finding_id": finding["id"],
+            "confidence": confidence_enum,
             "recorded": True,
         },
     }
