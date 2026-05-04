@@ -115,6 +115,27 @@ async def _on_startup() -> None:
                     ),
                 )
 
+            # Bundled skills loader (S14) — universal: runs on every boot,
+            # not gated on SANDBOX_MODE. Wrapped so loader failures cannot
+            # crash startup; a missing app/skills/ dir is logged + skipped.
+            try:
+                from pathlib import Path as _Path
+
+                from app.skills.loader import load_bundled_skills
+
+                await load_bundled_skills(
+                    db, skills_dir=_Path(settings.BUNDLED_SKILLS_DIR)
+                )
+            except Exception as exc:
+                logger.warning(
+                    "app.bundled_skills_load_failed",
+                    error=str(exc),
+                    hint=(
+                        "Bundled skills (e.g. 'calseta') were not loaded — "
+                        "managed agents may run with no global skill context"
+                    ),
+                )
+
             if settings.SANDBOX_MODE:
                 from app.seed.sandbox import seed_sandbox
 
