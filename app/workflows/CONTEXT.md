@@ -65,7 +65,32 @@ Both clients manage their own HTTP sessions and auth. They are `None` if credent
 async def run_workflow_code(code: str, ctx: WorkflowContext, timeout: int) -> WorkflowResult
 ```
 
-Never raises. Returns `WorkflowResult.fail(...)` for every failure mode: syntax error, missing `run()`, timeout, runtime exception, wrong return type.
+In-process AST-allowlisted executor. Never raises. Returns `WorkflowResult.fail(...)` for every failure mode: syntax error, missing `run()`, timeout, runtime exception, wrong return type.
+
+**Used today only by:** unit tests (`tests/test_workflows.py`) and the dev-only `POST /v1/workflows/{uuid}/test` endpoint (sandbox preview, not the production runtime). Production runtime goes through the isolated runner below.
+
+### Isolated Runner (`runner.py`) — Wave 5 / S1
+
+```python
+async def run_workflow_isolated(
+    code: str,
+    ctx_payload: dict,
+    *,
+    timeout_seconds: int,
+    memory_mb: int = 256,
+) -> WorkflowResult
+```
+
+Spawns a separate OS process (`scripts/workflow_subprocess_entry.py`) for each workflow run. The child receives an `init` line via stdin, installs rlimits + (Linux) seccomp-bpf with a locked allowlist, then runs the workflow with an IPC-proxy `WorkflowContext`. All `ctx.http`, `ctx.secrets`, and `ctx.log` calls are routed back to the parent via NDJSON over the same pipe, so SSRF, secrets, and logging stay under the parent's control.
+
+Locked design decisions:
+- Subprocess execution is **mandatory** in every environment. `WORKFLOW_ISOLATION_MODE` accepts only `"subprocess"` (default) and `"subprocess_no_seccomp"` (auto-fallback when libseccomp is missing).
+- Child env is scrubbed: only `PATH`, `LANG`, `LC_ALL`, `TZ`, plus `PYTHONPATH` for `app.*` resolution. No parent secrets visible.
+- Workspace: each run gets `/tmp/workflow-<run_uuid>/`, removed in `finally`.
+- Failure reasons mapped to `WorkflowResult.fail(data={"reason": ...})`: `timeout`, `child_crashed`, `resource_limit_exceeded`, `ssrf_blocked`, `ipc_protocol_error`.
+- On platforms without `pyseccomp`, the runner emits `workflow.seccomp_unavailable` once and proceeds with rlimit-only confinement.
+
+The existing AST allowlist in `sandbox.py` stays as defense-in-depth — the seccomp filter (when active) is the actual security boundary, but blocked imports never reach the seccomp layer in the first place.
 
 ### AST Validation (`app/services/workflow_ast.py`)
 

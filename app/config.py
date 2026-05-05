@@ -266,9 +266,17 @@ class Settings(BaseSettings):
     CROWDSTRIKE_BASE_URL: str = ""  # defaults to https://api.crowdstrike.com if empty
 
     # ------------------------------------------------------------------
-    # Workflow Resource Limits
+    # Workflow Resource Limits + Isolation
     # ------------------------------------------------------------------
     WORKFLOW_MAX_MEMORY_MB: int = 256  # Max virtual memory per workflow execution
+    # Wave 5 / S1 — workflow execution mode.  Two values:
+    #   "subprocess"            — full subprocess + scrubbed env + rlimit + seccomp
+    #                             (default; mandatory in production)
+    #   "subprocess_no_seccomp" — auto-selected on platforms without libseccomp;
+    #                             retains rlimit + scrubbed-env confinement.
+    # ``none`` is intentionally NOT supported.  Subprocess execution is mandatory
+    # in every environment.
+    WORKFLOW_ISOLATION_MODE: str = "subprocess"
 
     # ------------------------------------------------------------------
     # Persistent Data Volume

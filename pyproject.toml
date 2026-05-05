@@ -36,6 +36,14 @@ azure = [
 aws = [
     "boto3>=1.35.0",
 ]
+# Wave 5 / S1 — Linux-only kernel-level workflow confinement.  ``pyseccomp``
+# is the Python binding for libseccomp; on macOS or any platform without it,
+# the runner falls back to rlimit-only confinement and emits a one-time
+# ``workflow.seccomp_unavailable`` warning event.  Production Linux deployers
+# should ``pip install calseta[isolation]``.
+isolation = [
+    "pyseccomp>=0.1.2; sys_platform == 'linux'",
+]
 dev = [
     "ruff>=0.8.0",
     "mypy>=1.13.0",
