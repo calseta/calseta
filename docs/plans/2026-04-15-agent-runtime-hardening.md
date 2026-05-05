@@ -1446,6 +1446,12 @@ The hard requirement: a malicious value in any of those four sources must not be
 - **Verification**: `pytest tests/integration/workflows/test_isolation.py` (new file) + manually run a known-malicious workflow snippet
 - **Findings addressed**: #1 (Critical), #4 (High — depends on S3 for the allowlist), #17 (Medium)
 - **Implementation notes**: The cleanest reference for this pattern in the codebase is the way `app/integrations/llm/claude_code_adapter.py` wraps `asyncio.create_subprocess_exec` with line-by-line stdout streaming. Use the same pattern for the parent⇄child pipe. Don't try to ship gVisor/Firecracker in v1 — start with seccomp-bpf + rlimit + scrubbed env. That alone closes the open holes.
+- **Design decisions locked 2026-05-05** (intake `tmp/wave5-s1-s3-s5-intake.md`):
+  - **Confinement**: `subprocess + scrubbed env + rlimit + seccomp-bpf` (Linux). On macOS/dev where seccomp isn't available, fall back to `subprocess + scrubbed env + rlimit only` and emit a `workflow.seccomp_unavailable` warning at startup. gVisor/Firecracker explicitly out of scope.
+  - **No escape hatch**: `WORKFLOW_ISOLATION_MODE=none` is NOT supported. Subprocess execution is mandatory in every environment. Local DX cost is small — the existing in-memory sandbox tests still run unchanged; the runtime path just adds a 50–200ms subprocess spawn per workflow run.
+  - **IPC**: NDJSON over a pipe (matches the `claude_code` adapter pattern). One JSON object per line on stdout in each direction. Parent⇄child message ops at minimum: `http.request {method,url,headers,body,timeout}` → `http.response {status,headers,body}`; `secret.get {name}` → `secret.value {value|null}`; `log {level,message,fields}`; `done {result: WorkflowResult}`.
+  - **`WORKFLOW_MAX_MEMORY_MB`**: keep at 256. Add a `workflow.memory_peak_mb` metric per run for future tuning.
+  - **Workspace**: each workflow run gets a fresh `/tmp/workflow-<run_uuid>/` directory created by the parent and passed to the child as cwd. Cleaned up in the parent's `finally`. Filesystem writes outside this dir are denied by seccomp where available.
 
 #### Chunk S2: Tool Output Validation Gate
 
@@ -1485,6 +1491,12 @@ The hard requirement: a malicious value in any of those four sources must not be
 - **Verification**: `pytest tests/unit/test_secret_resolver.py tests/unit/test_secrets_accessor.py tests/integration/test_scoped_api_keys.py`
 - **Findings addressed**: #4 (High), #6 (High — completes C5), #9 (High), #11 (Medium — partial)
 - **Implementation notes**: `app/auth/encryption.py` already implements Fernet-based at-rest encryption. The current resolver just isn't using it. Wiring it through is mostly plumbing — the harder part is the migration story for existing rows that have a literal key. Recommend: on startup, scan `llm_integrations` for `api_key_ref` values that don't match the prefix grammar; log them, refuse to call the adapter, and emit a single CLI command to re-encrypt.
+- **Design decisions locked 2026-05-05** (intake `tmp/wave5-s1-s3-s5-intake.md`):
+  - **Prefix grammar**: confirmed four prefixes — `env:NAME`, `vault:PATH`, `aws-sm:NAME`, `azure-kv:NAME`. Plus a fifth `enc:<base64-fernet-ciphertext>` introduced by this chunk for at-rest-encrypted secrets.
+  - **Global denylist**: confirmed — `CALSETA_*`, `*_API_KEY`, `*_SECRET`, `*_TOKEN`, `*_PASSWORD`, `DATABASE_URL`, `ENCRYPTION_KEY`, `AWS_*`, `AZURE_*`. Implementation as a list of regex patterns compiled once at startup.
+  - **Migration story**: option (b) — auto-migrate. On startup, scan `llm_integrations` for `api_key_ref` values that don't match any known prefix. For each, encrypt the literal with `Fernet(ENCRYPTION_KEY)`, write it back as `enc:<ciphertext>` in the SAME row in a single transaction (write before discard), log `secrets.literal_migrated` with integration name + 8-char prefix of the new ciphertext. Idempotent: re-run on already-migrated rows is a no-op (prefix matches, no migration needed). On crash mid-migration, the row is either fully literal (retry next startup) or fully encrypted (already done) — never partially migrated.
+  - **Scoped per-run agent API key TTL**: 3600s (1 hour).
+  - **Rename `LLMIntegration.api_key_ref` → `api_key_secret_ref`**: yes, this chunk performs the rename. Update the existing `0018_wave5_hardening.py` migration in place to add the column rename (don't add a new migration). Lab is reset via `make lab-reset`.
 
 #### Chunk S4: Run Log Redaction
 
@@ -1523,6 +1535,12 @@ The hard requirement: a malicious value in any of those four sources must not be
 - **Verification**: `pytest tests/integration/test_budget_enforcement.py -v` (extend existing if present)
 - **Findings addressed**: #8 (High)
 - **Implementation notes**: The simplest correct approach is to drop `agent.spent_monthly_cents` as a stored field and compute it on read. The lock-on-agent-row approach is enough to prevent the race; you don't need a distributed lock.
+- **Design decisions locked 2026-05-05** (intake `tmp/wave5-s1-s3-s5-intake.md`):
+  - **Lock**: Postgres advisory lock keyed on `(agent_id, alert_id)` via `pg_try_advisory_xact_lock(hashtext(agent_id::text || ':' || alert_id::text))` (or `pg_advisory_xact_lock` if you want to wait). NOT `SELECT … FOR UPDATE` — advisory lock is the right primitive (no row contention, no WAL impact, auto-released on transaction end).
+  - **Drop `agent.spent_monthly_cents`** entirely. Add it to the `0018_wave5_hardening.py` migration in place (don't create a new migration). Compute monthly spend on-read via `SELECT SUM(cost_cents) FROM cost_events WHERE agent_id = $1 AND created_at >= date_trunc('month', now() AT TIME ZONE 'UTC')`. Add a covering index `(agent_id, created_at)` if not already present.
+  - **In-flight behavior on budget hit (per-alert AND monthly)**: option (c) — finish the current LLM iteration AND any tool calls it produces, then stop. Implementation: budget check at the TOP of each iteration of `_run_tool_loop`. When the check fails, set a stop flag, let the iteration complete (LLM call + dispatched tools), and exit cleanly at the top of the next iteration with `error_code="budget_exceeded"`. Matches the existing B3 cancellation pattern. Partial findings preserved.
+  - **`claude_code` (subscription) treatment**: continue recording `cost_events` rows with `cost_cents=0` and `billing_type="subscription"` for audit/consumption tracking. Skip the budget check entirely for `billing_type="subscription"` rows (no per-call cost to enforce against).
+  - **Hard-stop activity event**: confirmed `cost.hard_stop` with payload `{spent_cents: int, limit_cents: int, scope: "alert" | "monthly"}`.
 
 #### Chunk S6: Adapter Input Validation
 
