@@ -3,8 +3,8 @@ Workflow execution service.
 
 Orchestrates the full lifecycle of a single workflow execution:
   1. Loads indicator (and alert if applicable) from the DB
-  2. Builds WorkflowContext from the trigger context
-  3. Delegates to run_workflow_code() in the sandbox
+  2. Builds the indicator/alert payload for the isolated runner
+  3. Delegates to ``run_workflow_isolated`` (subprocess runtime, S1)
   4. Returns a WorkflowExecutionResult for audit logging
 
 This module does NOT write to the database — that is the caller's responsibility
@@ -31,13 +31,15 @@ from app.workflows.context import (
     IndicatorContext,
     IntegrationClients,
     OktaClient,
-    SecretsAccessor,
     TriggerContext,
-    WorkflowContext,
     WorkflowLogger,
     WorkflowResult,
 )
-from app.workflows.sandbox import run_workflow_code
+from app.workflows.runner import (
+    run_workflow_isolated,
+    serialize_alert,
+    serialize_indicator,
+)
 
 # ---------------------------------------------------------------------------
 # WorkflowExecutionResult
@@ -172,37 +174,46 @@ async def execute_workflow(
 
     alert_ctx = await _build_alert_context(trigger_context.alert_id, db)
 
-    integrations = _build_integrations()
+    # Integrations object retained for in-process compatibility paths but
+    # not currently proxied to the isolated runner (Okta/Entra clients run
+    # in the parent — S1 v1 ships proxied http+secrets+log only).  Future
+    # iterations will route integration calls through additional IPC ops.
+    _ = _build_integrations()
 
-    async def _ssrf_check_hook(request: httpx.Request) -> None:
-        from app.services.url_validation import validate_outbound_url
-
-        validate_outbound_url(str(request.url))
-
+    # Wave 5 / S1 — execute the workflow in an isolated subprocess.  The
+    # parent (this process) handles HTTP requests with the same SSRF gate,
+    # so SSRF protection is preserved transparently.
     async with httpx.AsyncClient(
         timeout=float(workflow.timeout_seconds),
-        event_hooks={"request": [_ssrf_check_hook]},
     ) as http:
-        ctx = WorkflowContext(
-            indicator=indicator_ctx,
-            alert=alert_ctx,
-            http=http,
-            log=logger,
-            secrets=SecretsAccessor(),
-            integrations=integrations,
+        ctx_payload: dict[str, Any] = {
+            "indicator": serialize_indicator(indicator_ctx),
+            "alert": serialize_alert(alert_ctx),
+        }
+        result = await run_workflow_isolated(
+            code=workflow.code,
+            ctx_payload=ctx_payload,
+            timeout_seconds=workflow.timeout_seconds,
+            memory_mb=settings.WORKFLOW_MAX_MEMORY_MB,
+            http_client=http,
         )
 
-        result = await run_workflow_code(
-            code=workflow.code,
-            ctx=ctx,
-            timeout=workflow.timeout_seconds,
-            max_memory_mb=settings.WORKFLOW_MAX_MEMORY_MB,
-        )
+    # The isolated runner mirrors the child's log buffer back into
+    # ``result.data["__log_buffer"]`` so the caller can persist it.
+    log_output = ""
+    if isinstance(result.data, dict):
+        buffered = result.data.pop("__log_buffer", None)
+        if isinstance(buffered, str):
+            log_output = buffered
+        # Strip the metadata key from the public ``data`` dict — runner-only.
+        result.data.pop("__metadata", None)
+    if not log_output:
+        log_output = logger.render()
 
     duration_ms = int(time.monotonic() * 1000) - start_ms
     return WorkflowExecutionResult(
         result=result,
-        log_output=logger.render(),
+        log_output=log_output,
         duration_ms=duration_ms,
         code_version_executed=workflow.code_version,
     )
