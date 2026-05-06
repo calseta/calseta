@@ -193,9 +193,10 @@ def test_error_response_serializes_correctly() -> None:
 # ActivityEventType enum
 # ---------------------------------------------------------------------------
 
-def test_activity_event_type_all_twelve_values() -> None:
-    """ActivityEventType has exactly 28 values (23 original + 4 invocation + alert_note_added)."""
-    assert len(ActivityEventType) == 28
+def test_activity_event_type_value_count() -> None:
+    """ActivityEventType has 30 values: 23 original + 4 invocation + alert_note_added
+    + 2 added by S2 (tool_scope_violation, tool_input_rejected)."""
+    assert len(ActivityEventType) == 30
     # Spot-check key values
     assert ActivityEventType.ALERT_INGESTED.value == "alert_ingested"
     assert ActivityEventType.WORKFLOW_APPROVAL_REQUESTED.value == "workflow_approval_requested"
