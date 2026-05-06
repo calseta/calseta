@@ -552,7 +552,10 @@ class PromptBuilder:
           Stale entries are included with a [STALE] prefix.
         """
         budget_monthly = agent.budget_monthly_cents
-        spent = agent.spent_monthly_cents
+        # S5: monthly spend is computed from cost_events (no longer stored on the agent row).
+        from app.services.budget_service import BudgetService
+
+        spent = await BudgetService(self._db).get_monthly_spend(agent)
 
         if budget_monthly > 0:
             budget_pct = spent / budget_monthly * 100

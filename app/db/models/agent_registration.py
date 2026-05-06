@@ -99,10 +99,10 @@ class AgentRegistration(TimestampMixin, UUIDMixin, Base):
     max_sub_agent_calls: Mapped[int | None] = mapped_column(Integer)
 
     # --- Control plane: budget ---
+    # NOTE (S5): ``spent_monthly_cents`` was previously a stored column. It is
+    # now computed on read from ``cost_events`` via ``BudgetService.check_monthly``.
+    # The column was dropped in alembic 0018_wave5_hardening.
     budget_monthly_cents: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0"), default=0
-    )
-    spent_monthly_cents: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("0"), default=0
     )
     budget_period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

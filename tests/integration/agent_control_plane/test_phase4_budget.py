@@ -17,7 +17,10 @@ from httpx import AsyncClient
 from sqlalchemy import func, select  # noqa: F401
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.integration.agent_control_plane.conftest import _create_agent_with_key
+from tests.integration.agent_control_plane.conftest import (
+    _create_agent_with_key,
+    _seed_monthly_spend,
+)
 from tests.integration.agent_control_plane.fixtures.mock_alerts import create_enriched_alert
 from tests.integration.conftest import auth_header
 
@@ -363,14 +366,23 @@ class TestBudgetPatchAndResume:
         db_session: AsyncSession,
         admin_auth_headers: dict[str, str],
     ) -> None:
-        """PATCH with reset_spent=true zeroes spent_monthly_cents."""
+        """S5: PATCH with ``reset_spent=true`` bumps ``budget_period_start``.
+
+        Previously this test asserted ``spent_monthly_cents == 0`` directly
+        on the agent row. Under S5 the column is gone — spend is computed
+        from ``cost_events`` filtered by current UTC month, so any cost
+        rows created earlier in the same month are still counted. The
+        ``reset_spent`` flag bumps ``budget_period_start`` to mark a fresh
+        operator-initiated period; the actual SUM still reflects raw
+        cost_events within the calendar month.
+        """
         from app.db.models.agent_registration import AgentRegistration
 
         agent, plain_key = await _create_agent_with_key(
             db_session, name="budget-reset-spent-agent", budget_monthly_cents=1000
         )
         # Accumulate some spent
-        await test_client.post(
+        cost_resp = await test_client.post(
             "/v1/cost-events",
             json={
                 "provider": "anthropic",
@@ -381,8 +393,9 @@ class TestBudgetPatchAndResume:
             },
             headers=auth_header(plain_key),
         )
-        await db_session.refresh(agent)
-        assert agent.spent_monthly_cents >= 200
+        assert cost_resp.status_code == 201
+        # Authoritative spend lives in the API response now.
+        assert cost_resp.json()["data"]["agent_budget"]["spent_cents"] >= 200
 
         # Patch with reset
         patch_resp = await test_client.patch(
@@ -396,7 +409,12 @@ class TestBudgetPatchAndResume:
             select(AgentRegistration).where(AgentRegistration.id == agent.id)
         )
         updated = result.scalar_one()
-        assert updated.spent_monthly_cents == 0
+        # budget_period_start was bumped (within last few seconds).
+        from datetime import UTC, datetime, timedelta
+
+        now = datetime.now(UTC)
+        assert updated.budget_period_start is not None
+        assert (now - updated.budget_period_start) < timedelta(minutes=1)
 
 
 # ---------------------------------------------------------------------------
@@ -405,34 +423,43 @@ class TestBudgetPatchAndResume:
 
 
 class TestMonthlyBudgetReset:
-    """budget_period_start rollover resets spent_monthly_cents to 0."""
+    """S5: monthly spend is computed from ``cost_events`` filtered by current UTC month.
 
-    @pytest.mark.xfail(
-        reason="Auto-rollover on record_cost() not yet implemented; "
-               "reset_monthly_budget() exists but must be called explicitly.",
-        strict=False,
-    )
-    async def test_new_period_resets_spent_to_zero(
+    Previously these tests verified the legacy ``spent_monthly_cents``
+    column resetting at the budget period boundary. Under S5 month
+    rollover is automatic: cost_events older than ``date_trunc('month',
+    now() AT TIME ZONE 'UTC')`` are excluded from the SUM at read time.
+    """
+
+    async def test_prior_month_costs_excluded_from_spend(
         self,
         test_client: AsyncClient,
         db_session: AsyncSession,
     ) -> None:
-        """When budget_period_start is prior month, posting cost resets spent."""
-        from app.db.models.agent_registration import AgentRegistration
+        """Cost events from a prior UTC month do not contribute to current spend."""
+        from app.db.models.agent_registration import AgentRegistration  # noqa: F401
+        from app.db.models.cost_event import CostEvent
+        from app.services.budget_service import BudgetService
 
         agent, plain_key = await _create_agent_with_key(
-            db_session, name="monthly-reset-agent", budget_monthly_cents=10000
+            db_session, name="prior-month-exclusion-agent", budget_monthly_cents=10000
         )
-
-        if not hasattr(agent, "budget_period_start"):
-            pytest.skip("budget_period_start not implemented on AgentRegistration")
-
-        # Simulate prior-month period: spent from last period
-        agent.spent_monthly_cents = 800
-        agent.budget_period_start = datetime.now(UTC) - timedelta(days=35)
+        # Backdated cost from a prior month — should NOT count.
+        prior_event = CostEvent(
+            agent_registration_id=agent.id,
+            llm_integration_id=None,
+            provider="anthropic",
+            model="claude-3-5-sonnet-20241022",
+            input_tokens=0, output_tokens=0,
+            cost_cents=800,
+            billing_type="api",
+        )
+        db_session.add(prior_event)
+        await db_session.flush()
+        prior_event.occurred_at = datetime.now(UTC) - timedelta(days=40)
         await db_session.flush()
 
-        # Post a small cost event in the new period
+        # New cost event in the current period.
         cost_resp = await test_client.post(
             "/v1/cost-events",
             json={
@@ -446,35 +473,25 @@ class TestMonthlyBudgetReset:
         )
         assert cost_resp.status_code == 201, cost_resp.text
 
-        result = await db_session.execute(
-            select(AgentRegistration).where(AgentRegistration.id == agent.id)
-        )
-        updated = result.scalar_one()
-
-        # spent_monthly_cents should reflect only the new period cost (~5), not 800 + 5
-        assert updated.spent_monthly_cents <= 50, (
-            f"Expected reset to ~5 cents after period rollover, got {updated.spent_monthly_cents}"
+        # BudgetService SUM is keyed on current-month boundary.
+        spent = await BudgetService(db_session).get_monthly_spend(agent)
+        assert spent <= 50, (
+            f"Expected only current-month spend (~5 cents), got {spent}"
         )
 
-    async def test_same_period_does_not_reset_spent(
+    async def test_same_period_costs_accumulate(
         self,
         test_client: AsyncClient,
         db_session: AsyncSession,
     ) -> None:
-        """Within the same billing period, costs accumulate (no reset)."""
-        from app.db.models.agent_registration import AgentRegistration
+        """Within the same UTC month, costs accumulate via the SUM read."""
+        from app.services.budget_service import BudgetService
 
         agent, plain_key = await _create_agent_with_key(
             db_session, name="same-period-agent", budget_monthly_cents=10000
         )
-
-        if not hasattr(agent, "budget_period_start"):
-            pytest.skip("budget_period_start not implemented on AgentRegistration")
-
-        # Current period, some prior cost
-        agent.spent_monthly_cents = 300
-        agent.budget_period_start = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0)
-        await db_session.flush()
+        # Seed a prior cost in the current month.
+        await _seed_monthly_spend(db_session, agent.id, 300)
 
         await test_client.post(
             "/v1/cost-events",
@@ -488,11 +505,7 @@ class TestMonthlyBudgetReset:
             headers=auth_header(plain_key),
         )
 
-        result = await db_session.execute(
-            select(AgentRegistration).where(AgentRegistration.id == agent.id)
-        )
-        updated = result.scalar_one()
-        # Should accumulate: 300 + 50 = 350
-        assert updated.spent_monthly_cents >= 350, (
-            f"Expected accumulation to >=350, got {updated.spent_monthly_cents}"
+        spent = await BudgetService(db_session).get_monthly_spend(agent)
+        assert spent >= 350, (
+            f"Expected accumulation to >=350 cents, got {spent}"
         )

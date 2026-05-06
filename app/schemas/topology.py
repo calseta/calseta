@@ -27,7 +27,8 @@ class TopologyNode(BaseModel):
     active_assignments: int
     max_concurrent_alerts: int
     budget_monthly_cents: int | None
-    spent_monthly_cents: int
+    # S5: computed on read from ``cost_events`` (no longer a stored column).
+    spent_monthly_cents: int = 0
     last_heartbeat_at: datetime | None
 
 

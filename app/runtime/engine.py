@@ -304,8 +304,20 @@ class AgentRuntimeEngine:
         """The core LLM → tool → LLM loop.
 
         Returns (final_messages, partial_result).
+
+        S5 budget enforcement (per-alert + monthly):
+          * Authoritative spend lives in ``cost_events``; the
+            ``BudgetService`` issues SUM queries before each iteration.
+          * Subscription billing (``provider == "claude_code"``) bypasses
+            the budget gate — ``cost_events`` rows are still recorded with
+            ``cost_cents=0`` for audit.
+          * On hit, set ``budget_stop`` flag and finish the current
+            iteration (LLM call + dispatched tools); exit at the top of
+            the next iteration with ``error_code="budget_exceeded"``.
+            Mirrors the B3 cancellation pattern.
         """
         from app.integrations.llm.base import LLMMessage
+        from app.services.budget_service import BudgetCheckResult, BudgetService
 
         total_cost_cents = 0
         total_input = 0
@@ -314,6 +326,52 @@ class AgentRuntimeEngine:
         actions_proposed: list[dict] = []
 
         dispatcher = ToolDispatcher(db=self._db, agent=agent, context=context)
+
+        # S5: subscription billing is exempt from the per-call cost gate.
+        is_subscription = bool(
+            integration is not None
+            and getattr(integration, "provider", None) == "claude_code"
+        )
+        budget_svc = BudgetService(self._db) if not is_subscription else None
+
+        # S5: hard-stop flag — set when budget is exceeded after an iteration.
+        # Checked at the TOP of the next iteration so the current LLM call +
+        # dispatched tools complete cleanly (option (c) in the design lock).
+        budget_stop_result: BudgetCheckResult | None = None
+
+        # S5: per-(agent, alert) advisory lock — serializes budget checks for
+        # concurrent runs racing the same alert. Auto-released at transaction
+        # end. If a peer holds the lock, abort: the assignment will be
+        # released and a later heartbeat will retry.
+        if (
+            budget_svc is not None
+            and context.alert_id is not None
+        ):
+            from app.services.budget_service import BudgetLockUnavailable
+
+            try:
+                await budget_svc.acquire_alert_lock(
+                    agent.id, context.alert_id,
+                )
+            except BudgetLockUnavailable:
+                logger.warning(
+                    "runtime.budget_lock_unavailable",
+                    agent_id=agent.id,
+                    alert_id=context.alert_id,
+                )
+                return messages, RuntimeResult(
+                    success=False,
+                    error=(
+                        "Concurrent run holds the budget lock for this "
+                        "(agent, alert) pair; retry on next heartbeat."
+                    ),
+                    error_code="budget_lock_unavailable",
+                    findings=findings,
+                    actions_proposed=actions_proposed,
+                    total_cost_cents=total_cost_cents,
+                    input_tokens=total_input,
+                    output_tokens=total_output,
+                )
 
         for iteration in range(self.MAX_TOOL_ITERATIONS):
             logger.debug(
@@ -341,6 +399,71 @@ class AgentRuntimeEngine:
                     input_tokens=total_input,
                     output_tokens=total_output,
                 )
+
+            # --- S5: budget check at the TOP of each iteration ---
+            # If the previous iteration tripped the budget, exit now with the
+            # partial result (LLM call + tools from that iteration are
+            # already persisted). cost.hard_stop activity event was emitted
+            # at the moment the breach was detected.
+            if budget_stop_result is not None:
+                logger.warning(
+                    "runtime.budget_hard_stop_exit",
+                    iteration=iteration,
+                    scope=budget_stop_result.scope,
+                    spent_cents=budget_stop_result.spent_cents,
+                    limit_cents=budget_stop_result.limit_cents,
+                    agent_id=agent.id,
+                )
+                return messages, RuntimeResult(
+                    success=False,
+                    error=(
+                        f"Budget exceeded ({budget_stop_result.scope}): "
+                        f"{budget_stop_result.spent_cents} cents >= "
+                        f"{budget_stop_result.limit_cents} cents limit."
+                    ),
+                    error_code="budget_exceeded",
+                    findings=findings,
+                    actions_proposed=actions_proposed,
+                    total_cost_cents=total_cost_cents,
+                    input_tokens=total_input,
+                    output_tokens=total_output,
+                )
+
+            # Run a fresh per-alert SUM check before issuing the LLM call.
+            # Subscription runs skip this (no cost to enforce against).
+            if budget_svc is not None:
+                pre = await budget_svc.check_per_alert(
+                    agent, context.alert_id,
+                )
+                if not pre.allowed:
+                    # Already over before we even called the LLM — exit
+                    # immediately. No iteration to "let finish".
+                    await self._record_budget_hard_stop(
+                        agent=agent,
+                        context=context,
+                        result=pre,
+                    )
+                    logger.warning(
+                        "runtime.budget_hard_stop_pre",
+                        scope=pre.scope,
+                        spent_cents=pre.spent_cents,
+                        limit_cents=pre.limit_cents,
+                        agent_id=agent.id,
+                    )
+                    return messages, RuntimeResult(
+                        success=False,
+                        error=(
+                            f"Budget exceeded ({pre.scope}): "
+                            f"{pre.spent_cents} cents >= "
+                            f"{pre.limit_cents} cents limit."
+                        ),
+                        error_code="budget_exceeded",
+                        findings=findings,
+                        actions_proposed=actions_proposed,
+                        total_cost_cents=total_cost_cents,
+                        input_tokens=total_input,
+                        output_tokens=total_output,
+                    )
 
             # Call LLM
             llm_messages = [
@@ -406,46 +529,52 @@ class AgentRuntimeEngine:
             total_input += cost.input_tokens
             total_output += cost.output_tokens
 
-            # Record cost event in DB
+            # Record cost event in DB. Subscription runs still record a row
+            # (cost_cents=0) for audit / consumption tracking.
             await self._record_cost(
                 agent=agent, context=context, cost=cost, integration=integration
             )
 
-            # Check per-alert budget
-            budget_exceeded = (
-                agent.max_cost_per_alert_cents > 0
-                and total_cost_cents >= agent.max_cost_per_alert_cents
-            )
-            # Emit budget_check event
+            # --- S5: post-call budget probe (per-alert + monthly) ---
+            # Skip entirely for subscription billing — nothing to enforce.
+            # On a hit, set the stop flag; we still process the tool calls
+            # this LLM iteration produced (option (c) in the design lock),
+            # then exit at the top of the next iteration.
+            if budget_svc is not None:
+                post_alert = await budget_svc.check_per_alert(
+                    agent, context.alert_id,
+                )
+                if not post_alert.allowed:
+                    await self._record_budget_hard_stop(
+                        agent=agent,
+                        context=context,
+                        result=post_alert,
+                    )
+                    budget_stop_result = post_alert
+                else:
+                    post_monthly = await budget_svc.check_monthly(agent)
+                    if not post_monthly.allowed:
+                        await self._record_budget_hard_stop(
+                            agent=agent,
+                            context=context,
+                            result=post_monthly,
+                        )
+                        budget_stop_result = post_monthly
+
+            # Emit budget_check event for run log observability.
             if on_log is not None:
                 import contextlib
                 with contextlib.suppress(Exception):
+                    spent_str = (
+                        str(budget_stop_result.spent_cents)
+                        if budget_stop_result is not None
+                        else "ok"
+                    )
                     await on_log(
                         "budget_check",
-                        f"cost={total_cost_cents}c"
-                        f" / {agent.max_cost_per_alert_cents}c",
+                        f"per_alert={spent_str}/{agent.max_cost_per_alert_cents}c "
+                        f"subscription={is_subscription}",
                     )
-
-            if budget_exceeded:
-                logger.warning(
-                    "runtime.per_alert_budget_exceeded",
-                    total_cost_cents=total_cost_cents,
-                    max_cost_per_alert_cents=agent.max_cost_per_alert_cents,
-                    agent_id=agent.id,
-                )
-                messages.append({"role": "assistant", "content": response.content})
-                return messages, RuntimeResult(
-                    success=False,
-                    error=(
-                        f"Per-alert budget exceeded: {total_cost_cents} cents >= "
-                        f"{agent.max_cost_per_alert_cents} cents limit."
-                    ),
-                    findings=findings,
-                    actions_proposed=actions_proposed,
-                    total_cost_cents=total_cost_cents,
-                    input_tokens=total_input,
-                    output_tokens=total_output,
-                )
 
             # Append assistant response to conversation
             messages.append({"role": "assistant", "content": response.content})
@@ -770,6 +899,41 @@ class AgentRuntimeEngine:
             last_run_id=heartbeat_run_id,
             last_error=result.error,
         )
+
+    async def _record_budget_hard_stop(
+        self,
+        agent: AgentRegistration,
+        context: RuntimeContext,
+        result: Any,
+    ) -> None:
+        """Persist a ``cost.hard_stop`` activity event.
+
+        Payload schema (locked 2026-05-05):
+        ``{spent_cents, limit_cents, scope: "alert" | "monthly"}``.
+
+        Never raises — emit-best-effort. Cost-event recording always wins
+        over activity-event bookkeeping.
+        """
+        import contextlib
+        import uuid as uuid_module
+
+        from app.db.models.activity_event import ActivityEvent
+
+        with contextlib.suppress(Exception):
+            self._db.add(ActivityEvent(
+                uuid=uuid_module.uuid4(),
+                event_type="cost.hard_stop",
+                actor_type="system",
+                actor_key_prefix=None,
+                alert_id=context.alert_id,
+                references={
+                    "agent_id": agent.id,
+                    "spent_cents": int(result.spent_cents),
+                    "limit_cents": int(result.limit_cents),
+                    "scope": result.scope,
+                },
+            ))
+            await self._db.flush()
 
     async def _record_cost(
         self,

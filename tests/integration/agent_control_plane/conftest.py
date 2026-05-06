@@ -30,6 +30,36 @@ from tests.integration.conftest import auth_header
 # ---------------------------------------------------------------------------
 
 
+async def _seed_monthly_spend(
+    db: AsyncSession,
+    agent_id: int,
+    cost_cents: int,
+    *,
+    alert_id: int | None = None,
+) -> None:
+    """S5: write a ``cost_events`` row to seed monthly spend for tests.
+
+    Replaces the previous ``agent.spent_monthly_cents = N`` direct
+    assignment (the column was dropped). Use this anywhere a test needs
+    to simulate prior spend.
+    """
+    from app.db.models.cost_event import CostEvent
+
+    db.add(CostEvent(
+        agent_registration_id=agent_id,
+        llm_integration_id=None,
+        alert_id=alert_id,
+        heartbeat_run_id=None,
+        provider="anthropic",
+        model="claude-3-5-sonnet-20241022",
+        input_tokens=0,
+        output_tokens=0,
+        cost_cents=cost_cents,
+        billing_type="api",
+    ))
+    await db.flush()
+
+
 async def _create_agent_with_key(
     db: AsyncSession,
     *,

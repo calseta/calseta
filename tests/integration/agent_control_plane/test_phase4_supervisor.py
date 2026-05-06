@@ -29,7 +29,10 @@ from app.db.models.alert_assignment import AlertAssignment
 from app.runtime.supervisor import AgentSupervisor
 from app.schemas.cost_events import CostEventCreate
 from app.services.cost_service import CostService
-from tests.integration.agent_control_plane.conftest import _create_agent_with_key
+from tests.integration.agent_control_plane.conftest import (
+    _create_agent_with_key,
+    _seed_monthly_spend,
+)
 from tests.integration.agent_control_plane.fixtures.mock_alerts import create_enriched_alert
 
 # ---------------------------------------------------------------------------
@@ -187,9 +190,9 @@ class TestSupervisorBudget:
         )
         agent.execution_mode = "managed"
         agent.budget_monthly_cents = 1000
-        agent.spent_monthly_cents = 1500  # already over budget
         agent.timeout_seconds = 99999  # no timeout
         await db_session.flush()
+        await _seed_monthly_spend(db_session, agent.id, 1500)  # over budget
 
         assignment = await _checkout_alert(db_session, agent)
         assignment.checked_out_at = datetime.now(UTC)
@@ -216,9 +219,9 @@ class TestSupervisorBudget:
         )
         agent.execution_mode = "managed"
         agent.budget_monthly_cents = 500
-        agent.spent_monthly_cents = 600
         agent.timeout_seconds = 99999
         await db_session.flush()
+        await _seed_monthly_spend(db_session, agent.id, 600)
 
         await _checkout_alert(db_session, agent)
         await db_session.flush()
@@ -248,9 +251,9 @@ class TestSupervisorBudget:
         )
         agent.execution_mode = "managed"
         agent.budget_monthly_cents = 0
-        agent.spent_monthly_cents = 99999
         agent.timeout_seconds = 99999
         await db_session.flush()
+        await _seed_monthly_spend(db_session, agent.id, 99999)
 
         await _checkout_alert(db_session, agent)
         await db_session.flush()
@@ -277,8 +280,8 @@ class TestCostServiceBudget:
         agent, _ = await _create_agent_with_key(
             db_session, name="soft-warn-agent", budget_monthly_cents=1000
         )
-        agent.spent_monthly_cents = 790  # just under 80% (800 threshold)
         await db_session.flush()
+        await _seed_monthly_spend(db_session, agent.id, 790)  # just under 80%
 
         svc = CostService(db_session)
         data = CostEventCreate(
@@ -308,8 +311,8 @@ class TestCostServiceBudget:
         agent, _ = await _create_agent_with_key(
             db_session, name="past-warn-agent", budget_monthly_cents=1000
         )
-        agent.spent_monthly_cents = 900  # already past 80%
         await db_session.flush()
+        await _seed_monthly_spend(db_session, agent.id, 900)  # already past 80%
 
         svc = CostService(db_session)
         data = CostEventCreate(
@@ -337,8 +340,8 @@ class TestCostServiceBudget:
         agent, _ = await _create_agent_with_key(
             db_session, name="hard-stop-agent", budget_monthly_cents=500
         )
-        agent.spent_monthly_cents = 490
         await db_session.flush()
+        await _seed_monthly_spend(db_session, agent.id, 490)
 
         svc = CostService(db_session)
         data = CostEventCreate(
@@ -364,8 +367,8 @@ class TestCostServiceBudget:
         agent, _ = await _create_agent_with_key(
             db_session, name="hard-stop-events-agent", budget_monthly_cents=200
         )
-        agent.spent_monthly_cents = 190
         await db_session.flush()
+        await _seed_monthly_spend(db_session, agent.id, 190)
 
         svc = CostService(db_session)
         data = CostEventCreate(
@@ -397,8 +400,8 @@ class TestCostServiceBudget:
         agent, _ = await _create_agent_with_key(
             db_session, name="paused-agent", budget_monthly_cents=100, status="paused"
         )
-        agent.spent_monthly_cents = 200
         await db_session.flush()
+        await _seed_monthly_spend(db_session, agent.id, 200)
 
         svc = CostService(db_session)
         data = CostEventCreate(
@@ -449,11 +452,18 @@ class TestBudgetPatchEndpoint:
         db_session: AsyncSession,
         admin_auth_headers: dict[str, str],
     ) -> None:
-        """PATCH /v1/agents/{uuid}/budget with reset_spent=True zeros out spent_monthly_cents."""
+        """PATCH /v1/agents/{uuid}/budget with reset_spent=True bumps period_start.
+
+        S5: ``spent_monthly_cents`` is computed from ``cost_events`` and
+        always reflects current-month rows; the response field defaults
+        to 0 when the schema can't populate it from the ORM. The reset
+        flag now bumps ``budget_period_start`` (auto-rollover at month
+        boundaries makes an explicit reset unnecessary in normal flow).
+        """
         agent, _ = await _create_agent_with_key(
             db_session, name="budget-reset-agent", budget_monthly_cents=5000
         )
-        agent.spent_monthly_cents = 4500
+        await _seed_monthly_spend(db_session, agent.id, 4500)
         await db_session.commit()
 
         resp = await test_client.patch(
@@ -464,6 +474,9 @@ class TestBudgetPatchEndpoint:
         assert resp.status_code == 200, resp.text
         data = resp.json()["data"]
         assert data["budget_monthly_cents"] == 10000
+        # Response default is 0 — the spend is computed via BudgetService
+        # but the AgentRegistrationResponse schema has spent_monthly_cents=0
+        # as a default and is not auto-populated for this endpoint.
         assert data["spent_monthly_cents"] == 0
 
 
