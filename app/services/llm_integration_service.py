@@ -103,7 +103,7 @@ class LLMIntegrationService:
         if data.model is not None:
             updates["model"] = data.model
         if data.api_key_ref is not None:
-            updates["api_key_ref"] = data.api_key_ref
+            updates["api_key_secret_ref"] = data.api_key_ref
         if data.base_url is not None:
             updates["base_url"] = data.base_url
         if data.config is not None:

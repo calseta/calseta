@@ -48,7 +48,7 @@ async def _seed_llm_integration(db: AsyncSession) -> LLMIntegration:
         name=_LLM_INTEGRATION_NAME,
         provider="claude_code",
         model="claude-sonnet-4-6",
-        api_key_ref=None,
+        api_key_secret_ref=None,
         config={"max_tokens": 8096},
         cost_per_1k_input_tokens_cents=0,
         cost_per_1k_output_tokens_cents=0,

@@ -103,11 +103,34 @@ class SecretsAccessor:
     """
     Provides named secret access to workflow code.
 
-    Reads environment variables by name. Never exposes all secrets at once.
-    Returns None if the variable is not set, so workflows can handle absence gracefully.
+    S3 (2026-05-05) — fail-closed semantics:
+
+    * Names matching the global denylist (``CALSETA_*``, ``*_API_KEY``,
+      ``*_SECRET``, ``*_TOKEN``, ``*_PASSWORD``, ``DATABASE_URL``,
+      ``ENCRYPTION_KEY``, ``AWS_*``, ``AZURE_*``) always return ``None``.
+      The workflow does not learn whether the variable exists in the
+      process environment — denied is denied.
+    * Names absent from the per-workflow ``allowed_secrets`` allowlist
+      return ``None``. Workflows must explicitly opt in to each secret.
+    * Names that pass both checks are read from ``os.environ``; missing
+      env vars also return ``None`` so workflows can handle absence
+      gracefully.
+
+    The S1 IPC ``secret.get`` op proxies these same semantics into the
+    sandboxed subprocess.
     """
 
+    def __init__(self, allowed_secrets: list[str] | None = None) -> None:
+        self._allowed: frozenset[str] = frozenset(allowed_secrets or [])
+
     def get(self, key: str) -> str | None:
+        # Lazy import to keep this module import-light for workflow authors.
+        from app.secrets.denylist import is_denied
+
+        if is_denied(key):
+            return None
+        if key not in self._allowed:
+            return None
         return os.environ.get(key)
 
 

@@ -99,6 +99,20 @@ class AgentAPIKeyAuthBackend(AuthBackendBase):
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
 
+        # S3: scoped per-run keys auto-expire. expires_at IS NULL means
+        # never expires (long-lived management UI keys).
+        if record.expires_at is not None and record.expires_at <= datetime.now(UTC):
+            log_auth_failure(
+                "key_expired",
+                request,
+                key_prefix=key_prefix,
+            )
+            raise CalsetaException(
+                code="KEY_EXPIRED",
+                message="Agent API key has expired.",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
         # Update last_used_at — committed with the session at request end
         record.last_used_at = datetime.now(UTC)
 

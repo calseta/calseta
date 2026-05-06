@@ -30,6 +30,10 @@ class AgentAPIKey(TimestampMixin, UUIDMixin, Base):
     scopes: Mapped[list[Any]] = mapped_column(JSONB, nullable=False)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # S3: scoped per-run keys auto-expire. NULL means never expires (keys
+    # created via the manage UI). Expired keys are rejected by the auth
+    # backend with error_code="key_expired".
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     agent_registration: Mapped[AgentRegistration] = relationship(
         "AgentRegistration",

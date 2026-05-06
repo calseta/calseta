@@ -188,7 +188,7 @@ async def execute_workflow(
             alert=alert_ctx,
             http=http,
             log=logger,
-            secrets=SecretsAccessor(),
+            secrets=SecretsAccessor(allowed_secrets=list(workflow.allowed_secrets or [])),
             integrations=integrations,
         )
 
