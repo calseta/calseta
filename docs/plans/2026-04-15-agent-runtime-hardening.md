@@ -621,11 +621,11 @@ The existing dashboard has 32 fixed cards. With agent runtime data adding more, 
 | D3: Alert comment re-trigger (UI) | 4 | **complete** | C1 |
 | D4: Workspace schema (plan only) | 4 | **complete** | — |
 | D5: Configurable dashboard cards (UI) | 4 | **complete** | — |
-| S1: Workflow process isolation | 5 | **pending** (design) | — |
+| S1: Workflow process isolation | 5 | **complete** (merged 2026-05-05) | — |
 | S2: Tool output validation gate | 5 | **complete** (merged 2026-05-04) | — |
-| S3: Secret resolver hardening | 5 | **pending** (design) | — |
+| S3: Secret resolver hardening | 5 | **complete** (merged 2026-05-05) | — |
 | S4: Run log redaction | 5 | **pending** | S3 |
-| S5: Real budget enforcement path | 5 | **pending** (design) | — |
+| S5: Real budget enforcement path | 5 | **complete** (merged 2026-05-05) | — |
 | S6: Adapter input validation | 5 | **complete** (merged 2026-05-04) | — |
 | S7: Prompt injection escaping in Layers 1/3 | 5 | **complete — escaping only** (merged 2026-05-04; post-filter deferred) | — |
 | S8: Per-agent runtime rate limit | 5 | **pending** | S5 |
@@ -1817,3 +1817,18 @@ Two merge-time resolutions worth flagging for future readers:
 **Open spec question (deferred to follow-up):** S2 picked the `post_finding` classification enum to match the live `app/seed/builtin_tools.py` schema (`true_positive` / `false_positive` / `benign` / `inconclusive`), not the spec's `benign` / `suspicious` / `malicious` / `inconclusive`. If the spec values are preferred, both `app/seed/builtin_tools.py` AND `POST_FINDING_CLASSIFICATIONS` must change in lockstep with a finding data-fix migration.
 
 **Three Wave 5 chunks remain pending design discussion:** S1 (workflow process isolation — seccomp + IPC), S3 (secret resolver hardening — migration story for existing literal `api_key_ref` rows), S5 (real budget enforcement — `FOR UPDATE` lock semantics). S4/S8/S9 each depend on one of these.
+
+#### 2026-05-05 — S1 / S3 / S5 shipment
+
+The three remaining "design needed" chunks shipped after intake-driven design lockdown (`tmp/wave5-s1-s3-s5-intake.md`). All three were implemented by isolated agents in worktrees and merged into `feat/calseta-v2`:
+
+- **S1** (`wave5/s1-workflow-process-isolation`): subprocess + scrubbed env + rlimit + seccomp-bpf (Linux). NDJSON IPC over pipe with ops `http.request` / `secret.get` / `log` / `done`. macOS / no-libseccomp falls back to rlimit-only with a one-shot `workflow.seccomp_unavailable` warning. Each run gets a fresh `/tmp/workflow-<run_uuid>/` workspace. `WORKFLOW_ISOLATION_MODE=none` removed entirely — isolation mandatory in every environment. Files: `app/workflows/runner.py`, `scripts/workflow_subprocess_entry.py`, `pyproject.toml` `[isolation]` group with `pyseccomp`. 9 isolation tests.
+- **S3** (`wave5/s3-secret-resolver-hardening`): fail-closed `resolve_secret_ref` with five-prefix grammar (`env:` / `vault:` / `aws-sm:` / `azure-kv:` / `enc:`). Global denylist as compiled regexes. Auto-migration on startup: literal `api_key_ref` values → `enc:<ciphertext>` via Fernet, single transaction per row, idempotent. `LLMIntegration.api_key_ref` renamed to `api_key_secret_ref` at the DB layer (Pydantic API field name preserved at the boundary for back-compat). `workflows.allowed_secrets` TEXT[] added. `agent_api_keys.expires_at` added; scoped per-run `cak_*` keys minted with 1h TTL, expired keys reject auth with `key_expired`. 70+ new tests across 3 files.
+- **S5** (`wave5/s5-real-budget-enforcement`): `BudgetService` with per-alert + monthly checks via `cost_events` SUM, Postgres advisory lock on `(agent_id, alert_id)`. Hard-stop semantics mirror B3 cancellation (set flag, finish iteration, exit at top of next). `agent.spent_monthly_cents` column dropped (the ORM/migration mismatch S3 flagged as a pre-existing bug — fixed cleanly here). `claude_code` subscription runs still record `cost_events` rows with `cost_cents=0` for audit; budget check skipped per `provider == "claude_code"`. 10 budget tests.
+
+**Notable merge-time work:**
+- `app/services/workflow_executor.py` — S1 + S3 conflict on this file. Resolution: keep S1's subprocess execution path but pass `workflow.allowed_secrets` through `ctx_payload`, then update S1's `_handle_secret_get` IPC handler to enforce both the global denylist (from S3's `app/secrets/denylist.py`) and the per-workflow allowlist before reading `os.environ`.
+- `tests/integration/workflows/test_isolation.py::test_env_scrubbing` — S1's test asserted that the v1 secret stub returned the parent env value for `ANTHROPIC_API_KEY` (the test's docstring explicitly noted "S3 will lock this down"). After S3, the IPC handler correctly returns `None` because the key matches the global denylist; assertion flipped accordingly.
+- Migration `0018_wave5_hardening.py` now consolidates schema changes from S14, S15, S17, S3, and S5 into a single revision — alembic chain stays linear, round-trip verified.
+
+**Wave 5 status:** S2/S6/S7/S10/S11/S12/S13/S14/S15/S16/S17 + S1/S3/S5 → all complete. Remaining: S4 (run log redaction; depends on S3 — now unblocked), S8 (per-agent rate limit; depends on S5 — now unblocked), S9 (production startup hardening; depends on S1 + S3 — now unblocked), S7 follow-up (comment-citation post-filter; deferred per spec).

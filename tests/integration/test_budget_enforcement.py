@@ -538,7 +538,7 @@ class TestConcurrentBudgetEnforcement:
 
         successes = 0
         budget_exceeds = 0
-        for run_idx in range(3):
+        for _run_idx in range(3):
             adapter = AsyncMock()
             adapter.create_message.side_effect = [
                 _llm_response_text(cost_cents=8),

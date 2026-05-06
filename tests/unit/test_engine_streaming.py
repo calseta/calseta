@@ -12,7 +12,6 @@ from app.runtime.engine import AgentRuntimeEngine
 from app.runtime.models import RuntimeContext
 from app.services.budget_service import BudgetCheckResult
 
-
 # S5: stub BudgetCheckResult instances reused across the unit tests below.
 # These tests mock out the DB session, so BudgetService SQL queries cannot
 # run — patches at call sites swap the methods for AsyncMocks returning
