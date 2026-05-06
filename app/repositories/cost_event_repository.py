@@ -82,6 +82,42 @@ class CostEventRepository(BaseRepository[CostEvent]):
         )
         return int(result.scalar_one())
 
+    async def sum_for_alert(self, agent_id: int, alert_id: int) -> int:
+        """Return SUM(cost_cents) for one (agent, alert) pair.
+
+        Authoritative source for per-alert budget checks; replaces the
+        previous in-process counter in the runtime engine.
+        """
+        result = await self._db.execute(
+            select(func.coalesce(func.sum(CostEvent.cost_cents), 0)).where(
+                CostEvent.agent_registration_id == agent_id,
+                CostEvent.alert_id == alert_id,
+            )
+        )
+        return int(result.scalar_one())
+
+    async def sum_for_month(
+        self, agent_id: int, ref_dt: datetime,
+    ) -> int:
+        """Return SUM(cost_cents) for an agent in the UTC month of ref_dt.
+
+        Window is ``[start_of_month, now]`` (no upper bound — current month).
+        Authoritative source for the supervisor's monthly budget check;
+        replaces the previous read of ``agent.spent_monthly_cents``.
+        """
+        from datetime import UTC
+
+        # Coerce to UTC-aware then truncate to start-of-month.
+        ref_utc = ref_dt.astimezone(UTC) if ref_dt.tzinfo else ref_dt.replace(tzinfo=UTC)
+        month_start = datetime(ref_utc.year, ref_utc.month, 1, tzinfo=UTC)
+        result = await self._db.execute(
+            select(func.coalesce(func.sum(CostEvent.cost_cents), 0)).where(
+                CostEvent.agent_registration_id == agent_id,
+                CostEvent.occurred_at >= month_start,
+            )
+        )
+        return int(result.scalar_one())
+
     async def get_summary_for_agent(
         self,
         agent_id: int,

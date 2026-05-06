@@ -62,9 +62,16 @@ def _derive_node_status(agent: AgentRegistration) -> str:
 def _build_node(
     agent: AgentRegistration,
     assignment_counts: dict[int, int],
+    spent_by_agent: dict[int, int] | None = None,
 ) -> TopologyNode:
-    """Build a TopologyNode from an AgentRegistration row."""
+    """Build a TopologyNode from an AgentRegistration row.
+
+    S5: ``spent_monthly_cents`` is no longer a stored column. The caller
+    must pass a precomputed ``spent_by_agent`` mapping (one SUM query
+    per topology snapshot) — defaults to 0 when omitted.
+    """
     active_assignments = assignment_counts.get(agent.id, 0)
+    spent_monthly = (spent_by_agent or {}).get(agent.id, 0)
 
     # capabilities is JSONB — extract list of capability names if present
     caps: list[str] = []
@@ -87,7 +94,7 @@ def _build_node(
         budget_monthly_cents=(
             agent.budget_monthly_cents if agent.budget_monthly_cents != 0 else None
         ),
-        spent_monthly_cents=agent.spent_monthly_cents,
+        spent_monthly_cents=spent_monthly,
         last_heartbeat_at=agent.last_heartbeat_at,
     )
 
@@ -100,6 +107,33 @@ async def _load_agents(db: AsyncSession) -> list[AgentRegistration]:
         )
     )
     return list(result.scalars().all())
+
+
+async def _batch_monthly_spend(
+    db: AsyncSession, agent_ids: list[int],
+) -> dict[int, int]:
+    """S5: SUM(cost_cents) per agent for the current UTC month, in one query.
+
+    Replaces the per-agent ``spent_monthly_cents`` column read.
+    """
+    if not agent_ids:
+        return {}
+    from app.db.models.cost_event import CostEvent
+
+    now = datetime.now(UTC)
+    month_start = datetime(now.year, now.month, 1, tzinfo=UTC)
+    result = await db.execute(
+        select(
+            CostEvent.agent_registration_id,
+            func.coalesce(func.sum(CostEvent.cost_cents), 0).label("total"),
+        )
+        .where(
+            CostEvent.agent_registration_id.in_(agent_ids),
+            CostEvent.occurred_at >= month_start,
+        )
+        .group_by(CostEvent.agent_registration_id)
+    )
+    return {row.agent_registration_id: int(row.total) for row in result.all()}
 
 
 def _build_delegation_edges(
@@ -139,7 +173,8 @@ class TopologyService:
         uuid_by_id: dict[int, uuid.UUID] = {a.id: a.uuid for a in agents}
         counts = await _batch_active_assignment_counts(self._db, [a.id for a in agents])
 
-        nodes = [_build_node(a, counts) for a in agents]
+        spent = await _batch_monthly_spend(self._db, [a.id for a in agents])
+        nodes = [_build_node(a, counts, spent) for a in agents]
         edges = _build_delegation_edges(agents, uuid_by_id)
 
         logger.info(
@@ -167,8 +202,11 @@ class TopologyService:
         counts = await _batch_active_assignment_counts(
             self._db, [a.id for a in routing_agents]
         )
+        spent = await _batch_monthly_spend(
+            self._db, [a.id for a in routing_agents]
+        )
 
-        nodes = [_build_node(a, counts) for a in routing_agents]
+        nodes = [_build_node(a, counts, spent) for a in routing_agents]
 
         # No edges for routing graph — just shows which agents receive alerts
         return TopologyGraph(
@@ -194,7 +232,10 @@ class TopologyService:
         counts = await _batch_active_assignment_counts(
             self._db, [a.id for a in involved_agents]
         )
-        nodes = [_build_node(a, counts) for a in involved_agents]
+        spent = await _batch_monthly_spend(
+            self._db, [a.id for a in involved_agents]
+        )
+        nodes = [_build_node(a, counts, spent) for a in involved_agents]
 
         return TopologyGraph(
             nodes=nodes,

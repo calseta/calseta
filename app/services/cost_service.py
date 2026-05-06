@@ -33,20 +33,34 @@ class CostService:
     ) -> tuple[object, AgentBudgetStatus]:
         """Record a cost event and check the agent's monthly budget.
 
-        Steps:
-          1. Create cost_event row.
-          2. Update agent.spent_monthly_cents.
-          3. Soft-warn at 80%: emit cost.budget_alert activity event once per crossing.
-          4. Hard stop at 100%: set status='paused', emit cost.hard_stop +
-             agent.budget_exceeded activity events.
-          5. Return (cost_event, budget_status).
+        S5: monthly spend is now read from ``cost_events`` via the same
+        SUM that the supervisor and runtime engine use — there is no
+        ``agent.spent_monthly_cents`` column to update. This eliminates
+        the race where two concurrent ``record_cost`` calls each saw
+        their own stale snapshot of the column.
 
-        budget_status.hard_stop_triggered=True if the monthly limit was just breached.
+        Steps:
+          1. Create the ``cost_event`` row.
+          2. Compute the new monthly spend from ``cost_events`` (post-insert).
+          3. Soft-warn at 80%: emit ``cost.budget_alert`` once per crossing.
+          4. Hard stop at 100%: set ``status='paused'``, emit
+             ``cost.hard_stop`` + ``agent.budget_exceeded``.
+          5. Return ``(cost_event, budget_status)``.
+
+        ``budget_status.hard_stop_triggered`` is True if the monthly limit
+        was just breached by this event.
         """
         repo = CostEventRepository(self._db)
 
         # Resolve llm_integration_id — look it up from agent if not overridden
         llm_integration_id: int | None = agent.llm_integration_id
+
+        # Snapshot pre-insert spend so the soft-warn crossing detection is
+        # symmetric (prev_spent < threshold <= new_spent).
+        from datetime import UTC, datetime
+
+        now = datetime.now(UTC)
+        prev_spent = await repo.sum_for_month(agent.id, now)
 
         cost_event = await repo.create(
             agent_id=agent.id,
@@ -61,19 +75,16 @@ class CostService:
             billing_type=data.billing_type,
         )
 
-        prev_spent = agent.spent_monthly_cents or 0
-
-        # Update agent's running total
-        agent.spent_monthly_cents = prev_spent + data.cost_cents
-        await self._db.flush()
+        # Authoritative post-insert spend.
+        new_spent = await repo.sum_for_month(agent.id, now)
 
         budget = agent.budget_monthly_cents
 
         # Soft-warning: fire once when spend crosses the 80% threshold
         if budget > 0:
             warn_threshold = int(budget * self.SOFT_WARN_THRESHOLD)
-            crossed_soft_warn = prev_spent < warn_threshold <= agent.spent_monthly_cents
-            if crossed_soft_warn and agent.spent_monthly_cents < budget:
+            crossed_soft_warn = prev_spent < warn_threshold <= new_spent
+            if crossed_soft_warn and new_spent < budget:
                 try:
                     await self._emit_activity_event(
                         event_type="cost.budget_alert",
@@ -81,7 +92,7 @@ class CostService:
                         references={
                             "agent_id": agent.id,
                             "budget_monthly_cents": budget,
-                            "spent_monthly_cents": agent.spent_monthly_cents,
+                            "spent_cents": new_spent,
                             "threshold_pct": int(self.SOFT_WARN_THRESHOLD * 100),
                         },
                     )
@@ -91,12 +102,12 @@ class CostService:
                     "agent_budget_soft_warn",
                     agent_id=agent.id,
                     budget_monthly_cents=budget,
-                    spent_monthly_cents=agent.spent_monthly_cents,
+                    spent_cents=new_spent,
                     threshold_pct=int(self.SOFT_WARN_THRESHOLD * 100),
                 )
 
         # Evaluate hard stop
-        hard_stop = budget > 0 and agent.spent_monthly_cents >= budget
+        hard_stop = budget > 0 and new_spent >= budget
 
         if hard_stop and agent.status not in ("paused", "terminated"):
             agent.status = "paused"
@@ -105,7 +116,7 @@ class CostService:
                 "agent_budget_hard_stop",
                 agent_id=agent.id,
                 budget_monthly_cents=budget,
-                spent_monthly_cents=agent.spent_monthly_cents,
+                spent_cents=new_spent,
             )
             try:
                 await self._emit_activity_event(
@@ -113,8 +124,9 @@ class CostService:
                     alert_id=db_alert_id,
                     references={
                         "agent_id": agent.id,
-                        "budget_monthly_cents": budget,
-                        "spent_monthly_cents": agent.spent_monthly_cents,
+                        "spent_cents": new_spent,
+                        "limit_cents": budget,
+                        "scope": "monthly",
                     },
                 )
                 await self._emit_activity_event(
@@ -123,17 +135,17 @@ class CostService:
                     references={
                         "agent_id": agent.id,
                         "budget_monthly_cents": budget,
-                        "spent_monthly_cents": agent.spent_monthly_cents,
+                        "spent_cents": new_spent,
                     },
                 )
             except Exception as exc:
                 logger.warning("cost_service.hard_stop_event_failed", error=str(exc))
 
-        remaining = max(0, budget - agent.spent_monthly_cents) if budget > 0 else 0
+        remaining = max(0, budget - new_spent) if budget > 0 else 0
 
         budget_status = AgentBudgetStatus(
             monthly_cents=budget,
-            spent_cents=agent.spent_monthly_cents,
+            spent_cents=new_spent,
             remaining_cents=remaining,
             hard_stop_triggered=hard_stop,
         )
@@ -147,7 +159,7 @@ class CostService:
             agent_id=agent.id,
             cost_cents=data.cost_cents,
             billing_type=data.billing_type,
-            spent_monthly_cents=agent.spent_monthly_cents,
+            spent_cents=new_spent,
             hard_stop=hard_stop,
         )
 
@@ -176,8 +188,19 @@ class CostService:
         await self._db.flush()
 
     async def reset_monthly_budget(self, agent: AgentRegistration) -> None:
-        """Reset spent_monthly_cents=0 and budget_period_start=now()."""
-        agent.spent_monthly_cents = 0
+        """Mark the start of a fresh budget period.
+
+        S5: monthly spend is computed from ``cost_events`` filtered by
+        ``occurred_at >= start_of_current_utc_month``, so rollover is
+        automatic at month boundaries. ``reset_spent`` (called by
+        ``PATCH /v1/agents/{uuid}/budget``) now bumps
+        ``budget_period_start`` and excludes any cost rows older than
+        ``budget_period_start`` from spend (handled in BudgetService —
+        future enhancement). Today this is effectively a no-op except
+        for bumping the period stamp; the immediate effect is that the
+        next ``BudgetService.check_monthly`` call sees only the current
+        UTC month's rows.
+        """
         agent.budget_period_start = datetime.now(UTC)
         await self._db.flush()
         await self._db.commit()

@@ -9,7 +9,8 @@ Handles:
 Design:
 - Service never executes specialists inline — always enqueues via task queue
 - All DB mutations flush before enqueueing so tasks see committed state
-- Cost roll-up: when invocation completes, child cost is added to parent agent spent_monthly_cents
+- Cost roll-up (S5): child cost is added to ``invocation.cost_cents`` only.
+  Parent agent monthly spend is computed from ``cost_events`` on demand.
 """
 
 from __future__ import annotations
@@ -341,15 +342,18 @@ class InvocationService:
         invocation: AgentInvocation,
         cost_cents: int,
     ) -> None:
-        """Accumulate child cost on invocation and roll up to parent agent budget."""
+        """Accumulate child cost on the invocation row.
+
+        S5: roll-up to the parent agent's ``spent_monthly_cents`` is no
+        longer needed — that column has been dropped. Parent monthly spend
+        is computed authoritatively from ``cost_events`` on demand. The
+        execution handler that reports child costs is expected to insert
+        a ``cost_events`` row for the parent (already done in the runtime
+        engine's ``_record_cost``); this method only updates the
+        per-invocation rollup counter for invocation-level reporting.
+        """
         invocation.cost_cents = (invocation.cost_cents or 0) + cost_cents
         await self._db.flush()
-
-        # Roll up to parent agent spent_monthly_cents
-        parent = await self._agent_repo.get_by_id(invocation.parent_agent_id)
-        if parent is not None:
-            parent.spent_monthly_cents = (parent.spent_monthly_cents or 0) + cost_cents
-            await self._db.flush()
 
     # ----------------------------------------------------------------
     # Internal helpers

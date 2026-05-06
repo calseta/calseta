@@ -1,6 +1,6 @@
 """Wave 5 hardening — combined schema + data migration.
 
-Consolidates three Wave 5 chunks that each landed an independent migration in
+Consolidates four Wave 5 chunks that each landed an independent migration in
 their own worktree. Merged into one revision so the alembic chain stays
 linear:
 
@@ -18,6 +18,11 @@ linear:
   enum, recommended_action, evidence, posted_at``). Idempotent — already-
   canonical rows are skipped. Reversible (best-effort) via the originals
   preserved under ``evidence.*``.
+* **S5** — drop ``agent_registrations.spent_monthly_cents`` (computed on read
+  from ``cost_events``) and add covering index ``(agent_id, created_at)`` on
+  ``cost_events`` for the per-alert / monthly SUM queries. The previous column
+  was unenforced and racy; ``BudgetService`` now reads authoritative state
+  directly from ``cost_events``.
 
 Revision ID: 0018
 Revises: 0017
@@ -241,9 +246,40 @@ def upgrade() -> None:
     # --- S15: agent_findings canonicalization (data fix) ---
     _rewrite_agent_findings(direction="up")
 
+    # --- S5: drop agent.spent_monthly_cents + add cost_events covering index ---
+    # The column was created in 0003_agent_control_plane_phase1; in some test
+    # databases the ORM declares the column but no migration ever installed it.
+    # ``IF EXISTS`` keeps the migration idempotent across both states.
+    op.execute(
+        sa.text(
+            "ALTER TABLE agent_registrations "
+            "DROP COLUMN IF EXISTS spent_monthly_cents",
+        ),
+    )
+    op.execute(
+        sa.text(
+            "CREATE INDEX IF NOT EXISTS idx_cost_events_agent_id_created_at "
+            "ON cost_events (agent_registration_id, occurred_at)",
+        ),
+    )
+
 
 def downgrade() -> None:
     # Reverse order of upgrade.
+
+    # --- S5 inverse ---
+    op.execute(
+        sa.text(
+            "DROP INDEX IF EXISTS idx_cost_events_agent_id_created_at",
+        ),
+    )
+    op.execute(
+        sa.text(
+            "ALTER TABLE agent_registrations "
+            "ADD COLUMN IF NOT EXISTS spent_monthly_cents "
+            "INTEGER NOT NULL DEFAULT 0",
+        ),
+    )
 
     # --- S15 inverse ---
     _rewrite_agent_findings(direction="down")

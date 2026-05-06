@@ -471,19 +471,24 @@ class TestInvocationSupervisorTimeout:
 
 
 class TestCostRollup:
-    """Phase 5 exit criterion: child invocation cost is reflected in the parent
-    agent's spent_monthly_cents after InvocationService.add_cost() is called.
+    """Phase 5 exit criterion: child invocation cost is recorded on the
+    invocation row.
+
+    S5: parent-agent monthly spend is no longer rolled up by ``add_cost``
+    — it is computed authoritatively from ``cost_events`` on demand. The
+    runtime engine writes a ``cost_events`` row per LLM call (including
+    delegated child runs), so the parent's monthly SUM picks them up
+    without any explicit rollup step.
     """
 
-    async def test_child_invocation_cost_rolls_up_to_parent_agent(
+    async def test_child_invocation_cost_recorded_on_invocation(
         self,
         db_session: AsyncSession,
     ) -> None:
-        """add_cost() increments invocation.cost_cents AND parent agent.spent_monthly_cents."""
+        """add_cost() increments invocation.cost_cents (parent SUM is via cost_events)."""
         from app.db.models.agent_invocation import AgentInvocation
         from app.services.invocation_service import InvocationService
 
-        # Create orchestrator (parent) and specialist (child) agents
         parent_agent, _ = await _create_orchestrator_with_key(
             db_session, name="rollup-parent", budget_monthly_cents=10_000
         )
@@ -493,7 +498,6 @@ class TestCostRollup:
         alert = await create_enriched_alert(db_session, title="Cost Rollup Alert")
         await db_session.flush()
 
-        # Create the invocation row directly (bypasses queue)
         inv = AgentInvocation(
             parent_agent_id=parent_agent.id,
             child_agent_id=child_agent.id,
@@ -507,31 +511,21 @@ class TestCostRollup:
         await db_session.flush()
         await db_session.refresh(inv)
 
-        initial_parent_spent = parent_agent.spent_monthly_cents or 0
         charge_cents = 42
 
         svc = InvocationService(db_session)
         await svc.add_cost(inv, charge_cents)
 
-        # Verify invocation.cost_cents incremented
         await db_session.refresh(inv)
         assert inv.cost_cents == charge_cents, (
             f"Expected invocation.cost_cents={charge_cents}, got {inv.cost_cents}"
-        )
-
-        # Verify parent agent.spent_monthly_cents rolled up
-        await db_session.refresh(parent_agent)
-        expected_parent_spent = initial_parent_spent + charge_cents
-        assert parent_agent.spent_monthly_cents == expected_parent_spent, (
-            f"Expected parent spent_monthly_cents={expected_parent_spent}, "
-            f"got {parent_agent.spent_monthly_cents}"
         )
 
     async def test_cost_rollup_accumulates_across_multiple_calls(
         self,
         db_session: AsyncSession,
     ) -> None:
-        """Multiple add_cost() calls accumulate on both invocation and parent agent."""
+        """Multiple add_cost() calls accumulate on the invocation row."""
         from app.db.models.agent_invocation import AgentInvocation
         from app.services.invocation_service import InvocationService
 
@@ -563,7 +557,4 @@ class TestCostRollup:
         await svc.add_cost(inv, 5)
 
         await db_session.refresh(inv)
-        await db_session.refresh(parent_agent)
-
         assert inv.cost_cents == 35
-        assert (parent_agent.spent_monthly_cents or 0) >= 35

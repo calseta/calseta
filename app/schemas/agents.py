@@ -125,8 +125,13 @@ class AgentRegistrationResponse(BaseModel):
     max_sub_agent_calls: int | None
 
     # --- Control plane: budget ---
+    # S5: ``spent_monthly_cents`` is no longer a stored column on
+    # ``agent_registrations``. The API contract retains the field for
+    # back-compat; populate via BudgetService when serializing if a
+    # current value is needed. Defaults to 0 so ``model_validate(orm)``
+    # never breaks for callers that don't care about live spend.
     budget_monthly_cents: int
-    spent_monthly_cents: int
+    spent_monthly_cents: int = 0
     budget_period_start: datetime | None
 
     # --- Control plane: runtime ---

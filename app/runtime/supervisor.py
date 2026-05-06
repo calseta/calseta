@@ -217,14 +217,24 @@ class AgentSupervisor:
         agent: AgentRegistration,  # type: ignore[name-defined]  # noqa: F821
         assign_repo: AlertAssignmentRepository,  # type: ignore[name-defined]  # noqa: F821
     ) -> bool:
-        """Check if this agent has exceeded its monthly budget. Returns True if stopped."""
+        """Check if this agent has exceeded its monthly budget. Returns True if stopped.
+
+        S5: spend is computed authoritatively from ``cost_events`` via
+        ``BudgetService.check_monthly`` (the previous read of
+        ``agent.spent_monthly_cents`` was unenforced and racy).
+        """
         budget = agent.budget_monthly_cents
         if budget <= 0:
             return False
 
-        spent = agent.spent_monthly_cents or 0
-        if spent < budget:
+        from app.services.budget_service import BudgetService
+
+        budget_svc = BudgetService(self._db)
+        check = await budget_svc.check_monthly(agent)
+        if check.allowed:
             return False
+
+        spent = check.spent_cents
 
         # Agent is over budget — pause if not already
         if agent.status in ("paused", "terminated"):
@@ -234,7 +244,7 @@ class AgentSupervisor:
             "supervisor.budget_hard_stop",
             agent_id=agent.id,
             budget_monthly_cents=budget,
-            spent_monthly_cents=spent,
+            spent_cents=spent,
             assignment_id=assignment.id,
         )
 
@@ -456,26 +466,45 @@ class AgentSupervisor:
         budget: int,
         spent: int,
     ) -> None:
-        """Emit cost.hard_stop and agent.budget_exceeded activity events."""
+        """Emit ``cost.hard_stop`` and ``agent.budget_exceeded`` events.
+
+        S5 ``cost.hard_stop`` payload schema:
+        ``{spent_cents, limit_cents, scope: "monthly"}``.
+        ``agent.budget_exceeded`` keeps the legacy keys for the supervisor
+        path (this event is supervisor-only and not emitted by the engine).
+        """
         import uuid as uuid_module
 
         from app.db.models.activity_event import ActivityEvent
 
-        refs = {
-            "agent_id": agent.id,
-            "assignment_id": assignment.id,
-            "budget_monthly_cents": budget,
-            "spent_monthly_cents": spent,
-        }
-        for event_type in ("cost.hard_stop", "agent.budget_exceeded"):
-            self._db.add(ActivityEvent(
-                uuid=uuid_module.uuid4(),
-                event_type=event_type,
-                actor_type="system",
-                actor_key_prefix=None,
-                alert_id=assignment.alert_id,
-                references=refs,
-            ))
+        # S5: cost.hard_stop uses the canonical schema.
+        self._db.add(ActivityEvent(
+            uuid=uuid_module.uuid4(),
+            event_type="cost.hard_stop",
+            actor_type="system",
+            actor_key_prefix=None,
+            alert_id=assignment.alert_id,
+            references={
+                "agent_id": agent.id,
+                "spent_cents": int(spent),
+                "limit_cents": int(budget),
+                "scope": "monthly",
+            },
+        ))
+        # Supervisor-specific event — keep richer context for ops.
+        self._db.add(ActivityEvent(
+            uuid=uuid_module.uuid4(),
+            event_type="agent.budget_exceeded",
+            actor_type="system",
+            actor_key_prefix=None,
+            alert_id=assignment.alert_id,
+            references={
+                "agent_id": agent.id,
+                "assignment_id": assignment.id,
+                "budget_monthly_cents": budget,
+                "spent_cents": int(spent),
+            },
+        ))
         await self._db.flush()
 
     async def _log_timeout_event(

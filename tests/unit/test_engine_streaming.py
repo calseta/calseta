@@ -10,6 +10,19 @@ import pytest
 from app.integrations.llm.base import CostInfo, LLMResponse
 from app.runtime.engine import AgentRuntimeEngine
 from app.runtime.models import RuntimeContext
+from app.services.budget_service import BudgetCheckResult
+
+
+# S5: stub BudgetCheckResult instances reused across the unit tests below.
+# These tests mock out the DB session, so BudgetService SQL queries cannot
+# run — patches at call sites swap the methods for AsyncMocks returning
+# these constants.
+_ALLOWED_ALERT = BudgetCheckResult(
+    allowed=True, reason=None, spent_cents=0, limit_cents=0, scope="alert",
+)
+_ALLOWED_MONTHLY = BudgetCheckResult(
+    allowed=True, reason=None, spent_cents=0, limit_cents=0, scope="monthly",
+)
 
 
 def _make_llm_response(
@@ -49,6 +62,9 @@ class TestEngineOnLogPassthrough:
         agent = MagicMock()
         agent.id = 1
         agent.max_tokens = 4096
+        # S5: BudgetService reads these as ints; MagicMock auto-int-coercion
+        # would otherwise yield non-zero limits and trip the budget gate.
+        agent.budget_monthly_cents = 0
         agent.max_cost_per_alert_cents = 0
         agent.tool_ids = []
 
@@ -66,6 +82,19 @@ class TestEngineOnLogPassthrough:
                 return_value=False,
             ),
             patch.object(engine, "_record_cost", new_callable=AsyncMock),
+            # S5: stub BudgetService SQL — tests use AsyncMock for the DB.
+            patch(
+                "app.services.budget_service.BudgetService.acquire_alert_lock",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.services.budget_service.BudgetService.check_per_alert",
+                new_callable=AsyncMock, return_value=_ALLOWED_ALERT,
+            ),
+            patch(
+                "app.services.budget_service.BudgetService.check_monthly",
+                new_callable=AsyncMock, return_value=_ALLOWED_MONTHLY,
+            ),
         ):
             messages, result = await engine._run_tool_loop(
                 adapter=adapter,
@@ -108,6 +137,9 @@ class TestEngineToolEventEmission:
         agent = MagicMock()
         agent.id = 1
         agent.max_tokens = 4096
+        # S5: BudgetService reads these as ints; MagicMock auto-int-coercion
+        # would otherwise yield non-zero limits and trip the budget gate.
+        agent.budget_monthly_cents = 0
         agent.max_cost_per_alert_cents = 0
 
         context = RuntimeContext(
@@ -132,6 +164,18 @@ class TestEngineToolEventEmission:
                 return_value=mock_dispatcher,
             ),
             patch.object(engine, "_record_cost", new_callable=AsyncMock),
+            patch(
+                "app.services.budget_service.BudgetService.acquire_alert_lock",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.services.budget_service.BudgetService.check_per_alert",
+                new_callable=AsyncMock, return_value=_ALLOWED_ALERT,
+            ),
+            patch(
+                "app.services.budget_service.BudgetService.check_monthly",
+                new_callable=AsyncMock, return_value=_ALLOWED_MONTHLY,
+            ),
         ):
             await engine._run_tool_loop(
                 adapter=adapter,
@@ -167,6 +211,9 @@ class TestEngineBudgetCheckEvent:
         agent = MagicMock()
         agent.id = 1
         agent.max_tokens = 4096
+        # S5: BudgetService reads these as ints; MagicMock auto-int-coercion
+        # would otherwise yield non-zero limits and trip the budget gate.
+        agent.budget_monthly_cents = 0
         agent.max_cost_per_alert_cents = 100  # Budget set
 
         context = RuntimeContext(
@@ -183,6 +230,19 @@ class TestEngineBudgetCheckEvent:
                 return_value=False,
             ),
             patch.object(engine, "_record_cost", new_callable=AsyncMock),
+            # S5: stub BudgetService SQL — tests use AsyncMock for the DB.
+            patch(
+                "app.services.budget_service.BudgetService.acquire_alert_lock",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.services.budget_service.BudgetService.check_per_alert",
+                new_callable=AsyncMock, return_value=_ALLOWED_ALERT,
+            ),
+            patch(
+                "app.services.budget_service.BudgetService.check_monthly",
+                new_callable=AsyncMock, return_value=_ALLOWED_MONTHLY,
+            ),
         ):
             await engine._run_tool_loop(
                 adapter=adapter,
@@ -216,6 +276,9 @@ class TestEngineBudgetCheckEventNoBudget:
         agent = MagicMock()
         agent.id = 1
         agent.max_tokens = 4096
+        # S5: BudgetService reads these as ints; MagicMock auto-int-coercion
+        # would otherwise yield non-zero limits and trip the budget gate.
+        agent.budget_monthly_cents = 0
         agent.max_cost_per_alert_cents = 0  # No budget limit
 
         context = RuntimeContext(
@@ -232,6 +295,19 @@ class TestEngineBudgetCheckEventNoBudget:
                 return_value=False,
             ),
             patch.object(engine, "_record_cost", new_callable=AsyncMock),
+            # S5: stub BudgetService SQL — tests use AsyncMock for the DB.
+            patch(
+                "app.services.budget_service.BudgetService.acquire_alert_lock",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.services.budget_service.BudgetService.check_per_alert",
+                new_callable=AsyncMock, return_value=_ALLOWED_ALERT,
+            ),
+            patch(
+                "app.services.budget_service.BudgetService.check_monthly",
+                new_callable=AsyncMock, return_value=_ALLOWED_MONTHLY,
+            ),
         ):
             await engine._run_tool_loop(
                 adapter=adapter,
@@ -266,6 +342,9 @@ class TestEngineCancellationCheck:
         agent = MagicMock()
         agent.id = 1
         agent.max_tokens = 4096
+        # S5: BudgetService reads these as ints; MagicMock auto-int-coercion
+        # would otherwise yield non-zero limits and trip the budget gate.
+        agent.budget_monthly_cents = 0
 
         context = RuntimeContext(
             agent_id=1,
@@ -318,6 +397,9 @@ class TestEngineFindingEvent:
         agent = MagicMock()
         agent.id = 1
         agent.max_tokens = 4096
+        # S5: BudgetService reads these as ints; MagicMock auto-int-coercion
+        # would otherwise yield non-zero limits and trip the budget gate.
+        agent.budget_monthly_cents = 0
         agent.max_cost_per_alert_cents = 0
 
         context = RuntimeContext(
@@ -341,6 +423,18 @@ class TestEngineFindingEvent:
                 return_value=mock_dispatcher,
             ),
             patch.object(engine, "_record_cost", new_callable=AsyncMock),
+            patch(
+                "app.services.budget_service.BudgetService.acquire_alert_lock",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.services.budget_service.BudgetService.check_per_alert",
+                new_callable=AsyncMock, return_value=_ALLOWED_ALERT,
+            ),
+            patch(
+                "app.services.budget_service.BudgetService.check_monthly",
+                new_callable=AsyncMock, return_value=_ALLOWED_MONTHLY,
+            ),
         ):
             _messages, result = await engine._run_tool_loop(
                 adapter=adapter,
