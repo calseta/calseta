@@ -142,15 +142,14 @@ async def run(ctx):
         ctx_payload={"indicator": _indicator_payload()},
         timeout_seconds=15,
     )
-    # The IPC route returns the parent value — that's expected (S3 locks it
-    # down).  The hardening tested here is that the child's *own* environ
-    # is scrubbed: a separate workflow that tries to read os.environ
-    # directly is blocked by the AST allowlist before this test even runs,
-    # so the only path to a parent secret is via ctx.secrets, which is
-    # explicit and audited.
+    # The IPC route is now S3-gated: ANTHROPIC_API_KEY matches the global
+    # denylist (``*_API_KEY``), so the parent returns ``None`` even though
+    # the env var is set. The child's own ``os.environ`` is also scrubbed
+    # (any direct read by the workflow would be blocked by the AST
+    # allowlist before reaching this assertion). Two independent layers
+    # ensure the secret never leaves the parent.
     assert result.success is True, result.message
-    # Sanity: the IPC stub does return the parent env var (S3 will gate this).
-    assert result.data.get("anthropic_via_ipc") == "sentinel-anthropic-key"
+    assert result.data.get("anthropic_via_ipc") is None
 
 
 async def test_child_environ_does_not_contain_parent_secrets(

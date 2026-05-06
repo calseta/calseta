@@ -22,7 +22,7 @@ class LLMIntegrationRepository(BaseRepository[LLMIntegration]):
             name=data.name,
             provider=data.provider,
             model=data.model,
-            api_key_ref=data.api_key_ref,
+            api_key_secret_ref=data.api_key_ref,
             base_url=data.base_url,
             config=data.config,
             cost_per_1k_input_tokens_cents=data.cost_per_1k_input_tokens_cents,
@@ -81,7 +81,7 @@ class LLMIntegrationRepository(BaseRepository[LLMIntegration]):
         "name",
         "provider",
         "model",
-        "api_key_ref",
+        "api_key_secret_ref",
         "base_url",
         "config",
         "cost_per_1k_input_tokens_cents",
@@ -90,7 +90,7 @@ class LLMIntegrationRepository(BaseRepository[LLMIntegration]):
     })
 
     _NULLABLE_FIELDS: frozenset[str] = frozenset({
-        "api_key_ref",
+        "api_key_secret_ref",
         "base_url",
         "config",
     })

@@ -182,11 +182,32 @@ async def _handle_http_request(
     }
 
 
-async def _handle_secret_get(msg: dict[str, Any]) -> dict[str, Any]:
+async def _handle_secret_get(
+    msg: dict[str, Any],
+    *,
+    allowed_secrets: list[str],
+) -> dict[str, Any]:
+    """Resolve a secret on behalf of the child.
+
+    S3 enforces two gates BEFORE reading os.environ:
+      1. Global denylist — keys matching any sensitive pattern (CALSETA_*,
+         *_API_KEY, DATABASE_URL, ENCRYPTION_KEY, AWS_*, AZURE_*, etc.) are
+         never resolved, even if on the workflow's allowlist.
+      2. Per-workflow allowlist — only names declared in
+         ``workflow.allowed_secrets`` are resolved.
+
+    A blocked or absent secret returns ``value: None`` (NOT an error envelope)
+    so workflows that probe for an optional secret don't crash.
+    """
+    from app.secrets.denylist import is_denied
+
     name = str(msg.get("name") or "")
     if not name:
         return {"ok": True, "value": None}
-    # v1 baseline: env-var lookup.  S3 swaps in an allowlist-aware resolver.
+    if is_denied(name):
+        return {"ok": True, "value": None}
+    if name not in allowed_secrets:
+        return {"ok": True, "value": None}
     value = os.environ.get(name)
     return {"ok": True, "value": value}
 
@@ -216,6 +237,8 @@ async def _ipc_loop(
     proc: asyncio.subprocess.Process,
     http: httpx.AsyncClient,
     log_buffer: list[dict[str, Any]],
+    *,
+    allowed_secrets: list[str],
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     """Run the IPC loop until ``done`` or pipe close.
 
@@ -268,7 +291,7 @@ async def _ipc_loop(
             if op == "http.request":
                 response = await _handle_http_request(msg, http)
             elif op == "secret.get":
-                response = await _handle_secret_get(msg)
+                response = await _handle_secret_get(msg, allowed_secrets=allowed_secrets)
             elif op == "log":
                 response = _handle_log(msg, log_buffer)
             else:
@@ -403,8 +426,16 @@ async def run_workflow_isolated(
         # Wall-clock timeout: cap the IPC loop.  CPU and memory limits are
         # enforced by the child via rlimit.
         try:
+            allowed_secrets_list: list[str] = [
+                str(s) for s in (ctx_payload.get("allowed_secrets") or []) if s
+            ]
             final_result, final_metadata = await asyncio.wait_for(
-                _ipc_loop(proc, http_client, log_buffer),
+                _ipc_loop(
+                    proc,
+                    http_client,
+                    log_buffer,
+                    allowed_secrets=allowed_secrets_list,
+                ),
                 timeout=float(timeout_seconds) + 5.0,  # +5s for child startup
             )
         except TimeoutError:

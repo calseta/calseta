@@ -84,6 +84,26 @@ async def _on_startup() -> None:
 
     load_external_adapters(settings.CALSETA_EXTERNAL_ADAPTERS or "")
 
+    # S3: Migrate any literal LLMIntegration.api_key_secret_ref values to
+    # ``enc:<ciphertext>`` form. Idempotent — runs on every boot but only
+    # rewrites rows that are still literal. Wrapped so a missing migration
+    # (e.g. column not yet renamed) cannot crash startup.
+    try:
+        async with AsyncSessionLocal() as db:
+            from app.auth.startup_migration import migrate_literal_api_key_refs
+
+            await migrate_literal_api_key_refs(db)
+    except Exception as exc:
+        logger.warning(
+            "secrets.literal_migration_skipped",
+            error=str(exc),
+            hint=(
+                "Run 'alembic upgrade head' so api_key_secret_ref column "
+                "exists. Until then, LLMIntegration adapters that hold "
+                "literal keys will be refused by the resolver."
+            ),
+        )
+
     try:
         async with AsyncSessionLocal() as db:
             await seed_system_mappings(db)

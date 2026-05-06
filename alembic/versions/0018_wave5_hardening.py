@@ -1,6 +1,6 @@
 """Wave 5 hardening — combined schema + data migration.
 
-Consolidates three Wave 5 chunks that each landed an independent migration in
+Consolidates four Wave 5 chunks that each landed an independent migration in
 their own worktree. Merged into one revision so the alembic chain stays
 linear:
 
@@ -18,6 +18,12 @@ linear:
   enum, recommended_action, evidence, posted_at``). Idempotent — already-
   canonical rows are skipped. Reversible (best-effort) via the originals
   preserved under ``evidence.*``.
+* **S3** — secret resolver hardening:
+    - Rename ``llm_integrations.api_key_ref`` → ``api_key_secret_ref``.
+    - Add ``workflows.allowed_secrets`` TEXT[] (default ``'{}'``) for the
+      per-workflow secret allowlist enforced by ``SecretsAccessor``.
+    - Add ``agent_api_keys.expires_at`` TIMESTAMPTZ (nullable) so per-run
+      scoped ``cak_*`` keys auto-expire after 1 hour.
 
 Revision ID: 0018
 Revises: 0017
@@ -33,6 +39,7 @@ from typing import Any
 from uuid import uuid4
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -202,6 +209,39 @@ def _rewrite_agent_findings(direction: str) -> None:
 
 
 def upgrade() -> None:
+    # --- S3: rename api_key_ref → api_key_secret_ref ---
+    # Rename happens BEFORE the agent_findings rewrite (which doesn't depend
+    # on it) so an aborted migration leaves the column in either fully-old
+    # or fully-new state. The startup auto-migration in
+    # ``app.auth.startup_migration`` reads the new column name and rewrites
+    # any literal values into ``enc:<ciphertext>`` form.
+    op.alter_column(
+        "llm_integrations",
+        "api_key_ref",
+        new_column_name="api_key_secret_ref",
+    )
+
+    # --- S3: workflows.allowed_secrets (per-workflow secret allowlist) ---
+    op.add_column(
+        "workflows",
+        sa.Column(
+            "allowed_secrets",
+            postgresql.ARRAY(sa.Text()),
+            nullable=False,
+            server_default=sa.text("ARRAY[]::text[]"),
+        ),
+    )
+
+    # --- S3: agent_api_keys.expires_at (scoped per-run key TTL) ---
+    op.add_column(
+        "agent_api_keys",
+        sa.Column(
+            "expires_at",
+            sa.DateTime(timezone=True),
+            nullable=True,
+        ),
+    )
+
     # --- S17: api key prefix uniqueness ---
     op.drop_constraint("api_keys_key_prefix_key", "api_keys", type_="unique")
     op.create_index(
@@ -256,4 +296,13 @@ def downgrade() -> None:
     op.drop_index("idx_api_keys_key_prefix", table_name="api_keys")
     op.create_unique_constraint(
         "api_keys_key_prefix_key", "api_keys", ["key_prefix"],
+    )
+
+    # --- S3 inverse: drop expires_at, allowed_secrets; rename column back ---
+    op.drop_column("agent_api_keys", "expires_at")
+    op.drop_column("workflows", "allowed_secrets")
+    op.alter_column(
+        "llm_integrations",
+        "api_key_secret_ref",
+        new_column_name="api_key_ref",
     )

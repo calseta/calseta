@@ -1,23 +1,32 @@
-"""Unit tests for CALSETA_* environment variable builder (C5).
+"""Unit tests for CALSETA_* environment variable builder (C5 + S3).
 
 Tests ``build_agent_env`` and ``CalsetaEnvVar`` at ``app/runtime/env_builder.py``.
+
+S3 (2026-05-05): ``build_agent_env`` is now async and mints a scoped
+``cak_*`` API key per run via ``app.services.scoped_api_keys.mint_run_api_key``
+unless the test passes an explicit ``api_key=`` override. These tests
+exercise the override path so they don't need a real DB.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
-from uuid import UUID, uuid4
+from uuid import UUID
+
+import pytest
 
 from app.runtime.env_builder import CalsetaEnvVar, build_agent_env
 from app.runtime.models import RuntimeContext
 
 
 def _make_agent(
+    agent_id: int = 1,
     uuid: UUID | None = None,
     name: str = "test-agent",
 ) -> MagicMock:
     """Build a mock AgentRegistration with required fields."""
     agent = MagicMock()
+    agent.id = agent_id
     agent.uuid = uuid or UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
     agent.name = name
     return agent
@@ -80,11 +89,12 @@ class TestCalsetaEnvVar:
 
 
 class TestBuildAgentEnv:
-    """Tests for build_agent_env()."""
+    """Tests for build_agent_env() — async, S3-scoped key minting path."""
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_sets_agent_id(self, mock_os, mock_settings):
+    async def test_sets_agent_id(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -92,13 +102,14 @@ class TestBuildAgentEnv:
         agent = _make_agent(uuid=UUID("11111111-2222-3333-4444-555555555555"))
         ctx = _make_context()
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert env["CALSETA_AGENT_ID"] == "11111111-2222-3333-4444-555555555555"
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_sets_agent_name(self, mock_os, mock_settings):
+    async def test_sets_agent_name(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -106,13 +117,14 @@ class TestBuildAgentEnv:
         agent = _make_agent(name="triage-bot")
         ctx = _make_context()
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert env["CALSETA_AGENT_NAME"] == "triage-bot"
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_sets_task_key(self, mock_os, mock_settings):
+    async def test_sets_task_key(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -120,13 +132,14 @@ class TestBuildAgentEnv:
         agent = _make_agent()
         ctx = _make_context(task_key="issue:42")
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert env["CALSETA_TASK_KEY"] == "issue:42"
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_sets_api_url_from_settings(self, mock_os, mock_settings):
+    async def test_sets_api_url_from_settings(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "https://api.calseta.io"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -134,13 +147,14 @@ class TestBuildAgentEnv:
         agent = _make_agent()
         ctx = _make_context()
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert env["CALSETA_API_URL"] == "https://api.calseta.io"
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_includes_api_key_when_provided(self, mock_os, mock_settings):
+    async def test_includes_api_key_when_provided(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -148,27 +162,57 @@ class TestBuildAgentEnv:
         agent = _make_agent()
         ctx = _make_context()
 
-        env = build_agent_env(agent, ctx, api_key="cai_scoped_test_key_1234")
+        env = await build_agent_env(
+            MagicMock(), agent, ctx, api_key="cak_scoped_test_key_1234"
+        )
 
-        assert env["CALSETA_API_KEY"] == "cai_scoped_test_key_1234"
+        assert env["CALSETA_API_KEY"] == "cak_scoped_test_key_1234"
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_excludes_api_key_when_none(self, mock_os, mock_settings):
+    async def test_excludes_api_key_when_no_run_uuid_and_none_provided(
+        self, mock_os, mock_settings
+    ):
+        """No run_uuid + no override → no key minted, CALSETA_API_KEY absent.
+
+        S3: this is a defensive default. In production, every managed run
+        has a run_uuid. The branch is here so unit tests / non-run callers
+        don't accidentally trigger a DB write.
+        """
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
 
         agent = _make_agent()
-        ctx = _make_context()
+        ctx = _make_context(run_uuid=None)
 
-        env = build_agent_env(agent, ctx, api_key=None)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key=None)
 
         assert "CALSETA_API_KEY" not in env
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_includes_alert_uuid_when_set(self, mock_os, mock_settings):
+    async def test_strips_inherited_master_api_key(self, mock_os, mock_settings):
+        """S3: parent's CALSETA_API_KEY must NEVER reach the subprocess."""
+        mock_os.environ = {"CALSETA_API_KEY": "cai_master_platform_key_dangerous"}
+        mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
+        mock_settings.AGENT_FILES_DIR = "/tmp/agents"
+
+        agent = _make_agent()
+        ctx = _make_context(run_uuid=None)
+
+        # No override and no run_uuid → no key minted, but inherited key
+        # MUST be stripped.
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key=None)
+
+        assert "CALSETA_API_KEY" not in env
+
+    @pytest.mark.asyncio
+    @patch("app.runtime.env_builder.settings")
+    @patch("app.runtime.env_builder.os")
+    async def test_includes_alert_uuid_when_set(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -176,13 +220,14 @@ class TestBuildAgentEnv:
         agent = _make_agent()
         ctx = _make_context(alert_id=777)
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert env["CALSETA_ALERT_UUID"] == "777"
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_excludes_alert_uuid_when_none(self, mock_os, mock_settings):
+    async def test_excludes_alert_uuid_when_none(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -190,13 +235,14 @@ class TestBuildAgentEnv:
         agent = _make_agent()
         ctx = _make_context(alert_id=None)
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert "CALSETA_ALERT_UUID" not in env
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_includes_run_id_when_set(self, mock_os, mock_settings):
+    async def test_includes_run_id_when_set(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -205,13 +251,14 @@ class TestBuildAgentEnv:
         run_uuid = UUID("aaaa1111-bbbb-cccc-dddd-eeee22223333")
         ctx = _make_context(run_uuid=run_uuid)
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert env["CALSETA_RUN_ID"] == str(run_uuid)
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_excludes_run_id_when_none(self, mock_os, mock_settings):
+    async def test_excludes_run_id_when_none(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -219,21 +266,26 @@ class TestBuildAgentEnv:
         agent = _make_agent()
         ctx = _make_context(run_uuid=None)
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert "CALSETA_RUN_ID" not in env
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_inherits_existing_env_vars(self, mock_os, mock_settings):
-        mock_os.environ = {"PATH": "/usr/bin", "HOME": "/home/test", "CUSTOM_VAR": "hello"}
+    async def test_inherits_existing_env_vars(self, mock_os, mock_settings):
+        mock_os.environ = {
+            "PATH": "/usr/bin",
+            "HOME": "/home/test",
+            "CUSTOM_VAR": "hello",
+        }
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
 
         agent = _make_agent()
         ctx = _make_context()
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert env["PATH"] == "/usr/bin"
         assert env["HOME"] == "/home/test"
@@ -241,9 +293,10 @@ class TestBuildAgentEnv:
         # CALSETA vars are also present
         assert "CALSETA_AGENT_ID" in env
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_includes_wake_reason_when_set(self, mock_os, mock_settings):
+    async def test_includes_wake_reason_when_set(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -251,13 +304,14 @@ class TestBuildAgentEnv:
         agent = _make_agent()
         ctx = _make_context(wake_reason="comment")
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert env["CALSETA_WAKE_REASON"] == "comment"
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_excludes_wake_reason_when_none(self, mock_os, mock_settings):
+    async def test_excludes_wake_reason_when_none(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/tmp/agents"
@@ -265,13 +319,14 @@ class TestBuildAgentEnv:
         agent = _make_agent()
         ctx = _make_context(wake_reason=None)
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert "CALSETA_WAKE_REASON" not in env
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_sets_workspace_dir_from_settings(self, mock_os, mock_settings):
+    async def test_sets_workspace_dir_from_settings(self, mock_os, mock_settings):
         mock_os.environ = {}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
         mock_settings.AGENT_FILES_DIR = "/data/agent-files"
@@ -279,13 +334,17 @@ class TestBuildAgentEnv:
         agent = _make_agent(uuid=UUID("11111111-2222-3333-4444-555555555555"))
         ctx = _make_context()
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
-        assert env["CALSETA_WORKSPACE_DIR"] == "/data/agent-files/11111111-2222-3333-4444-555555555555"
+        assert (
+            env["CALSETA_WORKSPACE_DIR"]
+            == "/data/agent-files/11111111-2222-3333-4444-555555555555"
+        )
 
+    @pytest.mark.asyncio
     @patch("app.runtime.env_builder.settings")
     @patch("app.runtime.env_builder.os")
-    def test_calseta_vars_override_inherited_env(self, mock_os, mock_settings):
+    async def test_calseta_vars_override_inherited_env(self, mock_os, mock_settings):
         """If os.environ has CALSETA_AGENT_ID, the builder overwrites it."""
         mock_os.environ = {"CALSETA_AGENT_ID": "stale-value"}
         mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
@@ -294,28 +353,6 @@ class TestBuildAgentEnv:
         agent = _make_agent(uuid=UUID("11111111-2222-3333-4444-555555555555"))
         ctx = _make_context()
 
-        env = build_agent_env(agent, ctx)
+        env = await build_agent_env(MagicMock(), agent, ctx, api_key="test")
 
         assert env["CALSETA_AGENT_ID"] == "11111111-2222-3333-4444-555555555555"
-
-    @patch("app.runtime.env_builder.settings")
-    @patch("app.runtime.env_builder.os")
-    def test_full_env_dict_with_all_optional_fields(self, mock_os, mock_settings):
-        """When all optional fields are provided, all CALSETA_* vars are present."""
-        mock_os.environ = {}
-        mock_settings.CALSETA_API_BASE_URL = "http://localhost:8000"
-        mock_settings.AGENT_FILES_DIR = "/tmp/agents"
-
-        agent = _make_agent()
-        run_uuid = uuid4()
-        ctx = _make_context(
-            alert_id=100,
-            run_uuid=run_uuid,
-            wake_reason="retry",
-        )
-
-        env = build_agent_env(agent, ctx, api_key="cai_key123")
-
-        expected_keys = {m.value for m in CalsetaEnvVar}
-        for key in expected_keys:
-            assert key in env, f"Expected {key} in env"

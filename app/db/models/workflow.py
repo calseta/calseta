@@ -36,3 +36,10 @@ class Workflow(TimestampMixin, UUIDMixin, Base):
     )
     risk_level: Mapped[str] = mapped_column(Text, nullable=False, default="medium")
     documentation: Mapped[str | None] = mapped_column(Text)
+    # S3: per-workflow secret allowlist. SecretsAccessor.get(name) returns
+    # None if name is not on this list (also None if name is on the global
+    # denylist; denylist wins). Default is empty — workflows opt in to each
+    # secret they need.
+    allowed_secrets: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
+    )

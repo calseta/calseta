@@ -189,6 +189,10 @@ async def execute_workflow(
         ctx_payload: dict[str, Any] = {
             "indicator": serialize_indicator(indicator_ctx),
             "alert": serialize_alert(alert_ctx),
+            # S3: per-workflow secret allowlist; the parent's ``secret.get``
+            # IPC handler honors it (plus the global denylist) before reading
+            # ``os.environ`` on the child's behalf.
+            "allowed_secrets": list(workflow.allowed_secrets or []),
         }
         result = await run_workflow_isolated(
             code=workflow.code,

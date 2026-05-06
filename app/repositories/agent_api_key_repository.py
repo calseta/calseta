@@ -21,8 +21,14 @@ class AgentAPIKeyRepository(BaseRepository[AgentAPIKey]):
         key_prefix: str,
         key_hash: str,
         scopes: list[str],
+        expires_at: datetime | None = None,
     ) -> AgentAPIKey:
-        """Persist a new agent API key. Returns the created ORM object."""
+        """Persist a new agent API key. Returns the created ORM object.
+
+        ``expires_at`` is optional. ``None`` means the key never expires
+        (long-lived keys created via the management UI). Per-run scoped
+        keys minted by ``mint_run_api_key`` always set this field.
+        """
         record = AgentAPIKey(
             uuid=uuid.uuid4(),
             agent_registration_id=agent_id,
@@ -30,6 +36,7 @@ class AgentAPIKeyRepository(BaseRepository[AgentAPIKey]):
             key_prefix=key_prefix,
             key_hash=key_hash,
             scopes=scopes,
+            expires_at=expires_at,
         )
         self._db.add(record)
         await self._db.flush()

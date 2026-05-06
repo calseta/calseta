@@ -29,7 +29,7 @@ class AnthropicAdapter(LLMProviderAdapter):
     """
     LLM adapter for Anthropic's messages API.
 
-    Requires the ``anthropic`` package (>=0.40.0). The api_key_ref on the
+    Requires the ``anthropic`` package (>=0.40.0). The api_key_secret_ref on the
     LLMIntegration is resolved by the factory before this adapter is constructed.
     """
 

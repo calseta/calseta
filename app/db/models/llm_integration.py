@@ -18,7 +18,11 @@ class LLMIntegration(TimestampMixin, UUIDMixin, Base):
     name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     provider: Mapped[str] = mapped_column(Text, nullable=False)
     model: Mapped[str] = mapped_column(Text, nullable=False)
-    api_key_ref: Mapped[str | None] = mapped_column(Text)
+    # S3: renamed from ``api_key_ref`` 2026-05-04. Values must match one of
+    # the prefixes accepted by ``resolve_secret_ref``: env:, enc:, vault:,
+    # aws-sm:, azure-kv:. Literal values are auto-migrated to ``enc:<...>``
+    # at startup (see ``app.auth.startup_migration``).
+    api_key_secret_ref: Mapped[str | None] = mapped_column("api_key_secret_ref", Text)
     base_url: Mapped[str | None] = mapped_column(Text)
     config: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     cost_per_1k_input_tokens_cents: Mapped[int] = mapped_column(

@@ -126,7 +126,7 @@ class LLMIntegrationResponse(BaseModel):
             name=obj.name,
             provider=obj.provider,
             model=obj.model,
-            api_key_ref_set=obj.api_key_ref is not None,
+            api_key_ref_set=obj.api_key_secret_ref is not None,
             base_url=obj.base_url,
             config=obj.config,
             cost_per_1k_input_tokens_cents=obj.cost_per_1k_input_tokens_cents,
