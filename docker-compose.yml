@@ -32,6 +32,10 @@ services:
     volumes:
       - .:/app
       - calseta_data:/data/calseta
+      # Persist `claude` CLI auth across container rebuilds. After running
+      # `claude /login` in api OR worker once, the credentials stick in the
+      # named volume — survives `make lab-reset` and image rebuilds.
+      - claude_home:/root/.claude
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 30s
@@ -53,6 +57,8 @@ services:
     volumes:
       - .:/app
       - calseta_data:/data/calseta
+      # Shared with api so a single `claude /login` covers both.
+      - claude_home:/root/.claude
     healthcheck:
       test: ["CMD-SHELL", "cat /proc/1/cmdline | tr '\\0' ' ' | grep -q 'app.worker'"]
       interval: 30s
@@ -95,3 +101,4 @@ services:
 volumes:
   postgres_data:
   calseta_data:
+  claude_home:

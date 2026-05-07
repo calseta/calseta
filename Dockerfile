@@ -40,6 +40,26 @@ RUN apt-get update \
 # ============================================================
 FROM base AS dev
 
+# Claude Code CLI for the `claude_code` LLM provider (subscription billing,
+# no API key). Only baked into dev — production deployments configure an API
+# provider (anthropic / openai / azure_openai) instead.
+#   - bubblewrap + socat: claude CLI's optional sandbox tooling. Without them
+#     the CLI prints a "Sandbox disabled" warning on every invocation.
+#   - Node 20 LTS: required by @anthropic-ai/claude-code.
+# Login state lives at /root/.claude — mounted as a named volume in
+# docker-compose.yml so it survives container rebuilds.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        gnupg \
+        bubblewrap \
+        socat \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g @anthropic-ai/claude-code \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml .
 RUN pip install --no-cache-dir -e ".[dev]"
 
