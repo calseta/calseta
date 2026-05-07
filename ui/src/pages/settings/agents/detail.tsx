@@ -2121,20 +2121,39 @@ export function AgentDetailPage() {
                   <CardContent className="p-0">
                     {allSkills.map((skill) => {
                       const isAssigned = agentSkillUuids.has(skill.uuid);
+                      // Global skills are auto-injected at runtime regardless
+                      // of agent_skill_assignments (see _inject_skills_ephemeral).
+                      // Reflect that in the UI: render checked + disabled with
+                      // a "Global" badge, so operators can't be misled into
+                      // thinking the skill isn't applied here.
+                      const isGlobal = !!skill.is_global;
+                      const isEffectivelyAssigned = isAssigned || isGlobal;
+                      const checkboxTitle = isGlobal
+                        ? "This skill is global — always injected by the runtime, defined by the skill itself, not by this agent. Toggle it on the skill detail page."
+                        : undefined;
                       return (
                         <div
                           key={skill.uuid}
                           className={cn(
                             "flex items-start gap-3 px-4 py-3 border-b border-border last:border-0 transition-colors",
-                            isAssigned && "bg-teal/5",
+                            isEffectivelyAssigned && "bg-teal/5",
                           )}
                         >
                           <input
                             type="checkbox"
-                            checked={isAssigned}
+                            checked={isEffectivelyAssigned}
                             onChange={(e) => handleSkillToggle(skill.uuid, e.target.checked)}
-                            className="mt-0.5 h-3.5 w-3.5 rounded accent-teal cursor-pointer"
-                            disabled={syncAgentSkills.isPending}
+                            className={cn(
+                              "mt-0.5 h-3.5 w-3.5 rounded accent-teal",
+                              isGlobal ? "cursor-not-allowed opacity-70" : "cursor-pointer",
+                            )}
+                            disabled={syncAgentSkills.isPending || isGlobal}
+                            title={checkboxTitle}
+                            aria-label={
+                              isGlobal
+                                ? `${skill.name} (global, always injected)`
+                                : skill.name
+                            }
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
@@ -2143,7 +2162,17 @@ export function AgentDetailPage() {
                               {!skill.is_active && (
                                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-dim border-dim/30">inactive</Badge>
                               )}
-                              {isAssigned && (
+                              {isGlobal && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 text-amber border-amber/30 bg-amber/10"
+                                  title="Always injected for every agent"
+                                >
+                                  <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                                  global
+                                </Badge>
+                              )}
+                              {isAssigned && !isGlobal && (
                                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-teal border-teal/30 bg-teal/10">
                                   <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
                                   assigned
